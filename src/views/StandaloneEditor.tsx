@@ -1,15 +1,18 @@
 // StandaloneEditor — 새 탭에서 열리는 풀스크린 도면 편집 워크플로
-// Stage 1(추출) → Stage 2(변환) → Stage 3(이미지확정) → Stage 4(편집)
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { DrawingEditorModal } from '../features/drawing-workflow/DrawingEditorModal';
 import {
   readEditorSession,
   writeEditorResult,
   clearEditorChannel,
 } from '../features/drawing-workflow/editorChannel';
+import type { EditorReference } from '../features/patent-editor';
 
 export function StandaloneEditor() {
   const session = readEditorSession();
+
+  // 도면 부호 상태 — 구성요소 목록으로 초기화, 편집 중 변경 가능
+  const [refs] = useState<EditorReference[]>(() => session?.references ?? []);
 
   // 탭 타이틀 업데이트
   useEffect(() => {
@@ -30,9 +33,8 @@ export function StandaloneEditor() {
     );
   }
 
-  // 편집기 결과를 메인 탭에 전달하는 내부 헬퍼
   const syncResult = (drawingId: string, stage: 'editing' | 'done', extra?: { editorJson?: string; exportedImageUrl?: string }) => {
-    writeEditorResult({ drawingId, stage, references: session.references, ...extra, timestamp: Date.now() });
+    writeEditorResult({ drawingId, stage, references: refs, ...extra, timestamp: Date.now() });
   };
 
   return (
@@ -58,13 +60,13 @@ export function StandaloneEditor() {
         </div>
       </div>
 
-      {/* DrawingEditorModal — standalone 모드 (Stage 1~4 전체 워크플로) */}
+      {/* DrawingEditorModal — standalone 모드 */}
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         <DrawingEditorModal
           standalone
           drawings={session.drawings}
           initialDrawingId={session.drawingId}
-          availableReferences={session.references}
+          availableReferences={refs}
           onSave={(drawingId, updates) => {
             const stage = (updates.stage === 'done' || updates.stage === 'editing')
               ? updates.stage : 'editing';

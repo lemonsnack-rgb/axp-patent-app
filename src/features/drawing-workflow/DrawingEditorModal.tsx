@@ -53,6 +53,8 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
   });
   const [candidatesMap, setCandidatesMap] = useState<Record<string, CadCandidate[]>>({});
   const [selectedMap, setSelectedMap] = useState<Record<string, string>>({});
+  // 도면 부호 목록 — availableReferences(구성요소)로 초기화, 편집 중 변경 가능
+  const [localRefs, setLocalRefs] = useState<EditorReference[]>(() => availableReferences ?? []);
   const [zoomedCandId, setZoomedCandId] = useState<string | null>(null);
   const [regenPrompt, setRegenPrompt] = useState('');
   const [showRegen, setShowRegen] = useState(false);
@@ -508,10 +510,13 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                   <PatentEditor
                     drawings={patentDrawings}
                     activeDrawingId={activeId}
-                    availableReferences={availableReferences}
+                    availableReferences={localRefs}
                     inventionComponents={refsToComponents(availableReferences ?? [])}
                     singleDrawingMode={true}
                     onActiveDrawingChange={() => {}}
+                    onReferenceAdd={ref => setLocalRefs(p => [...p, ref])}
+                    onReferenceUpdate={ref => setLocalRefs(p => p.map(r => r.number === ref.number ? ref : r))}
+                    onReferenceDelete={num => setLocalRefs(p => p.filter(r => r.number !== num))}
                     onSaveProject={(id, json) => {
                       onSave(id, { savedEditorJson: json, stage: 'editing' });
                       if (standalone) writeEditorResult({ drawingId: id, editorJson: json, stage: 'editing', references: [], timestamp: Date.now() });

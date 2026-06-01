@@ -159,32 +159,42 @@ export function RefListPanel({
     <aside className="flex h-full w-full flex-col bg-ck-bg overflow-hidden">
 
       {/* ── 헤더 ── */}
-      <div className="flex items-center justify-between px-2.5 pt-2 pb-1.5 border-b border-ck-border shrink-0 bg-white">
-        <span className="text-xs2 font-semibold uppercase tracking-wider text-gray-500">
-          도면 부호 <span className="font-normal text-gray-400">({references.length})</span>
-        </span>
-        <button type="button" onClick={submitNew}
-          className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs2 border border-blue-500 bg-blue-500 text-white rounded hover:bg-blue-600">
-          <Plus size={10} /> 추가
-        </button>
+      <div className="px-2.5 pt-2 pb-1.5 border-b border-ck-border shrink-0 bg-white">
+        <div className="flex items-center justify-between mb-0.5">
+          <span className="text-xs2 font-semibold uppercase tracking-wider text-gray-500">
+            도면 부호 <span className="font-normal text-gray-400">({references.length})</span>
+          </span>
+          <button type="button" onClick={submitNew}
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs2 border border-blue-500 bg-blue-500 text-white rounded hover:bg-blue-600"
+            title="새 도면 부호 추가 (번호 + 이름)">
+            <Plus size={10} /> 추가
+          </button>
+        </div>
+        {/* 목적 설명 */}
+        <p className="text-xs2 text-gray-400 leading-tight">
+          구성요소 위치를 캔버스에서 클릭·드래그로 지정합니다
+        </p>
       </div>
 
       {/* ── 검색 ── */}
       <div className="px-2 py-1.5 border-b border-ck-border shrink-0">
         <input
           type="text" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="부호 검색…"
+          placeholder="번호 또는 이름으로 검색…"
           className="w-full text-sm2 rounded border border-gray-300 px-2 py-1 focus:border-blue-500 focus:outline-none"
         />
       </div>
 
-      {/* ── 새 부호 입력 ── */}
+      {/* ── 새 부호 추가 ── */}
       <div className="px-2 py-1.5 border-b border-ck-border bg-white shrink-0 space-y-1">
+        <p className="text-xs2 text-gray-400 font-semibold">새 부호 추가</p>
         <input type="text" value={newNum} onChange={e => setNewNum(e.target.value)}
-          placeholder={`번호 (기본: ${getNextRootNumber(references)})`}
+          placeholder={`부호 번호 (자동: ${getNextRootNumber(references)})`}
+          title="100, 200, 300... 특허 도면 부호 번호"
           className="w-full text-sm2 rounded border border-gray-300 px-1.5 py-0.5 focus:border-blue-500 focus:outline-none" />
         {inventionComponents && inventionComponents.length > 0 ? (
           <select value={linkedComp} onChange={e => { setLinkedComp(e.target.value); const c = inventionComponents.find(c => c.number === e.target.value); if (c) setNewName(c.name); }}
+            title="구성요소와 연결 — 구성요소 이름이 부호 이름으로 사용됩니다"
             className="w-full text-sm2 rounded border border-gray-300 px-1.5 py-0.5 focus:border-blue-500 focus:outline-none">
             <option value="">— 구성요소 연결</option>
             {inventionComponents.map(c => <option key={c.number} value={c.number}>({c.number}) {c.name}</option>)}
@@ -200,7 +210,13 @@ export function RefListPanel({
       {/* ── 부호 목록 (그룹·계층·스크롤) ── */}
       <div className="flex-1 overflow-y-auto scroll-thin">
         {groups.length === 0 && (
-          <p className="text-center text-xs2 text-gray-400 py-4">등록된 부호 없음</p>
+          <div className="px-3 py-4 text-center space-y-1.5">
+            <p className="text-xs2 text-gray-500 font-semibold">구성요소가 없습니다</p>
+            <p className="text-xs2 text-gray-400 leading-relaxed">
+              구성요소 단계에서 확정한 항목이<br/>자동으로 여기에 나타납니다.<br/>
+              없는 경우 [추가] 버튼을 눌러<br/>번호(100, 200...)와 이름을 입력하세요.
+            </p>
+          </div>
         )}
         {groups.map(({ prefix, items }) => {
           const collapsed = collapsedGroups.has(prefix);
