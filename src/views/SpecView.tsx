@@ -1,5 +1,7 @@
 // SpecView
 import { useEffect, useRef, useState } from 'react';
+import { DrawingEditorModal } from '../features/drawing-workflow/DrawingEditorModal';
+import { MOCK_DRAWINGS } from '../features/drawing-workflow/types';
 import { useStore } from '../store';
 import { Icon } from '../components/Icon';
 import { PreviewModal } from '../components/PreviewModal';
@@ -691,81 +693,150 @@ function ComponentsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => v
 }
 
 // 도면 패널 (#21)
-interface DrawItem { id: number; label: string; desc: string; sel: boolean }
-const INIT_DRAWS: DrawItem[] = [
-  { id: 1, label: 'FIG.1', desc: '전체 시스템 구성도', sel: true },
-  { id: 2, label: 'FIG.2', desc: 'LiDAR 센서 배치 및 수집 방식', sel: true },
-  { id: 3, label: 'FIG.3', desc: '전처리부 노이즈 제거 흐름도', sel: true },
-  { id: 4, label: 'FIG.4', desc: 'PointNet++ 특징 추출 구조도', sel: true },
-  { id: 5, label: 'FIG.5', desc: '객체 인식 결과 화면', sel: false },
-];
 
+// DrawingsPanel — CK.Patent 추출 포맷 기반, 체크박스 적용 여부, 편집 모달 연결
 function DrawingsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void }) {
-  const [draws, setDraws] = useState<DrawItem[]>(INIT_DRAWS);
-  const [activeId, setActiveId] = useState(1);
+  const [drawings, setDrawings] = useState(() =>
+    MOCK_DRAWINGS.map(d => ({ ...d }))
+  );
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalStartId, setModalStartId] = useState('');
 
-  const upd = (next: DrawItem[]) => { setDraws(next); onUpdate(next.filter(d => d.sel).map(d => `${d.label}: ${d.desc}`).join('\n')); };
-  const toggle = (id: number) => { if (!done) upd(draws.map(d => d.id === id ? { ...d, sel: !d.sel } : d)); };
-  const activeD = draws.find(d => d.id === activeId);
-  const selCount = draws.filter(d => d.sel).length;
+  const toggleApplied = (id: string) => {
+    if (done) return;
+    setDrawings(prev => {
+      const next = prev.map(d => d.id === id ? { ...d, applied: !d.applied } : d);
+      onUpdate(next.filter(d => d.applied).map(d => `기호${d.symbol} ${d.name}: ${d.description}`).join('\n\n'));
+      return next;
+    });
+  };
+
+  const handleSave = (drawingId: string, updates: Partial<typeof drawings[0]>) => {
+    setDrawings(prev => prev.map(d => d.id === drawingId ? { ...d, ...updates } : d));
+  };
+
+  const openModal = (id: string) => {
+    setModalStartId(id);
+    setModalOpen(true);
+  };
+
+  const appliedCount = drawings.filter(d => d.applied).length;
+
+  const LABEL_STYLES: Record<string, string> = {
+    '제안기술': 'bg-blue-100 text-blue-700',
+    '종래기술': 'bg-gray-100 text-gray-600',
+    'AI생성': 'bg-violet-100 text-violet-700',
+  };
+
+  const STAGE_BADGE: Record<string, { label: string; cls: string }> = {
+    'extracted':        { label: '대기', cls: 'text-gray-400' },
+    'bbox-adjusted':    { label: '변환 준비', cls: 'text-amber-600' },
+    'converting':       { label: '변환 중…', cls: 'text-amber-600' },
+    'candidate-select': { label: '후보 선택', cls: 'text-violet-600' },
+    'editing':          { label: '편집 중', cls: 'text-blue-600' },
+    'done':             { label: '편집 완료', cls: 'text-green-600' },
+  };
 
   return (
     <>
-      <div className="flex-1 overflow-y-auto scroll-thin p-3">
-        <div className="mb-2"><span className="text-xs2 font-semibold text-gray-600">도면 후보 ({selCount}개 선택)</span></div>
-        {/* 썸네일 스트립 */}
-        <div className="flex gap-2 overflow-x-auto scroll-thin pb-2 mb-3">
-          {draws.map(d => (
-            <div key={d.id} onClick={() => setActiveId(d.id)}
-              className={clsx('shrink-0 w-16 rounded-lg border-2 cursor-pointer transition-all',
-                activeId === d.id ? 'border-blue-500' : 'border-gray-200 hover:border-gray-400',
-                !d.sel && 'opacity-40')}>
-              <div className="bg-gray-100 rounded-t aspect-square flex items-center justify-center">
-                <span className="text-xs2 text-gray-400 font-medium">{d.label}</span>
-              </div>
-              <div className="px-1 py-0.5 text-center">
-                <span className={clsx('text-xs2 font-medium', activeId === d.id ? 'text-blue-700' : 'text-gray-500')}>{d.label}</span>
-              </div>
-            </div>
-          ))}
+      <div className="flex-1 overflow-y-auto scroll-thin px-3 py-3 ml-1.5 space-y-2">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs2 font-semibold text-gray-600">
+            추출된 도면 ({appliedCount}개 적용됨)
+          </span>
+          <button onClick={() => drawings.length > 0 && openModal(drawings[0].id)}
+            className="btn-outline btn-xs flex items-center gap-1">
+            <Icon name="image" size={11} /> 편집기 열기
+          </button>
         </div>
-        {activeD && (
-          <div className="card p-3 mb-3">
-            <div className="bg-gray-100 rounded-lg h-28 flex items-center justify-center mb-2 border border-gray-200">
-              <div className="text-center">
-                <div className="text-gray-300 text-lg2 font-bold mb-1">{activeD.label}</div>
-                <Icon name="image" size={24} className="text-gray-300 mx-auto" />
+
+        {drawings.map(d => {
+          const stageBadge = STAGE_BADGE[d.stage] || STAGE_BADGE['extracted'];
+          return (
+            <div key={d.id} className={clsx(
+              'rounded-lg border transition-all',
+              d.applied && !done ? 'border-blue-200 bg-white' : '',
+              !d.applied ? 'border-gray-200 bg-white opacity-70' : '',
+              done && d.applied ? 'border-green-200 bg-green-50/40' : '',
+            )}>
+              {/* 카드 상단 — 체크박스 + 기본 정보 */}
+              <div className="flex items-start gap-2 px-3 py-2.5">
+                {/* 체크박스 — 적용 여부 */}
+                <input
+                  type="checkbox"
+                  checked={d.applied}
+                  onChange={() => toggleApplied(d.id)}
+                  disabled={done}
+                  className="mt-0.5 rounded border-gray-300 text-blue-600 cursor-pointer shrink-0"
+                  title={d.applied ? '적용 해제' : '적용'}
+                />
+
+                {/* 썸네일 */}
+                <div className="w-12 shrink-0">
+                  <div className="aspect-[4/3] bg-gray-100 rounded border border-gray-200 flex items-center justify-center overflow-hidden">
+                    {d.exportedImageUrl
+                      ? <img src={d.exportedImageUrl} className="w-full h-full object-contain" alt="" />
+                      : <Icon name="image" size={14} className="text-gray-300" />}
+                  </div>
+                </div>
+
+                {/* 메타 정보 */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                    <span className="text-xs2 font-bold text-gray-700">기호 {d.symbol}</span>
+                    <span className={clsx('text-xs2 px-1.5 py-0.5 rounded-full font-medium', LABEL_STYLES[d.label])}>
+                      {d.label}
+                    </span>
+                    <span className={clsx('text-xs2 ml-auto', stageBadge.cls)}>
+                      {d.stage === 'done' && <Icon name="check" size={9} className="inline mr-0.5" />}
+                      {stageBadge.label}
+                    </span>
+                  </div>
+                  <p className="text-xs2 font-semibold text-gray-700 truncate">{d.name}</p>
+                  {d.imageSize && (
+                    <p className="text-xs2 text-gray-400">{d.imageSize.w}×{d.imageSize.h} · p.{d.pageNumber}</p>
+                  )}
+                </div>
               </div>
+
+              {/* 설명 (접힘) */}
+              <div className="px-3 pb-2 border-t border-gray-100 pt-1.5">
+                <p className="text-xs2 text-gray-500 leading-relaxed line-clamp-2">{d.description}</p>
+              </div>
+
+              {/* 편집 버튼 */}
+              {!done && (
+                <div className="px-3 pb-2.5">
+                  <button
+                    onClick={() => openModal(d.id)}
+                    className="btn-outline btn-xs w-full flex items-center justify-center gap-1"
+                  >
+                    <Icon name="edit" size={10} />
+                    {d.stage === 'done' ? '편집 내용 보기' : d.stage === 'editing' ? '편집 계속' : '도면 편집'}
+                  </button>
+                </div>
+              )}
             </div>
-            <p className="text-xs2 font-semibold text-gray-700 mb-1">{activeD.label}</p>
-            <p className="text-xs2 text-gray-500 mb-2">{activeD.desc}</p>
-            {!done && <button onClick={() => toggle(activeD.id)}
-              className={clsx('btn-xs w-full', activeD.sel ? 'btn-outline text-red-500 hover:border-red-400' : 'btn-primary')}>
-              {activeD.sel ? '제외' : '포함'}
-            </button>}
-          </div>
-        )}
-        <div className="space-y-1">
-          {draws.map(d => (
-            <div key={d.id} onClick={() => setActiveId(d.id)}
-              className={clsx('flex items-center gap-2 rounded-lg border px-2 py-1.5 cursor-pointer transition-all',
-                d.sel && !done ? 'border-blue-200 bg-blue-50' : '',
-                !d.sel ? 'border-gray-200 opacity-50' : '',
-                done && d.sel ? 'border-green-200 bg-green-50' : '')}>
-              <span className={clsx('w-4 h-4 rounded flex items-center justify-center shrink-0', d.sel ? 'bg-blue-600 text-white' : 'bg-gray-200')}>
-                {d.sel && <Icon name="check" size={10} />}
-              </span>
-              <span className="text-xs2 font-medium text-gray-600 w-10 shrink-0">{d.label}</span>
-              <span className="text-xs2 text-gray-500 flex-1 truncate">{d.desc}</span>
-              {!done && <button onClick={e => { e.stopPropagation(); toggle(d.id); }} className="text-gray-300 hover:text-red-400 shrink-0"><Icon name="close" size={10} /></button>}
-            </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
+
       {done && (
-        <div className="p-3 border-t border-gray-100 bg-green-50 shrink-0">
-          <div className="flex items-center gap-1.5 text-sm2 text-green-700 font-medium"><Icon name="check" size={13} /> 도면 확정 완료</div>
+        <div className="p-3 border-t border-ck-border bg-green-50 shrink-0 ml-1.5">
+          <div className="flex items-center gap-1.5 text-sm2 text-green-700 font-medium">
+            <Icon name="check" size={13} /> 도면 확정 완료 ({appliedCount}개 적용)
+          </div>
         </div>
+      )}
+
+      {/* DrawingEditorModal */}
+      {modalOpen && (
+        <DrawingEditorModal
+          drawings={drawings}
+          initialDrawingId={modalStartId}
+          onSave={handleSave}
+          onClose={() => setModalOpen(false)}
+        />
       )}
     </>
   );
