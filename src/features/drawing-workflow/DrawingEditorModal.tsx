@@ -5,7 +5,7 @@ import clsx from 'clsx';
 import { Icon } from '../../components/Icon';
 import { PatentEditor } from '../patent-editor';
 import {
-  openEditorTab, onEditorResult, isMobile,
+  openEditorTab, onEditorResult, isMobile, writeEditorResult,
 } from './editorChannel';
 import type { DrawingItem, CadCandidate } from './types';
 import type { EditorReference, PatentDrawing, InventionComponent } from '../patent-editor';
@@ -25,6 +25,8 @@ interface Props {
   availableReferences?: EditorReference[];
   onSave: (drawingId: string, updates: Partial<DrawingItem>) => void;
   onClose: () => void;
+  /** true: 새 탭 풀스크린 모드 (backdrop 없이 전체 페이지 차지) */
+  standalone?: boolean;
 }
 
 type WorkStage = 'crop' | 'reselect' | 'converting' | 'decide' | 'editing';
@@ -53,7 +55,7 @@ const MOCK_SVGS = [
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150"><rect x="20" y="20" width="160" height="110" fill="none" stroke="#222" stroke-width="1.5" rx="4"/><rect x="40" y="40" width="50" height="70" fill="none" stroke="#555" stroke-width="1"/><rect x="110" y="40" width="50" height="70" fill="none" stroke="#555" stroke-width="1"/><line x1="90" y1="75" x2="110" y2="75" stroke="#333" stroke-width="1"/></svg>`,
 ];
 
-export function DrawingEditorModal({ drawings, initialDrawingId, availableReferences, onSave, onClose }: Props) {
+export function DrawingEditorModal({ drawings, initialDrawingId, availableReferences, onSave, onClose, standalone = false }: Props) {
   const [activeId, setActiveId] = useState(initialDrawingId);
   const [workStageMap, setWorkStageMap] = useState<Record<string, WorkStage>>(() => {
     const m: Record<string, WorkStage> = {};
@@ -143,20 +145,10 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
       // 모바일: 인라인 모달로 PatentEditor 표시
       setEditorOpen(true);
     } else {
-      // 데스크탑: 새 탭으로 편집기 열기
-      const cands = candidatesMap[activeId] || activeDraw?.cadCandidates || [];
-      const selCand = cands.find(c => c.id === selId) || cands[0];
-      const patentDraw: PatentDrawing = {
-        id: activeId,
-        caption: activeDraw ? `${activeDraw.symbol}. ${activeDraw.name}` : activeId,
-        description: activeDraw?.description,
-        sourceImageUrl: selCand?.svgDataUrl || activeDraw?.originalImageUrl || '',
-        thumbnailUrl: activeDraw?.exportedImageUrl,
-        savedEditorDataJson: activeDraw?.savedEditorJson,
-      };
+      // 데스크탑: 새 탭으로 전체 워크플로 오픈 (DrawingItem 전체 전달)
       openEditorTab({
         drawingId: activeId,
-        drawings: [patentDraw],
+        drawings,                          // DrawingItem[] 전체
         components: MOCK_COMPONENTS,
         references: [],
         drawingName: activeDraw?.name ?? activeId,
@@ -192,20 +184,35 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
     : workStage === 'decide' ? 2
     : workStage === 'editing' ? 3 : 0;
 
-  return (
-    <>
-      {/* ── 구성요소 갱신 알림 토스트 ── */}
-      {syncNotice && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[70] bg-green-600 text-white text-sm2 font-semibold px-4 py-2 rounded-lg shadow-xl flex items-center gap-2 animate-fade-up">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/><path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-          {syncNotice}
-        </div>
-      )}
+  // standalone: 풀스크린 wrapper, 모달: backdrop + 고정 크기
+  const Wrapper = standalone
+    ? ({ children }: { children: React.ReactNode }) => (
+        <div className="fixed inset-0 flex flex-col bg-white">{children}</div>
+      )
+    : ({ children }: { children: React.ReactNode }) => (
+        <>
+          {syncNotice && (
+            <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[70] bg-green-600 text-white text-sm2 font-semibold px-4 py-2 rounded-lg shadow-xl flex items-center gap-2 animate-fade-up">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/><path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              {syncNotice}
+            </div>
+          )}
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+            {children}
+          </div>
+        </>
+      );
 
-      {/* ── 백드롭 + 고정 크기 모달 ── */}
-      <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden w-full"
-          style={{ width: '100%', maxWidth: 900, height: 'min(620px, calc(100vh - 32px))' }}>
+  const innerStyle = standalone
+    ? undefined
+    : { width: '100%', maxWidth: 900, height: 'min(620px, calc(100vh - 32px))' };
+
+  return (
+    <Wrapper>
+      <div className={standalone
+        ? 'flex flex-col w-full h-full bg-white overflow-hidden'
+        : 'bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden w-full'}
+        style={innerStyle}>
 
           {/* ── 헤더 ── */}
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-ck-border bg-white shrink-0">
@@ -565,7 +572,6 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
             </div>
           </div>
         </div>
-      </div>
 
       {/* ── 확대 뷰어 ── */}
       {zoomedCandId && (() => {
@@ -607,11 +613,15 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
         );
       })()}
 
-      {/* ── PatentEditor 모달 (모바일 전용) ── */}
-      {editorOpen && isMobile() && patentDrawings.length > 0 && (
-        <div className="fixed inset-0 z-60 bg-black/60 flex items-center justify-center p-4">
-          <div className="w-full h-full bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden"
-            style={{ maxWidth: '95vw', maxHeight: '95vh' }}>
+      {/* ── PatentEditor (standalone 또는 모바일 인라인) ── */}
+      {editorOpen && (standalone || isMobile()) && patentDrawings.length > 0 && (
+        <div className={standalone
+          ? 'fixed inset-0 bg-white flex flex-col'
+          : 'fixed inset-0 z-60 bg-black/60 flex items-center justify-center p-4'}>
+          <div className={standalone
+            ? 'flex flex-col w-full h-full overflow-hidden'
+            : 'w-full h-full bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden'}
+            style={standalone ? undefined : { maxWidth: '95vw', maxHeight: '95vh' }}>
             <PatentEditor
               drawings={patentDrawings}
               activeDrawingId={activeId}
@@ -622,18 +632,22 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
               onExportComplete={(id, blob) => {
                 const url = URL.createObjectURL(blob);
                 onSave(id, { exportedImageUrl: url, stage: 'done' });
+                if (standalone) writeEditorResult({ drawingId: id, exportedImageUrl: url, stage: 'done', references: [], timestamp: Date.now() });
               }}
               onComponentsSync={(refs) => {
-                // 수락된 부호 → 구성요소 이름 일괄 갱신 (mock: 알림 표시)
                 const names = refs.map(r => `${r.number} ${r.name}`).join(', ');
                 setSyncNotice(`구성요소 갱신 완료: ${names}`);
                 setTimeout(() => setSyncNotice(null), 4000);
+                if (standalone) writeEditorResult({ drawingId: activeId, stage: 'editing', references: refs, timestamp: Date.now() });
               }}
-              onClose={() => setEditorOpen(false)}
+              onClose={() => {
+                setEditorOpen(false);
+                if (standalone) goStage('decide');
+              }}
             />
           </div>
         </div>
       )}
-    </>
+    </Wrapper>
   );
 }

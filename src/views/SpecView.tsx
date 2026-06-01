@@ -2,6 +2,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { DrawingEditorModal } from '../features/drawing-workflow/DrawingEditorModal';
 import { MOCK_DRAWINGS } from '../features/drawing-workflow/types';
+import {
+  openEditorTab, onEditorResult, isMobile,
+} from '../features/drawing-workflow/editorChannel';
+import type { InventionComponent } from '../features/patent-editor';
 import { useStore } from '../store';
 import { Icon } from '../components/Icon';
 import { PreviewModal } from '../components/PreviewModal';
@@ -694,9 +698,18 @@ function ComponentsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => v
 
 // 도면 패널 (#21)
 
+const MOCK_INVENTION_COMPONENTS: InventionComponent[] = [
+  { number: '10', name: '데이터 수집부' },
+  { number: '20', name: '전처리부' },
+  { number: '30', name: '특징 추출부' },
+  { number: '40', name: '인식부' },
+  { number: '50', name: '출력부' },
+];
+
 // DrawingsPanel — 썸네일/기호/라벨/도면명 표시, 단일 편집 버튼
 function DrawingsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void }) {
   const [drawings, setDrawings] = useState(() => MOCK_DRAWINGS.map(d => ({ ...d })));
+  // 모바일 전용 모달 상태
   const [modalOpen, setModalOpen] = useState(false);
   const [modalStartId, setModalStartId] = useState('');
 
@@ -708,7 +721,37 @@ function DrawingsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => voi
     });
   };
 
-  const openModal = (id: string) => { setModalStartId(id); setModalOpen(true); };
+  // 편집기 탭 결과 수신 (데스크탑 새 탭 편집 후 반영)
+  useEffect(() => {
+    const off = onEditorResult((result) => {
+      handleSave(result.drawingId, {
+        stage: result.stage,
+        savedEditorJson: result.editorJson,
+        exportedImageUrl: result.exportedImageUrl,
+      });
+    });
+    return off;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const openEditor = (id: string) => {
+    if (isMobile()) {
+      // 모바일: 모달로
+      setModalStartId(id);
+      setModalOpen(true);
+    } else {
+      // 데스크탑: 새 탭으로 전체 워크플로 오픈
+      const draw = drawings.find(d => d.id === id);
+      openEditorTab({
+        drawingId: id,
+        drawings,
+        components: MOCK_INVENTION_COMPONENTS,
+        references: [],
+        drawingName: draw?.name ?? id,
+        timestamp: Date.now(),
+      });
+    }
+  };
 
   const LABEL_STYLES: Record<string, string> = {
     '제안기술': 'bg-blue-100 text-blue-700',
@@ -731,7 +774,7 @@ function DrawingsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => voi
           <span className="text-xs2 font-semibold text-gray-600">
             추출된 도면 ({drawings.length}개 · 완료 {doneCount}개)
           </span>
-          <button onClick={() => drawings.length > 0 && openModal(drawings[0].id)}
+          <button onClick={() => drawings.length > 0 && openEditor(drawings[0].id)}
             className="btn-outline btn-xs flex items-center gap-1">
             <Icon name="image" size={11} /> 편집기 열기
           </button>
@@ -739,7 +782,7 @@ function DrawingsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => voi
 
         {drawings.map(d => (
           <button key={d.id} disabled={done}
-            onClick={() => !done && openModal(d.id)}
+            onClick={() => !done && openEditor(d.id)}
             className={clsx(
               'w-full text-left rounded-lg border transition-all flex items-center gap-2.5 px-2.5 py-2',
               !done && 'hover:border-blue-300 hover:shadow-sm cursor-pointer',

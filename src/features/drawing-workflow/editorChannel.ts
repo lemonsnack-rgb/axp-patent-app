@@ -1,13 +1,14 @@
 // editorChannel.ts — 메인 탭 ↔ 편집기 탭 간 데이터 통신 (localStorage 기반)
-import type { EditorReference, InventionComponent, PatentDrawing } from '../patent-editor';
+import type { EditorReference, InventionComponent } from '../patent-editor';
+import type { DrawingItem } from './types';
 
 const SESSION_KEY = 'axp_drawing_editor_session';
 const RESULT_KEY  = 'axp_drawing_editor_result';
 
-/** 메인 탭이 새 탭에 전달하는 세션 데이터 */
+/** 메인 탭이 새 탭에 전달하는 세션 데이터 (Stage 1부터 전체 워크플로) */
 export interface EditorSession {
   drawingId: string;
-  drawings: PatentDrawing[];
+  drawings: DrawingItem[];         // Stage 1~3용 전체 도면 데이터
   components: InventionComponent[];
   references: EditorReference[];
   drawingName: string;
