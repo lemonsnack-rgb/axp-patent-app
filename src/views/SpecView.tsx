@@ -998,13 +998,30 @@ function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChan
   return (
     <>
       {/* 현재 섹션 표시 (스텝바 없이 섹션명만) */}
-      <div className="mx-3 mt-3 mb-2 shrink-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm2 font-bold text-gray-800">{sec.label}</span>
-          {sec.badge2 && <span className="text-xs2 text-gray-400">{sec.badge2}</span>}
-          <span className="text-xs2 text-gray-400 ml-auto">{safeSubStep + 1}/{DESC_SECTIONS.length}</span>
-          {isDone && <span className="text-xs2 text-green-600 font-medium flex items-center gap-1"><Icon name="check" size={10} /> 확정됨</span>}
+      {/* 섹션 탭 네비게이션 — 확정 섹션 클릭으로 재방문 가능 */}
+      <div className="mx-3 mt-2 mb-1 shrink-0">
+        <div className="flex gap-1 overflow-x-auto scroll-thin pb-1">
+          {DESC_SECTIONS.map((s, i) => {
+            const isConfirmed = !!confirmed[s.key];
+            const isActive = i === safeSubStep;
+            return (
+              <button
+                key={s.key}
+                onClick={() => setSubStep(i)}
+                className={clsx(
+                  'shrink-0 px-2 py-1 rounded text-xs2 transition-colors border',
+                  isActive ? 'bg-blue-700 text-white border-blue-700' :
+                  isConfirmed ? 'bg-green-50 text-green-700 border-green-300 hover:bg-green-100' :
+                  'bg-white text-gray-400 border-gray-200',
+                )}
+              >
+                {isConfirmed && !isActive && <Icon name="check" size={8} className="inline mr-0.5" />}
+                {s.label}
+              </button>
+            );
+          })}
         </div>
+        {isDone && <p className="text-xs2 text-green-600 mt-1 flex items-center gap-1"><Icon name="check" size={9} /> 확정됨</p>}
       </div>
 
       <div className="flex-1 overflow-y-auto scroll-thin px-3 pb-2 ml-1.5 space-y-2">
