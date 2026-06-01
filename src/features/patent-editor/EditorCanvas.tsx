@@ -1143,7 +1143,13 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
           const newOffset = calcOffsetFromMidHandle(anchor, textPos, handlePos);
           const style = useEditorStore.getState().lineStyle;
           const newPath = rebuildLeaderPathWithOffset(fc, leader, anchor, textPos, newOffset, style);
-          if (newPath) setMeta(newPath, LEADER_OFFSET_KEY, newOffset);
+          if (newPath) {
+            setMeta(newPath, LEADER_OFFSET_KEY, newOffset);
+            // 핸들을 실제 C1 위치로 보정 (수직축에서 벗어나지 않도록)
+            const corrected = getMidHandlePos(anchor, textPos, newOffset);
+            target.set({ left: corrected.x, top: corrected.y });
+            target.setCoords();
+          }
           return;
         }
 
