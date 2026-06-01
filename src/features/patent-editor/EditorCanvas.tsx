@@ -155,10 +155,11 @@ function makeLeaderAnchorHandle(anchor: Pt, leaderId: string): fabric.Circle {
   const h = new fabric.Circle({
     left: anchor.x,
     top: anchor.y,
-    radius: 6,
+    radius: 10,              // 클릭 영역 충분히 확보
     fill: "#f59e0b",
     stroke: "#fff",
-    strokeWidth: 2,
+    strokeWidth: 2.5,
+    opacity: 0.85,
     originX: "center",
     originY: "center",
     hasBorders: false,
@@ -209,6 +210,12 @@ function spawnLeaderPair(
   fc.add(leader);
   fc.add(text);
   fc.add(anchorHandle);
+  // 핸들이 항상 다른 객체 위에 렌더링 (z-order: 맨 위로)
+  const objs = fc.getObjects();
+  const hIdx = objs.indexOf(anchorHandle);
+  if (hIdx !== -1 && hIdx < objs.length - 1) {
+    fc.moveObjectTo(anchorHandle, objs.length - 1);
+  }
   fc.setActiveObject(text);
   fc.requestRenderAll();
 }
@@ -541,6 +548,7 @@ function rebuildLeaderPath(
   setMeta(newPath, META.leaderAnchorY, anchor.y);
   fc.remove(oldLeader);
   fc.insertAt(idx, newPath);
+  fc.requestRenderAll();
   return newPath;
 }
 
@@ -1051,16 +1059,17 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
         const target = opt.target;
         if (!target) return;
 
-        // 지시선 앵커 핸들 드래그 → 지시선 앵커 위치 갱신
+        // 지시선 앵커 핸들 드래그 → 앵커 끝점 갱신
         if (hasMeta(target, LEADER_ANCHOR)) {
           const leaderId = getMeta<string>(target, META.leaderId);
           if (!leaderId) return;
           const leader = findLeaderLine(fc, leaderId);
           const textObj = fc.getObjects().find(
-            o => hasMeta(o, META.isLeaderText) && getMeta<string>(o, META.leaderId) === leaderId
+            o => (hasMeta(o, META.isLeaderText) || hasMeta(o, META.isRefCircle))
+              && getMeta<string>(o, META.leaderId) === leaderId
           );
           if (!leader || !textObj) return;
-          const newAnchor = { x: target.left ?? 0, y: target.top ?? 0 };
+          const newAnchor = { x: snap(target.left ?? 0), y: snap(target.top ?? 0) };
           const textPos = { x: textObj.left ?? 0, y: textObj.top ?? 0 };
           const style = useEditorStore.getState().lineStyle;
           if (leader instanceof fabric.Path) {
@@ -1068,6 +1077,7 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
           } else if (leader instanceof fabric.Line) {
             leader.set({ x1: newAnchor.x, y1: newAnchor.y });
             leader.setCoords();
+            fc.requestRenderAll();
           }
           return;
         }
@@ -1093,8 +1103,8 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
           top: snap(target.top ?? 0),
         });
 
-        // Leader text 추적
-        if (isLeaderText(target)) {
+        // Leader text / refCircle 이동 → 지시선의 텍스트 끝점 갱신
+        if (isLeaderText(target) || hasMeta(target, META.isRefCircle)) {
           const leaderId = getMeta<string>(target, META.leaderId);
           if (!leaderId) return;
           const leader = findLeaderLine(fc, leaderId);
@@ -1111,6 +1121,7 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
           } else if (leader instanceof fabric.Line) {
             leader.set({ x2: newTextPos.x, y2: newTextPos.y });
             leader.setCoords();
+            fc.requestRenderAll();
           }
           return;
         }
