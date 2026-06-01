@@ -8,13 +8,10 @@ import { onEditorResult, writeEditorResult } from './editorChannel';
 import type { DrawingItem, CadCandidate } from './types';
 import type { EditorReference, PatentDrawing, InventionComponent } from '../patent-editor';
 
-const MOCK_COMPONENTS: InventionComponent[] = [
-  { number: '10', name: '데이터 수집부' },
-  { number: '20', name: '전처리부' },
-  { number: '30', name: '특징 추출부' },
-  { number: '40', name: '인식부' },
-  { number: '50', name: '출력부' },
-];
+// availableReferences(구성요소)를 InventionComponent 형식으로 변환
+function refsToComponents(refs: EditorReference[]): InventionComponent[] {
+  return refs.map(r => ({ number: r.number, name: r.name ?? '' })).filter(c => c.name);
+}
 
 interface Props {
   drawings: DrawingItem[];
@@ -512,7 +509,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                     drawings={patentDrawings}
                     activeDrawingId={activeId}
                     availableReferences={availableReferences}
-                    inventionComponents={MOCK_COMPONENTS}
+                    inventionComponents={refsToComponents(availableReferences ?? [])}
                     singleDrawingMode={true}
                     onActiveDrawingChange={() => {}}
                     onSaveProject={(id, json) => {

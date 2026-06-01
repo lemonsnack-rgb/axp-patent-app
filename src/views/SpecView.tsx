@@ -382,6 +382,15 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
     subStep: number; currentLabel: string; allDone: boolean; doConfirm: (() => void) | null;
   }>({ subStep: 0, currentLabel: '기술분야', allDone: false, doConfirm: null });
 
+  // 구성요소 → 도면 부호 공유 (ComponentsPanel → DrawingsPanel)
+  const [confirmedComponents, setConfirmedComponents] = useState<InventionComponent[]>([
+    { number: '100', name: '데이터 수집부' },
+    { number: '200', name: '전처리부' },
+    { number: '300', name: '특징 추출부' },
+    { number: '400', name: '인식부' },
+    { number: '500', name: '출력부' },
+  ]);
+
   const getCardVal = (i: number) => editVals[i] ?? cands[i] ?? '';
 
   const STEP_DESCS: Partial<Record<StepId, string>> = {
@@ -461,8 +470,8 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
 
       {/* 단계별 특수 패널 */}
       {step === 'description' && <DescriptionPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} onModeChange={setDescMode} promptTrigger={descPromptTrigger} onSubInfoChange={setDescSubInfo} />}
-      {step === 'components' && <ComponentsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} />}
-      {step === 'drawings' && <DrawingsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} />}
+      {step === 'components' && <ComponentsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} onComponentsChange={setConfirmedComponents} />}
+      {step === 'drawings' && <DrawingsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} inventionComponents={confirmedComponents} />}
       {step === 'claims' && <ClaimsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} />}
       {step === 'abstract' && <AbstractPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} />}
 
@@ -632,13 +641,33 @@ const INIT_COMPS: CompItem[] = [
   { id: 5, text: '출력부: 인식된 객체의 3D 위치, 크기, 종류를 출력', sel: true },
 ];
 
-function ComponentsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void }) {
+// 구성요소 텍스트에서 이름 추출 (":  " 앞부분)
+function extractCompName(text: string): string {
+  const colonIdx = text.indexOf(':');
+  return colonIdx > 0 ? text.slice(0, colonIdx).trim() : text.trim();
+}
+
+function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
+  done: boolean;
+  onConfirm: () => void;
+  onUpdate: (v: string) => void;
+  onComponentsChange?: (comps: InventionComponent[]) => void;
+}) {
   const [items, setItems] = useState<CompItem[]>(INIT_COMPS);
   const [newText, setNewText] = useState('');
 
   const upd = (next: CompItem[]) => {
     setItems(next);
-    let n = 0; onUpdate(next.filter(it => it.sel).map(it => `(${++n * 10}) ${it.text}`).join('\n'));
+    // 번호 체계: 100, 200, 300... (특허 도면 부호 규격)
+    let n = 0;
+    const selected = next.filter(it => it.sel);
+    onUpdate(selected.map(it => `${++n * 100} ${it.text}`).join('\n'));
+    // 구조화 데이터를 상위로 전달 (DrawingsPanel에서 사용)
+    let m = 0;
+    onComponentsChange?.(selected.map(it => ({
+      number: String(++m * 100),
+      name: extractCompName(it.text),
+    })));
   };
   const toggle = (id: number) => { if (!done) upd(items.map(it => it.id === id ? { ...it, sel: !it.sel } : it)); };
   const moveUp = (i: number) => { if (i > 0 && !done) { const a = [...items]; [a[i - 1], a[i]] = [a[i], a[i - 1]]; upd(a); } };
@@ -654,10 +683,10 @@ function ComponentsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => v
       <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-1.5">
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs2 font-semibold text-gray-600">AI 추출 구성요소</span>
-          <span className="text-xs2 text-gray-400">번호 자동 부여</span>
+          <span className="text-xs2 text-gray-400">100, 200... 자동 부여</span>
         </div>
         {items.map((item, idx) => {
-          const num = item.sel ? (autoN += 10) : null;
+          const num = item.sel ? (autoN += 100) : null;
           return (
             <div key={item.id} className={clsx('flex items-start gap-1.5 rounded-lg border p-2 transition-all',
               item.sel && !done ? 'border-blue-300 bg-blue-50' : '',
@@ -665,7 +694,7 @@ function ComponentsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => v
               done && item.sel ? 'border-green-200 bg-green-50' : '')}>
               <span className={clsx('w-9 text-xs2 font-bold rounded px-1 py-0.5 shrink-0 mt-0.5 text-center',
                 item.sel ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-400')}>
-                {num ? `(${num})` : '—'}
+                {num ? `${num}` : '—'}
               </span>
               <span className="text-xs2 text-gray-700 flex-1 leading-relaxed break-words">{item.text}</span>
               {!done && (
@@ -698,16 +727,13 @@ function ComponentsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => v
 
 // 도면 패널 (#21)
 
-const MOCK_INVENTION_COMPONENTS: InventionComponent[] = [
-  { number: '10', name: '데이터 수집부' },
-  { number: '20', name: '전처리부' },
-  { number: '30', name: '특징 추출부' },
-  { number: '40', name: '인식부' },
-  { number: '50', name: '출력부' },
-];
-
 // DrawingsPanel — 썸네일/기호/라벨/도면명 표시, 단일 편집 버튼
-function DrawingsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void }) {
+function DrawingsPanel({ done, onUpdate, inventionComponents }: {
+  done: boolean;
+  onConfirm: () => void;
+  onUpdate: (v: string) => void;
+  inventionComponents?: InventionComponent[];
+}) {
   const [drawings, setDrawings] = useState(() => MOCK_DRAWINGS.map(d => ({ ...d })));
   // 모바일 전용 모달 상태
   const [modalOpen, setModalOpen] = useState(false);
@@ -745,8 +771,9 @@ function DrawingsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => voi
       openEditorTab({
         drawingId: id,
         drawings,
-        components: MOCK_INVENTION_COMPONENTS,
-        references: [],
+        components: inventionComponents ?? [],
+        // 구성요소 목록을 도면 부호 초기값으로 변환하여 전달
+        references: (inventionComponents ?? []).map(c => ({ number: c.number, name: c.name })),
         drawingName: draw?.name ?? id,
         timestamp: Date.now(),
       });
@@ -841,6 +868,7 @@ function DrawingsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => voi
         <DrawingEditorModal
           drawings={drawings}
           initialDrawingId={modalStartId}
+          availableReferences={(inventionComponents ?? []).map(c => ({ number: c.number, name: c.name }))}
           onSave={handleSave}
           onClose={() => setModalOpen(false)}
         />
