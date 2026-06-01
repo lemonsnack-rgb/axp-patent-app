@@ -426,7 +426,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                             <div key={cand.id}
                               onClick={() => setSelectedMap(m => ({ ...m, [activeId]: cand.id }))}
                               className={clsx(
-                                'flex-1 cursor-pointer rounded-lg border-2 p-1 transition-all',
+                                'w-20 shrink-0 cursor-pointer rounded-lg border-2 p-1 transition-all',
                                 isSel ? 'border-blue-600 bg-blue-50 shadow-sm' : 'border-gray-200 bg-white hover:border-blue-300',
                               )}>
                               <div className="aspect-[4/3] bg-gray-50 rounded border border-gray-100 flex items-center justify-center overflow-hidden mb-1">
