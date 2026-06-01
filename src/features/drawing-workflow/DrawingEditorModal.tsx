@@ -225,45 +225,20 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
             </button>
           </div>
 
-          {/* ── 서브헤더: 선택 도면 정보 + 단계 ── */}
-          {activeDraw && (
-            <div className="flex items-center gap-3 px-4 py-2 border-b border-ck-border bg-ck-bg shrink-0 flex-wrap">
-              <div className="flex items-center gap-2">
-                <span className="text-sm2 font-bold text-gray-800">기호 {activeDraw.symbol}</span>
-                <span className="text-sm2 text-gray-600">·</span>
-                <span className="text-sm2 font-semibold text-gray-700">{activeDraw.name}</span>
-                <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', LABEL_COLORS[activeDraw.label] || 'bg-gray-100 text-gray-600')}>
-                  {activeDraw.label}
-                </span>
-              </div>
-              {/* 단계 표시 */}
-              <div className="flex items-center gap-1 ml-auto">
-                {STEP_LABELS.map((label, i) => (
-                  <div key={i} className="flex items-center">
-                    <div className={clsx(
-                      'flex items-center gap-1 px-2 py-0.5 rounded text-xs2 font-medium transition-all',
-                      i === stepIdx ? 'bg-blue-100 text-blue-700' :
-                      i < stepIdx  ? 'text-green-600' : 'text-gray-400',
-                    )}>
-                      {i < stepIdx
-                        ? <Icon name="check" size={9} />
-                        : <span className="w-4 h-4 rounded-full border flex items-center justify-center text-xs2 font-bold" style={{ fontSize: 9 }}>{i + 1}</span>}
-                      <span className="hidden sm:inline">{label}</span>
-                    </div>
-                    {i < STEP_LABELS.length - 1 && <span className="text-gray-300 mx-0.5">›</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* ── 본문 ── */}
           <div className="flex flex-1 overflow-hidden min-h-0">
 
-            {/* 좌: 도면 목록 (고정 너비, 스크롤) */}
-            <aside className="w-36 border-r border-ck-border bg-ck-bg overflow-y-auto scroll-thin shrink-0 flex flex-col">
-              <p className="text-xs2 font-semibold text-gray-400 uppercase tracking-wide px-2.5 pt-2.5 pb-1.5 shrink-0">도면 목록</p>
-              <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-1.5">
+            {/* 좌: 도면 목록 — 독립 패널 */}
+            <aside className="w-36 border-r border-ck-border bg-ck-bg shrink-0 flex flex-col overflow-hidden">
+              {/* 좌측 패널 고정 헤더 */}
+              <div className="px-2.5 pt-2.5 pb-1.5 border-b border-ck-border shrink-0">
+                <p className="text-xs2 font-semibold text-gray-500 uppercase tracking-wide">
+                  도면 목록
+                  <span className="ml-1 font-normal text-gray-400">({drawings.length})</span>
+                </p>
+              </div>
+              {/* 도면 카드 목록 — 독립 스크롤 */}
+              <div className="flex-1 overflow-y-auto scroll-thin px-2 py-2 space-y-1.5">
                 {drawings.map(d => {
                   const isActive = d.id === activeId;
                   const status = STAGE_STATUS[d.stage] || STAGE_STATUS.extracted;
@@ -302,8 +277,44 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
               </div>
             </aside>
 
-            {/* 우: 단계별 콘텐츠 */}
-            <div className="flex-1 overflow-y-auto scroll-thin flex flex-col">
+            {/* 우: 선택 도면 정보 + 단계 + 콘텐츠 */}
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+
+              {/* 우측 패널 고정 헤더: 선택 도면 정보 + 단계 표시 */}
+              {activeDraw && (
+                <div className="shrink-0 border-b border-ck-border bg-ck-bg px-4 py-2 flex items-center gap-3 flex-wrap">
+                  {/* 선택 도면 정보 */}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm2 font-bold text-gray-800">기호 {activeDraw.symbol}</span>
+                    <span className="text-gray-300">·</span>
+                    <span className="text-sm2 font-semibold text-gray-700 truncate max-w-[140px]">{activeDraw.name}</span>
+                    <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium shrink-0', LABEL_COLORS[activeDraw.label] || 'bg-gray-100 text-gray-600')}>
+                      {activeDraw.label}
+                    </span>
+                  </div>
+                  {/* 단계 표시 */}
+                  <div className="flex items-center gap-0.5 ml-auto">
+                    {STEP_LABELS.map((label, i) => (
+                      <div key={i} className="flex items-center">
+                        <div className={clsx(
+                          'flex items-center gap-1 px-1.5 py-0.5 rounded text-xs2 font-medium transition-all',
+                          i === stepIdx ? 'bg-blue-100 text-blue-700' :
+                          i < stepIdx  ? 'text-green-600' : 'text-gray-300',
+                        )}>
+                          {i < stepIdx
+                            ? <Icon name="check" size={9} />
+                            : <span className="w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0" style={{ fontSize: 8 }}>{i + 1}</span>}
+                          <span className="hidden md:inline">{label}</span>
+                        </div>
+                        {i < STEP_LABELS.length - 1 && <span className="text-gray-200 mx-0.5 text-xs2">›</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 단계별 콘텐츠 */}
+              <div className="flex-1 overflow-y-auto scroll-thin flex flex-col">
 
               {/* ── Stage 1: 추출 영역 확인 (crop) ── */}
               {(workStage === 'crop' || workStage === 'reselect') && activeDraw && (
@@ -612,6 +623,8 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
           </div>
         );
       })()}
+
+      </div>{/* ← inner panel 닫기 */}
 
       {/* ── PatentEditor (standalone 또는 모바일 인라인) ── */}
       {editorOpen && (standalone || isMobile()) && patentDrawings.length > 0 && (
