@@ -230,8 +230,11 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
           {/* ── 본문 ── */}
           <div className="flex flex-1 overflow-hidden min-h-0">
 
-            {/* 좌: 도면 목록 — 독립 패널 */}
-            <aside className="w-36 border-r border-ck-border bg-ck-bg shrink-0 flex flex-col overflow-hidden">
+            {/* 좌: 도면 목록 — 모달 모드에서만 표시 (standalone는 단일 도면 전용이므로 숨김) */}
+            <aside className={clsx(
+              'border-r border-ck-border bg-ck-bg shrink-0 flex flex-col overflow-hidden',
+              standalone ? 'hidden' : 'w-36',
+            )}>
               {/* 좌측 패널 고정 헤더 */}
               <div className="px-2.5 pt-2.5 pb-1.5 border-b border-ck-border shrink-0">
                 <p className="text-xs2 font-semibold text-gray-500 uppercase tracking-wide">
@@ -337,7 +340,6 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                             <div className="text-center text-gray-400 p-4">
                               <Icon name="image" size={48} className="mx-auto mb-2 text-gray-200" />
                               <p className="text-sm2 text-gray-400">도면 이미지</p>
-                              <p className="text-xs2 text-gray-300 mt-0.5">{activeDraw.imageSize?.w}×{activeDraw.imageSize?.h}px</p>
                             </div>
                           )}
                         </div>
@@ -376,16 +378,6 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                             <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', LABEL_COLORS[activeDraw.label] || 'bg-gray-100 text-gray-600')}>
                               {activeDraw.label}
                             </span>
-                          </div>
-                          {activeDraw.imageSize && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs2 text-gray-400 w-8 shrink-0">크기</span>
-                              <span className="text-xs2 text-gray-500">{activeDraw.imageSize.w}×{activeDraw.imageSize.h}</span>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs2 text-gray-400 w-8 shrink-0">출처</span>
-                            <span className="text-xs2 text-gray-500">직무발명서 p.{activeDraw.pageNumber}</span>
                           </div>
                         </div>
                       </div>
@@ -463,81 +455,79 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
               {workStage === 'decide' && activeDraw && (
                 <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
 
-                  {/* 상단: 선택된 버전 크게 보기 */}
-                  <div className="flex-1 min-h-0 flex flex-col p-4 gap-2 overflow-hidden">
-                    <div className="flex items-center gap-2 shrink-0">
-                      <p className="text-xs2 font-semibold text-gray-500">
-                        {selCandId
-                          ? `선택됨 — 버전 ${String.fromCharCode(65 + candidates.findIndex(c => c.id === selCandId))}`
-                          : '변환 결과를 선택하세요'}
-                      </p>
-                      <span className="text-gray-300 text-xs2">|</span>
-                      <p className="text-xs2 text-gray-400">원본 도면 기준으로 변환된 결과입니다</p>
+                  {/* 상단: 원본 + 선택된 변환본 나란히 */}
+                  <div className="flex-1 min-h-0 flex gap-0 overflow-hidden">
+                    {/* 원본 (좌측 50%) */}
+                    <div className="flex-1 min-h-0 flex flex-col border-r border-ck-border overflow-hidden">
+                      <div className="px-3 py-1.5 border-b border-ck-border bg-ck-bg shrink-0">
+                        <p className="text-xs2 font-semibold text-gray-500">원본</p>
+                      </div>
+                      <div className="flex-1 bg-gray-100 flex items-center justify-center overflow-hidden">
+                        <div className="text-center text-gray-400 p-4">
+                          <Icon name="image" size={36} className="mx-auto mb-2 text-gray-300" />
+                          <p className="text-sm2">원본 도면</p>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* 선택된 버전 크게 */}
-                    <div className="flex-1 min-h-0 bg-gray-50 rounded-lg border-2 border-blue-100 flex items-center justify-center overflow-hidden">
-                      {selCandId ? (
-                        (() => {
-                          const selCand = candidates.find(c => c.id === selCandId);
-                          return selCand?.svgDataUrl
-                            ? <img src={selCand.svgDataUrl} className="max-w-full max-h-full object-contain p-4" alt="선택된 버전" />
-                            : <Icon name="image" size={36} className="text-gray-300" />;
-                        })()
-                      ) : (
-                        <div className="text-center text-gray-400">
-                          <Icon name="image" size={36} className="mx-auto mb-2 text-gray-200" />
-                          <p className="text-sm2">아래에서 버전을 선택하세요</p>
-                        </div>
-                      )}
+                    {/* 선택된 변환본 (우측 50%) */}
+                    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                      <div className="px-3 py-1.5 border-b border-ck-border bg-ck-bg shrink-0">
+                        <p className="text-xs2 font-semibold text-gray-500">
+                          {selCandId
+                            ? `변환 결과 — 버전 ${String.fromCharCode(65 + candidates.findIndex(c => c.id === selCandId))}`
+                            : '변환 결과 (아래에서 선택)'}
+                        </p>
+                      </div>
+                      <div className="flex-1 bg-gray-50 border-2 border-transparent flex items-center justify-center overflow-hidden"
+                        style={{ borderColor: selCandId ? '#bfdbfe' : 'transparent' }}>
+                        {selCandId ? (
+                          (() => {
+                            const selCand = candidates.find(c => c.id === selCandId);
+                            return selCand?.svgDataUrl
+                              ? <img src={selCand.svgDataUrl} className="max-w-full max-h-full object-contain p-4" alt="" />
+                              : <Icon name="image" size={36} className="text-gray-300" />;
+                          })()
+                        ) : (
+                          <div className="text-center text-gray-400 p-4">
+                            <Icon name="image" size={36} className="mx-auto mb-2 text-gray-200" />
+                            <p className="text-sm2">아래 후보를 선택하세요</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  {/* 하단: 원본(작게) + 변환 썸네일 선택 */}
-                  <div className="shrink-0 border-t border-ck-border bg-ck-bg px-4 py-3">
-                    <div className="flex items-start gap-3">
-                      {/* 원본 (참고용, 작게) */}
-                      <div className="shrink-0 flex flex-col items-center gap-1">
-                        <div className="w-20 aspect-[4/3] bg-gray-100 rounded border border-gray-200 flex items-center justify-center overflow-hidden">
-                          <div className="text-center p-1">
-                            <Icon name="image" size={16} className="mx-auto text-gray-300 mb-0.5" />
-                            <p className="text-xs2 text-gray-400" style={{ fontSize: 9 }}>원본</p>
-                          </div>
-                        </div>
-                        <p className="text-xs2 text-gray-400" style={{ fontSize: 9 }}>원본 도면</p>
-                      </div>
-
-                      <div className="text-gray-300 shrink-0 mt-3">→</div>
-
-                      {/* 변환 결과 썸네일 (클릭 → 위에서 크게 보기) */}
-                      <div className="flex gap-2 flex-1">
-                        {candidates.map((cand, i) => {
-                          const isSel = cand.id === selCandId;
-                          return (
-                            <div key={cand.id}
-                              onClick={() => setSelectedMap(m => ({ ...m, [activeId]: cand.id }))}
-                              className={clsx(
-                                'flex-1 cursor-pointer rounded-lg border-2 p-1 transition-all',
-                                isSel ? 'border-blue-600 bg-blue-50 shadow-sm' : 'border-gray-200 bg-white hover:border-blue-300',
-                              )}>
-                              <div className="aspect-[4/3] bg-gray-50 rounded border border-gray-100 flex items-center justify-center overflow-hidden mb-1">
-                                {cand.svgDataUrl
-                                  ? <img src={cand.svgDataUrl} className="w-full h-full object-contain" alt="" />
-                                  : <Icon name="image" size={12} className="text-gray-300" />}
-                              </div>
-                              <div className="flex items-center justify-center gap-1">
-                                <span className={clsx('w-3 h-3 rounded-full border-2 flex items-center justify-center shrink-0',
-                                  isSel ? 'border-blue-600 bg-blue-600' : 'border-gray-300')}>
-                                  {isSel && <span className="w-1 h-1 rounded-full bg-white" />}
-                                </span>
-                                <span className={clsx('font-bold', isSel ? 'text-blue-700' : 'text-gray-500')} style={{ fontSize: 10 }}>
-                                  버전 {String.fromCharCode(65 + i)}
-                                </span>
-                              </div>
+                  {/* 하단: 변환 후보 썸네일 (가로 나열) */}
+                  <div className="shrink-0 border-t border-ck-border bg-ck-bg px-4 py-2.5">
+                    <p className="text-xs2 text-gray-400 mb-2">변환 후보 — 클릭하여 선택</p>
+                    <div className="flex gap-2">
+                      {candidates.map((cand, i) => {
+                        const isSel = cand.id === selCandId;
+                        return (
+                          <div key={cand.id}
+                            onClick={() => setSelectedMap(m => ({ ...m, [activeId]: cand.id }))}
+                            className={clsx(
+                              'flex-1 cursor-pointer rounded-lg border-2 p-1 transition-all',
+                              isSel ? 'border-blue-600 bg-blue-50 shadow-sm' : 'border-gray-200 bg-white hover:border-blue-300',
+                            )}>
+                            <div className="aspect-[4/3] bg-gray-50 rounded border border-gray-100 flex items-center justify-center overflow-hidden mb-1">
+                              {cand.svgDataUrl
+                                ? <img src={cand.svgDataUrl} className="w-full h-full object-contain" alt="" />
+                                : <Icon name="image" size={12} className="text-gray-300" />}
                             </div>
-                          );
-                        })}
-                      </div>
+                            <div className="flex items-center justify-center gap-1">
+                              <span className={clsx('w-3 h-3 rounded-full border-2 flex items-center justify-center shrink-0',
+                                isSel ? 'border-blue-600 bg-blue-600' : 'border-gray-300')}>
+                                {isSel && <span className="w-1 h-1 rounded-full bg-white" />}
+                              </span>
+                              <span className={clsx('font-bold', isSel ? 'text-blue-700' : 'text-gray-500')} style={{ fontSize: 10 }}>
+                                버전 {String.fromCharCode(65 + i)}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -692,6 +682,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
               activeDrawingId={activeId}
               availableReferences={availableReferences}
               inventionComponents={MOCK_COMPONENTS}
+              singleDrawingMode={standalone}
               onActiveDrawingChange={setActiveId}
               onSaveProject={(id, json) => onSave(id, { savedEditorJson: json, stage: 'editing' })}
               onExportComplete={(id, blob) => {

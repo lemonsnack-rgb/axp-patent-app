@@ -62,6 +62,8 @@ export interface PatentEditorProps {
   inventionComponents?: InventionComponent[];
   /** 부호 확정 후 구성요소명 일괄 갱신 콜백 */
   onComponentsSync?: (refs: EditorReference[]) => void;
+  /** true: 단일 도면 편집 모드 — 좌측 도면 목록 패널 숨김 */
+  singleDrawingMode?: boolean;
   onReferenceAdd?: (ref: EditorReference) => void;
   /** 부호 이름·parent 변경 시 호출. 이 모듈 밖에서는 다른 명세서와도 동기화 가능 */
   onReferenceUpdate?: (ref: EditorReference) => void;

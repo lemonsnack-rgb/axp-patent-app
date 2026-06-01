@@ -58,6 +58,7 @@ export function PatentEditor({
   availableReferences,
   inventionComponents,
   onComponentsSync,
+  singleDrawingMode = false,
   onReferenceAdd,
   onReferenceUpdate,
   onReferenceDelete,
@@ -335,22 +336,27 @@ export function PatentEditor({
         onComponentChange={handleAiComponentChange}
       />
       <div className="flex-1 min-h-0 flex">
-        <div
-          className="shrink-0 border-r border-ck-border"
-          style={{ width: leftWidth }}
-        >
-          <DrawingListPanel
-            drawings={drawings}
-            activeId={activeDrawing.id}
-            representativeId={representativeDrawingId}
-            onSelect={handleDrawingChange}
-          />
-        </div>
-        <div
-          onMouseDown={startResize("left")}
-          className="w-1 shrink-0 cursor-col-resize bg-gray-200 transition hover:bg-blue-400"
-          title="패널 크기 조절"
-        />
+        {/* 단일 도면 모드에서는 도면 목록 패널 숨김 */}
+        {!singleDrawingMode && (
+          <>
+            <div
+              className="shrink-0 border-r border-ck-border"
+              style={{ width: leftWidth }}
+            >
+              <DrawingListPanel
+                drawings={drawings}
+                activeId={activeDrawing.id}
+                representativeId={representativeDrawingId}
+                onSelect={handleDrawingChange}
+              />
+            </div>
+            <div
+              onMouseDown={startResize("left")}
+              className="w-1 shrink-0 cursor-col-resize bg-gray-200 transition hover:bg-blue-400"
+              title="패널 크기 조절"
+            />
+          </>
+        )}
         <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
           <div className="space-y-2 border-b border-ck-border bg-white px-3 py-2 shrink-0">
             <div className="flex items-center gap-2">
