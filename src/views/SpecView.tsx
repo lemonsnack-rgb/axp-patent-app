@@ -425,9 +425,16 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
   };
 
   const handleConfirm = () => {
-    // 특수 단계(description/components/drawings/claims/abstract)는 gSel 값과 무관하게 항상 확정
+    // 특수 단계: gSel에 이미 onUpdate로 세팅된 실제 내용이 있으면 그것을 사용
     if (isSpecial) {
-      const specialVal = gSel[step] || '(확정)';
+      // gSel[step]이 있으면 그 값을 사용, 없으면 단계별 기본 요약 문자열 사용
+      const fallbacks: Partial<Record<StepId, string>> = {
+        components: '구성요소 확정',
+        drawings: '도면 확정',
+        claims: '청구항 확정',
+        abstract: '요약서 확정',
+      };
+      const specialVal = gSel[step] || fallbacks[step] || '확정';
       setGSel(p => ({ ...p, [step]: specialVal }));
       onConfirm(step);
       return;
@@ -656,6 +663,19 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
   const [items, setItems] = useState<CompItem[]>(INIT_COMPS);
   const [newText, setNewText] = useState('');
 
+  // 마운트 시 초기값을 상위에 전달 (확정 카드에 "(확정)" 대신 실제 내용 표시)
+  useEffect(() => {
+    let n = 0;
+    const selected = INIT_COMPS.filter(it => it.sel);
+    onUpdate(selected.map(it => `${++n * 100} ${it.text}`).join('\n'));
+    let m = 0;
+    onComponentsChange?.(selected.map(it => ({
+      number: String(++m * 100),
+      name: extractCompName(it.text),
+    })));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const upd = (next: CompItem[]) => {
     setItems(next);
     // 번호 체계: 100, 200, 300... (특허 도면 부호 규격)
@@ -877,66 +897,312 @@ function DrawingsPanel({ done, onUpdate, inventionComponents }: {
   );
 }
 
-// 청구항 패널 (#22)
-interface ClaimItem { id: number; type: 'independent' | 'dependent'; refId?: number; text: string; sel: boolean }
-const INIT_CLAIMS: ClaimItem[] = [
-  { id: 1, type: 'independent', text: '라이다 센서로부터 3차원 포인트 클라우드 데이터를 획득하는 데이터 수집부; 딥러닝 모델을 적용하여 객체를 분류하는 인식부를 포함하는, 라이다 기반 객체 감지 장치.', sel: true },
-  { id: 2, type: 'dependent', refId: 1, text: '제1항에 있어서, 상기 인식부는 PointNet++ 아키텍처를 포함하는, 라이다 기반 객체 감지 장치.', sel: true },
-  { id: 3, type: 'dependent', refId: 1, text: '제1항에 있어서, 상기 데이터 수집부는 복수의 라이다 센서를 포함하는, 라이다 기반 객체 감지 장치.', sel: false },
-  { id: 4, type: 'independent', text: '라이다 센서로부터 포인트 클라우드 데이터를 획득하는 단계; 딥러닝 모델을 이용하여 객체를 분류하는 단계를 포함하는, 라이다 기반 객체 감지 방법.', sel: true },
+// ── 청구항 패널 (#22) — 독립항 → 종속항 2단계 플로우 ──────────────────
+// Phase 'indep' : 독립항 후보 A/B 중 선택 (기존 명칭 선택과 동일 패턴)
+// Phase 'dep'   : 선택된 독립항 기반으로 종속항 생성·관리
+interface IndepCand { id: number; label: string; text: string }
+const INDEP_CANDS: IndepCand[] = [
+  {
+    id: 1, label: 'A',
+    text: '라이다 센서로부터 3차원 포인트 클라우드 데이터를 획득하는 데이터 수집부;\n상기 포인트 클라우드 데이터에서 지면 포인트를 분리하고 노이즈를 제거하는 전처리부;\n딥러닝 모델을 적용하여 객체를 분류하는 인식부를 포함하며,\n상기 마찰면의 외부 노출 구조에 의해 실시간 3D 객체 인식이 가능한 라이다 기반 객체 감지 장치.',
+  },
+  {
+    id: 2, label: 'B',
+    text: '라이다 센서로부터 포인트 클라우드 데이터를 획득하는 단계;\n상기 포인트 클라우드 데이터를 기둥(Pillar) 단위로 구성하여 2D 의사 이미지를 생성하는 전처리 단계;\nPointNet++ 기반 딥러닝 모델을 이용하여 객체를 인식하는 인식 단계를 포함하는, 라이다 기반 객체 감지 방법.',
+  },
+];
+
+interface DepItem { id: number; text: string; sel: boolean; expanded: boolean; editing: boolean; editVal: string }
+const MOCK_DEPS: DepItem[] = [
+  { id: 1, sel: true,  expanded: false, editing: false, editVal: '',
+    text: '제1항에 있어서, 상기 전처리부는 RANSAC 알고리즘을 이용하여 지면 포인트를 분리하는, 라이다 기반 객체 감지 장치.' },
+  { id: 2, sel: true,  expanded: false, editing: false, editVal: '',
+    text: '제1항에 있어서, 상기 인식부는 PointNet++ 기반의 다층 신경망을 포함하는, 라이다 기반 객체 감지 장치.' },
+  { id: 3, sel: true,  expanded: false, editing: false, editVal: '',
+    text: '제2항에 있어서, 상기 다층 신경망은 포인트 클라우드를 기둥(pillar) 단위로 처리하는, 라이다 기반 객체 감지 장치.' },
+  { id: 4, sel: false, expanded: false, editing: false, editVal: '',
+    text: '제1항에 있어서, 상기 데이터 수집부는 복수의 라이다 센서를 포함하는, 라이다 기반 객체 감지 장치.' },
+  { id: 5, sel: true,  expanded: false, editing: false, editVal: '',
+    text: '제1항에 있어서, 상기 출력부는 3D 바운딩 박스를 이용하여 감지된 객체의 위치 및 크기를 표시하는, 라이다 기반 객체 감지 장치.' },
 ];
 
 function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void }) {
-  const [claims, setClaims] = useState<ClaimItem[]>(INIT_CLAIMS);
-  const [expId, setExpId] = useState<number | null>(1);
+  const [claimsPhase, setClaimsPhase] = useState<'indep' | 'dep'>('indep');
+  // 독립항 후보 — 직접 수정 상태
+  const [cands, setCands] = useState<(IndepCand & { editing: boolean; editVal: string })[]>(
+    INDEP_CANDS.map(c => ({ ...c, editing: false, editVal: c.text }))
+  );
+  const [selIndepId, setSelIndepId] = useState<number>(1);
+  const [depGenerated, setDepGenerated] = useState(false);
+  const [deps, setDeps] = useState<DepItem[]>([]);
+  const [newDepText, setNewDepText] = useState('');
 
-  const upd = (next: ClaimItem[]) => {
-    setClaims(next);
-    let n = 0; onUpdate(next.filter(c => c.sel).map(c => `청구항 ${++n}.\n${c.text}`).join('\n\n'));
+  // 요약 문자열을 상위로 전달
+  const syncUpdate = (depList: DepItem[], indepText: string) => {
+    const selDeps = depList.filter(d => d.sel);
+    const summary = `독립항 1개, 종속항 ${selDeps.length}개\n\n청구항 1.\n${indepText}${
+      selDeps.map((d, i) => `\n\n청구항 ${i + 2}.\n${d.text}`).join('')
+    }`;
+    onUpdate(summary);
   };
-  const toggle = (id: number) => { if (!done) upd(claims.map(c => c.id === id ? { ...c, sel: !c.sel } : c)); };
-  let autoN = 0;
-  const numbered = claims.map(c => ({ ...c, num: c.sel ? ++autoN : null }));
-  const selCount = claims.filter(c => c.sel).length;
 
-  return (
-    <>
-      <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-xs2 font-semibold text-gray-600">청구항 ({selCount}개 선택)</span>
-          <span className="text-xs2 text-gray-400">독립항 {claims.filter(c => c.type === 'independent' && c.sel).length}개</span>
+  // 독립항 확정 → 종속항 단계로 이동
+  const confirmIndep = () => {
+    const sel = cands.find(c => c.id === selIndepId);
+    if (!sel) return;
+    const text = sel.editing ? sel.editVal : sel.text;
+    syncUpdate([], text);
+    setClaimsPhase('dep');
+  };
+
+  // 종속항 AI 생성
+  const generateDeps = () => {
+    setDeps(MOCK_DEPS.map(d => ({ ...d })));
+    setDepGenerated(true);
+    const sel = cands.find(c => c.id === selIndepId);
+    if (sel) syncUpdate(MOCK_DEPS, sel.editing ? sel.editVal : sel.text);
+  };
+
+  // 종속항 토글
+  const toggleDep = (id: number) => {
+    if (done) return;
+    const next = deps.map(d => d.id === id ? { ...d, sel: !d.sel } : d);
+    setDeps(next);
+    const sel = cands.find(c => c.id === selIndepId);
+    if (sel) syncUpdate(next, sel.editing ? sel.editVal : sel.text);
+  };
+
+  const removeDep = (id: number) => {
+    const next = deps.filter(d => d.id !== id);
+    setDeps(next);
+    const sel = cands.find(c => c.id === selIndepId);
+    if (sel) syncUpdate(next, sel.editing ? sel.editVal : sel.text);
+  };
+
+  const addDep = () => {
+    if (!newDepText.trim()) return;
+    const maxId = deps.reduce((m, d) => Math.max(m, d.id), 0);
+    const next = [...deps, { id: maxId + 1, text: newDepText.trim(), sel: true, expanded: false, editing: false, editVal: newDepText.trim() }];
+    setDeps(next);
+    setNewDepText('');
+    const sel = cands.find(c => c.id === selIndepId);
+    if (sel) syncUpdate(next, sel.editing ? sel.editVal : sel.text);
+  };
+
+  const selDepsCount = deps.filter(d => d.sel).length;
+  const selectedIndep = cands.find(c => c.id === selIndepId);
+
+  // ── Phase A: 독립항 선택 ─────────────────────────────────────────────
+  if (claimsPhase === 'indep') {
+    return (
+      <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2.5 ml-1.5">
+        <div className="text-xs2 text-gray-500 mb-1">
+          기초자료를 분석하여 독립항 후보를 생성했습니다. 선택하거나 직접 수정하세요.
         </div>
-        {numbered.map(claim => (
-          <div key={claim.id} className={clsx('rounded-lg border transition-all',
-            claim.sel && !done ? 'border-blue-300' : '',
-            !claim.sel ? 'border-gray-200 opacity-50' : '',
-            done && claim.sel ? 'border-green-200' : '')}>
-            <div className="flex items-center gap-2 px-3 py-2 cursor-pointer" onClick={() => setExpId(expId === claim.id ? null : claim.id)}>
-              <span className={clsx('w-5 h-5 rounded flex items-center justify-center shrink-0',
-                claim.sel ? 'bg-blue-600 text-white' : 'bg-gray-200')}>
-                {claim.sel && <Icon name="check" size={9} />}
-              </span>
-              <span className={clsx('text-xs2 font-bold shrink-0', claim.num ? 'text-blue-700' : 'text-gray-400')}>청구항 {claim.num ?? '—'}</span>
-              <span className={clsx('text-xs2 px-1.5 py-0.5 rounded-full shrink-0',
-                claim.type === 'independent' ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700')}>
-                {claim.type === 'independent' ? '독립항' : `종속(→${claim.refId})`}
-              </span>
-              {!done && <button onClick={e => { e.stopPropagation(); toggle(claim.id); }} className="ml-auto text-gray-300 hover:text-red-400"><Icon name="close" size={10} /></button>}
+        {cands.map(cand => {
+          const isSelected = selIndepId === cand.id;
+          return (
+            <div key={cand.id}
+              onClick={() => { if (!cand.editing) setSelIndepId(cand.id); }}
+              className={clsx('rounded-lg border-2 p-3 cursor-pointer transition-all',
+                isSelected && !cand.editing ? 'border-blue-700 bg-blue-50' : '',
+                cand.editing ? 'border-blue-500 bg-blue-50' : '',
+                !isSelected && !cand.editing ? 'border-ck-border bg-ck-bg hover:border-blue-300' : ''
+              )}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className={clsx('w-6 h-6 rounded-full flex items-center justify-center text-xs2 font-bold shrink-0',
+                    isSelected ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-600')}>
+                    {cand.label}
+                  </span>
+                  <span className="text-xs2 px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">독립항</span>
+                </div>
+                {!done && (
+                  <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                    {cand.editing ? (
+                      <>
+                        <button onClick={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, editing: false } : c))}
+                          className="text-xs2 text-gray-500 hover:text-red-500 px-2 py-0.5 rounded border border-gray-200 hover:border-red-200">취소</button>
+                        <button onClick={() => { setCands(p => p.map(c => c.id === cand.id ? { ...c, editing: false, text: c.editVal } : c)); setSelIndepId(cand.id); }}
+                          className="text-xs2 text-white bg-blue-600 hover:bg-blue-700 px-2 py-0.5 rounded">저장</button>
+                      </>
+                    ) : (
+                      <button onClick={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, editing: true, editVal: c.text } : c))}
+                        className="text-xs2 text-gray-500 hover:text-blue-600 px-2 py-0.5 rounded border border-gray-200 hover:border-blue-300">
+                        직접 수정
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+              {cand.editing ? (
+                <textarea
+                  className="w-full text-xs2 text-gray-800 bg-white border border-blue-300 rounded px-2 py-2 outline-none resize-none leading-relaxed"
+                  rows={5}
+                  value={cand.editVal}
+                  onChange={e => setCands(p => p.map(c => c.id === cand.id ? { ...c, editVal: e.target.value } : c))}
+                  onClick={e => e.stopPropagation()}
+                  autoFocus
+                />
+              ) : (
+                <p className="text-xs2 text-gray-700 leading-relaxed whitespace-pre-line">{cand.text}</p>
+              )}
             </div>
-            {expId === claim.id && (
-              <div className="px-3 pb-2"><p className="text-xs2 text-gray-600 leading-relaxed border-t border-gray-100 pt-2">{claim.text}</p></div>
-            )}
-          </div>
-        ))}
+          );
+        })}
+
         {!done && (
-          <button className="w-full border border-dashed border-gray-300 rounded-lg py-2 text-xs2 text-gray-400 hover:border-blue-400 hover:text-blue-600 transition-colors">
-            + 청구항 추가
+          <button
+            onClick={confirmIndep}
+            className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm2 font-semibold hover:bg-blue-700 active:scale-[0.98] transition-all mt-2">
+            이 독립항으로 종속항 생성 →
           </button>
         )}
       </div>
+    );
+  }
+
+  // ── Phase B: 종속항 생성 및 관리 ────────────────────────────────────
+  return (
+    <>
+      <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2 ml-1.5">
+
+        {/* 선택된 독립항 — 요약 카드 */}
+        <div className="rounded-lg border-2 border-green-400 bg-green-50 p-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-2">
+              <Icon name="check" size={12} className="text-green-600" />
+              <span className="text-xs2 font-bold text-green-700">청구항 1 · 독립항 (확정)</span>
+            </div>
+            {!done && (
+              <button onClick={() => setClaimsPhase('indep')}
+                className="text-xs2 text-gray-500 hover:text-blue-600 px-2 py-0.5 rounded border border-gray-200 hover:border-blue-300">
+                수정
+              </button>
+            )}
+          </div>
+          <p className="text-xs2 text-gray-700 leading-relaxed whitespace-pre-line line-clamp-3">
+            {selectedIndep?.editing ? selectedIndep.editVal : selectedIndep?.text}
+          </p>
+        </div>
+
+        {/* 종속항 섹션 */}
+        <div className="flex items-center justify-between mt-3 mb-1">
+          <span className="text-xs2 font-semibold text-gray-600">
+            종속항 {depGenerated ? `(${selDepsCount}개 선택)` : ''}
+          </span>
+          {!done && !depGenerated && (
+            <button onClick={generateDeps}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white rounded-lg text-xs2 font-semibold hover:bg-violet-700 active:scale-[0.98] transition-all">
+              <div className="w-4 h-4 rounded flex items-center justify-center text-white font-bold text-xs2"
+                style={{ background: 'rgba(255,255,255,0.3)' }}>AI</div>
+              AI 종속항 생성
+            </button>
+          )}
+        </div>
+
+        {!depGenerated && (
+          <div className="rounded-lg border-2 border-dashed border-gray-200 p-4 text-center">
+            <p className="text-xs2 text-gray-400 mb-2">독립항을 기반으로 종속항을 자동 생성합니다</p>
+            <button onClick={generateDeps}
+              className="px-4 py-2 bg-violet-600 text-white rounded-lg text-xs2 font-semibold hover:bg-violet-700 transition-all">
+              AI 종속항 생성
+            </button>
+          </div>
+        )}
+
+        {depGenerated && deps.map((dep, idx) => (
+          <div key={dep.id}
+            className={clsx('rounded-lg border transition-all',
+              dep.sel && !done ? 'border-blue-300 bg-white' : '',
+              !dep.sel ? 'border-gray-200 bg-gray-50 opacity-60' : '',
+              done && dep.sel ? 'border-green-200 bg-green-50/30' : ''
+            )}>
+            <div className="flex items-center gap-2 px-3 py-2 cursor-pointer"
+              onClick={() => setDeps(p => p.map(d => d.id === dep.id ? { ...d, expanded: !d.expanded } : d))}>
+              <button
+                onClick={e => { e.stopPropagation(); toggleDep(dep.id); }}
+                className={clsx('w-5 h-5 rounded flex items-center justify-center shrink-0 transition-colors',
+                  dep.sel ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300')}>
+                {dep.sel && <Icon name="check" size={9} />}
+              </button>
+              <span className={clsx('text-xs2 font-bold shrink-0',
+                dep.sel ? 'text-blue-700' : 'text-gray-400')}>
+                청구항 {dep.sel ? idx + 2 : '—'}
+              </span>
+              <span className="text-xs2 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 shrink-0">
+                종속(→1)
+              </span>
+              <span className="text-xs2 text-gray-500 flex-1 truncate">{dep.text.slice(0, 30)}...</span>
+              {!done && (
+                <button onClick={e => { e.stopPropagation(); removeDep(dep.id); }}
+                  className="shrink-0 text-gray-300 hover:text-red-400 ml-1">
+                  <Icon name="close" size={10} />
+                </button>
+              )}
+            </div>
+
+            {dep.expanded && (
+              <div className="px-3 pb-3 border-t border-gray-100 pt-2">
+                {dep.editing ? (
+                  <>
+                    <textarea
+                      className="w-full text-xs2 text-gray-800 border border-blue-300 rounded px-2 py-2 outline-none resize-none leading-relaxed"
+                      rows={4}
+                      value={dep.editVal}
+                      onChange={e => setDeps(p => p.map(d => d.id === dep.id ? { ...d, editVal: e.target.value } : d))}
+                      autoFocus
+                    />
+                    <div className="flex justify-end gap-1.5 mt-1.5">
+                      <button onClick={() => setDeps(p => p.map(d => d.id === dep.id ? { ...d, editing: false } : d))}
+                        className="text-xs2 text-gray-500 hover:text-red-500 px-2 py-0.5 rounded border border-gray-200">취소</button>
+                      <button onClick={() => setDeps(p => p.map(d => d.id === dep.id ? { ...d, editing: false, text: d.editVal } : d))}
+                        className="text-xs2 text-white bg-blue-600 px-2 py-0.5 rounded">저장</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs2 text-gray-700 leading-relaxed">{dep.text}</p>
+                    {!done && (
+                      <button
+                        onClick={() => setDeps(p => p.map(d => d.id === dep.id ? { ...d, editing: true, editVal: d.text } : d))}
+                        className="mt-2 text-xs2 text-violet-600 hover:text-violet-800 flex items-center gap-1">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="10" height="10">
+                          <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10" />
+                          <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6" />
+                        </svg>
+                        AI로 수정하기
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+
+        {/* 종속항 직접 추가 */}
+        {depGenerated && !done && (
+          <div className="flex gap-1.5 mt-1">
+            <input
+              className="input text-xs2 py-1.5 flex-1"
+              placeholder="종속항 직접 추가... (제1항에 있어서, ...)"
+              value={newDepText}
+              onChange={e => setNewDepText(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addDep()}
+            />
+            <button onClick={addDep} className="btn-outline btn-xs px-2 shrink-0">
+              <Icon name="plus" size={12} />
+            </button>
+          </div>
+        )}
+      </div>
+
       {done && (
-        <div className="p-3 border-t border-gray-100 bg-green-50 shrink-0">
-          <div className="flex items-center gap-1.5 text-sm2 text-green-700 font-medium"><Icon name="check" size={13} /> 청구항 확정 완료</div>
+        <div className="p-3 border-t border-gray-100 bg-green-50 shrink-0 ml-1.5">
+          <div className="flex items-center gap-1.5 text-sm2 text-green-700 font-medium">
+            <Icon name="check" size={13} /> 청구항 확정 완료 (독립항 1개, 종속항 {selDepsCount}개)
+          </div>
         </div>
       )}
     </>
