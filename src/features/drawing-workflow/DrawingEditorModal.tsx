@@ -69,6 +69,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
   const [zoomedCandId, setZoomedCandId] = useState<string | null>(null);
   const [regenPrompt, setRegenPrompt] = useState('');
   const [showRegen, setShowRegen] = useState(false);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null); // 구성요소 갱신 알림
 
   const activeDraw = drawings.find(d => d.id === activeId);
   const workStage = workStageMap[activeId] || 'crop';
@@ -141,6 +142,14 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
 
   return (
     <>
+      {/* ── 구성요소 갱신 알림 토스트 ── */}
+      {syncNotice && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[70] bg-green-600 text-white text-sm2 font-semibold px-4 py-2 rounded-lg shadow-xl flex items-center gap-2 animate-fade-up">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/><path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+          {syncNotice}
+        </div>
+      )}
+
       {/* ── 백드롭 + 고정 크기 모달 ── */}
       <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
         <div className="bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden w-full"
@@ -525,6 +534,12 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
               onExportComplete={(id, blob) => {
                 const url = URL.createObjectURL(blob);
                 onSave(id, { exportedImageUrl: url, stage: 'done' });
+              }}
+              onComponentsSync={(refs) => {
+                // 수락된 부호 → 구성요소 이름 일괄 갱신 (mock: 알림 표시)
+                const names = refs.map(r => `${r.number} ${r.name}`).join(', ');
+                setSyncNotice(`구성요소 갱신 완료: ${names}`);
+                setTimeout(() => setSyncNotice(null), 4000);
               }}
               onClose={() => setEditorOpen(false)}
             />

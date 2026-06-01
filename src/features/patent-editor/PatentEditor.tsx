@@ -57,6 +57,7 @@ export function PatentEditor({
   onDescriptionChange,
   availableReferences,
   inventionComponents,
+  onComponentsSync,
   onReferenceAdd,
   onReferenceUpdate,
   onReferenceDelete,
@@ -93,9 +94,7 @@ export function PatentEditor({
   }, []);
 
   const handleAiAccept = useCallback((rec: AiRefRecommendation, _linkedComponentNumber: string) => {
-    // 캔버스에 부호 원형 삽입 (위치는 rec.posXPct/posYPct 기반)
     onReferenceAdd?.({ number: rec.refNumber, name: rec.componentName });
-    // TODO: canvasHandleRef.current?.placeRefCircle(rec.refNumber, rec.posXPct, rec.posYPct)
     setAiRecs(prev => prev.map(r => r.id === rec.id ? { ...r, status: 'accepted' } : r));
   }, [onReferenceAdd]);
 
@@ -112,6 +111,27 @@ export function PatentEditor({
     if (!comp) return;
     setAiRecs(prev => prev.map(r => r.id === recId ? { ...r, componentName: comp.name } : r));
   }, [inventionComponents]);
+
+  // 배지 드래그 — 캔버스 래퍼 기준 상대 좌표로 posXPct/posYPct 갱신
+  const canvasWrapperRef = useRef<HTMLDivElement>(null);
+  const handleBadgeDrag = useCallback((recId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const wrapper = canvasWrapperRef.current;
+    if (!wrapper) return;
+    const rect = wrapper.getBoundingClientRect();
+    const onMove = (ev: MouseEvent) => {
+      const x = Math.max(2, Math.min(98, ((ev.clientX - rect.left) / rect.width) * 100));
+      const y = Math.max(2, Math.min(95, ((ev.clientY - rect.top) / rect.height) * 100));
+      setAiRecs(prev => prev.map(r => r.id === recId ? { ...r, posXPct: x, posYPct: y } : r));
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, []);
 
   const components = useMemo(() => inventionComponents ?? [], [inventionComponents]);
   const [leftWidth, setLeftWidth] = useState(() =>
@@ -271,12 +291,19 @@ export function PatentEditor({
     [onReferenceDelete],
   );
 
-  // 닫기 전 현재 도면 자동 저장
+  // 닫기 전 현재 도면 자동 저장 + 수락된 부호 일괄 갱신 콜백
   const handleClose = useCallback(() => {
     const json = serializeCurrentCanvas();
     if (json) onSaveProject(activeDrawingId, json);
+    // 수락된 AI 추천 부호를 구성요소 목록에 동기화
+    const accepted = aiRecs
+      .filter(r => r.status === 'accepted')
+      .map(r => ({ number: r.refNumber, name: r.componentName }));
+    if (accepted.length > 0) {
+      onComponentsSync?.(accepted);
+    }
     onClose();
-  }, [activeDrawingId, onClose, onSaveProject, serializeCurrentCanvas]);
+  }, [activeDrawingId, aiRecs, onClose, onComponentsSync, onSaveProject, serializeCurrentCanvas]);
 
   if (!activeDrawing) {
     return (
@@ -385,7 +412,7 @@ export function PatentEditor({
           <div className="flex flex-1 min-h-0 overflow-hidden">
             <div className="flex-1 min-h-0 overflow-auto bg-gray-100 p-4 flex items-center justify-center">
               {/* 캔버스 + AI pending 배지 오버레이 */}
-              <div className="relative inline-block">
+              <div className="relative inline-block" ref={canvasWrapperRef}>
                 {/* key={activeDrawing.id} : 도면 전환 시 fabric 캔버스를 완전히 새로 마운트 */}
                 <EditorCanvas
                   key={activeDrawing.id}
@@ -397,25 +424,25 @@ export function PatentEditor({
                   availableReferences={refs}
                   onReferenceAdd={onReferenceAdd}
                 />
-                {/* AI pending 배지 (수락 전 시각화) */}
+                {/* AI pending 배지 — 드래그로 위치 조정 가능 */}
                 {pendingRecs.map(rec => (
                   <div
                     key={rec.id}
-                    className="absolute flex flex-col items-center pointer-events-none"
-                    style={{
-                      left: `${rec.posXPct}%`,
-                      top: `${rec.posYPct}%`,
-                      transform: 'translate(-50%, -100%)',
-                    }}
-                    title={`${rec.refNumber} · ${rec.componentName}`}
+                    className="absolute flex flex-col items-center select-none z-10"
+                    style={{ left: `${rec.posXPct}%`, top: `${rec.posYPct}%`, transform: 'translate(-50%, -100%)' }}
+                    title={`${rec.refNumber} · ${rec.componentName} — 드래그하여 위치 조정`}
                   >
-                    <div className="bg-amber-500 text-white text-xs2 rounded px-1.5 py-0.5 font-semibold shadow-lg mb-0.5 whitespace-nowrap border border-amber-300">
-                      {rec.refNumber} {rec.componentName}
+                    {/* 라벨 */}
+                    <div className="bg-amber-500 text-white text-xs2 rounded px-1.5 py-0.5 font-semibold shadow-lg mb-0.5 whitespace-nowrap border border-amber-300 cursor-move"
+                      onMouseDown={e => handleBadgeDrag(rec.id, e)}>
+                      ⠿ {rec.refNumber} {rec.componentName}
                     </div>
-                    <div className="w-5 h-5 rounded-full bg-amber-500 border-2 border-white shadow-lg animate-pulse flex items-center justify-center">
-                      <span className="text-white font-bold" style={{ fontSize: 8 }}>{rec.refNumber.slice(0,3)}</span>
+                    {/* 핀 */}
+                    <div className="w-5 h-5 rounded-full bg-amber-500 border-2 border-white shadow-lg flex items-center justify-center pointer-events-none">
+                      <span className="text-white font-bold" style={{ fontSize: 7 }}>{rec.refNumber}</span>
                     </div>
-                    <div className="w-px h-8 bg-amber-400 opacity-70" />
+                    {/* 지시선 */}
+                    <div className="w-px h-8 bg-amber-400 opacity-60 pointer-events-none" />
                   </div>
                 ))}
               </div>
