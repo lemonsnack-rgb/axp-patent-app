@@ -770,49 +770,63 @@ function DrawingsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => voi
   return (
     <>
       <div className="flex-1 overflow-y-auto scroll-thin px-3 py-3 ml-1.5 space-y-1.5">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs2 font-semibold text-gray-600">
-            추출된 도면 ({drawings.length}개 · 완료 {doneCount}개)
-          </span>
-          <button onClick={() => drawings.length > 0 && openEditor(drawings[0].id)}
-            className="btn-outline btn-xs flex items-center gap-1">
-            <Icon name="image" size={11} /> 편집기 열기
-          </button>
-        </div>
+        {/* 헤더 — 전체 "편집기 열기" 버튼 제거 (개별 카드에서 편집 진입) */}
+        <p className="text-xs2 font-semibold text-gray-500 mb-2">
+          추출된 도면 <span className="font-normal text-gray-400">({drawings.length}개 · 완료 {doneCount}개)</span>
+        </p>
 
-        {drawings.map(d => (
-          <button key={d.id} disabled={done}
-            onClick={() => !done && openEditor(d.id)}
-            className={clsx(
-              'w-full text-left rounded-lg border transition-all flex items-center gap-2.5 px-2.5 py-2',
-              !done && 'hover:border-blue-300 hover:shadow-sm cursor-pointer',
-              d.stage === 'done' ? 'border-green-200 bg-green-50/30' : 'border-gray-200 bg-white',
-              done && 'opacity-60 cursor-default',
-            )}>
-            {/* 썸네일 */}
-            <div className="w-10 shrink-0 aspect-[4/3] bg-gray-100 rounded border border-gray-200 flex items-center justify-center overflow-hidden">
-              {d.exportedImageUrl
-                ? <img src={d.exportedImageUrl} className="w-full h-full object-contain" alt="" />
-                : <Icon name="image" size={12} className="text-gray-300" />}
-            </div>
-            {/* 정보 */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1 mb-0.5">
-                <span className="text-xs2 font-bold text-gray-700">기호 {d.symbol}</span>
-                <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', LABEL_STYLES[d.label])}>
-                  {d.label}
-                </span>
+        {drawings.map(d => {
+          const isEditable = !done;
+          const stageDot = STAGE_DOT[d.stage] || 'bg-gray-300';
+          const isDone = d.stage === 'done';
+          return (
+            <div key={d.id}
+              className={clsx(
+                'rounded-lg border transition-all overflow-hidden',
+                isDone ? 'border-green-200 bg-green-50/30' : 'border-gray-200 bg-white',
+                done && 'opacity-60',
+              )}>
+              {/* 썸네일 + 메타 */}
+              <div className="flex items-center gap-2.5 px-2.5 pt-2 pb-1.5">
+                <div className="w-10 shrink-0 aspect-[4/3] bg-gray-100 rounded border border-gray-200 flex items-center justify-center overflow-hidden">
+                  {d.exportedImageUrl
+                    ? <img src={d.exportedImageUrl} className="w-full h-full object-contain" alt="" />
+                    : <Icon name="image" size={12} className="text-gray-300" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <span className="text-xs2 font-bold text-gray-700">기호 {d.symbol}</span>
+                    <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', LABEL_STYLES[d.label])}>
+                      {d.label}
+                    </span>
+                  </div>
+                  <p className="text-xs2 text-gray-700 font-semibold truncate">{d.name}</p>
+                </div>
+                {/* 완료 상태 */}
+                <div className="shrink-0">
+                  {isDone
+                    ? <Icon name="check" size={11} className="text-green-500" />
+                    : <span className={clsx('w-2 h-2 rounded-full block', stageDot)} />}
+                </div>
               </div>
-              <p className="text-xs2 text-gray-700 font-semibold truncate">{d.name}</p>
+
+              {/* 편집 버튼 — 항상 표시, 클릭 가능함을 명확히 인지 */}
+              {isEditable && (
+                <button
+                  onClick={() => openEditor(d.id)}
+                  className={clsx(
+                    'w-full flex items-center justify-center gap-1 py-1 text-xs2 font-semibold transition-colors border-t',
+                    isDone
+                      ? 'border-green-100 text-green-600 hover:bg-green-50'
+                      : 'border-gray-100 text-blue-600 hover:bg-blue-50',
+                  )}>
+                  <Icon name="edit" size={10} />
+                  {isDone ? '편집 내용 보기 →' : '도면 편집 →'}
+                </button>
+              )}
             </div>
-            {/* 상태 dot */}
-            <div className="shrink-0 flex items-center gap-1">
-              {d.stage === 'done'
-                ? <Icon name="check" size={11} className="text-green-500" />
-                : <span className={clsx('w-2 h-2 rounded-full', STAGE_DOT[d.stage] || 'bg-gray-300')} />}
-            </div>
-          </button>
-        ))}
+          );
+        })}
       </div>
 
       {done && (
