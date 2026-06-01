@@ -370,7 +370,7 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
   // description 패널 내부 모드 추적 (view/edit/prompt/diff)
   const [descMode, setDescMode] = useState<string>('view');
   // description 패널의 prompt 재입력 요청 콜백
-  const [descPromptTrigger, setDescPromptTrigger] = useState(0);
+  const [descPromptTrigger] = useState(0);
   // description 패널의 현재 섹션 상태 (GuidePanel 하단 버튼 제어용)
   const [descSubInfo, setDescSubInfo] = useState<{
     subStep: number; currentLabel: string; allDone: boolean; doConfirm: (() => void) | null;
@@ -568,7 +568,7 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
         </div>
       )}
 
-      {/* 하단 버튼 바 — description diff 모드에서는 다른 버튼 표시 */}
+      {/* 하단 버튼 바 */}
       <div className="flex gap-2 px-3 py-2.5 border-t border-ck-border bg-ck-bg shrink-0 ml-1.5">
         <button
           onClick={onPrev}
@@ -578,49 +578,22 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
           ← 이전
         </button>
 
-        {/* description 패널 diff 모드: "다시 수정 요청" 표시, "선택 확인 →" 숨김 */}
-        {step === 'description' && descMode === 'diff' ? (
-          <button
-            onClick={() => setDescPromptTrigger(t => t + 1)}
-            className="flex-1 py-1.5 border border-violet-300 text-violet-600 rounded text-xs2 font-semibold hover:bg-violet-50 flex items-center justify-center gap-1"
-          >
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11">
-              <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10"/>
-              <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6"/>
-            </svg>
-            다시 수정 요청
-          </button>
-        ) : (
-          <button
-            className="flex-1 py-1.5 border border-gray-300 rounded text-xs2 text-gray-500 hover:bg-gray-50 flex items-center justify-center gap-1"
-          >
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11">
-              <path d="M2 8a6 6 0 0 1 10.3-4.1L14 2v4h-4"/>
-              <path d="M14 8a6 6 0 0 1-10.3 4.1L2 14v-4h4"/>
-            </svg>
-            프롬프트 재생성
-          </button>
-        )}
-
         {/* description diff 모드에서 확인 버튼 숨김 */}
         {!(step === 'description' && descMode === 'diff') && (
           !isDone ? (
             step === 'description' ? (
-              // description: 섹션별 단계 확정 (단일 CTA)
               descSubInfo.allDone ? (
-                // 모든 섹션 완료 → 다음 단계(구성요소)로
                 <button onClick={handleConfirm}
                   className="flex-1 py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800">
-                  발명의 설명 완료 →
+                  다음 →
                 </button>
               ) : (
-                // 현재 섹션 확정
                 <button
                   onClick={() => descSubInfo.doConfirm?.()}
                   disabled={descMode === 'prompt' || descMode === 'diff'}
                   className="flex-1 py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  {descSubInfo.currentLabel} 확정 →
+                  다음 →
                 </button>
               )
             ) : (
@@ -629,7 +602,7 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
                 disabled={!isSpecial && !curSel.trim()}
                 className="flex-1 py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                선택 확인 →
+                다음 →
               </button>
             )
           ) : (
@@ -971,31 +944,13 @@ function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChan
 
   return (
     <>
-      {/* 진행 표시 */}
+      {/* 현재 섹션 표시 (스텝바 없이 섹션명만) */}
       <div className="mx-3 mt-3 mb-2 shrink-0">
-        <div className="flex items-center gap-1 mb-2">
-          {DESC_SECTIONS.map((s, i) => (
-            <div key={s.key} className="flex items-center">
-              <button
-                onClick={() => i <= subStep && setSubStep(i)}
-                className={clsx('w-5 h-5 rounded-full text-xs2 font-bold flex items-center justify-center border-2 transition-all',
-                  confirmed[s.key] ? 'bg-green-500 border-green-500 text-white' :
-                  i === subStep ? 'bg-blue-700 border-blue-700 text-white' :
-                  'bg-white border-gray-300 text-gray-400')}
-              >
-                {confirmed[s.key] ? <Icon name="check" size={9} /> : i + 1}
-              </button>
-              {i < DESC_SECTIONS.length - 1 && (
-                <div className={clsx('h-0.5 w-3', confirmed[s.key] ? 'bg-green-400' : 'bg-gray-200')} />
-              )}
-            </div>
-          ))}
-          <span className="text-xs2 text-gray-400 ml-1">{subStep + 1}/{DESC_SECTIONS.length}</span>
-        </div>
         <div className="flex items-center gap-2">
           <span className="text-sm2 font-bold text-gray-800">{sec.label}</span>
           {sec.badge2 && <span className="text-xs2 text-gray-400">{sec.badge2}</span>}
-          {isDone && <span className="ml-auto text-xs2 text-green-600 font-medium flex items-center gap-1"><Icon name="check" size={10} /> 확정됨</span>}
+          <span className="text-xs2 text-gray-400 ml-auto">{safeSubStep + 1}/{DESC_SECTIONS.length}</span>
+          {isDone && <span className="text-xs2 text-green-600 font-medium flex items-center gap-1"><Icon name="check" size={10} /> 확정됨</span>}
         </div>
       </div>
 
