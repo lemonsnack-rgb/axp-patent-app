@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { StoreProvider, useStore } from './store';
 import { ToastProvider } from './components/Toast';
 import { TopBar } from './components/TopBar';
@@ -9,6 +10,7 @@ import { LibraryView } from './views/LibraryView';
 import { ClientsView } from './views/ClientsView';
 import { SearchView } from './views/SearchView';
 import { SpecView } from './views/SpecView';
+import { LoginView } from './components/LoginView';
 
 function Shell() {
   const { mode } = useStore();
@@ -32,6 +34,14 @@ function Shell() {
 }
 
 export default function App() {
+  const [loggedIn, setLoggedIn] = useState(
+    () => sessionStorage.getItem('axp_auth') === '1'
+  );
+
+  if (!loggedIn) {
+    return <LoginView onLogin={() => setLoggedIn(true)} />;
+  }
+
   return (
     <StoreProvider>
       <ToastProvider>
