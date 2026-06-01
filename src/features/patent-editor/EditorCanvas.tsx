@@ -36,6 +36,8 @@ export interface EditorCanvasHandle {
   toggleHatchOnSelection: () => void;
   exportBinaryReady: () => HTMLCanvasElement | null;
   removeAllUsesOfRef: (refNumber: string) => number;
+  /** AI 추천 위치에 참조 부호를 자동 배치 */
+  placeInitialRefs: (refs: EditorReference[]) => void;
 }
 
 interface Props {
@@ -740,6 +742,27 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
         if (!fc) return null;
         fc.discardActiveObject();
         return withOverlaysHidden(fc, () => fc.toCanvasElement(1));
+      },
+      placeInitialRefs: (refs: EditorReference[]) => {
+        const fc = fabricRef.current;
+        if (!fc || refs.length === 0) return;
+        // 캔버스 크기 기반으로 배치 위치 분산 (AI 추천 위치 모의)
+        const W = fc.getWidth();
+        const H = fc.getHeight();
+        const positions = [
+          { anchor: { x: W * 0.25, y: H * 0.35 }, text: { x: W * 0.08, y: H * 0.12 } },
+          { anchor: { x: W * 0.55, y: H * 0.45 }, text: { x: W * 0.72, y: H * 0.20 } },
+          { anchor: { x: W * 0.45, y: H * 0.65 }, text: { x: W * 0.25, y: H * 0.78 } },
+          { anchor: { x: W * 0.75, y: H * 0.30 }, text: { x: W * 0.88, y: H * 0.48 } },
+          { anchor: { x: W * 0.65, y: H * 0.70 }, text: { x: W * 0.82, y: H * 0.78 } },
+        ];
+        const state = useEditorStore.getState();
+        refs.slice(0, positions.length).forEach((ref, i) => {
+          const { anchor, text } = positions[i];
+          spawnLeaderPair(fc, anchor, text, state.lineStyle, state.leaderCurve, ref);
+        });
+        fc.discardActiveObject();
+        fc.requestRenderAll();
       },
       removeAllUsesOfRef: (refNumber: string) => {
         const fc = fabricRef.current;

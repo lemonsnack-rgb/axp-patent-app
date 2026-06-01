@@ -133,6 +133,18 @@ export function PatentEditor({
     setDescriptionDraft(activeDrawing?.description ?? "");
   }, [activeDrawing?.id, activeDrawing?.caption, activeDrawing?.description]);
 
+  // 저장 데이터 없을 때 구성요소를 캔버스에 자동 배치 (AI 추천 위치)
+  useEffect(() => {
+    if (!activeDrawing?.savedEditorDataJson && refs.length > 0) {
+      // EditorCanvas가 마운트된 후 약간의 지연 후 배치
+      const t = setTimeout(() => {
+        canvasHandleRef.current?.placeInitialRefs(refs);
+      }, 300);
+      return () => clearTimeout(t);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDrawing?.id]);
+
   const commitCaption = useCallback(() => {
     if (!activeDrawing) return;
     if (captionDraft !== activeDrawing.caption) {
