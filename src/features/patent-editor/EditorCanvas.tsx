@@ -1213,20 +1213,18 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
       const syncSelectionFromCanvas = () => {
         const active = fc.getActiveObject();
 
-        // 지시선 앵커 핸들 자체가 선택된 경우: 드래그를 위해 핸들 유지
-        if (active && hasMeta(active, LEADER_ANCHOR)) {
-          // handleObjectMoving에서 드래그 처리. 핸들을 제거하지 않음.
+        // 핸들이 선택된 경우: removeAllEndpointHandles 호출 전에 체크
+        // → 핸들을 제거하지 않고 드래그 허용
+        if (active && (
+          hasMeta(active, LEADER_ANCHOR) ||          // 지시선 앵커 핸들
+          hasMeta(active, META.isEndpointHandle)      // user line 끝점 핸들
+        )) {
+          // handleObjectMoving에서 각각 처리
           return;
         }
 
         removeAllEndpointHandles(fc);
         if (active && active.type !== "activeselection") {
-          // Endpoint handle 자체가 선택된 경우 — 드래그를 위해 핸들 그대로 유지
-          // (부모 라인으로 redirect하면 drag가 라인 전체 이동이 되어버림)
-          if (hasMeta(active, META.isEndpointHandle)) {
-            // handleObjectMoving에서 rebuildUserLineWithEndpoint가 처리
-            return;
-          }
           setSelectedObj(active);
           setShapeNameInput(
             (getMeta<string>(active, META.shapeName) as string | undefined) ??
