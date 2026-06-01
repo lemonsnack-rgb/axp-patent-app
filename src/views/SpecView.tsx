@@ -897,14 +897,21 @@ function DrawingsPanel({ done, onUpdate, inventionComponents }: {
   );
 }
 
-// ── 청구항 패널 (#22) — 독립항 → 종속항 2단계 플로우 ──────────────────
-// Phase 'indep' : 독립항 후보 A/B 중 선택 (기존 명칭 선택과 동일 패턴)
-// Phase 'dep'   : 선택된 독립항 기반으로 종속항 생성·관리
-interface IndepCand { id: number; label: string; text: string }
-const INDEP_CANDS: IndepCand[] = [
+// ── 청구항 패널 (#22) — n개 독립항 다중 선택 + 독립항별 종속항 + AI 재생성 ──
+// Phase 'indep' : 독립항 후보 중 n개 체크박스 선택
+// Phase 'dep'   : 선택된 독립항별 종속항 섹션 + AI 재생성 인라인 UI
+
+interface IndepCandState {
+  id: number; label: string; text: string;
+  selected: boolean;
+  editing: boolean; editVal: string;
+  aiOpen: boolean; aiPromptVal: string;
+}
+
+const INDEP_CANDS_INIT: Omit<IndepCandState, 'selected'|'editing'|'editVal'|'aiOpen'|'aiPromptVal'>[] = [
   {
     id: 1, label: 'A',
-    text: '라이다 센서로부터 3차원 포인트 클라우드 데이터를 획득하는 데이터 수집부;\n상기 포인트 클라우드 데이터에서 지면 포인트를 분리하고 노이즈를 제거하는 전처리부;\n딥러닝 모델을 적용하여 객체를 분류하는 인식부를 포함하며,\n상기 마찰면의 외부 노출 구조에 의해 실시간 3D 객체 인식이 가능한 라이다 기반 객체 감지 장치.',
+    text: '라이다 센서로부터 3차원 포인트 클라우드 데이터를 획득하는 데이터 수집부;\n상기 포인트 클라우드 데이터에서 지면 포인트를 분리하고 노이즈를 제거하는 전처리부;\n딥러닝 모델을 적용하여 객체를 분류하는 인식부를 포함하며,\n실시간 3D 객체 인식이 가능한 라이다 기반 객체 감지 장치.',
   },
   {
     id: 2, label: 'B',
@@ -912,296 +919,478 @@ const INDEP_CANDS: IndepCand[] = [
   },
 ];
 
-interface DepItem { id: number; text: string; sel: boolean; expanded: boolean; editing: boolean; editVal: string }
-const MOCK_DEPS: DepItem[] = [
-  { id: 1, sel: true,  expanded: false, editing: false, editVal: '',
-    text: '제1항에 있어서, 상기 전처리부는 RANSAC 알고리즘을 이용하여 지면 포인트를 분리하는, 라이다 기반 객체 감지 장치.' },
-  { id: 2, sel: true,  expanded: false, editing: false, editVal: '',
-    text: '제1항에 있어서, 상기 인식부는 PointNet++ 기반의 다층 신경망을 포함하는, 라이다 기반 객체 감지 장치.' },
-  { id: 3, sel: true,  expanded: false, editing: false, editVal: '',
-    text: '제2항에 있어서, 상기 다층 신경망은 포인트 클라우드를 기둥(pillar) 단위로 처리하는, 라이다 기반 객체 감지 장치.' },
-  { id: 4, sel: false, expanded: false, editing: false, editVal: '',
-    text: '제1항에 있어서, 상기 데이터 수집부는 복수의 라이다 센서를 포함하는, 라이다 기반 객체 감지 장치.' },
-  { id: 5, sel: true,  expanded: false, editing: false, editVal: '',
-    text: '제1항에 있어서, 상기 출력부는 3D 바운딩 박스를 이용하여 감지된 객체의 위치 및 크기를 표시하는, 라이다 기반 객체 감지 장치.' },
-];
+interface DepItemState {
+  id: number; text: string; sel: boolean; expanded: boolean;
+  editing: boolean; editVal: string;
+  aiOpen: boolean; aiPromptVal: string;
+}
+
+// 독립항별 더미 종속항 — 실제에서는 AI가 독립항 텍스트 기반으로 생성
+const MOCK_DEPS_BY_INDEP: Record<number, Pick<DepItemState,'text'|'sel'>[]> = {
+  1: [
+    { sel: true,  text: '제1항에 있어서, 상기 전처리부는 RANSAC 알고리즘을 이용하여 지면 포인트를 분리하는, 라이다 기반 객체 감지 장치.' },
+    { sel: true,  text: '제1항에 있어서, 상기 인식부는 PointNet++ 기반의 다층 신경망을 포함하는, 라이다 기반 객체 감지 장치.' },
+    { sel: true,  text: '제2항에 있어서, 상기 다층 신경망은 포인트 클라우드를 기둥(pillar) 단위로 처리하는, 라이다 기반 객체 감지 장치.' },
+    { sel: false, text: '제1항에 있어서, 상기 데이터 수집부는 복수의 라이다 센서를 포함하는, 라이다 기반 객체 감지 장치.' },
+    { sel: true,  text: '제1항에 있어서, 상기 출력부는 3D 바운딩 박스를 이용하여 감지된 객체의 위치 및 크기를 표시하는, 라이다 기반 객체 감지 장치.' },
+  ],
+  2: [
+    { sel: true,  text: '제1항에 있어서, 상기 전처리 단계는 RANSAC 알고리즘으로 지면 포인트를 분리하는 단계를 포함하는, 라이다 기반 객체 감지 방법.' },
+    { sel: true,  text: '제1항에 있어서, 상기 인식 단계는 인식된 객체에 3D 바운딩 박스를 할당하는 단계를 더 포함하는, 라이다 기반 객체 감지 방법.' },
+    { sel: false, text: '제2항에 있어서, 상기 3D 바운딩 박스는 객체의 방위각을 포함하는, 라이다 기반 객체 감지 방법.' },
+  ],
+};
+
+interface DepGroupState { generated: boolean; items: DepItemState[]; newText: string }
+
+// AI 재생성 인라인 UI — 발명의 설명과 동일 패턴
+function AiRegenBlock({ currentText, open, promptVal, onPromptChange, onSubmit, onCancel }: {
+  currentText: string; open: boolean;
+  promptVal: string; onPromptChange: (v: string) => void;
+  onSubmit: () => void; onCancel: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div className="mt-2 space-y-2">
+      <div className="rounded border border-gray-200 bg-gray-50 p-2.5">
+        <p className="text-xs2 text-gray-400 mb-1">현재 내용</p>
+        <p className="text-xs2 text-gray-700 leading-relaxed whitespace-pre-line">{currentText}</p>
+      </div>
+      <div className="rounded border border-violet-300 bg-violet-50 p-2.5">
+        <p className="text-xs2 text-violet-700 font-semibold mb-1.5 flex items-center gap-1">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11">
+            <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10" />
+            <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6" />
+          </svg>
+          어떻게 수정할까요?
+        </p>
+        <textarea autoFocus
+          className="w-full text-xs2 bg-white border border-violet-200 rounded px-2 py-1.5 outline-none resize-none"
+          placeholder="예: 더 구체적으로 / 청구범위 넓게 / 구성요소 명칭 포함"
+          value={promptVal} rows={2}
+          onChange={e => onPromptChange(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit(); } }}
+        />
+        <div className="flex gap-1.5 mt-1.5 justify-end">
+          <button onClick={onCancel} className="btn-outline btn-xs text-xs2">취소</button>
+          <button onClick={onSubmit} disabled={!promptVal.trim()}
+            className="px-3 py-1 bg-violet-600 text-white rounded text-xs2 font-semibold hover:bg-violet-700 disabled:opacity-40">
+            수정 생성
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void }) {
   const [claimsPhase, setClaimsPhase] = useState<'indep' | 'dep'>('indep');
-  // 독립항 후보 — 직접 수정 상태
-  const [cands, setCands] = useState<(IndepCand & { editing: boolean; editVal: string })[]>(
-    INDEP_CANDS.map(c => ({ ...c, editing: false, editVal: c.text }))
+
+  // 독립항 후보 상태 (n개 다중 선택)
+  const [cands, setCands] = useState<IndepCandState[]>(
+    INDEP_CANDS_INIT.map(c => ({ ...c, selected: c.id === 1, editing: false, editVal: c.text, aiOpen: false, aiPromptVal: '' }))
   );
-  const [selIndepId, setSelIndepId] = useState<number>(1);
-  const [depGenerated, setDepGenerated] = useState(false);
-  const [deps, setDeps] = useState<DepItem[]>([]);
-  const [newDepText, setNewDepText] = useState('');
 
-  // 요약 문자열을 상위로 전달
-  const syncUpdate = (depList: DepItem[], indepText: string) => {
-    const selDeps = depList.filter(d => d.sel);
-    const summary = `독립항 1개, 종속항 ${selDeps.length}개\n\n청구항 1.\n${indepText}${
-      selDeps.map((d, i) => `\n\n청구항 ${i + 2}.\n${d.text}`).join('')
-    }`;
-    onUpdate(summary);
+  // 독립항별 종속항 그룹
+  const [depGroups, setDepGroups] = useState<Record<number, DepGroupState>>({});
+
+  // 선택된 독립항 목록
+  const selectedCands = cands.filter(c => c.selected);
+
+  // 전체 요약을 상위로 전달 (청구항 번호 자동 부여)
+  const syncUpdate = (updCands: IndepCandState[], updGroups: Record<number, DepGroupState>) => {
+    const selCands = updCands.filter(c => c.selected);
+    let num = 0;
+    const lines: string[] = [];
+    selCands.forEach(c => {
+      const text = c.editing ? c.editVal : c.text;
+      lines.push(`청구항 ${++num}.\n${text}`);
+      const grp = updGroups[c.id];
+      if (grp?.generated) {
+        grp.items.filter(d => d.sel).forEach(d => {
+          lines.push(`청구항 ${++num}.\n${d.text}`);
+        });
+      }
+    });
+    const indepCount = selCands.length;
+    const depCount = selCands.reduce((acc, c) => {
+      const grp = updGroups[c.id];
+      return acc + (grp?.items.filter(d => d.sel).length ?? 0);
+    }, 0);
+    onUpdate(`독립항 ${indepCount}개, 종속항 ${depCount}개\n\n${lines.join('\n\n')}`);
   };
 
-  // 독립항 확정 → 종속항 단계로 이동
+  // 독립항 선택 토글
+  const toggleIndep = (id: number) => {
+    const next = cands.map(c => c.id === id ? { ...c, selected: !c.selected } : c);
+    setCands(next);
+    syncUpdate(next, depGroups);
+  };
+
+  // 독립항 Phase B로 이동
   const confirmIndep = () => {
-    const sel = cands.find(c => c.id === selIndepId);
-    if (!sel) return;
-    const text = sel.editing ? sel.editVal : sel.text;
-    syncUpdate([], text);
+    if (selectedCands.length === 0) return;
     setClaimsPhase('dep');
+    syncUpdate(cands, depGroups);
   };
 
-  // 종속항 AI 생성
-  const generateDeps = () => {
-    setDeps(MOCK_DEPS.map(d => ({ ...d })));
-    setDepGenerated(true);
-    const sel = cands.find(c => c.id === selIndepId);
-    if (sel) syncUpdate(MOCK_DEPS, sel.editing ? sel.editVal : sel.text);
+  // 독립항 AI 재생성 (mock)
+  const regenIndep = (id: number) => {
+    const c = cands.find(x => x.id === id);
+    if (!c) return;
+    const newText = `${c.aiPromptVal.trim() ? `[${c.aiPromptVal.trim()} 반영] ` : ''}${c.text.split('.')[0]}${c.text.includes('장치') ? ' 및 이를 이용한 감지 방법.' : ' 방법 및 시스템.'}`;
+    const next = cands.map(x => x.id === id ? { ...x, text: newText, aiOpen: false, aiPromptVal: '' } : x);
+    setCands(next);
+    syncUpdate(next, depGroups);
+  };
+
+  // 종속항 AI 생성 (mock)
+  const generateDeps = (indepId: number) => {
+    const mockItems = (MOCK_DEPS_BY_INDEP[indepId] ?? MOCK_DEPS_BY_INDEP[1]).map((d, i) => ({
+      id: i + 1, ...d, expanded: false, editing: false, editVal: d.text, aiOpen: false, aiPromptVal: '',
+    }));
+    const next: Record<number, DepGroupState> = { ...depGroups, [indepId]: { generated: true, items: mockItems, newText: '' } };
+    setDepGroups(next);
+    syncUpdate(cands, next);
   };
 
   // 종속항 토글
-  const toggleDep = (id: number) => {
+  const toggleDep = (indepId: number, depId: number) => {
     if (done) return;
-    const next = deps.map(d => d.id === id ? { ...d, sel: !d.sel } : d);
-    setDeps(next);
-    const sel = cands.find(c => c.id === selIndepId);
-    if (sel) syncUpdate(next, sel.editing ? sel.editVal : sel.text);
+    const grp = depGroups[indepId];
+    if (!grp) return;
+    const next = { ...depGroups, [indepId]: { ...grp, items: grp.items.map(d => d.id === depId ? { ...d, sel: !d.sel } : d) } };
+    setDepGroups(next);
+    syncUpdate(cands, next);
   };
 
-  const removeDep = (id: number) => {
-    const next = deps.filter(d => d.id !== id);
-    setDeps(next);
-    const sel = cands.find(c => c.id === selIndepId);
-    if (sel) syncUpdate(next, sel.editing ? sel.editVal : sel.text);
+  const removeDep = (indepId: number, depId: number) => {
+    const grp = depGroups[indepId];
+    if (!grp) return;
+    const next = { ...depGroups, [indepId]: { ...grp, items: grp.items.filter(d => d.id !== depId) } };
+    setDepGroups(next);
+    syncUpdate(cands, next);
   };
 
-  const addDep = () => {
-    if (!newDepText.trim()) return;
-    const maxId = deps.reduce((m, d) => Math.max(m, d.id), 0);
-    const next = [...deps, { id: maxId + 1, text: newDepText.trim(), sel: true, expanded: false, editing: false, editVal: newDepText.trim() }];
-    setDeps(next);
-    setNewDepText('');
-    const sel = cands.find(c => c.id === selIndepId);
-    if (sel) syncUpdate(next, sel.editing ? sel.editVal : sel.text);
+  const addDep = (indepId: number) => {
+    const grp = depGroups[indepId];
+    if (!grp || !grp.newText.trim()) return;
+    const maxId = grp.items.reduce((m, d) => Math.max(m, d.id), 0);
+    const newItem: DepItemState = { id: maxId + 1, text: grp.newText.trim(), sel: true, expanded: false, editing: false, editVal: grp.newText.trim(), aiOpen: false, aiPromptVal: '' };
+    const next = { ...depGroups, [indepId]: { ...grp, items: [...grp.items, newItem], newText: '' } };
+    setDepGroups(next);
+    syncUpdate(cands, next);
   };
 
-  const selDepsCount = deps.filter(d => d.sel).length;
-  const selectedIndep = cands.find(c => c.id === selIndepId);
+  const regenDep = (indepId: number, depId: number) => {
+    const grp = depGroups[indepId];
+    if (!grp) return;
+    const dep = grp.items.find(d => d.id === depId);
+    if (!dep) return;
+    const suffix = dep.text.includes('장치') ? ', 라이다 기반 객체 감지 장치.' : ', 라이다 기반 객체 감지 방법.';
+    const newText = `${dep.text.split('있어서')[0]}있어서, ${dep.aiPromptVal.trim() || '상기 구성을 더 포함하는'}${suffix}`;
+    const next = { ...depGroups, [indepId]: { ...grp, items: grp.items.map(d => d.id === depId ? { ...d, text: newText, aiOpen: false, aiPromptVal: '' } : d) } };
+    setDepGroups(next);
+    syncUpdate(cands, next);
+  };
 
-  // ── Phase A: 독립항 선택 ─────────────────────────────────────────────
+  const updateDepGroup = (indepId: number, patch: Partial<DepGroupState>) => {
+    setDepGroups(p => ({ ...p, [indepId]: { ...p[indepId], ...patch } }));
+  };
+
+  // 청구항 전체 카운트
+  const totalIndep = selectedCands.length;
+  const totalDep = selectedCands.reduce((acc, c) => acc + (depGroups[c.id]?.items.filter(d => d.sel).length ?? 0), 0);
+
+  // ── Phase A: 독립항 다중 선택 (체크박스) ─────────────────────────────
   if (claimsPhase === 'indep') {
     return (
       <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2.5 ml-1.5">
-        <div className="text-xs2 text-gray-500 mb-1">
-          기초자료를 분석하여 독립항 후보를 생성했습니다. 선택하거나 직접 수정하세요.
-        </div>
-        {cands.map(cand => {
-          const isSelected = selIndepId === cand.id;
-          return (
-            <div key={cand.id}
-              onClick={() => { if (!cand.editing) setSelIndepId(cand.id); }}
-              className={clsx('rounded-lg border-2 p-3 cursor-pointer transition-all',
-                isSelected && !cand.editing ? 'border-blue-700 bg-blue-50' : '',
-                cand.editing ? 'border-blue-500 bg-blue-50' : '',
-                !isSelected && !cand.editing ? 'border-ck-border bg-ck-bg hover:border-blue-300' : ''
-              )}>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className={clsx('w-6 h-6 rounded-full flex items-center justify-center text-xs2 font-bold shrink-0',
-                    isSelected ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-600')}>
-                    {cand.label}
-                  </span>
-                  <span className="text-xs2 px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">독립항</span>
-                </div>
-                {!done && (
-                  <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                    {cand.editing ? (
-                      <>
-                        <button onClick={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, editing: false } : c))}
-                          className="text-xs2 text-gray-500 hover:text-red-500 px-2 py-0.5 rounded border border-gray-200 hover:border-red-200">취소</button>
-                        <button onClick={() => { setCands(p => p.map(c => c.id === cand.id ? { ...c, editing: false, text: c.editVal } : c)); setSelIndepId(cand.id); }}
-                          className="text-xs2 text-white bg-blue-600 hover:bg-blue-700 px-2 py-0.5 rounded">저장</button>
-                      </>
-                    ) : (
-                      <button onClick={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, editing: true, editVal: c.text } : c))}
+        <p className="text-xs2 text-gray-500 leading-relaxed">
+          기초자료를 분석하여 독립항 후보를 생성했습니다.<br />
+          <span className="text-blue-700 font-medium">여러 개를 선택</span>할 수 있습니다.
+        </p>
+
+        {cands.map(cand => (
+          <div key={cand.id}
+            className={clsx('rounded-lg border-2 p-3 transition-all',
+              cand.selected && !cand.editing ? 'border-blue-600 bg-blue-50' : '',
+              cand.editing ? 'border-blue-400 bg-blue-50' : '',
+              !cand.selected && !cand.editing ? 'border-ck-border bg-ck-bg' : ''
+            )}>
+            {/* 헤더 */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2 cursor-pointer" onClick={() => { if (!cand.editing && !done) toggleIndep(cand.id); }}>
+                <button
+                  onClick={e => { e.stopPropagation(); if (!done) toggleIndep(cand.id); }}
+                  className={clsx('w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all',
+                    cand.selected ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 bg-white hover:border-blue-400')}>
+                  {cand.selected && <Icon name="check" size={9} />}
+                </button>
+                <span className={clsx('w-6 h-6 rounded-full flex items-center justify-center text-xs2 font-bold shrink-0',
+                  cand.selected ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-600')}>
+                  {cand.label}
+                </span>
+                <span className="text-xs2 px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">독립항</span>
+              </div>
+              {!done && (
+                <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                  {cand.editing ? (
+                    <>
+                      <button onClick={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, editing: false } : c))}
+                        className="text-xs2 text-gray-500 hover:text-red-500 px-2 py-0.5 rounded border border-gray-200">취소</button>
+                      <button onClick={() => { const next = cands.map(c => c.id === cand.id ? { ...c, editing: false, text: c.editVal } : c); setCands(next); syncUpdate(next, depGroups); }}
+                        className="text-xs2 text-white bg-blue-600 px-2 py-0.5 rounded">저장</button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, editing: true, editVal: c.text, aiOpen: false } : c))}
                         className="text-xs2 text-gray-500 hover:text-blue-600 px-2 py-0.5 rounded border border-gray-200 hover:border-blue-300">
                         직접 수정
                       </button>
-                    )}
-                  </div>
-                )}
-              </div>
-              {cand.editing ? (
-                <textarea
-                  className="w-full text-xs2 text-gray-800 bg-white border border-blue-300 rounded px-2 py-2 outline-none resize-none leading-relaxed"
-                  rows={5}
-                  value={cand.editVal}
-                  onChange={e => setCands(p => p.map(c => c.id === cand.id ? { ...c, editVal: e.target.value } : c))}
-                  onClick={e => e.stopPropagation()}
-                  autoFocus
-                />
-              ) : (
-                <p className="text-xs2 text-gray-700 leading-relaxed whitespace-pre-line">{cand.text}</p>
+                      <button
+                        onClick={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, aiOpen: !c.aiOpen, aiPromptVal: '' } : c))}
+                        className="flex items-center gap-1 text-xs2 text-violet-600 hover:text-violet-800 px-2 py-0.5 rounded border border-violet-200 hover:border-violet-400">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="9" height="9">
+                          <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10" />
+                          <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6" />
+                        </svg>
+                        AI 재생성
+                      </button>
+                    </>
+                  )}
+                </div>
               )}
             </div>
-          );
-        })}
+
+            {/* 본문 */}
+            {cand.editing ? (
+              <textarea
+                className="w-full text-xs2 text-gray-800 bg-white border border-blue-300 rounded px-2 py-2 outline-none resize-none leading-relaxed"
+                rows={5} value={cand.editVal} autoFocus
+                onChange={e => setCands(p => p.map(c => c.id === cand.id ? { ...c, editVal: e.target.value } : c))}
+              />
+            ) : (
+              <p className="text-xs2 text-gray-700 leading-relaxed whitespace-pre-line">{cand.text}</p>
+            )}
+
+            {/* AI 재생성 인라인 */}
+            <AiRegenBlock
+              currentText={cand.editing ? cand.editVal : cand.text}
+              open={cand.aiOpen}
+              promptVal={cand.aiPromptVal}
+              onPromptChange={v => setCands(p => p.map(c => c.id === cand.id ? { ...c, aiPromptVal: v } : c))}
+              onSubmit={() => regenIndep(cand.id)}
+              onCancel={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, aiOpen: false } : c))}
+            />
+          </div>
+        ))}
 
         {!done && (
           <button
             onClick={confirmIndep}
-            className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm2 font-semibold hover:bg-blue-700 active:scale-[0.98] transition-all mt-2">
-            이 독립항으로 종속항 생성 →
+            disabled={selectedCands.length === 0}
+            className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm2 font-semibold hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed mt-1">
+            선택한 독립항 {selectedCands.length > 0 ? `${selectedCands.length}개` : ''} 으로 종속항 구성 →
           </button>
         )}
       </div>
     );
   }
 
-  // ── Phase B: 종속항 생성 및 관리 ────────────────────────────────────
+  // ── Phase B: 독립항별 종속항 섹션 ───────────────────────────────────
+  // 청구항 번호 계산
+  let claimNum = 0;
+  const indepNums: Record<number, number> = {};
+  selectedCands.forEach(c => { indepNums[c.id] = ++claimNum; depGroups[c.id]?.items.filter(d => d.sel).forEach(() => { ++claimNum; }); });
+  claimNum = 0; // reset to recompute inline
+
   return (
     <>
-      <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2 ml-1.5">
-
-        {/* 선택된 독립항 — 요약 카드 */}
-        <div className="rounded-lg border-2 border-green-400 bg-green-50 p-3">
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-2">
-              <Icon name="check" size={12} className="text-green-600" />
-              <span className="text-xs2 font-bold text-green-700">청구항 1 · 독립항 (확정)</span>
-            </div>
-            {!done && (
-              <button onClick={() => setClaimsPhase('indep')}
-                className="text-xs2 text-gray-500 hover:text-blue-600 px-2 py-0.5 rounded border border-gray-200 hover:border-blue-300">
-                수정
-              </button>
-            )}
-          </div>
-          <p className="text-xs2 text-gray-700 leading-relaxed whitespace-pre-line line-clamp-3">
-            {selectedIndep?.editing ? selectedIndep.editVal : selectedIndep?.text}
-          </p>
-        </div>
-
-        {/* 종속항 섹션 */}
-        <div className="flex items-center justify-between mt-3 mb-1">
+      <div className="flex-1 overflow-y-auto scroll-thin p-3 ml-1.5 space-y-3">
+        <div className="flex items-center justify-between">
           <span className="text-xs2 font-semibold text-gray-600">
-            종속항 {depGenerated ? `(${selDepsCount}개 선택)` : ''}
+            청구항 구성 — 독립항 {totalIndep}개, 종속항 {totalDep}개
           </span>
-          {!done && !depGenerated && (
-            <button onClick={generateDeps}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white rounded-lg text-xs2 font-semibold hover:bg-violet-700 active:scale-[0.98] transition-all">
-              <div className="w-4 h-4 rounded flex items-center justify-center text-white font-bold text-xs2"
-                style={{ background: 'rgba(255,255,255,0.3)' }}>AI</div>
-              AI 종속항 생성
+          {!done && (
+            <button onClick={() => setClaimsPhase('indep')}
+              className="text-xs2 text-blue-600 hover:underline">
+              ← 독립항 재선택
             </button>
           )}
         </div>
 
-        {!depGenerated && (
-          <div className="rounded-lg border-2 border-dashed border-gray-200 p-4 text-center">
-            <p className="text-xs2 text-gray-400 mb-2">독립항을 기반으로 종속항을 자동 생성합니다</p>
-            <button onClick={generateDeps}
-              className="px-4 py-2 bg-violet-600 text-white rounded-lg text-xs2 font-semibold hover:bg-violet-700 transition-all">
-              AI 종속항 생성
-            </button>
-          </div>
-        )}
+        {selectedCands.map(indep => {
+          const indepClaimNum = ++claimNum;
+          const grp = depGroups[indep.id] ?? { generated: false, items: [], newText: '' };
 
-        {depGenerated && deps.map((dep, idx) => (
-          <div key={dep.id}
-            className={clsx('rounded-lg border transition-all',
-              dep.sel && !done ? 'border-blue-300 bg-white' : '',
-              !dep.sel ? 'border-gray-200 bg-gray-50 opacity-60' : '',
-              done && dep.sel ? 'border-green-200 bg-green-50/30' : ''
-            )}>
-            <div className="flex items-center gap-2 px-3 py-2 cursor-pointer"
-              onClick={() => setDeps(p => p.map(d => d.id === dep.id ? { ...d, expanded: !d.expanded } : d))}>
-              <button
-                onClick={e => { e.stopPropagation(); toggleDep(dep.id); }}
-                className={clsx('w-5 h-5 rounded flex items-center justify-center shrink-0 transition-colors',
-                  dep.sel ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300')}>
-                {dep.sel && <Icon name="check" size={9} />}
-              </button>
-              <span className={clsx('text-xs2 font-bold shrink-0',
-                dep.sel ? 'text-blue-700' : 'text-gray-400')}>
-                청구항 {dep.sel ? idx + 2 : '—'}
-              </span>
-              <span className="text-xs2 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 shrink-0">
-                종속(→1)
-              </span>
-              <span className="text-xs2 text-gray-500 flex-1 truncate">{dep.text.slice(0, 30)}...</span>
-              {!done && (
-                <button onClick={e => { e.stopPropagation(); removeDep(dep.id); }}
-                  className="shrink-0 text-gray-300 hover:text-red-400 ml-1">
-                  <Icon name="close" size={10} />
-                </button>
-              )}
-            </div>
-
-            {dep.expanded && (
-              <div className="px-3 pb-3 border-t border-gray-100 pt-2">
-                {dep.editing ? (
-                  <>
-                    <textarea
-                      className="w-full text-xs2 text-gray-800 border border-blue-300 rounded px-2 py-2 outline-none resize-none leading-relaxed"
-                      rows={4}
-                      value={dep.editVal}
-                      onChange={e => setDeps(p => p.map(d => d.id === dep.id ? { ...d, editVal: e.target.value } : d))}
-                      autoFocus
-                    />
-                    <div className="flex justify-end gap-1.5 mt-1.5">
-                      <button onClick={() => setDeps(p => p.map(d => d.id === dep.id ? { ...d, editing: false } : d))}
-                        className="text-xs2 text-gray-500 hover:text-red-500 px-2 py-0.5 rounded border border-gray-200">취소</button>
-                      <button onClick={() => setDeps(p => p.map(d => d.id === dep.id ? { ...d, editing: false, text: d.editVal } : d))}
-                        className="text-xs2 text-white bg-blue-600 px-2 py-0.5 rounded">저장</button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-xs2 text-gray-700 leading-relaxed">{dep.text}</p>
-                    {!done && (
+          return (
+            <div key={indep.id} className="rounded-xl border border-zinc-200 overflow-hidden">
+              {/* 독립항 헤더 */}
+              <div className="bg-blue-50 border-b border-blue-200 px-3 py-2.5">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <Icon name="check" size={11} className="text-blue-600" />
+                    <span className="text-xs2 font-bold text-blue-700">청구항 {indepClaimNum} · 독립항 {indep.label}</span>
+                  </div>
+                  {!done && (
+                    <div className="flex gap-1">
                       <button
-                        onClick={() => setDeps(p => p.map(d => d.id === dep.id ? { ...d, editing: true, editVal: d.text } : d))}
-                        className="mt-2 text-xs2 text-violet-600 hover:text-violet-800 flex items-center gap-1">
-                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="10" height="10">
+                        onClick={() => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiOpen: !c.aiOpen, aiPromptVal: '' } : c))}
+                        className="flex items-center gap-1 text-xs2 text-violet-600 hover:text-violet-800 px-2 py-0.5 rounded border border-violet-200">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="9" height="9">
                           <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10" />
                           <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6" />
                         </svg>
-                        AI로 수정하기
+                        AI 재생성
                       </button>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs2 text-blue-800 leading-relaxed whitespace-pre-line line-clamp-3">{indep.text}</p>
+                <AiRegenBlock
+                  currentText={indep.text} open={indep.aiOpen}
+                  promptVal={indep.aiPromptVal}
+                  onPromptChange={v => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiPromptVal: v } : c))}
+                  onSubmit={() => regenIndep(indep.id)}
+                  onCancel={() => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiOpen: false } : c))}
+                />
+              </div>
+
+              {/* 종속항 섹션 */}
+              <div className="p-2.5 space-y-1.5">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs2 font-semibold text-gray-500">
+                    종속항 {grp.generated ? `(${grp.items.filter(d => d.sel).length}개 선택)` : ''}
+                  </span>
+                  {!done && !grp.generated && (
+                    <button onClick={() => generateDeps(indep.id)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 bg-violet-600 text-white rounded-md text-xs2 font-semibold hover:bg-violet-700 active:scale-[0.98] transition-all">
+                      <span className="font-bold text-xs2">AI</span> 종속항 생성
+                    </button>
+                  )}
+                </div>
+
+                {!grp.generated ? (
+                  <div className="rounded-lg border border-dashed border-gray-200 py-3 text-center">
+                    <p className="text-xs2 text-gray-400 mb-2">독립항을 기반으로 종속항을 자동 생성합니다</p>
+                    <button onClick={() => generateDeps(indep.id)}
+                      className="px-4 py-1.5 bg-violet-600 text-white rounded-lg text-xs2 font-semibold hover:bg-violet-700">
+                      AI 종속항 생성
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {grp.items.map((dep) => {
+                      const depNum = dep.sel ? ++claimNum : null;
+                      return (
+                        <div key={dep.id}
+                          className={clsx('rounded-lg border transition-all',
+                            dep.sel && !done ? 'border-blue-200 bg-white' : '',
+                            !dep.sel ? 'border-gray-200 bg-gray-50 opacity-60' : '',
+                            done && dep.sel ? 'border-green-200 bg-green-50/30' : ''
+                          )}>
+                          <div className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer"
+                            onClick={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, expanded: !d.expanded } : d) })}>
+                            <button
+                              onClick={e => { e.stopPropagation(); toggleDep(indep.id, dep.id); }}
+                              className={clsx('w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all',
+                                dep.sel ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 bg-white hover:border-blue-400')}>
+                              {dep.sel && <Icon name="check" size={8} />}
+                            </button>
+                            <span className={clsx('text-xs2 font-bold shrink-0', dep.sel ? 'text-blue-700' : 'text-gray-400')}>
+                              청구항 {depNum ?? '—'}
+                            </span>
+                            <span className="text-xs2 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 shrink-0 text-[10px]">
+                              종속(→{indepClaimNum})
+                            </span>
+                            <span className="text-xs2 text-gray-500 flex-1 truncate text-[10px]">{dep.text.slice(0, 28)}...</span>
+                            {!done && (
+                              <button onClick={e => { e.stopPropagation(); removeDep(indep.id, dep.id); }}
+                                className="shrink-0 text-gray-300 hover:text-red-400">
+                                <Icon name="close" size={9} />
+                              </button>
+                            )}
+                          </div>
+
+                          {dep.expanded && (
+                            <div className="px-2.5 pb-2.5 border-t border-gray-100 pt-2">
+                              {dep.editing ? (
+                                <>
+                                  <textarea className="w-full text-xs2 text-gray-800 border border-blue-300 rounded px-2 py-1.5 outline-none resize-none leading-relaxed"
+                                    rows={4} value={dep.editVal} autoFocus
+                                    onChange={e => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, editVal: e.target.value } : d) })}
+                                  />
+                                  <div className="flex justify-end gap-1.5 mt-1.5">
+                                    <button onClick={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, editing: false } : d) })}
+                                      className="text-xs2 text-gray-500 px-2 py-0.5 rounded border border-gray-200">취소</button>
+                                    <button onClick={() => {
+                                      const next = { ...depGroups, [indep.id]: { ...grp, items: grp.items.map(d => d.id === dep.id ? { ...d, editing: false, text: d.editVal } : d) } };
+                                      setDepGroups(next); syncUpdate(cands, next);
+                                    }} className="text-xs2 text-white bg-blue-600 px-2 py-0.5 rounded">저장</button>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <p className="text-xs2 text-gray-700 leading-relaxed">{dep.text}</p>
+                                  {!done && (
+                                    <div className="flex gap-1.5 mt-2">
+                                      <button onClick={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, editing: true, editVal: d.text, aiOpen: false } : d) })}
+                                        className="text-xs2 text-gray-500 hover:text-blue-600 flex items-center gap-0.5">
+                                        <Icon name="edit" size={9} /> 직접 수정
+                                      </button>
+                                      <button onClick={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiOpen: !d.aiOpen, aiPromptVal: '' } : d) })}
+                                        className="text-xs2 text-violet-600 hover:text-violet-800 flex items-center gap-0.5">
+                                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="9" height="9">
+                                          <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10" />
+                                          <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6" />
+                                        </svg>
+                                        AI 재생성
+                                      </button>
+                                    </div>
+                                  )}
+                                  <AiRegenBlock
+                                    currentText={dep.text} open={dep.aiOpen}
+                                    promptVal={dep.aiPromptVal}
+                                    onPromptChange={v => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiPromptVal: v } : d) })}
+                                    onSubmit={() => regenDep(indep.id, dep.id)}
+                                    onCancel={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiOpen: false } : d) })}
+                                  />
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* 직접 추가 */}
+                    {!done && (
+                      <div className="flex gap-1.5 mt-1">
+                        <input
+                          className="input text-xs2 py-1 flex-1"
+                          placeholder={`제${indepClaimNum}항에 있어서, ...`}
+                          value={grp.newText}
+                          onChange={e => updateDepGroup(indep.id, { newText: e.target.value })}
+                          onKeyDown={e => e.key === 'Enter' && addDep(indep.id)}
+                        />
+                        <button onClick={() => addDep(indep.id)} className="btn-outline btn-xs px-2 shrink-0">
+                          <Icon name="plus" size={11} />
+                        </button>
+                      </div>
                     )}
                   </>
                 )}
               </div>
-            )}
-          </div>
-        ))}
-
-        {/* 종속항 직접 추가 */}
-        {depGenerated && !done && (
-          <div className="flex gap-1.5 mt-1">
-            <input
-              className="input text-xs2 py-1.5 flex-1"
-              placeholder="종속항 직접 추가... (제1항에 있어서, ...)"
-              value={newDepText}
-              onChange={e => setNewDepText(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addDep()}
-            />
-            <button onClick={addDep} className="btn-outline btn-xs px-2 shrink-0">
-              <Icon name="plus" size={12} />
-            </button>
-          </div>
-        )}
+            </div>
+          );
+        })}
       </div>
 
       {done && (
         <div className="p-3 border-t border-gray-100 bg-green-50 shrink-0 ml-1.5">
           <div className="flex items-center gap-1.5 text-sm2 text-green-700 font-medium">
-            <Icon name="check" size={13} /> 청구항 확정 완료 (독립항 1개, 종속항 {selDepsCount}개)
+            <Icon name="check" size={13} /> 청구항 확정 완료 (독립항 {totalIndep}개, 종속항 {totalDep}개)
           </div>
         </div>
       )}
@@ -1589,18 +1778,33 @@ function AbstractPanel({ done, onUpdate }: { done: boolean; onConfirm: () => voi
   );
 }
 
-// 명세서 편집기 뷰 (#23)
+// 명세서 섹션 정의
+const SPEC_DOC_SECTIONS = [
+  { id: 'title',    label: '발명의 명칭' },
+  { id: 'tech',     label: '기술분야' },
+  { id: 'bg',       label: '발명의 배경기술' },
+  { id: 'problem',  label: '해결하려는 과제' },
+  { id: 'solution', label: '과제의 해결 수단' },
+  { id: 'effect',   label: '발명의 효과' },
+  { id: 'draw_desc',label: '도면의 간단한 설명' },
+  { id: 'detail',   label: '발명을 실시하기 위한 구체적인 내용' },
+  { id: 'claims',   label: '청구범위' },
+  { id: 'abstract', label: '요약서' },
+];
+
+// 명세서 편집기 뷰 (#23) — 단락형 문서 출력 + 섹션별 AI 어시스트
 function EditorView({ task, onBack }: { task: any; onBack: () => void }) {
-  const sections = [
-    { id: 'tech', label: '기술분야' }, { id: 'bg', label: '배경기술' },
-    { id: 'problem', label: '해결과제' }, { id: 'solution', label: '해결수단' },
-    { id: 'effect', label: '효과' }, { id: 'claims', label: '청구범위' },
-    { id: 'abstract', label: '요약서' },
-  ];
   const [activeSection, setActiveSection] = useState('tech');
+  const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [sectionTexts, setSectionTexts] = useState<Record<string, string>>(
+    Object.fromEntries(SPEC_DOC_SECTIONS.map(s => [s.id, getDefault(s.id, task)]))
+  );
+  const [aiPromptOpen, setAiPromptOpen] = useState(false);
+  const [aiPromptVal, setAiPromptVal] = useState('');
   const [assistTab, setAssistTab] = useState<'ai-suggest' | 'drawings' | 'refs'>('ai-suggest');
   const [selectedDrawing, setSelectedDrawing] = useState(0);
   const [activeSuggestion, setActiveSuggestion] = useState<string | null>(null);
+  const centerRef = useRef<HTMLDivElement>(null);
 
   const drawings = [
     { label: '도 1', desc: '전체 블록도', sub: '시스템 구성 개요' },
@@ -1609,69 +1813,206 @@ function EditorView({ task, onBack }: { task: any; onBack: () => void }) {
     { label: '도 4', desc: '인식 결과 화면', sub: '바운딩박스 시각화' },
   ];
 
-  const suggestions: { title: string; body: string }[] = [
-    { title: '해결수단 강화 제안', body: '현재 섹션의 "딥러닝 모델을 이용하여" 표현을 "PointNet++ 기반의 다층 신경망을 이용하여"로 구체화하면 특허 청구범위의 명확성이 향상됩니다.' },
-    { title: '청구항 독립성 검토', body: '제1항의 독립항에서 구성요소(데이터 수집부, 전처리부, 인식부)가 기능적으로 연결되어 있는지 확인하세요. 상위 개념으로 기재하면 권리범위가 넓어집니다.' },
-    { title: '유사 특허 3건 확인', body: 'KR10-2024-0123456, US11987654, JP2024-012345 특허가 유사 기술을 포함합니다. 차별점을 명시하여 거절 가능성을 줄이세요.' },
+  const AI_SUGGESTIONS: Record<string, { title: string; body: string }[]> = {
+    tech:     [{ title: '기술분야 범위 조정', body: '"자율주행 기술"을 "자율주행 및 무인이동체 제어 기술"로 확장하면 권리범위가 넓어집니다.' }],
+    bg:       [{ title: '배경기술 강화', body: '종래 기술의 문제점을 수치 데이터로 구체화하면 발명의 필요성이 명확해집니다.' }],
+    problem:  [{ title: '과제 명확화', body: '"높은 탐지 정확도"를 "95% 이상의 탐지 정확도"로 수치화하면 명세서 기재 요건에 유리합니다.' }],
+    solution: [{ title: '해결수단 강화', body: '"딥러닝 모델을 이용하여"를 "PointNet++ 기반의 다층 신경망을 이용하여"로 구체화하면 청구범위의 명확성이 향상됩니다.' }],
+    effect:   [{ title: '효과 계량화', body: '처리 속도 향상 수치(예: 기존 대비 40% 향상)를 명시하면 설득력이 높아집니다.' }],
+    claims:   [
+      { title: '청구항 독립성 검토', body: '제1항의 독립항에서 구성요소가 기능적으로 연결되어 있는지 확인하세요. 상위 개념으로 기재하면 권리범위가 넓어집니다.' },
+      { title: '유사 특허 3건 확인', body: 'KR10-2024-0123456, US11987654, JP2024-012345 특허가 유사 기술을 포함합니다. 차별점을 명시하세요.' },
+    ],
+    abstract: [{ title: '요약서 간결화', body: '200자 이내로 줄이고 발명의 핵심 효과를 첫 문장에 명시하면 검색 가시성이 향상됩니다.' }],
+  };
+
+  const currentSuggestions = AI_SUGGESTIONS[activeSection] ?? [
+    { title: 'AI 제안', body: '이 섹션을 선택하면 맞춤형 AI 제안이 표시됩니다.' }
   ];
+
+  const scrollTo = (id: string) => {
+    const el = centerRef.current?.querySelector(`[data-section="${id}"]`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setActiveSection(id);
+  };
+
+  const submitAiPrompt = () => {
+    const cur = sectionTexts[editingSection ?? activeSection] || '';
+    const mock = cur.replace(/이다\.$/, `이다 (${aiPromptVal.slice(0, 20)} 반영).`);
+    setSectionTexts(p => ({ ...p, [editingSection ?? activeSection]: mock }));
+    setAiPromptOpen(false);
+    setAiPromptVal('');
+  };
 
   return (
     <div className="absolute inset-0 flex flex-col bg-white z-10">
-      {/* 앵커 바 */}
-      <div className="flex items-center gap-0 px-4 border-b border-gray-200 bg-white shrink-0 overflow-x-auto scroll-thin">
-        <button onClick={onBack} className="flex items-center gap-1 text-sm2 text-blue-700 font-semibold mr-3 py-2.5 shrink-0">
+      {/* 상단 앵커 탭 바 */}
+      <div className="flex items-center gap-0 px-4 border-b border-zinc-200 bg-white shrink-0 overflow-x-auto scroll-thin">
+        <button onClick={onBack} className="flex items-center gap-1 text-sm2 text-blue-600 font-semibold mr-3 py-2.5 shrink-0 hover:text-blue-800 transition-colors">
           <Icon name="chevron-left" size={14} /> 분석 결과
         </button>
-        <div className="w-px h-4 bg-gray-300 mr-3" />
-        {sections.map(s => (
-          <button key={s.id} onClick={() => setActiveSection(s.id)}
-            className={clsx('px-3 py-2.5 text-md2 border-b-2 whitespace-nowrap',
-              activeSection === s.id ? 'border-blue-700 text-blue-700 font-semibold' : 'border-transparent text-gray-500')}>
+        <div className="w-px h-4 bg-zinc-200 mr-3" />
+        {SPEC_DOC_SECTIONS.map(s => (
+          <button key={s.id} onClick={() => scrollTo(s.id)}
+            className={clsx('px-3 py-2.5 text-md2 border-b-2 whitespace-nowrap transition-colors',
+              activeSection === s.id ? 'border-blue-600 text-blue-700 font-semibold' : 'border-transparent text-zinc-500 hover:text-zinc-700')}>
             {s.label}
           </button>
         ))}
-        <button className="ml-auto flex items-center gap-1 text-md2 text-violet-600 font-medium py-2.5 whitespace-nowrap">
-          <Icon name="grid" size={13} /> 청구항-도면 병행
-        </button>
       </div>
 
       <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* 좌측 레일 */}
-        <div className="w-44 border-r border-gray-200 overflow-y-auto scroll-thin bg-gray-50 shrink-0 p-2 space-y-0.5">
-          {sections.map(s => (
-            <button key={s.id} onClick={() => setActiveSection(s.id)}
+        {/* 좌측 목차 레일 */}
+        <div className="w-44 border-r border-zinc-200 overflow-y-auto scroll-thin bg-zinc-50 shrink-0 p-2 space-y-0.5">
+          {SPEC_DOC_SECTIONS.map(s => (
+            <button key={s.id} onClick={() => scrollTo(s.id)}
               className={clsx('w-full text-left px-3 py-2 rounded-lg text-sm2 transition-colors',
-                activeSection === s.id ? 'bg-blue-700 text-white font-semibold' : 'text-gray-600 hover:bg-gray-200')}>
+                activeSection === s.id ? 'bg-blue-600 text-white font-semibold' : 'text-zinc-600 hover:bg-zinc-200')}>
               {s.label}
             </button>
           ))}
-          <div className="border-t border-gray-200 mt-2 pt-2 space-y-0.5">
-            <button className="w-full text-left px-3 py-2 rounded-lg text-sm2 text-gray-600 hover:bg-gray-200">라이브러리</button>
-            <button className="w-full text-left px-3 py-2 rounded-lg text-sm2 text-gray-600 hover:bg-gray-200">선행기술</button>
+          <div className="border-t border-zinc-200 mt-2 pt-2 space-y-0.5">
+            <button className="w-full text-left px-3 py-2 rounded-lg text-sm2 text-zinc-500 hover:bg-zinc-200">라이브러리</button>
+            <button className="w-full text-left px-3 py-2 rounded-lg text-sm2 text-zinc-500 hover:bg-zinc-200">선행기술</button>
           </div>
         </div>
 
-        {/* 중앙 에디터 */}
-        <div className="flex-1 overflow-y-auto scroll-thin p-6 min-w-0">
-          <div className="max-w-2xl mx-auto">
-            <h3 className="text-lg2 font-bold text-gray-800 mb-4">{sections.find(s => s.id === activeSection)?.label}</h3>
-            <textarea className="input min-h-[400px] font-mono text-sm2 resize-y w-full"
-              defaultValue={getDefault(activeSection, task)} />
+        {/* 중앙 — 단락형 명세서 문서 */}
+        <div ref={centerRef} className="flex-1 overflow-y-auto scroll-thin bg-zinc-50 min-w-0"
+          onScroll={() => {
+            if (!centerRef.current) return;
+            const sections = centerRef.current.querySelectorAll<HTMLElement>('[data-section]');
+            const scrollTop = centerRef.current.scrollTop;
+            for (const el of Array.from(sections).reverse()) {
+              if (el.offsetTop <= scrollTop + 80) { setActiveSection(el.dataset.section!); break; }
+            }
+          }}>
+          <div className="max-w-3xl mx-auto py-8 px-8">
+            {/* 문서 제목 */}
+            <div className="text-center mb-10">
+              <p className="text-xs text-zinc-400 mb-1 tracking-widest uppercase">특허 명세서</p>
+              <h1 className="text-xl font-bold text-zinc-900">{task?.name || '새 명세서'}</h1>
+            </div>
+
+            {/* 섹션별 단락 출력 */}
+            {SPEC_DOC_SECTIONS.map(sec => {
+              const text = sectionTexts[sec.id] || '';
+              const isActive = activeSection === sec.id;
+              const isEditing = editingSection === sec.id;
+
+              return (
+                <div key={sec.id} data-section={sec.id}
+                  className={clsx('mb-8 rounded-xl border-2 transition-all',
+                    isActive ? 'border-blue-200 shadow-sm' : 'border-transparent hover:border-zinc-200',
+                    isEditing ? 'border-blue-400 shadow-md' : ''
+                  )}>
+                  {/* 섹션 헤더 */}
+                  <div className={clsx('flex items-center justify-between px-5 py-3 rounded-t-xl cursor-pointer',
+                    isActive ? 'bg-blue-50' : 'bg-white')}
+                    onClick={() => { setActiveSection(sec.id); if (!isEditing) setEditingSection(null); }}>
+                    <h2 className="text-base font-bold text-zinc-800">{sec.label}</h2>
+                    {!isEditing && (
+                      <div className="flex gap-1.5 opacity-0 group-hover:opacity-100" style={{ opacity: isActive ? 1 : 0 }}>
+                        <button
+                          onClick={e => { e.stopPropagation(); setEditingSection(sec.id); setActiveSection(sec.id); setAiPromptOpen(false); }}
+                          className="flex items-center gap-1 text-xs2 text-zinc-500 hover:text-blue-600 px-2 py-1 rounded border border-zinc-200 hover:border-blue-300 transition-colors">
+                          <Icon name="edit" size={10} /> 편집
+                        </button>
+                        <button
+                          onClick={e => { e.stopPropagation(); setEditingSection(sec.id); setActiveSection(sec.id); setAiPromptOpen(true); setAiPromptVal(''); }}
+                          className="flex items-center gap-1 text-xs2 text-violet-600 hover:text-violet-800 px-2 py-1 rounded border border-violet-200 hover:border-violet-400 transition-colors">
+                          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="10" height="10">
+                            <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10" />
+                            <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6" />
+                          </svg>
+                          AI 수정
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 섹션 본문 */}
+                  <div className="px-5 pb-4">
+                    {isEditing ? (
+                      <>
+                        <textarea
+                          className="w-full text-sm text-zinc-800 bg-white border border-blue-300 rounded-lg px-4 py-3 outline-none resize-none leading-relaxed focus:ring-2 focus:ring-blue-500/20"
+                          rows={Math.max(4, Math.ceil(text.length / 60))}
+                          value={text} autoFocus
+                          onChange={e => setSectionTexts(p => ({ ...p, [sec.id]: e.target.value }))}
+                        />
+                        {/* AI 수정 인라인 */}
+                        {aiPromptOpen && (
+                          <div className="mt-2 rounded-lg border border-violet-300 bg-violet-50 p-3">
+                            <p className="text-xs2 text-violet-700 font-semibold mb-1.5 flex items-center gap-1">
+                              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11">
+                                <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10" />
+                                <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6" />
+                              </svg>
+                              어떻게 수정할까요?
+                            </p>
+                            <textarea autoFocus
+                              className="w-full text-xs2 bg-white border border-violet-200 rounded px-2 py-1.5 outline-none resize-none"
+                              placeholder="예: 더 구체적으로 / 더 간결하게 / 특허 문체로"
+                              value={aiPromptVal} rows={2}
+                              onChange={e => setAiPromptVal(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitAiPrompt(); } }}
+                            />
+                            <div className="flex gap-1.5 mt-1.5 justify-end">
+                              <button onClick={() => setAiPromptOpen(false)} className="btn-outline btn-xs text-xs2">취소</button>
+                              <button onClick={submitAiPrompt} disabled={!aiPromptVal.trim()}
+                                className="px-3 py-1 bg-violet-600 text-white rounded text-xs2 font-semibold hover:bg-violet-700 disabled:opacity-40">
+                                수정 생성
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex justify-end gap-2 mt-2">
+                          <button onClick={() => { setEditingSection(null); setAiPromptOpen(false); }}
+                            className="btn-outline btn-sm text-xs2">완료</button>
+                        </div>
+                      </>
+                    ) : (
+                      <div
+                        onClick={() => { setActiveSection(sec.id); }}
+                        className="cursor-text">
+                        {text ? (
+                          sec.id === 'claims' ? (
+                            <div className="space-y-3">
+                              {text.split('\n\n').filter(Boolean).map((para, i) => (
+                                <p key={i} className="text-sm text-zinc-700 leading-relaxed">{para}</p>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-zinc-700 leading-relaxed whitespace-pre-line">{text}</p>
+                          )
+                        ) : (
+                          <p className="text-sm text-zinc-400 italic">내용 없음 — 클릭하여 편집하거나 AI로 생성하세요</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* 우측 AI 어시스트 패널 — 원본 artifact-editor-tabs 구조 */}
-        <div className="w-72 border-l border-ck-border bg-white flex flex-col overflow-hidden shrink-0">
-          {/* 헤더 */}
-          <div className="px-3 py-2 border-b border-ck-border bg-gray-50 shrink-0">
-            <p className="text-xs2 text-gray-500">에디터에서 텍스트를 선택하면 AI가 수정안을 제안합니다.</p>
+        {/* 우측 AI 어시스트 패널 */}
+        <div className="w-72 border-l border-zinc-200 bg-white flex flex-col overflow-hidden shrink-0">
+          {/* 헤더 — 현재 선택 섹션 표시 */}
+          <div className="px-3 py-2.5 border-b border-zinc-200 bg-zinc-50 shrink-0">
+            <p className="text-xs2 font-semibold text-zinc-700">
+              {SPEC_DOC_SECTIONS.find(s => s.id === activeSection)?.label ?? 'AI 어시스턴트'}
+            </p>
+            <p className="text-xs2 text-zinc-400 mt-0.5">섹션을 선택하면 맞춤 제안이 표시됩니다.</p>
           </div>
           {/* 탭 */}
-          <div className="flex border-b border-ck-border shrink-0">
+          <div className="flex border-b border-zinc-200 shrink-0">
             {([['ai-suggest', 'AI 제안'], ['drawings', '도면 조회'], ['refs', '참고문헌']] as const).map(([id, label]) => (
               <button key={id} onClick={() => setAssistTab(id)}
                 className={clsx('flex-1 py-2 text-xs2 font-semibold border-b-2 transition-colors',
-                  assistTab === id ? 'border-violet-600 text-violet-700 bg-violet-50' : 'border-transparent text-gray-500 hover:text-gray-700')}>
+                  assistTab === id ? 'border-violet-600 text-violet-700 bg-violet-50' : 'border-transparent text-zinc-500 hover:text-zinc-700')}>
                 {label}
               </button>
             ))}
@@ -1683,35 +2024,33 @@ function EditorView({ task, onBack }: { task: any; onBack: () => void }) {
             {assistTab === 'ai-suggest' && (
               <div className="p-3 space-y-2">
                 {activeSuggestion === null ? (
-                  <>
-                    <div className="text-center py-4 text-gray-400">
-                      <Icon name="logo" size={28} className="mx-auto mb-2 text-gray-300" />
-                      <p className="text-xs2">에디터에서 섹션을 선택하면<br />AI 수정 제안이 여기에 표시됩니다</p>
-                    </div>
-                    <div className="border-t border-gray-100 pt-2 space-y-1.5">
-                      {suggestions.map((s, i) => (
-                        <div key={i} onClick={() => setActiveSuggestion(s.body)}
-                          className="rounded-lg border border-gray-200 p-2.5 cursor-pointer hover:border-violet-300 hover:bg-violet-50/30 transition-all">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <Icon name="star" size={10} className="text-violet-600 shrink-0" />
-                            <span className="text-xs2 font-semibold text-gray-700">{s.title}</span>
-                          </div>
-                          <p className="text-xs2 text-gray-400 line-clamp-2">{s.body}</p>
+                  <div className="space-y-1.5">
+                    {currentSuggestions.map((s, i) => (
+                      <div key={i} onClick={() => setActiveSuggestion(s.body)}
+                        className="rounded-xl border border-zinc-200 p-2.5 cursor-pointer hover:border-violet-300 hover:bg-violet-50/40 transition-all">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Icon name="star" size={10} className="text-violet-600 shrink-0" />
+                          <span className="text-xs2 font-semibold text-zinc-700">{s.title}</span>
                         </div>
-                      ))}
-                    </div>
-                  </>
+                        <p className="text-xs2 text-zinc-400 leading-relaxed line-clamp-2">{s.body}</p>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
-                  <div className="rounded-lg border border-violet-300 bg-violet-50 p-3">
+                  <div className="rounded-xl border border-violet-300 bg-violet-50 p-3">
                     <div className="flex items-center gap-1.5 mb-2">
-                      <Icon name="logo" size={12} className="text-violet-600" />
+                      <div className="w-4 h-4 rounded bg-violet-600 text-white text-[8px] font-bold flex items-center justify-center">AI</div>
                       <span className="text-xs2 font-bold text-violet-700">AI 수정 제안</span>
                     </div>
-                    <p className="text-xs2 text-gray-700 leading-relaxed mb-3">{activeSuggestion}</p>
+                    <p className="text-xs2 text-zinc-700 leading-relaxed mb-3">{activeSuggestion}</p>
                     <div className="flex gap-1.5">
-                      <button className="btn-primary btn-xs flex-1 text-xs2">적용</button>
+                      <button
+                        onClick={() => {
+                          setSectionTexts(p => ({ ...p, [activeSection]: (p[activeSection] || '') + '\n\n' + activeSuggestion }));
+                          setActiveSuggestion(null);
+                        }}
+                        className="btn-primary btn-xs flex-1 text-xs2">적용</button>
                       <button onClick={() => setActiveSuggestion(null)} className="btn-outline btn-xs text-xs2">무시</button>
-                      <button onClick={() => setActiveSuggestion(suggestions[0].body)} className="btn-outline btn-xs text-xs2">재생성</button>
                     </div>
                   </div>
                 )}
@@ -1721,49 +2060,36 @@ function EditorView({ task, onBack }: { task: any; onBack: () => void }) {
             {/* 도면 조회 탭 */}
             {assistTab === 'drawings' && (
               <div className="p-3">
-                <p className="text-xs2 font-semibold text-gray-600 mb-2">도면 목록</p>
+                <p className="text-xs2 font-semibold text-zinc-600 mb-2">도면 목록</p>
                 <div className="space-y-1.5">
                   {drawings.map((d, i) => (
                     <div key={i} onClick={() => setSelectedDrawing(i)}
                       className={clsx('flex items-center gap-2 rounded-lg border p-2 cursor-pointer transition-all',
-                        selectedDrawing === i ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-gray-300')}>
-                      <div className="w-12 h-9 bg-gray-100 rounded flex items-center justify-center shrink-0 border border-gray-200">
-                        <Icon name="image" size={16} className="text-gray-300" />
+                        selectedDrawing === i ? 'border-blue-400 bg-blue-50' : 'border-zinc-200 hover:border-zinc-300')}>
+                      <div className="w-12 h-9 bg-zinc-100 rounded flex items-center justify-center shrink-0 border border-zinc-200">
+                        <Icon name="image" size={16} className="text-zinc-300" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-xs2 font-semibold text-gray-800">{d.label} — {d.desc}</p>
-                        <p className="text-xs2 text-gray-400">{d.sub}</p>
+                        <p className="text-xs2 font-semibold text-zinc-800">{d.label} — {d.desc}</p>
+                        <p className="text-xs2 text-zinc-400">{d.sub}</p>
                       </div>
                     </div>
                   ))}
                 </div>
-                <button className="btn-primary w-full btn-xs mt-3 text-xs2">
-                  <Icon name="image" size={11} /> 선택 도면 에디터에 삽입
+                <button className="btn-primary w-full btn-xs mt-3 text-xs2 active:scale-[0.98]">
+                  <Icon name="image" size={11} /> 선택 도면 삽입
                 </button>
               </div>
             )}
 
             {/* 참고문헌 탭 */}
             {assistTab === 'refs' && (
-              <div className="p-3 text-center py-6 text-gray-400">
-                <Icon name="library" size={28} className="mx-auto mb-2 text-gray-300" />
+              <div className="p-3 text-center py-6 text-zinc-400">
+                <Icon name="library" size={28} className="mx-auto mb-2 text-zinc-300" />
                 <p className="text-xs2 mb-3">관련 선행기술/참고문헌을<br />검색하고 인용할 수 있습니다</p>
                 <button className="btn-outline btn-xs">선행기술 검색</button>
               </div>
             )}
-          </div>
-
-          {/* 하단 액션 바 */}
-          <div className="flex gap-2 p-2 border-t border-ck-border bg-ck-bg shrink-0">
-            <button className="px-3 py-1.5 border border-gray-300 rounded text-xs2 text-gray-500 hover:bg-gray-50 whitespace-nowrap">
-              ← 이전
-            </button>
-            <button className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs2 text-gray-500 hover:bg-gray-50">
-              프롬프트 재생성
-            </button>
-            <button className="flex-1 px-2 py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800">
-              선택 확인 →
-            </button>
           </div>
         </div>
       </div>
@@ -1774,13 +2100,16 @@ function EditorView({ task, onBack }: { task: any; onBack: () => void }) {
 function getDefault(section: string, task: any): string {
   const name = task?.name || '새 명세서';
   const d: Record<string, string> = {
-    tech: `본 발명은 ${name}에 관한 것으로, 특히 자율주행 차량에서 라이다 센서를 이용한 객체 감지 기술에 관한 것이다.`,
-    bg: '종래 기술에서는 카메라만을 이용한 2D 객체 감지 방식이 주로 사용되었으나, 이는 야간이나 악천후 상황에서 성능이 저하되는 문제점이 있었다.',
-    problem: '본 발명이 해결하고자 하는 과제는 라이다 센서와 딥러닝을 결합하여 다양한 환경 조건에서도 안정적으로 객체를 감지할 수 있는 장치 및 방법을 제공하는 것이다.',
-    solution: '상기 과제를 해결하기 위한 본 발명의 일 실시예에 따른 라이다 기반 객체 감지 장치는, 라이다 센서로부터 포인트 클라우드 데이터를 수집하는 데이터 수집부; 딥러닝 모델을 이용하여 객체를 분류하는 인식부를 포함한다.',
-    effect: '본 발명에 의하면, 딥러닝 기반의 포인트 클라우드 처리를 통해 기존 방식 대비 처리 속도가 40% 향상되고, 객체 인식 정확도가 95% 이상 달성된다.',
-    claims: '청구항 1.\n라이다 센서로부터 3차원 포인트 클라우드 데이터를 획득하는 데이터 수집부;\n상기 포인트 클라우드 데이터를 전처리하는 전처리부;\n딥러닝 모델을 적용하여 객체를 분류하는 인식부를 포함하는, 라이다 기반 객체 감지 장치.',
-    abstract: '본 발명은 자율주행 차량에서 라이다 센서를 이용하여 주변 객체를 실시간으로 감지하고 분류하는 장치 및 방법에 관한 것이다.',
+    title:    name,
+    tech:     `본 발명은 ${name}에 관한 것으로, 특히 자율주행 차량에서 라이다 센서를 이용한 객체 감지 기술에 관한 것이다.`,
+    bg:       '종래 기술에서는 카메라만을 이용한 2D 객체 감지 방식이 주로 사용되었으나, 이는 야간이나 악천후 상황에서 성능이 저하되는 문제점이 있었다. 라이다 센서를 이용한 3D 방식이 주목받고 있으나, 기존 복셀 기반 처리는 연산량이 많아 실시간 적용에 어려움이 있었다.',
+    problem:  '본 발명이 해결하고자 하는 과제는 라이다 센서와 딥러닝을 결합하여 다양한 환경 조건에서도 안정적으로 객체를 실시간으로 감지할 수 있는 장치 및 방법을 제공하는 것이다.',
+    solution: '상기 과제를 해결하기 위한 본 발명의 일 실시예에 따른 라이다 기반 객체 감지 장치는, 라이다 센서로부터 3D 포인트 클라우드 데이터를 수집하는 데이터 수집부; 상기 포인트 클라우드 데이터를 전처리하는 전처리부; PointNet++ 기반 딥러닝 모델을 이용하여 객체를 분류하는 인식부를 포함한다.',
+    effect:   '본 발명에 의하면, 딥러닝 기반의 포인트 클라우드 처리를 통해 기존 방식 대비 처리 속도가 40% 향상되고, 객체 인식 정확도가 95% 이상 달성된다. 또한 악천후 및 야간 환경에서도 안정적인 객체 감지가 가능하다.',
+    draw_desc:'도 1은 본 발명의 일 실시예에 따른 라이다 기반 객체 감지 장치의 전체 블록도이다.\n도 2는 데이터 전처리 흐름도이다.\n도 3은 PointNet++ 신경망 구조도이다.\n도 4는 객체 인식 결과 예시이다.',
+    detail:   '이하, 첨부된 도면을 참조하여 본 발명의 실시예를 상세히 설명한다.\n\n도 1을 참조하면, 본 발명의 라이다 기반 객체 감지 장치(10)는 데이터 수집부(100), 전처리부(200), 인식부(300), 출력부(400)를 포함한다.\n\n상기 데이터 수집부(100)는 라이다 센서로부터 3차원 포인트 클라우드 데이터를 수집한다. 상기 전처리부(200)는 RANSAC 알고리즘을 이용하여 지면 포인트를 분리하고 노이즈를 제거한다.',
+    claims:   '청구항 1.\n라이다 센서로부터 3차원 포인트 클라우드 데이터를 획득하는 데이터 수집부;\n상기 포인트 클라우드 데이터를 전처리하는 전처리부;\n딥러닝 모델을 적용하여 객체를 분류하는 인식부를 포함하는, 라이다 기반 객체 감지 장치.',
+    abstract: '본 발명은 자율주행 차량에서 라이다 센서를 이용하여 주변 객체를 실시간으로 감지하고 분류하는 장치 및 방법에 관한 것으로, 포인트 클라우드 데이터의 효율적인 전처리와 딥러닝 기반 객체 탐지를 결합하여 높은 정확도와 실시간 처리를 달성한다.',
   };
   return d[section] || '';
 }
