@@ -300,12 +300,10 @@ function getAbsoluteEndpoints(line: fabric.Line): { start: Pt; end: Pt } {
 }
 
 function removeAllEndpointHandles(fc: fabric.Canvas): void {
-  // 핸들 표시 중 비활성화했던 라인 그룹 복원
+  // 핸들 표시 중 숨겼던 line group 컨트롤 복원
   fc.getObjects().forEach(o => {
-    if (o instanceof fabric.Group && hasMeta(o, META.isUserLine) && !o.evented) {
+    if (o instanceof fabric.Group && hasMeta(o, META.isUserLine) && !o.hasControls) {
       o.hasControls = true;
-      o.evented = true;
-      o.selectable = true;
     }
   });
   const handles = fc
@@ -1245,14 +1243,10 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
           ) {
             const lineId = getMeta<string>(active, META.lineId);
             if (lineId) {
-              createEndpointHandles(fc, active, lineId);
-              // 그룹의 이벤트 가로채기를 비활성화 → 커스텀 핸들 클릭 가능
-              // (removeAllEndpointHandles에서 원복)
+              // Fabric.js 기본 크기조절/회전 컨트롤 숨김
+              // → 끝점 핸들과 겹치는 컨트롤 없으므로 핸들 클릭 가능
               active.hasControls = false;
-              active.evented = false;
-              active.selectable = false;
-              fc.discardActiveObject();
-              fc.requestRenderAll();
+              createEndpointHandles(fc, active, lineId);
             }
           }
           // 지시선 텍스트/부호 선택 시 앵커 핸들 표시
