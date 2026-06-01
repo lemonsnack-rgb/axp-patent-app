@@ -98,7 +98,7 @@ export function ClientsView() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto scroll-thin p-6 bg-ck-bg">
+    <div className="flex-1 overflow-y-auto scroll-thin p-6 bg-zinc-50">
       <div className="flex items-center gap-2 mb-6 ml-auto justify-end">
         <div className="relative">
           <Icon name="search" size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -119,13 +119,13 @@ export function ClientsView() {
           const cProjects = projects.filter(p => p.clientId === c.id).length;
           return (
             <div key={c.id} className="card">
-              <div className="p-4 flex items-start gap-3 border-b border-gray-100">
+              <div className="p-4 flex items-start gap-3 border-b border-zinc-100">
                 <span className="w-9 h-9 bg-blue-50 text-blue-700 rounded-md flex items-center justify-center shrink-0">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/></svg>
                 </span>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-lg2 font-bold text-gray-800">{c.name}</h3>
-                  <div className="flex items-center gap-3 mt-1 flex-wrap text-sm2 text-gray-500">
+                  <h3 className="text-lg2 font-bold text-zinc-800">{c.name}</h3>
+                  <div className="flex items-center gap-3 mt-1 flex-wrap text-sm2 text-zinc-500">
                     {c.industry && <span>🏷 {c.industry}</span>}
                     {c.address && <span>📍 {c.address}</span>}
                     <span>👥 담당자 {cContacts.length}명</span>
@@ -143,11 +143,11 @@ export function ClientsView() {
                 {cContacts.length > 0 && (
                   <div className="space-y-1 mb-1.5">
                     {cContacts.map(ct => (
-                      <div key={ct.id} className="flex items-center gap-3 px-2 py-1.5 hover:bg-gray-50 rounded text-md2">
-                        <span className="font-semibold text-gray-700 min-w-[80px]">{ct.name}</span>
-                        {ct.role && <span className="text-gray-500 min-w-[80px]">{ct.role}</span>}
-                        {ct.email && <span className="text-blue-700 font-mono text-sm2 truncate">{ct.email}</span>}
-                        {ct.phone && <span className="text-gray-600 font-mono text-sm2">{ct.phone}</span>}
+                      <div key={ct.id} className="flex items-center gap-3 px-2 py-1.5 hover:bg-zinc-50 rounded-md transition-colors text-md2 border-b border-zinc-100 last:border-0">
+                        <span className="font-semibold text-zinc-700 min-w-[80px]">{ct.name}</span>
+                        {ct.role && <span className="text-zinc-500 min-w-[80px]">{ct.role}</span>}
+                        {ct.email && <span className="text-blue-600 font-mono text-sm2 truncate">{ct.email}</span>}
+                        {ct.phone && <span className="text-zinc-600 font-mono text-sm2">{ct.phone}</span>}
                         <div className="ml-auto flex gap-1">
                           <button className="btn-ghost text-xs2 px-2 py-0.5" onClick={() => openEditContact(c.id, ct)}>편집</button>
                           <button className="text-xs2 px-2 py-0.5 text-red-600 hover:bg-red-50 rounded" onClick={() => deleteContact(ct)}>삭제</button>

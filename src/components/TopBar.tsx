@@ -18,7 +18,7 @@ export function TopBar() {
   const showTaskName = (mode === 'spec' || mode === 'search') && active;
 
   return (
-    <header className="h-topbar bg-white border-b border-ck-border flex items-center justify-between px-3 shrink-0">
+    <header className="h-topbar bg-white border-b border-zinc-200 flex items-center justify-between px-3 shrink-0">
       <div className="flex items-center gap-2">
         <div
           className="flex items-center justify-between"
@@ -26,11 +26,11 @@ export function TopBar() {
         >
           <button
             onClick={() => sidebarCollapsed ? setSidebarCollapsed(false) : setMode('home')}
-            className="flex items-center gap-2 cursor-pointer hover:opacity-80"
+            className="flex items-center gap-2 cursor-pointer hover:opacity-80 active:scale-[0.98] transition-all"
             title={sidebarCollapsed ? '사이드바 열기' : '프로젝트로 이동'}
           >
-            <span className="w-5 h-5 text-blue-700"><Icon name="logo" size={20} /></span>
-            {!sidebarCollapsed && <span className="font-semibold text-base2 text-gray-800">AXPlain.ai</span>}
+            <span className="w-5 h-5 text-blue-600"><Icon name="logo" size={20} /></span>
+            {!sidebarCollapsed && <span className="font-semibold text-base2 text-zinc-800">AXPlain.ai</span>}
           </button>
           {!sidebarCollapsed && (
             <button onClick={() => setSidebarCollapsed(true)} className="btn-ghost p-1" title="사이드바 토글">
@@ -38,12 +38,12 @@ export function TopBar() {
             </button>
           )}
         </div>
-        <span className="text-md2 text-gray-500 ml-2">
+        <span className="text-md2 text-zinc-500 ml-2">
           {label}
           {showTaskName && active && (
             <>
-              <span className="mx-1 text-gray-300">—</span>
-              <span className="text-gray-800 font-medium">{active.name}</span>
+              <span className="mx-1 text-zinc-300">—</span>
+              <span className="text-zinc-800 font-medium">{active.name}</span>
             </>
           )}
         </span>

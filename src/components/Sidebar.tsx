@@ -46,7 +46,7 @@ export function Sidebar() {
   return (
     <aside
       className={clsx(
-        'border-r border-ck-border bg-white flex flex-col shrink-0 transition-all relative',
+        'border-r border-zinc-200 bg-white flex flex-col shrink-0 transition-all relative',
         sidebarCollapsed ? 'w-nav-c min-w-nav-c' : 'w-nav min-w-nav',
       )}
     >
@@ -59,16 +59,16 @@ export function Sidebar() {
 
       {!sidebarCollapsed && (
         <>
-          <div className="mx-3 my-2 border-t border-gray-100" />
-          <div className="px-3 flex items-center justify-between gap-1 text-sm2 text-gray-500 font-semibold mb-1">
+          <div className="mx-3 my-2 border-t border-zinc-100" />
+          <div className="px-3 flex items-center justify-between gap-1 text-sm2 text-zinc-500 font-semibold mb-1">
             <span>작업 목록</span>
-            <span className="text-xs2 bg-gray-100 px-1.5 rounded">{tasks.length}</span>
+            <span className="text-xs2 bg-zinc-100 px-1.5 rounded">{tasks.length}</span>
           </div>
           <div className="px-3 flex items-center gap-1 mb-1.5">
             <div className="relative flex-1">
               <Icon name="search" size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
-                className="w-full pl-6 pr-2 py-1 border border-gray-200 rounded text-sm2 outline-none focus:border-blue-500"
+                className="w-full pl-6 pr-2 py-1 border border-zinc-200 rounded-md text-sm2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-shadow"
                 placeholder="검색"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -125,18 +125,18 @@ export function Sidebar() {
         </>
       )}
 
-      <div className={clsx('mt-auto border-t border-gray-100', sidebarCollapsed ? 'p-2' : 'p-3')}>
-        <button className={clsx('flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-gray-100 text-md2 text-gray-700', sidebarCollapsed && 'justify-center')}
+      <div className={clsx('mt-auto border-t border-zinc-100', sidebarCollapsed ? 'p-2' : 'p-3')}>
+        <button className={clsx('flex items-center gap-2 w-full px-2 py-1.5 rounded-md hover:bg-zinc-100 active:scale-[0.98] transition-all text-md2 text-zinc-700', sidebarCollapsed && 'justify-center')}
           onClick={() => toast.show('설정 모달 (구축 중)')}>
           <Icon name="settings" size={16} />
           {!sidebarCollapsed && <span>설정</span>}
         </button>
         {!sidebarCollapsed && (
           <div className="flex items-center gap-2 px-2 py-1.5 mt-1">
-            <span className="w-7 h-7 rounded-full bg-blue-700 text-white text-xs2 font-semibold flex items-center justify-center">P</span>
+            <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-xs2 font-semibold flex items-center justify-center">P</span>
             <div>
-              <div className="text-md2 text-gray-800">왕일</div>
-              <div className="text-xs2 text-gray-400">muhayu</div>
+              <div className="text-md2 text-zinc-800">왕일</div>
+              <div className="text-xs2 text-zinc-400">muhayu</div>
             </div>
           </div>
         )}
@@ -152,11 +152,11 @@ function NavItem({ icon, label, active, collapsed, onClick, primary }: {
     <button
       onClick={onClick}
       className={clsx(
-        'flex items-center gap-2 px-3 py-2 rounded-md text-md2 font-medium transition-colors',
+        'flex items-center gap-2 px-3 py-2 rounded-md text-md2 font-medium transition-all active:scale-[0.98]',
         collapsed && 'justify-center px-0',
         active && 'bg-blue-50 text-blue-700',
-        !active && primary && 'text-gray-800 hover:bg-gray-100',
-        !active && !primary && 'text-gray-600 hover:bg-gray-100',
+        !active && primary && 'text-zinc-800 hover:bg-zinc-100',
+        !active && !primary && 'text-zinc-600 hover:bg-zinc-100',
       )}
       title={label}
     >
@@ -189,8 +189,8 @@ function TaskRow({ t, active, onSelect, onToggleFav, menuOpen, onMenuToggle, onR
   return (
     <div
       className={clsx(
-        'group relative w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-left transition-colors cursor-pointer',
-        active ? 'bg-blue-50' : 'hover:bg-gray-50',
+        'group relative w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-left transition-all cursor-pointer',
+        active ? 'bg-blue-50' : 'hover:bg-zinc-50',
       )}
       onClick={onSelect}
     >
@@ -205,14 +205,14 @@ function TaskRow({ t, active, onSelect, onToggleFav, menuOpen, onMenuToggle, onR
         <Icon name={meta.icon} size={13} />
       </span>
       <span className="flex-1 min-w-0">
-        <div className={clsx('text-md2 font-medium leading-tight truncate', active ? 'text-blue-700' : 'text-gray-800')}>
+        <div className={clsx('text-md2 font-medium leading-tight truncate', active ? 'text-blue-700' : 'text-zinc-800')}>
           {t.name}
         </div>
-        <div className="text-xs2 text-gray-400 mt-0.5">{meta.label} · {ago}</div>
+        <div className="text-xs2 text-zinc-400 mt-0.5">{meta.label} · {ago}</div>
       </span>
       <button
         onClick={(e) => { e.stopPropagation(); onMenuToggle(); }}
-        className={clsx('w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:bg-gray-200 hover:text-gray-700',
+        className={clsx('w-5 h-5 flex items-center justify-center rounded text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700',
           menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100')}
         title="작업 메뉴"
       >
@@ -220,13 +220,13 @@ function TaskRow({ t, active, onSelect, onToggleFav, menuOpen, onMenuToggle, onR
       </button>
       {menuOpen && (
         <div ref={menuRef}
-          className="absolute right-2 top-9 z-20 bg-white border border-gray-200 rounded-md shadow-card-deep py-1 min-w-[140px]"
+          className="absolute right-2 top-9 z-20 bg-white border border-zinc-200 rounded-xl shadow-card-deep py-1 min-w-[140px]"
           onClick={e => e.stopPropagation()}
         >
-          <button onClick={onRename} className="w-full text-left px-3 py-1.5 text-md2 hover:bg-gray-50">이름 변경</button>
-          <button onClick={onDuplicate} className="w-full text-left px-3 py-1.5 text-md2 hover:bg-gray-50">복제</button>
-          <div className="h-px bg-gray-100 my-1" />
-          <button onClick={onDelete} className="w-full text-left px-3 py-1.5 text-md2 hover:bg-red-50 text-red-600">삭제</button>
+          <button onClick={onRename} className="w-full text-left px-3 py-1.5 text-md2 hover:bg-zinc-50 transition-colors">이름 변경</button>
+          <button onClick={onDuplicate} className="w-full text-left px-3 py-1.5 text-md2 hover:bg-zinc-50 transition-colors">복제</button>
+          <div className="h-px bg-zinc-100 my-1" />
+          <button onClick={onDelete} className="w-full text-left px-3 py-1.5 text-md2 hover:bg-red-50 text-red-600 transition-colors">삭제</button>
         </div>
       )}
     </div>

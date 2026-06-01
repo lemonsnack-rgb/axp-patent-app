@@ -26,7 +26,7 @@ export function LibraryView() {
   const allTags = Array.from(new Set(library.flatMap(l => l.tags || []))).sort();
 
   return (
-    <div className="flex-1 overflow-y-auto scroll-thin p-6 bg-ck-bg">
+    <div className="flex-1 overflow-y-auto scroll-thin p-6 bg-zinc-50">
       <div className="flex items-center gap-2 mb-6 justify-end">
         <div className="relative">
           <Icon name="search" size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -53,7 +53,7 @@ export function LibraryView() {
       <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
         <button
           onClick={() => setNewOpen(true)}
-          className="card border-dashed border-gray-300 p-4 flex items-center gap-3 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700 min-h-[84px] text-gray-500 transition-all"
+          className="card border-dashed border-zinc-300 p-4 flex items-center gap-3 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700 active:scale-[0.98] min-h-[84px] text-zinc-500 transition-all"
         >
           <span className="w-8 h-8 bg-gray-100 rounded-md flex items-center justify-center"><Icon name="plus" size={18} /></span>
           <div>
@@ -69,7 +69,7 @@ export function LibraryView() {
               key={c.id}
               onClick={() => setDrill({ kind: 'collection', id: c.id })}
               className={clsx(
-                'card p-4 flex items-start gap-3 cursor-pointer relative hover:border-blue-500 hover:shadow-card-hover hover:-translate-y-0.5 transition-all min-h-[84px]',
+                'card p-4 flex items-start gap-3 cursor-pointer relative hover:border-blue-500 hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.98] transition-all min-h-[84px]',
                 c.favorite && 'border-amber-300',
                 isActive && 'ring-2 ring-blue-500',
               )}
@@ -89,8 +89,8 @@ export function LibraryView() {
                 style={{ background: `${c.color}22`, color: c.color }}
               ><Icon name="folder" size={18} /></span>
               <div className="flex-1 min-w-0">
-                <div className="font-semibold text-base2 text-gray-800 truncate">{c.name}</div>
-                <div className="text-sm2 text-gray-500">{cnt}건</div>
+                <div className="font-semibold text-base2 text-zinc-800 truncate">{c.name}</div>
+                <div className="text-sm2 text-zinc-500">{cnt}건</div>
                 {c._system !== 'uncat' && (
                   <button
                     onClick={e => {
@@ -109,7 +109,7 @@ export function LibraryView() {
       {/* 태그 행 (드릴다운 모드일 때만) */}
       {drill && allTags.length > 0 && (
         <section className="mt-6">
-          <div className="text-sm2 font-semibold text-gray-500 mb-2">태그 {allTags.length}개</div>
+          <div className="text-sm2 font-semibold text-zinc-500 mb-2">태그 {allTags.length}개</div>
           <div className="flex flex-wrap gap-1.5">
             {allTags.map(t => {
               const cnt = library.filter(l => (l.tags || []).includes(t)).length;
@@ -119,10 +119,10 @@ export function LibraryView() {
                   key={t}
                   onClick={() => setDrill({ kind: 'tag', tag: t })}
                   className={clsx(
-                    'inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm2 border transition-all',
+                    'inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm2 border transition-all active:scale-[0.98]',
                     isActive
-                      ? 'bg-blue-700 text-white border-blue-700'
-                      : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700',
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-zinc-700 border-zinc-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700',
                   )}
                 >
                   #{t} <span className={clsx('text-xs2', isActive ? 'text-white/80' : 'text-gray-400')}>{cnt}</span>
@@ -180,15 +180,15 @@ function DrillDownItems({ filter, search, sort, onSortChange, onOpenDetail }: {
   return (
     <section className="mt-6">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-base2 font-semibold text-gray-700">{label}</span>
-        <span className="text-sm2 text-gray-400">{items.length}건</span>
+        <span className="text-base2 font-semibold text-zinc-700">{label}</span>
+        <span className="text-sm2 text-zinc-400">{items.length}건</span>
         <select className="input ml-auto py-1 px-2 text-sm2 w-auto" value={sort} onChange={e => onSortChange(e.target.value as any)}>
           <option value="recent">최근 저장순</option>
           <option value="title">제목순</option>
         </select>
       </div>
       {items.length === 0 ? (
-        <div className="card p-8 text-center text-gray-400">자료가 없습니다.</div>
+        <div className="card p-8 text-center text-zinc-400">자료가 없습니다.</div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3">
           {items.map(it => {
@@ -197,7 +197,7 @@ function DrillDownItems({ filter, search, sort, onSortChange, onOpenDetail }: {
               <div
                 key={it.id}
                 onClick={() => onOpenDetail(it.id)}
-                className="card p-3 relative cursor-pointer hover:border-blue-500 hover:shadow-card-hover transition-all"
+                className="card p-3 relative cursor-pointer hover:border-blue-500 hover:shadow-card-hover active:scale-[0.98] transition-all"
               >
                 <button
                   onClick={e => { e.stopPropagation(); libraryToggleFavorite(it.id); }}

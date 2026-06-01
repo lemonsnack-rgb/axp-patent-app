@@ -72,10 +72,10 @@ export function NewTaskView() {
   const contacts = clientId ? contactByClient(clientId) : [];
 
   return (
-    <div className="flex-1 overflow-y-auto scroll-thin flex flex-col items-center pt-16 pb-12 px-8 bg-ck-bg">
+    <div className="flex-1 overflow-y-auto scroll-thin flex flex-col items-center pt-16 pb-12 px-8 bg-zinc-50">
       <div className="max-w-3xl w-full text-center mb-9">
-        <h2 className="text-h1 font-bold text-gray-800 tracking-tight mb-2.5">어떤 작업을 시작하시겠어요?</h2>
-        <p className="text-lg2 text-gray-500">작업 유형을 선택하고, 필요하면 이름·프로젝트·고객사를 지정하세요.</p>
+        <h2 className="text-h1 font-bold text-zinc-900 tracking-tight mb-2.5">어떤 작업을 시작하시겠어요?</h2>
+        <p className="text-lg2 text-zinc-500">작업 유형을 선택하고, 필요하면 이름·프로젝트·고객사를 지정하세요.</p>
       </div>
 
       <div className="grid grid-cols-3 gap-4 max-w-3xl w-full mb-6">
@@ -84,17 +84,17 @@ export function NewTaskView() {
             key={t.type}
             onClick={() => setType(t.type)}
             className={clsx(
-              'flex flex-col gap-2 p-5 bg-white rounded-xl text-left border-2 transition-all min-h-[140px]',
+              'flex flex-col gap-2 p-5 bg-white rounded-xl text-left border-2 transition-all min-h-[140px] active:scale-[0.98]',
               type === t.type
-                ? 'border-blue-700 bg-blue-50 shadow-card-deep'
-                : 'border-gray-200 hover:border-blue-500 hover:-translate-y-0.5 hover:shadow-card-hover',
+                ? 'border-blue-600 bg-blue-50 shadow-card-deep'
+                : 'border-zinc-200 hover:border-blue-500 hover:-translate-y-0.5 hover:shadow-card-hover',
             )}
           >
             <span className={`w-12 h-12 rounded-lg flex items-center justify-center bg-${t.color}-50 text-${t.color}-700`}>
               <Icon name={t.icon} size={28} />
             </span>
-            <div className="text-lg2 font-bold text-gray-800">{t.title}</div>
-            <div className="text-sm2 text-gray-500 leading-snug">{t.desc}</div>
+            <div className="text-lg2 font-bold text-zinc-800">{t.title}</div>
+            <div className="text-sm2 text-zinc-500 leading-snug">{t.desc}</div>
           </button>
         ))}
       </div>
@@ -103,7 +103,7 @@ export function NewTaskView() {
         <div className="card max-w-[760px] w-full p-5 animate-fade-up">
           <Field label="작업 이름 (선택)">
             <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder={PLACEHOLDER[type]} maxLength={80} autoFocus />
-            <div className="text-xs2 text-gray-400 mt-1">검색 작업: 첫 검색 시 검색식 일부 · 명세서: 발명의 명칭 입력 시 자동 반영</div>
+            <div className="text-xs2 text-zinc-400 mt-1">검색 작업: 첫 검색 시 검색식 일부 · 명세서: 발명의 명칭 입력 시 자동 반영</div>
           </Field>
           <Field label="기술분야 (선택)">
             <input className="input" value={techField} onChange={e => setTechField(e.target.value)} placeholder="예: 자율주행 LIDAR, 무선통신, 의료영상" maxLength={60} />
@@ -141,7 +141,7 @@ export function NewTaskView() {
               </select>
             </Field>
           )}
-          <div className="flex justify-end gap-2 mt-3 pt-3.5 border-t border-gray-100">
+          <div className="flex justify-end gap-2 mt-3 pt-3.5 border-t border-zinc-100">
             <button className="btn-outline btn-sm" onClick={cancel}>취소</button>
             <button className="btn-primary btn-sm" disabled={!type} onClick={submit}>작업 만들기</button>
           </div>

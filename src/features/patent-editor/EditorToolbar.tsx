@@ -19,11 +19,11 @@ interface Props {
 }
 
 // ── 공통 버튼 크기: 모든 버튼 h-8 기준 ────────────────────
-const BTN_BASE = "inline-flex flex-col items-center justify-center gap-0.5 h-8 px-2 rounded border transition-colors text-xs2";
+const BTN_BASE = "inline-flex flex-col items-center justify-center gap-0.5 h-8 px-2 rounded-md border transition-all active:scale-[0.97] text-xs2";
 const BTN_ACTIVE = "border-blue-500 bg-blue-50 text-blue-700";
-const BTN_INACTIVE = "border-transparent text-gray-600 hover:border-gray-300 hover:bg-white";
-const BTN_OPT = "inline-flex items-center justify-center h-8 px-2 rounded border transition-colors text-xs2 font-mono";
-const DIVIDER = "w-px self-stretch bg-gray-200 mx-1.5";
+const BTN_INACTIVE = "border-transparent text-zinc-600 hover:border-zinc-300 hover:bg-white hover:text-zinc-800";
+const BTN_OPT = "inline-flex items-center justify-center h-8 px-2 rounded-md border transition-all text-xs2 font-mono";
+const DIVIDER = "w-px self-stretch bg-zinc-200 mx-1.5";
 
 function ToolBtn({ active, onClick, title, icon, label, disabled, badge }: {
   active?: boolean; onClick: () => void; title: string;
@@ -46,7 +46,7 @@ function OptBtn({ active, onClick, title, children }: {
 }) {
   return (
     <button type="button" onClick={onClick} title={title}
-      className={`${BTN_OPT} ${active ? BTN_ACTIVE : 'border-gray-300 bg-white text-gray-700 hover:bg-ck-bg'}`}>
+      className={`${BTN_OPT} ${active ? BTN_ACTIVE : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50'}`}>
       {children}
     </button>
   );
@@ -284,18 +284,18 @@ export function EditorToolbar({ onSave, onExport, onClose, onToggleHatch, busy }
         <div className="flex-1 min-w-[16px]" />
         <div className="flex items-center gap-1.5 pb-4">
           <button type="button" onClick={onSave} title="저장 (Ctrl+S)"
-            className="inline-flex items-center gap-1.5 h-8 px-3 border border-gray-300 rounded bg-white text-sm2 text-gray-700 hover:bg-ck-bg transition-colors">
+            className="inline-flex items-center gap-1.5 h-8 px-3 border border-zinc-300 rounded-md bg-white text-sm2 text-zinc-700 hover:bg-zinc-50 active:scale-[0.98] transition-all">
             <Save size={13} />
             <span>저장</span>
           </button>
           <button type="button" onClick={onExport} disabled={busy}
             title="1-bit 흑백 PNG 내보내기"
-            className="inline-flex items-center gap-1.5 h-8 px-3 border border-blue-600 rounded bg-blue-600 text-sm2 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors">
+            className="inline-flex items-center gap-1.5 h-8 px-3 border border-blue-600 rounded-md bg-blue-600 text-sm2 text-white hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 transition-all">
             <Download size={13} />
             <span>{busy ? '처리 중…' : '내보내기'}</span>
           </button>
           <button type="button" onClick={onClose} title="편집 종료"
-            className="inline-flex items-center gap-1.5 h-8 px-3 border border-gray-300 rounded bg-white text-sm2 text-gray-700 hover:bg-ck-bg transition-colors">
+            className="inline-flex items-center gap-1.5 h-8 px-3 border border-zinc-300 rounded-md bg-white text-sm2 text-zinc-700 hover:bg-zinc-50 active:scale-[0.98] transition-all">
             <X size={13} />
             <span>종료</span>
           </button>

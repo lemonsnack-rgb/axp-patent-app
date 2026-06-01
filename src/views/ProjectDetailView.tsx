@@ -86,8 +86,8 @@ export function ProjectDetailView() {
           <Icon name="arrow-left" size={13} /> 프로젝트
         </button>
         <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: p.color || '#1e5fa6' }} />
-        <h2 className="text-lg2 font-bold text-gray-800 truncate">{p.name}</h2>
-        <span className="text-sm2 text-gray-500">
+        <h2 className="text-lg2 font-bold text-zinc-800 truncate">{p.name}</h2>
+        <span className="text-sm2 text-zinc-500">
           {projectTasks.length}건
           {client && ` · ${client.name}`}
           {p.favorite && <span className="ml-2 text-amber-500"><Icon name="star-filled" size={11} className="inline" /></span>}
@@ -101,15 +101,15 @@ export function ProjectDetailView() {
             <Icon name="plus" size={13} /> 이 프로젝트에 새 작업
           </button>
           {menuOpen && (
-            <div ref={menuRef} className="absolute right-0 top-full mt-1 z-30 bg-white border border-gray-200 rounded-md shadow-card-deep py-1.5 min-w-[220px]">
+            <div ref={menuRef} className="absolute right-0 top-full mt-1 z-30 bg-white border border-zinc-200 rounded-xl shadow-card-deep py-1.5 min-w-[220px]">
               <MenuItem icon="edit" label="이름 변경" onClick={rename} />
               <MenuItem
                 icon={p.favorite ? 'star-filled' : 'star'}
                 label={p.favorite ? '즐겨찾기 해제' : '즐겨찾기'}
                 onClick={() => { projectToggleFavorite(p.id); setMenuOpen(false); }}
               />
-              <div className="h-px bg-gray-100 my-1" />
-              <div className="px-3 py-1 text-xs2 text-gray-400 font-semibold uppercase tracking-wide">색상</div>
+              <div className="h-px bg-zinc-100 my-1" />
+              <div className="px-3 py-1 text-xs2 text-zinc-400 font-semibold uppercase tracking-wide">색상</div>
               <div className="px-3 py-1.5 flex gap-1.5">
                 {PROJECT_COLORS.map(c => (
                   <button
@@ -121,7 +121,7 @@ export function ProjectDetailView() {
                   />
                 ))}
               </div>
-              <div className="h-px bg-gray-100 my-1" />
+              <div className="h-px bg-zinc-100 my-1" />
               <MenuItem icon="close" label="프로젝트 삭제" danger onClick={remove} />
             </div>
           )}
@@ -153,11 +153,11 @@ export function ProjectDetailView() {
                       setActiveTaskId(t.id);
                       setMode(t.type === 'spec' ? 'spec' : 'search');
                     }}
-                    className="card p-3 text-left hover:border-blue-500 hover:shadow-card-hover transition-all"
+                    className="card p-3 text-left hover:border-blue-500 hover:shadow-card-hover active:scale-[0.98] transition-all"
                   >
                     <div className="flex items-center gap-2 mb-1.5">
                       <span className={`text-${meta.color}-600`}><Icon name={meta.icon} size={14} /></span>
-                      <span className="text-xs2 text-gray-500">{meta.label}</span>
+                      <span className="text-xs2 text-zinc-500">{meta.label}</span>
                       {t.favorite && <Icon name="star-filled" size={12} className="text-amber-500" />}
                     </div>
                     <div className="text-md2 font-semibold text-gray-800 line-clamp-2 leading-snug">{t.name}</div>

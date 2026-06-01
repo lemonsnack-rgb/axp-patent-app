@@ -29,7 +29,7 @@ export function HomeView() {
     });
 
   return (
-    <div className="flex-1 overflow-y-auto scroll-thin p-6 bg-ck-bg">
+    <div className="flex-1 overflow-y-auto scroll-thin p-6 bg-zinc-50">
       <div className="flex items-center gap-2 mb-6 ml-auto justify-end">
         <div className="relative">
           <Icon name="search" size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -50,7 +50,7 @@ export function HomeView() {
       <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
         <button
           onClick={() => setNewOpen(true)}
-          className="card border-dashed border-gray-300 p-4 flex flex-col items-center justify-center gap-2 min-h-[120px] hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700 transition-colors text-gray-500"
+          className="card border-dashed border-zinc-300 p-4 flex flex-col items-center justify-center gap-2 min-h-[120px] hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700 active:scale-[0.98] transition-all text-zinc-500"
         >
           <Icon name="plus" size={28} />
           <div className="font-semibold text-base2">새 프로젝트</div>
@@ -81,23 +81,23 @@ function ProjectCard({ p, count, onOpen, onToggleFav }: {
     <button
       onClick={onOpen}
       className={clsx(
-        'card p-4 text-left hover:border-blue-500 hover:shadow-card-hover transition-all min-h-[120px] flex flex-col gap-2 relative',
+        'card p-4 text-left hover:border-blue-500 hover:shadow-card-hover active:scale-[0.98] transition-all min-h-[120px] flex flex-col gap-2 relative',
         p.favorite && 'border-amber-300',
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <Icon name="folder" size={20} style={{ color: p.color || '#1e5fa6' }} />
+        <Icon name="folder" size={20} style={{ color: p.color || '#2563eb' }} />
         <span
           onClick={(e) => { e.stopPropagation(); onToggleFav(); }}
-          className={clsx(p.favorite ? 'text-amber-500' : 'text-gray-300 hover:text-gray-500')}
+          className={clsx(p.favorite ? 'text-amber-500' : 'text-zinc-300 hover:text-zinc-500')}
         >
           <Icon name={p.favorite ? 'star-filled' : 'star'} size={13} />
         </span>
       </div>
-      <div className="font-semibold text-base2 text-gray-800 line-clamp-2">{p.name}</div>
-      {p.description && <div className="text-sm2 text-gray-500 line-clamp-2">{p.description}</div>}
-      <div className="mt-auto flex items-center justify-between text-xs2 text-gray-500">
-        <span className="font-semibold text-blue-700">{count}건</span>
+      <div className="font-semibold text-base2 text-zinc-800 line-clamp-2">{p.name}</div>
+      {p.description && <div className="text-sm2 text-zinc-500 line-clamp-2">{p.description}</div>}
+      <div className="mt-auto flex items-center justify-between text-xs2 text-zinc-500">
+        <span className="font-semibold text-blue-600">{count}건</span>
         <span className="truncate">{client?.name || '비어있음'}</span>
       </div>
     </button>
@@ -184,7 +184,7 @@ function NewProjectModal({ open, onClose }: { open: boolean; onClose: () => void
             maxLength={60}
             autoFocus
           />
-          <div className="text-xs2 text-gray-400 mt-1">{name.length} / 60자</div>
+          <div className="text-xs2 text-zinc-400 mt-1">{name.length} / 60자</div>
         </div>
 
         {/* 설명 */}

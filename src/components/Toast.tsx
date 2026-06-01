@@ -30,10 +30,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           <div
             key={t.id}
             className={
-              'px-4 py-2.5 rounded-lg shadow-card-deep text-md2 font-medium animate-fade-up pointer-events-auto max-w-md ' +
+              'px-4 py-2.5 rounded-xl shadow-card-deep text-base2 font-medium animate-fade-up pointer-events-auto max-w-md ' +
               (t.type === 'error'   ? 'bg-red-600 text-white' :
                t.type === 'success' ? 'bg-green-700 text-white' :
-                                      'bg-gray-800 text-white')
+                                      'bg-zinc-800 text-white')
             }
           >
             {t.text}
