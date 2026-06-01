@@ -11,6 +11,8 @@ import { ClientsView } from './views/ClientsView';
 import { SearchView } from './views/SearchView';
 import { SpecView } from './views/SpecView';
 import { LoginView } from './components/LoginView';
+import { StandaloneEditor } from './views/StandaloneEditor';
+import { isEditorTab } from './features/drawing-workflow/editorChannel';
 
 function Shell() {
   const { mode } = useStore();
@@ -34,6 +36,11 @@ function Shell() {
 }
 
 export default function App() {
+  // 새 탭으로 열린 도면 편집기 — 로그인 불필요, 독립 렌더
+  if (isEditorTab()) {
+    return <StandaloneEditor />;
+  }
+
   const [loggedIn, setLoggedIn] = useState(
     () => sessionStorage.getItem('axp_auth') === '1'
   );

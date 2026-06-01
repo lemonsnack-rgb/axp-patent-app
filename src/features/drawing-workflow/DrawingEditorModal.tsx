@@ -1,8 +1,12 @@
 // DrawingEditorModal — 배경 유지 오버레이, 고정 크기(900×620), 4단계 워크플로우
-import { useState, useCallback } from 'react';
+// Stage 1~3: 모달 내 처리 / Stage 4(편집): 데스크탑→새 탭, 모바일→인라인 패널
+import { useState, useCallback, useEffect } from 'react';
 import clsx from 'clsx';
 import { Icon } from '../../components/Icon';
 import { PatentEditor } from '../patent-editor';
+import {
+  openEditorTab, onEditorResult, isMobile,
+} from './editorChannel';
 import type { DrawingItem, CadCandidate } from './types';
 import type { EditorReference, PatentDrawing, InventionComponent } from '../patent-editor';
 
@@ -64,12 +68,35 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
   const [selectedMap, setSelectedMap] = useState<Record<string, string>>({});
   const [editorOpen, setEditorOpen] = useState(() => {
     const d = drawings.find(d => d.id === initialDrawingId);
-    return d?.stage === 'done' || d?.stage === 'editing';
+    return (d?.stage === 'done' || d?.stage === 'editing') && isMobile();
+  });
+  const [editorTabOpened, setEditorTabOpened] = useState(() => {
+    const d = drawings.find(d => d.id === initialDrawingId);
+    return (d?.stage === 'done' || d?.stage === 'editing') && !isMobile();
   });
   const [zoomedCandId, setZoomedCandId] = useState<string | null>(null);
   const [regenPrompt, setRegenPrompt] = useState('');
   const [showRegen, setShowRegen] = useState(false);
-  const [syncNotice, setSyncNotice] = useState<string | null>(null); // 구성요소 갱신 알림
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
+
+  // 편집기 탭 결과 수신 (메인 탭에서만 동작)
+  useEffect(() => {
+    const off = onEditorResult((result) => {
+      onSave(result.drawingId, {
+        stage: result.stage,
+        savedEditorJson: result.editorJson,
+        exportedImageUrl: result.exportedImageUrl,
+      });
+      if (result.stage === 'done') {
+        setSyncNotice('도면 편집 완료 — 결과가 반영되었습니다.');
+        setTimeout(() => setSyncNotice(null), 4000);
+        setEditorTabOpened(false);
+        goStage('editing'); // 편집 완료 상태 유지
+      }
+    });
+    return off;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const activeDraw = drawings.find(d => d.id === activeId);
   const workStage = workStageMap[activeId] || 'crop';
@@ -111,7 +138,32 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
     if (!selId) return;
     onSave(activeId, { stage: 'editing', selectedCandidateId: selId });
     goStage('editing');
-    setEditorOpen(true);
+
+    if (isMobile()) {
+      // 모바일: 인라인 모달로 PatentEditor 표시
+      setEditorOpen(true);
+    } else {
+      // 데스크탑: 새 탭으로 편집기 열기
+      const cands = candidatesMap[activeId] || activeDraw?.cadCandidates || [];
+      const selCand = cands.find(c => c.id === selId) || cands[0];
+      const patentDraw: PatentDrawing = {
+        id: activeId,
+        caption: activeDraw ? `${activeDraw.symbol}. ${activeDraw.name}` : activeId,
+        description: activeDraw?.description,
+        sourceImageUrl: selCand?.svgDataUrl || activeDraw?.originalImageUrl || '',
+        thumbnailUrl: activeDraw?.exportedImageUrl,
+        savedEditorDataJson: activeDraw?.savedEditorJson,
+      };
+      openEditorTab({
+        drawingId: activeId,
+        drawings: [patentDraw],
+        components: MOCK_COMPONENTS,
+        references: [],
+        drawingName: activeDraw?.name ?? activeId,
+        timestamp: Date.now(),
+      });
+      setEditorTabOpened(true);
+    }
   };
 
   // PatentEditor 데이터
@@ -449,25 +501,61 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                 </div>
               )}
 
-              {/* ── Stage 4: 편집 대기 ── */}
+              {/* ── Stage 4: 편집 ── */}
               {workStage === 'editing' && (
                 <div className="flex-1 flex flex-col p-4 gap-3">
                   <div>
                     <p className="text-base2 font-bold text-gray-800">편집</p>
-                    <p className="text-sm2 text-gray-500">편집기를 열어 도면에 선, 부호, 지시선을 추가하세요.</p>
+                    <p className="text-sm2 text-gray-500">
+                      {editorTabOpened
+                        ? '새 탭에서 편집 중입니다. 저장 후 이 창에서 명세서를 함께 확인하세요.'
+                        : '편집기를 열어 도면에 선, 부호, 지시선을 추가하세요.'}
+                    </p>
                   </div>
+
                   <div className="flex-1 flex flex-col items-center justify-center gap-3">
-                    <div className="card p-6 text-center w-full max-w-xs">
-                      <Icon name="image" size={36} className="mx-auto text-blue-200 mb-3" />
-                      <p className="text-sm2 text-gray-700 font-semibold mb-1">{activeDraw?.name}</p>
-                      <p className="text-xs2 text-gray-400 mb-4">편집 준비가 완료되었습니다.</p>
-                      <button className="btn-primary btn-sm w-full" onClick={() => setEditorOpen(true)}>
-                        편집기 열기 →
-                      </button>
-                    </div>
+                    {editorTabOpened ? (
+                      /* 새 탭 편집 중 상태 */
+                      <div className="card p-6 text-center w-full max-w-sm border-blue-200 bg-blue-50">
+                        <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-3">
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round">
+                            <rect x="3" y="3" width="8" height="5" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/>
+                            <rect x="3" y="11" width="8" height="10" rx="1"/><rect x="13" y="11" width="8" height="10" rx="1"/>
+                          </svg>
+                        </div>
+                        <p className="text-sm2 font-semibold text-blue-800 mb-1">새 탭에서 편집 중</p>
+                        <p className="text-xs2 text-blue-600 mb-4">
+                          {activeDraw?.name} · 편집기 탭과 이 창을 나란히 열어<br/>명세서를 참고하며 도면을 편집하세요.
+                        </p>
+                        <div className="flex gap-2 justify-center">
+                          <button className="btn-primary btn-sm"
+                            onClick={() => {
+                              // 편집기 탭을 다시 열기 (이미 열려 있으면 포커스 불가 → 새로 열기)
+                              confirmVersion();
+                            }}>
+                            편집기 탭 다시 열기
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* 편집기 미열림 상태 */
+                      <div className="card p-6 text-center w-full max-w-xs">
+                        <Icon name="image" size={36} className="mx-auto text-blue-200 mb-3" />
+                        <p className="text-sm2 text-gray-700 font-semibold mb-1">{activeDraw?.name}</p>
+                        <p className="text-xs2 text-gray-400 mb-4">편집 준비 완료</p>
+                        <button className="btn-primary btn-sm w-full"
+                          onClick={isMobile() ? () => setEditorOpen(true) : confirmVersion}>
+                          {isMobile() ? '편집기 열기 →' : '새 탭에서 편집하기 ↗'}
+                        </button>
+                      </div>
+                    )}
                   </div>
+
                   <div className="shrink-0">
-                    <button className="btn-outline btn-sm" onClick={() => goStage('decide')}>
+                    <button className="btn-outline btn-sm" onClick={() => {
+                      setEditorTabOpened(false);
+                      goStage('decide');
+                    }}>
                       ← 버전 다시 선택
                     </button>
                   </div>
@@ -519,8 +607,8 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
         );
       })()}
 
-      {/* ── PatentEditor 별도 모달 ── */}
-      {editorOpen && patentDrawings.length > 0 && (
+      {/* ── PatentEditor 모달 (모바일 전용) ── */}
+      {editorOpen && isMobile() && patentDrawings.length > 0 && (
         <div className="fixed inset-0 z-60 bg-black/60 flex items-center justify-center p-4">
           <div className="w-full h-full bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden"
             style={{ maxWidth: '95vw', maxHeight: '95vh' }}>
