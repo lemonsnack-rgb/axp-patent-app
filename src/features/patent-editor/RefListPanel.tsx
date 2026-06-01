@@ -1,271 +1,295 @@
-import { useMemo, useState } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Pencil,
-  Plus,
-  Trash2,
-} from "lucide-react";
-import type { EditorReference, InventionComponent } from "./types";
+// RefListPanel — 도면 부호 목록 (검색·100단위 그룹·계층·도면설명)
+import { useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, ChevronsUp, ChevronsDown } from 'lucide-react';
+import type { EditorReference, InventionComponent } from './types';
 
 interface Props {
   references: EditorReference[];
   onAdd: (ref: EditorReference) => void;
   onUpdate?: (ref: EditorReference) => void;
   onDelete: (refNumber: string) => void;
-  /** 구성요소 목록 (선택 연결용) */
   inventionComponents?: InventionComponent[];
+  /** 명세서에 들어갈 도면의 설명 */
+  drawingDescription?: string;
+  onDrawingDescriptionChange?: (value: string) => void;
 }
 
-interface FlatNode {
+// ── 계층 번호 자동 부여 ────────────────────────────────────
+function getNextChildNumber(parentNumber: string, allRefs: EditorReference[]): string {
+  const parentNum = parseInt(parentNumber);
+  if (isNaN(parentNum)) return String(parseInt(parentNumber) + 1);
+  // 100 → 110, 110 → 111 (끝자리 0이면 ×10 단위, 아니면 1 단위)
+  const step = parentNum % 10 === 0 ? 10 : 1;
+  const siblings = allRefs
+    .filter(r => r.parentNumber === parentNumber)
+    .map(r => parseInt(r.number))
+    .filter(n => !isNaN(n));
+  return siblings.length === 0
+    ? String(parentNum + step)
+    : String(Math.max(...siblings) + step);
+}
+
+function getNextRootNumber(allRefs: EditorReference[]): string {
+  const roots = allRefs
+    .filter(r => !r.parentNumber)
+    .map(r => parseInt(r.number))
+    .filter(n => !isNaN(n) && n % 100 === 0);
+  return roots.length === 0 ? '100' : String(Math.max(...roots) + 100);
+}
+
+// ── 트리 구성 ─────────────────────────────────────────────
+interface TreeNode {
   ref: EditorReference;
+  children: TreeNode[];
   depth: number;
 }
 
-function flattenTree(refs: EditorReference[]): FlatNode[] {
-  const allNums = new Set(refs.map((r) => r.number));
+function buildTree(refs: EditorReference[]): TreeNode[] {
+  const byNum = new Map(refs.map(r => [r.number, r]));
   const byParent = new Map<string | undefined, EditorReference[]>();
   for (const r of refs) {
-    const parent =
-      r.parentNumber && allNums.has(r.parentNumber) ? r.parentNumber : undefined;
+    const parent = r.parentNumber && byNum.has(r.parentNumber) ? r.parentNumber : undefined;
     const list = byParent.get(parent) ?? [];
     list.push(r);
     byParent.set(parent, list);
   }
   const sortFn = (a: EditorReference, b: EditorReference) =>
     a.number.localeCompare(b.number, undefined, { numeric: true });
-  const result: FlatNode[] = [];
-  const visit = (parent: string | undefined, depth: number) => {
-    const children = (byParent.get(parent) ?? []).sort(sortFn);
-    for (const c of children) {
-      result.push({ ref: c, depth });
-      visit(c.number, depth + 1);
+  function visit(parent: string | undefined, depth: number): TreeNode[] {
+    return (byParent.get(parent) ?? []).sort(sortFn).map(ref => ({
+      ref,
+      depth,
+      children: visit(ref.number, depth + 1),
+    }));
+  }
+  return visit(undefined, 0);
+}
+
+function flattenTree(nodes: TreeNode[]): { ref: EditorReference; depth: number }[] {
+  const result: { ref: EditorReference; depth: number }[] = [];
+  function walk(ns: TreeNode[]) {
+    for (const n of ns) {
+      result.push({ ref: n.ref, depth: n.depth });
+      walk(n.children);
     }
-  };
-  visit(undefined, 0);
+  }
+  walk(nodes);
   return result;
 }
 
-export function RefListPanel({ references, onAdd, onUpdate, onDelete, inventionComponents }: Props) {
-  // 다음 100단위 번호 자동 제안 (100, 200, 300...)
-  const nextNumber = useMemo(() => {
-    if (references.length === 0) return "100";
-    const nums = references.map(r => parseInt(r.number)).filter(n => !isNaN(n) && n % 100 === 0);
-    if (nums.length === 0) return "100";
-    return String(Math.max(...nums) + 100);
-  }, [references]);
+// ── 100단위 그룹 ──────────────────────────────────────────
+function getGroupPrefix(number: string): number {
+  const n = parseInt(number);
+  return isNaN(n) ? 0 : Math.floor(n / 100) * 100;
+}
 
-  const [num, setNum] = useState("");
-  const [name, setName] = useState("");
-  const [linkedComp, setLinkedComp] = useState("");
+export function RefListPanel({
+  references, onAdd, onUpdate, onDelete,
+  inventionComponents,
+  drawingDescription = '',
+  onDrawingDescriptionChange,
+}: Props) {
+  const [search, setSearch] = useState('');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(new Set());
   const [editingNum, setEditingNum] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
+  const [editName, setEditName] = useState('');
+  const [newNum, setNewNum] = useState('');
+  const [newName, setNewName] = useState('');
+  const [linkedComp, setLinkedComp] = useState('');
+  // addingChildOf: 향후 인라인 하위 추가 UI 확장 시 사용 예정
+  const setAddingChildOf = (_: string | null) => {};
 
-  const flat = useMemo(() => flattenTree(references), [references]);
+  const tree = useMemo(() => buildTree(references), [references]);
+  const flat = useMemo(() => flattenTree(tree), [tree]);
 
+  // 검색 필터
+  const filtered = useMemo(() => {
+    if (!search.trim()) return flat;
+    const q = search.toLowerCase();
+    return flat.filter(({ ref }) =>
+      ref.number.toLowerCase().includes(q) || (ref.name ?? '').toLowerCase().includes(q)
+    );
+  }, [flat, search]);
+
+  // 100단위 그룹 목록
+  const groups = useMemo(() => {
+    const prefixes = [...new Set(filtered.map(f => getGroupPrefix(f.ref.number)))].sort((a, b) => a - b);
+    return prefixes.map(prefix => ({
+      prefix,
+      items: filtered.filter(f => getGroupPrefix(f.ref.number) === prefix),
+    }));
+  }, [filtered]);
+
+  const toggleGroup = (prefix: number) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      next.has(prefix) ? next.delete(prefix) : next.add(prefix);
+      return next;
+    });
+  };
+
+  // 새 부호 추가 (루트)
   const submitNew = () => {
-    const trimmedNum = (num.trim() || nextNumber);
-    if (references.some((r) => r.number === trimmedNum)) {
-      alert("이미 존재하는 부호 번호입니다.");
-      return;
-    }
-    // 구성요소 선택 시 해당 이름 사용
+    const num = newNum.trim() || getNextRootNumber(references);
+    if (references.some(r => r.number === num)) { alert('이미 존재하는 번호입니다.'); return; }
     const compName = inventionComponents?.find(c => c.number === linkedComp)?.name;
-    onAdd({ number: trimmedNum, name: compName || name.trim() || undefined });
-    setNum("");
-    setName("");
-    setLinkedComp("");
+    onAdd({ number: num, name: compName || newName.trim() || undefined });
+    setNewNum(''); setNewName(''); setLinkedComp('');
+  };
+
+  // 하위 항목 추가
+  const submitChild = (parentNumber: string) => {
+    const num = getNextChildNumber(parentNumber, references);
+    if (references.some(r => r.number === num)) {
+      const unique = String(parseInt(num) + 1);
+      onAdd({ number: unique, parentNumber, name: undefined });
+    } else {
+      onAdd({ number: num, parentNumber, name: undefined });
+    }
+    setAddingChildOf(null);
   };
 
   const commitNameEdit = (ref: EditorReference) => {
     const trimmed = editName.trim();
-    if (trimmed !== (ref.name ?? "")) {
-      onUpdate?.({ ...ref, name: trimmed || undefined });
-    }
+    if (trimmed !== (ref.name ?? '')) onUpdate?.({ ...ref, name: trimmed || undefined });
     setEditingNum(null);
   };
 
-  const indent = (idx: number) => {
-    if (!onUpdate) return;
-    const cur = flat[idx];
-    if (!cur) return;
-    // 같은 depth의 바로 위 형제 찾기
-    for (let i = idx - 1; i >= 0; i--) {
-      if (flat[i].depth === cur.depth) {
-        // sibling 발견 → 그것의 자식으로
-        onUpdate({ ...cur.ref, parentNumber: flat[i].ref.number });
-        return;
-      }
-      if (flat[i].depth < cur.depth) return; // 위 형제 없음
-    }
-  };
-
-  const outdent = (idx: number) => {
-    if (!onUpdate) return;
-    const cur = flat[idx];
-    if (!cur || !cur.ref.parentNumber) return;
-    // 현재 parent의 parent로
-    const parent = references.find((r) => r.number === cur.ref.parentNumber);
-    onUpdate({ ...cur.ref, parentNumber: parent?.parentNumber });
-  };
-
   return (
-    <aside className="flex h-full w-full flex-col bg-ck-bg p-2">
-      <div className="mb-1.5 px-1 text-xs2 font-semibold uppercase tracking-wider text-gray-500">
-        도면 부호 ({references.length})
-      </div>
+    <aside className="flex h-full w-full flex-col bg-ck-bg overflow-hidden">
 
-      <ul className="flex-1 space-y-0.5 overflow-y-auto">
-        {flat.length === 0 ? (
-          <li className="py-4 text-center text-xs2 text-gray-400">
-            등록된 부호 없음
-          </li>
-        ) : (
-          flat.map(({ ref: r, depth }, idx) => {
-            const isEditing = editingNum === r.number;
-            const hasParent = !!r.parentNumber;
-            // 위 형제 존재 여부
-            let canIndent = false;
-            for (let i = idx - 1; i >= 0; i--) {
-              if (flat[i].depth === depth) {
-                canIndent = true;
-                break;
-              }
-              if (flat[i].depth < depth) break;
-            }
-            return (
-              <li
-                key={r.number}
-                className="flex items-center gap-0.5 rounded border border-ck-border bg-white px-1 py-0.5 text-sm2"
-                style={{ paddingLeft: 4 + depth * 10 }}
-                title={
-                  hasParent ? `상위: ${r.parentNumber}` : undefined
-                }
-              >
-                {depth > 0 && (
-                  <span className="text-gray-300 select-none">↳</span>
-                )}
-                <span className="min-w-[2.5em] font-mono font-semibold text-gray-900">
-                  {r.number}
-                </span>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    onBlur={() => commitNameEdit(r)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter")
-                        (e.currentTarget as HTMLInputElement).blur();
-                      if (e.key === "Escape") setEditingNum(null);
-                    }}
-                    autoFocus
-                    placeholder="이름"
-                    className="flex-1 min-w-0 rounded border border-blue-400 px-1 py-0 text-sm2 focus:outline-none"
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!onUpdate) return;
-                      setEditingNum(r.number);
-                      setEditName(r.name ?? "");
-                    }}
-                    title="이름 수정"
-                    className="flex flex-1 min-w-0 items-center gap-0.5 text-left text-gray-600 hover:text-blue-700"
-                  >
-                    <span className="truncate">
-                      {r.name ?? (
-                        <span className="italic text-gray-400">(이름 없음)</span>
-                      )}
-                    </span>
-                    {onUpdate && (
-                      <Pencil
-                        size={9}
-                        className="shrink-0 text-gray-300 group-hover:text-blue-500"
-                      />
-                    )}
-                  </button>
-                )}
-                {onUpdate && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => outdent(idx)}
-                      disabled={!hasParent}
-                      title="내어쓰기 (상위 단계로)"
-                      className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30"
-                    >
-                      <ChevronLeft size={11} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => indent(idx)}
-                      disabled={!canIndent}
-                      title="들여쓰기 (위 형제의 자식으로)"
-                      className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30"
-                    >
-                      <ChevronRight size={11} />
-                    </button>
-                  </>
-                )}
-                <button
-                  type="button"
-                  onClick={() => onDelete(r.number)}
-                  title="이 부호 + 사용 객체 일괄 삭제"
-                  className="rounded p-0.5 text-red-500 hover:bg-red-50 hover:text-red-700"
-                >
-                  <Trash2 size={11} />
-                </button>
-              </li>
-            );
-          })
-        )}
-      </ul>
-
-      <div className="mt-2 space-y-1 border-t border-ck-border pt-2">
-        <div className="text-xs2 font-semibold text-gray-500">새 부호 추가</div>
-        {/* 번호 (100단위 자동 제안) */}
-        <input
-          type="text"
-          value={num}
-          onChange={(e) => setNum(e.target.value)}
-          placeholder={`번호 (기본: ${nextNumber})`}
-          className="w-full rounded border border-gray-300 px-1.5 py-0.5 text-sm2 focus:border-blue-500 focus:outline-none"
-        />
-        {/* 구성요소 연결 선택 */}
-        {inventionComponents && inventionComponents.length > 0 ? (
-          <select
-            value={linkedComp}
-            onChange={e => {
-              setLinkedComp(e.target.value);
-              const comp = inventionComponents.find(c => c.number === e.target.value);
-              if (comp) setName(comp.name);
-            }}
-            className="w-full rounded border border-gray-300 px-1.5 py-0.5 text-sm2 focus:border-blue-500 focus:outline-none"
-          >
-            <option value="">-- 구성요소 연결 (선택)</option>
-            {inventionComponents.map(c => (
-              <option key={c.number} value={c.number}>({c.number}) {c.name}</option>
-            ))}
-          </select>
-        ) : (
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="이름 (선택)"
-            onKeyDown={(e) => { if (e.key === "Enter") submitNew(); }}
-            className="w-full rounded border border-gray-300 px-1.5 py-0.5 text-sm2 focus:border-blue-500 focus:outline-none"
-          />
-        )}
-        <button
-          type="button"
-          onClick={submitNew}
-          className="flex w-full items-center justify-center gap-1 rounded border border-blue-600 bg-blue-600 px-2 py-1 text-xs2 font-semibold text-white hover:bg-blue-500"
-        >
+      {/* ── 헤더 ── */}
+      <div className="flex items-center justify-between px-2.5 pt-2 pb-1.5 border-b border-ck-border shrink-0 bg-white">
+        <span className="text-xs2 font-semibold uppercase tracking-wider text-gray-500">
+          도면 부호 <span className="font-normal text-gray-400">({references.length})</span>
+        </span>
+        <button type="button" onClick={submitNew}
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs2 border border-blue-500 bg-blue-500 text-white rounded hover:bg-blue-600">
           <Plus size={10} /> 추가
         </button>
+      </div>
+
+      {/* ── 검색 ── */}
+      <div className="px-2 py-1.5 border-b border-ck-border shrink-0">
+        <input
+          type="text" value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="부호 검색…"
+          className="w-full text-sm2 rounded border border-gray-300 px-2 py-1 focus:border-blue-500 focus:outline-none"
+        />
+      </div>
+
+      {/* ── 새 부호 입력 ── */}
+      <div className="px-2 py-1.5 border-b border-ck-border bg-white shrink-0 space-y-1">
+        <input type="text" value={newNum} onChange={e => setNewNum(e.target.value)}
+          placeholder={`번호 (기본: ${getNextRootNumber(references)})`}
+          className="w-full text-sm2 rounded border border-gray-300 px-1.5 py-0.5 focus:border-blue-500 focus:outline-none" />
+        {inventionComponents && inventionComponents.length > 0 ? (
+          <select value={linkedComp} onChange={e => { setLinkedComp(e.target.value); const c = inventionComponents.find(c => c.number === e.target.value); if (c) setNewName(c.name); }}
+            className="w-full text-sm2 rounded border border-gray-300 px-1.5 py-0.5 focus:border-blue-500 focus:outline-none">
+            <option value="">— 구성요소 연결</option>
+            {inventionComponents.map(c => <option key={c.number} value={c.number}>({c.number}) {c.name}</option>)}
+          </select>
+        ) : (
+          <input type="text" value={newName} onChange={e => setNewName(e.target.value)}
+            placeholder="이름 (선택)"
+            onKeyDown={e => e.key === 'Enter' && submitNew()}
+            className="w-full text-sm2 rounded border border-gray-300 px-1.5 py-0.5 focus:border-blue-500 focus:outline-none" />
+        )}
+      </div>
+
+      {/* ── 부호 목록 (그룹·계층·스크롤) ── */}
+      <div className="flex-1 overflow-y-auto scroll-thin">
+        {groups.length === 0 && (
+          <p className="text-center text-xs2 text-gray-400 py-4">등록된 부호 없음</p>
+        )}
+        {groups.map(({ prefix, items }) => {
+          const collapsed = collapsedGroups.has(prefix);
+          const groupLabel = prefix === 0 ? '기타' : `${prefix}번대`;
+          return (
+            <div key={prefix}>
+              {/* 그룹 헤더 */}
+              <button type="button" onClick={() => toggleGroup(prefix)}
+                className="w-full flex items-center gap-1 px-2 py-1 bg-gray-100 border-b border-ck-border hover:bg-gray-200 text-left">
+                {collapsed ? <ChevronRight size={11} className="text-gray-500 shrink-0" /> : <ChevronDown size={11} className="text-gray-500 shrink-0" />}
+                <span className="text-xs2 font-semibold text-gray-600">{groupLabel}</span>
+                <span className="text-xs2 text-gray-400 ml-1">({items.length})</span>
+              </button>
+
+              {/* 그룹 아이템 */}
+              {!collapsed && items.map(({ ref: r, depth }) => {
+                const isEditing = editingNum === r.number;
+                return (
+                  <div key={r.number}
+                    className="flex items-center gap-0.5 border-b border-ck-border/50 bg-white hover:bg-ck-bg text-sm2 group"
+                    style={{ paddingLeft: 8 + depth * 12, paddingRight: 4, paddingTop: 3, paddingBottom: 3 }}>
+                    {depth > 0 && <span className="text-gray-300 text-xs2 shrink-0">↳</span>}
+
+                    {/* 번호 */}
+                    <span className="font-mono font-semibold text-gray-800 shrink-0 min-w-[2.8em]">{r.number}</span>
+
+                    {/* 이름 */}
+                    {isEditing ? (
+                      <input type="text" value={editName}
+                        onChange={e => setEditName(e.target.value)}
+                        onBlur={() => commitNameEdit(r)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') commitNameEdit(r);
+                          if (e.key === 'Escape') setEditingNum(null);
+                        }}
+                        autoFocus
+                        className="flex-1 min-w-0 rounded border border-blue-400 px-1 py-0 text-sm2 focus:outline-none"
+                      />
+                    ) : (
+                      <button type="button" onClick={() => { if (!onUpdate) return; setEditingNum(r.number); setEditName(r.name ?? ''); }}
+                        className="flex-1 min-w-0 text-left text-gray-600 hover:text-blue-700 flex items-center gap-0.5">
+                        <span className="truncate">{r.name ?? <span className="italic text-gray-400">(이름 없음)</span>}</span>
+                        {onUpdate && <Pencil size={8} className="shrink-0 opacity-0 group-hover:opacity-60" />}
+                      </button>
+                    )}
+
+                    {/* 액션 버튼 */}
+                    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {/* 하위 추가 */}
+                      <button type="button" onClick={() => submitChild(r.number)} title="하위 항목 추가"
+                        className="rounded p-0.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600">
+                        <ChevronsDown size={10} />
+                      </button>
+                      {/* 상위로 이동 */}
+                      {r.parentNumber && onUpdate && (
+                        <button type="button" onClick={() => {
+                          const parent = references.find(x => x.number === r.parentNumber);
+                          onUpdate({ ...r, parentNumber: parent?.parentNumber });
+                        }} title="상위로 이동" className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+                          <ChevronsUp size={10} />
+                        </button>
+                      )}
+                      {/* 삭제 */}
+                      <button type="button" onClick={() => onDelete(r.number)} title="삭제"
+                        className="rounded p-0.5 text-red-400 hover:bg-red-50 hover:text-red-600">
+                        <Trash2 size={10} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── 도면의 설명 ── */}
+      <div className="border-t border-ck-border shrink-0 flex flex-col" style={{ minHeight: 120, maxHeight: 200 }}>
+        <div className="px-2.5 py-1.5 border-b border-ck-border bg-white shrink-0 flex items-center justify-between">
+          <p className="text-xs2 font-semibold uppercase tracking-wider text-gray-500">도면의 설명</p>
+          <span className="text-xs2 text-gray-400">명세서 반영</span>
+        </div>
+        <textarea
+          value={drawingDescription}
+          onChange={e => onDrawingDescriptionChange?.(e.target.value)}
+          placeholder={`도 N은 ___에 관한 사시도이다. ___부(100)는 ___하고, ___부(200)는 ___한다.`}
+          className="flex-1 resize-none px-2.5 py-2 text-sm2 leading-relaxed focus:outline-none bg-white placeholder-gray-300"
+          style={{ minHeight: 90 }}
+        />
       </div>
     </aside>
   );

@@ -59,6 +59,7 @@ export function PatentEditor({
   inventionComponents,
   onComponentsSync,
   singleDrawingMode = false,
+  onDrawingDescriptionChange,
   onReferenceAdd,
   onReferenceUpdate,
   onReferenceDelete,
@@ -358,63 +359,42 @@ export function PatentEditor({
           </>
         )}
         <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-          <div className="space-y-2 border-b border-ck-border bg-white px-3 py-2 shrink-0">
-            <div className="flex items-center gap-2">
-              <label
-                htmlFor="patent-caption"
-                className="shrink-0 text-md2 font-semibold text-gray-600"
-              >
-                도면의 명칭:
-              </label>
-              <input
-                id="patent-caption"
-                type="text"
-                value={captionDraft}
-                onChange={(e) => setCaptionDraft(e.target.value)}
-                onBlur={commitCaption}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter")
-                    (e.currentTarget as HTMLInputElement).blur();
-                }}
-                placeholder="예: 도 1: 본체 사시도"
-                className="flex-1 max-w-md rounded border border-gray-300 px-2 py-1 text-md2 focus:border-blue-500 focus:outline-none"
-              />
-              {representativeDrawingId === activeDrawing.id ? (
-                <span className="shrink-0 rounded bg-amber-100 px-2 py-1 text-sm2 font-semibold text-amber-700">
-                  ★ 대표도면
-                </span>
-              ) : onRepresentativeChange ? (
-                <button
-                  type="button"
-                  onClick={() => onRepresentativeChange(activeDrawing.id)}
-                  className="shrink-0 rounded border border-amber-400 bg-white px-2 py-1 text-sm2 font-semibold text-amber-700 hover:bg-amber-50"
-                  title="이 도면을 명세서의 대표도면으로 지정"
-                >
-                  대표도면으로 설정
-                </button>
-              ) : null}
-              <span className="ml-auto shrink-0 text-xs2 text-gray-400">
-                ID: {activeDrawing.id}
-              </span>
+          {/* singleDrawingMode에서는 caption/description을 RefListPanel로 이동했으므로 숨김 */}
+          {!singleDrawingMode && (
+            <div className="space-y-2 border-b border-ck-border bg-white px-3 py-2 shrink-0">
+              <div className="flex items-center gap-2">
+                <label htmlFor="patent-caption" className="shrink-0 text-md2 font-semibold text-gray-600">
+                  도면의 명칭:
+                </label>
+                <input id="patent-caption" type="text" value={captionDraft}
+                  onChange={(e) => setCaptionDraft(e.target.value)}
+                  onBlur={commitCaption}
+                  onKeyDown={(e) => { if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur(); }}
+                  placeholder="예: 도 1: 본체 사시도"
+                  className="flex-1 max-w-md rounded border border-gray-300 px-2 py-1 text-md2 focus:border-blue-500 focus:outline-none"
+                />
+                {representativeDrawingId === activeDrawing.id ? (
+                  <span className="shrink-0 rounded bg-amber-100 px-2 py-1 text-sm2 font-semibold text-amber-700">★ 대표도면</span>
+                ) : onRepresentativeChange ? (
+                  <button type="button" onClick={() => onRepresentativeChange(activeDrawing.id)}
+                    className="shrink-0 rounded border border-amber-400 bg-white px-2 py-1 text-sm2 font-semibold text-amber-700 hover:bg-amber-50"
+                    title="이 도면을 명세서의 대표도면으로 지정">
+                    대표도면으로 설정
+                  </button>
+                ) : null}
+                <span className="ml-auto shrink-0 text-xs2 text-gray-400">ID: {activeDrawing.id}</span>
+              </div>
+              <div>
+                <label htmlFor="patent-description" className="mb-0.5 block text-xs2 font-semibold uppercase tracking-wider text-gray-500">도면의 설명</label>
+                <textarea id="patent-description" value={descriptionDraft}
+                  onChange={(e) => setDescriptionDraft(e.target.value)}
+                  onBlur={commitDescription} rows={2}
+                  placeholder="예: 도 1은 본체의 외관을 도시한 사시도이다."
+                  className="w-full resize-y rounded border border-gray-300 px-2 py-1 text-md2 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
             </div>
-            <div>
-              <label
-                htmlFor="patent-description"
-                className="mb-0.5 block text-xs2 font-semibold uppercase tracking-wider text-gray-500"
-              >
-                도면의 설명
-              </label>
-              <textarea
-                id="patent-description"
-                value={descriptionDraft}
-                onChange={(e) => setDescriptionDraft(e.target.value)}
-                onBlur={commitDescription}
-                rows={2}
-                placeholder="예: 도 1은 본체의 외관을 도시한 사시도이다. 본체(100)에는 …"
-                className="w-full resize-y rounded border border-gray-300 px-2 py-1 text-md2 focus:border-blue-500 focus:outline-none"
-              />
-            </div>
-          </div>
+          )}
           <div className="flex flex-1 min-h-0 overflow-hidden">
             <div className="flex-1 min-h-0 overflow-auto bg-gray-100 p-4 flex items-center justify-center">
               {/* 캔버스 + AI pending 배지 오버레이 */}
@@ -468,6 +448,11 @@ export function PatentEditor({
                 onUpdate={onReferenceUpdate}
                 onDelete={handleReferenceDelete}
                 inventionComponents={components}
+                drawingDescription={singleDrawingMode ? (descriptionDraft || activeDrawing?.description) : undefined}
+                onDrawingDescriptionChange={singleDrawingMode ? (val) => {
+                  setDescriptionDraft(val);
+                  onDrawingDescriptionChange?.(activeDrawing.id, val);
+                } : undefined}
               />
             </div>
           </div>

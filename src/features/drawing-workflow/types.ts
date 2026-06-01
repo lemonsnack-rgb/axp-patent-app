@@ -37,6 +37,8 @@ export interface DrawingItem {
   // 편집 결과
   savedEditorJson?: string;
   exportedImageUrl?: string;  // 편집 완료 후 썸네일
+  isRepresentative?: boolean; // 대표도면 여부
+  drawingDescription?: string; // 명세서에 들어갈 도면의 설명
 }
 
 // CK.Patent 포맷 mock 데이터

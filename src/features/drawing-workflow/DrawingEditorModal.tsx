@@ -60,6 +60,9 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
   const [regenPrompt, setRegenPrompt] = useState('');
   const [showRegen, setShowRegen] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
+  const [isRepresentative, setIsRepresentative] = useState(() =>
+    drawings.find(d => d.id === initialDrawingId)?.isRepresentative ?? false
+  );
 
   // 메인 탭: 편집기 탭 결과 수신
   useEffect(() => {
@@ -178,28 +181,47 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
         style={innerStyle}>
 
         {/* ── 공통 헤더 (모든 단계에서 유지) ── */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-ck-border bg-white shrink-0">
-          <div className="flex items-center gap-2">
-            <Icon name="image" size={15} className="text-blue-700 shrink-0" />
-            <span className="text-base2 font-bold text-gray-800">도면 편집기</span>
-          </div>
-          <button className="btn-outline btn-xs" onClick={onClose}>
-            <Icon name="close" size={12} /> 닫기
-          </button>
-        </div>
-
-        {/* ── 공통 서브헤더: 도면 정보 + 3단계 표시 (모든 단계에서 유지) ── */}
-        {activeDraw && (
-          <div className="flex items-center gap-3 px-4 py-2 border-b border-ck-border bg-ck-bg shrink-0 flex-wrap">
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm2 font-bold text-gray-800">기호 {activeDraw.symbol}</span>
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-ck-border bg-white shrink-0">
+          <Icon name="image" size={15} className="text-blue-700 shrink-0" />
+          <span className="text-base2 font-bold text-gray-800">도면 편집기</span>
+          {activeDraw && (
+            <>
+              <span className="text-gray-300 mx-0.5">·</span>
+              <span className="text-sm2 text-gray-700 font-semibold">기호 {activeDraw.symbol}</span>
               <span className="text-gray-300">·</span>
-              <span className="text-sm2 font-semibold text-gray-700 truncate max-w-[160px]">{activeDraw.name}</span>
+              <span className="text-sm2 text-gray-700 truncate max-w-[140px]">{activeDraw.name}</span>
               <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium shrink-0', LABEL_COLORS[activeDraw.label] || 'bg-gray-100 text-gray-600')}>
                 {activeDraw.label}
               </span>
-            </div>
-            {/* 3단계 표시 */}
+              {/* 대표도면 지정 (편집 단계에서만 표시) */}
+              {workStage === 'editing' && (
+                <button
+                  onClick={() => {
+                    const next = !isRepresentative;
+                    setIsRepresentative(next);
+                    onSave(activeId, { isRepresentative: next });
+                  }}
+                  className={clsx(
+                    'flex items-center gap-1 px-2 py-0.5 rounded border text-xs2 font-semibold transition-all shrink-0',
+                    isRepresentative
+                      ? 'border-amber-400 bg-amber-50 text-amber-700'
+                      : 'border-gray-200 text-gray-400 hover:border-amber-400 hover:text-amber-600',
+                  )}>
+                  ★ {isRepresentative ? '대표도면' : '대표도면 지정'}
+                </button>
+              )}
+            </>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            <button className="btn-outline btn-xs" onClick={onClose}>
+              <Icon name="close" size={12} /> 닫기
+            </button>
+          </div>
+        </div>
+
+        {/* ── 서브헤더: 단계 표시 (도면 편집 단계에서는 숨김 — 헤더에 이미 표시) ── */}
+        {activeDraw && workStage !== 'editing' && (
+          <div className="flex items-center gap-3 px-4 py-1.5 border-b border-ck-border bg-ck-bg shrink-0">
             <div className="flex items-center gap-1 ml-auto">
               {STEP_LABELS.map((label, i) => (
                 <div key={i} className="flex items-center">
