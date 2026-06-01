@@ -546,6 +546,38 @@ function createDragPreview(
       objectCaching: false,
     });
   }
+  if (tool === "triangle") {
+    return new fabric.Triangle({
+      left: p.x,
+      top: p.y,
+      width: 1,
+      height: 1,
+      fill: "transparent",
+      stroke: "#000",
+      strokeWidth: 1.5,
+      strokeDashArray: dash,
+      originX: "left",
+      originY: "top",
+      selectable: false,
+      evented: false,
+      objectCaching: false,
+    });
+  }
+  if (tool === "diamond") {
+    // 마름모: Polygon 4점 (초기 1×1, updateDragPreview에서 갱신)
+    return new fabric.Polygon(
+      [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }],
+      {
+        fill: "transparent",
+        stroke: "#000",
+        strokeWidth: 1.5,
+        strokeDashArray: dash,
+        selectable: false,
+        evented: false,
+        objectCaching: false,
+      }
+    );
+  }
   if (tool === "marquee-eraser") {
     return new fabric.Rect({
       left: p.x,
@@ -603,6 +635,36 @@ function updateDragPreview(
       radius: r,
     });
     circle.setCoords();
+    return;
+  }
+  if (tool === "triangle") {
+    const tri = preview as fabric.Triangle;
+    tri.set({
+      left: Math.min(start.x, end.x),
+      top: Math.min(start.y, end.y),
+      width: Math.max(1, Math.abs(end.x - start.x)),
+      height: Math.max(1, Math.abs(end.y - start.y)),
+    });
+    tri.setCoords();
+    return;
+  }
+  if (tool === "diamond") {
+    const cx = (start.x + end.x) / 2;
+    const cy = (start.y + end.y) / 2;
+    const hw = Math.max(1, Math.abs(end.x - start.x) / 2);
+    const hh = Math.max(1, Math.abs(end.y - start.y) / 2);
+    const poly = preview as fabric.Polygon;
+    poly.set({
+      points: [
+        { x: cx, y: cy - hh },
+        { x: cx + hw, y: cy },
+        { x: cx, y: cy + hh },
+        { x: cx - hw, y: cy },
+      ],
+      left: cx - hw,
+      top: cy - hh,
+    });
+    poly.setCoords();
     return;
   }
 }
@@ -899,6 +961,8 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
         if (
           state.tool === "rect" ||
           state.tool === "circle" ||
+          state.tool === "triangle" ||
+          state.tool === "diamond" ||
           state.tool === "marquee-eraser"
         ) {
           if (dx < 4 && dy < 4) {
@@ -1525,13 +1589,17 @@ function ToolHint({
 }) {
   if (pickerOpen || tool === "select") return null;
   const HINTS: Record<Exclude<ToolMode, "select">, string> = {
-    line: "직선: 시작점 클릭 → 끝점 클릭",
-    text: "참조번호: 부호 선택 후 → 지시 대상 클릭 → 텍스트 위치 클릭",
-    "ref-circle": "원형 부호: 부호 선택 후 → 지시 대상 클릭 → 원형부호 위치 클릭",
-    rect: "사각형: 드래그",
-    circle: "원: 드래그",
+    line:             "선/지시선: 시작점 클릭 → 끝점 클릭",
+    text:             "참조번호: 부호 선택 → 지시 대상 클릭 → 텍스트 위치 클릭",
+    "ref-circle":     "원형 부호: 부호 선택 → 지시 대상 클릭 → 원형 위치 클릭",
+    rect:             "사각형: 드래그",
+    circle:           "원/타원: 드래그",
+    triangle:         "삼각형: 드래그",
+    diamond:          "마름모: 드래그",
+    polygon:          "다각형: 클릭으로 꼭짓점 추가, 더블클릭으로 완성 (개발 예정)",
+    "arrow-shape":    "화살표 도형: 드래그 (개발 예정)",
     "marquee-eraser": "영역 지움: 드래그로 흰색 마스크",
-    "brush-eraser": "브러시 지움: 자유 드로잉 (흰색)",
+    "brush-eraser":   "브러시 지움: 자유 드로잉 (흰색)",
   };
   return (
     <div className="pointer-events-none absolute top-2 left-2 text-xs bg-blue-600 text-white px-2 py-1 rounded shadow">

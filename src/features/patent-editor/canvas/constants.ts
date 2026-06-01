@@ -1,10 +1,11 @@
 import type { LineStyle } from "../types";
 
 export const LINE_DASH_PATTERNS: Record<LineStyle, number[] | undefined> = {
-  solid: undefined,
-  dashed: [5, 5],
-  "dash-dot": [10, 3, 2, 3],
-  "dash-double-dot": [10, 3, 2, 3, 2, 3],
+  solid:              undefined,
+  dashed:             [5, 5],
+  "dash-dot":         [10, 3, 2, 3],
+  "dash-double-dot":  [10, 3, 2, 3, 2, 3],
+  dotted:             [1, 4],
 };
 
 export const SNAP_GRID = 10;

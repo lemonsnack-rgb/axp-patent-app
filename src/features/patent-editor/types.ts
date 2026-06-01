@@ -1,16 +1,39 @@
 export type ToolMode =
+  // 선택/편집
   | "select"
+  // 선/지시선 도구
   | "line"
-  | "text"
-  | "ref-circle"
+  // 부호 도구
+  | "text"           // 참조번호 (지시선 + 텍스트)
+  | "ref-circle"     // 원형 부호 (지시선 + 원)
+  // 기본 도형
   | "rect"
   | "circle"
+  | "triangle"
+  | "diamond"
+  // 확장 도형 (개발 예정 — 현재 시각적 버튼만 제공)
+  | "polygon"        // 자유 다각형
+  | "arrow-shape"    // 화살표 도형
+  // 지우기
   | "marquee-eraser"
   | "brush-eraser";
 
-export type LineStyle = "solid" | "dashed" | "dash-dot" | "dash-double-dot";
-export type LineEnd = "plain" | "dot" | "arrow";
+// 선 스타일 (KS/ISO 특허 도면 규격)
+export type LineStyle =
+  | "solid"           // 실선 (굵은 외형선)
+  | "dashed"          // 파선 (숨은선)
+  | "dash-dot"        // 1점 쇄선 (중심선)
+  | "dash-double-dot" // 2점 쇄선 (가상선)
+  | "dotted";         // 점선
+
+// 선 굵기
+export type LineWeight = "thin" | "normal" | "thick";
+
+export type LineEnd = "plain" | "dot" | "arrow" | "open-arrow";
 export type LeaderCurve = "straight" | "s-curve";
+
+// 채우기 스타일
+export type FillStyle = "none" | "hatch" | "cross-hatch";
 
 export interface EditorReference {
   number: string;
