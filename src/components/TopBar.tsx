@@ -1,6 +1,9 @@
 import { useStore } from '../store';
 import { Icon } from './Icon';
 
+// ★ 도움말 URL — 준비되면 아래 주소를 교체하세요
+const HELP_URL = 'https://axplain.ai/help'; // TODO: 실제 URL로 교체
+
 const MODE_LABELS: Record<string, string> = {
   newtask: '새 작업',
   home:    '프로젝트',
@@ -49,7 +52,13 @@ export function TopBar() {
         </span>
       </div>
       <div className="flex items-center gap-1">
-        <button className="btn-ghost" title="도움말"><Icon name="help" /></button>
+        <a
+          href={HELP_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-ghost"
+          title="도움말 (새 탭에서 열기)"
+        ><Icon name="help" /></a>
         <button className="btn-ghost relative" title="알림">
           <Icon name="bell" />
           <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full" />
