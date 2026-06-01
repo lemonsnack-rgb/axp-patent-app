@@ -626,7 +626,7 @@ const INIT_COMPS: CompItem[] = [
   { id: 5, text: '출력부: 인식된 객체의 3D 위치, 크기, 종류를 출력', sel: true },
 ];
 
-function ComponentsPanel({ done, onConfirm, onUpdate }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void }) {
+function ComponentsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void }) {
   const [items, setItems] = useState<CompItem[]>(INIT_COMPS);
   const [newText, setNewText] = useState('');
 
@@ -640,7 +640,7 @@ function ComponentsPanel({ done, onConfirm, onUpdate }: { done: boolean; onConfi
   const remove = (id: number) => { if (!done) upd(items.filter(it => it.id !== id)); };
   const add = () => { if (!newText.trim() || done) return; upd([...items, { id: Date.now(), text: newText.trim(), sel: true }]); setNewText(''); };
 
-  const sel = items.filter(it => it.sel);
+
   let autoN = 0;
 
   return (
@@ -681,13 +681,7 @@ function ComponentsPanel({ done, onConfirm, onUpdate }: { done: boolean; onConfi
           </div>
         )}
       </div>
-      {!done ? (
-        <div className="p-3 border-t border-gray-100 shrink-0">
-          <button onClick={onConfirm} className="btn-primary w-full btn-sm" disabled={sel.length === 0}>
-            <Icon name="check" size={12} /> 구성요소 확정 ({sel.length}개)
-          </button>
-        </div>
-      ) : (
+      {done && (
         <div className="p-3 border-t border-gray-100 bg-green-50 shrink-0">
           <div className="flex items-center gap-1.5 text-sm2 text-green-700 font-medium"><Icon name="check" size={13} /> 구성요소 확정 완료</div>
         </div>
@@ -706,7 +700,7 @@ const INIT_DRAWS: DrawItem[] = [
   { id: 5, label: 'FIG.5', desc: '객체 인식 결과 화면', sel: false },
 ];
 
-function DrawingsPanel({ done, onConfirm, onUpdate }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void }) {
+function DrawingsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void }) {
   const [draws, setDraws] = useState<DrawItem[]>(INIT_DRAWS);
   const [activeId, setActiveId] = useState(1);
 
@@ -768,13 +762,7 @@ function DrawingsPanel({ done, onConfirm, onUpdate }: { done: boolean; onConfirm
           ))}
         </div>
       </div>
-      {!done ? (
-        <div className="p-3 border-t border-gray-100 shrink-0">
-          <button onClick={onConfirm} className="btn-primary w-full btn-sm" disabled={selCount === 0}>
-            <Icon name="check" size={12} /> 도면 확정 ({selCount}개)
-          </button>
-        </div>
-      ) : (
+      {done && (
         <div className="p-3 border-t border-gray-100 bg-green-50 shrink-0">
           <div className="flex items-center gap-1.5 text-sm2 text-green-700 font-medium"><Icon name="check" size={13} /> 도면 확정 완료</div>
         </div>
@@ -792,7 +780,7 @@ const INIT_CLAIMS: ClaimItem[] = [
   { id: 4, type: 'independent', text: '라이다 센서로부터 포인트 클라우드 데이터를 획득하는 단계; 딥러닝 모델을 이용하여 객체를 분류하는 단계를 포함하는, 라이다 기반 객체 감지 방법.', sel: true },
 ];
 
-function ClaimsPanel({ done, onConfirm, onUpdate }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void }) {
+function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void }) {
   const [claims, setClaims] = useState<ClaimItem[]>(INIT_CLAIMS);
   const [expId, setExpId] = useState<number | null>(1);
 
@@ -840,13 +828,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate }: { done: boolean; onConfirm: 
           </button>
         )}
       </div>
-      {!done ? (
-        <div className="p-3 border-t border-gray-100 shrink-0">
-          <button onClick={onConfirm} className="btn-primary w-full btn-sm" disabled={selCount === 0}>
-            <Icon name="check" size={12} /> 청구항 확정 ({selCount}개)
-          </button>
-        </div>
-      ) : (
+      {done && (
         <div className="p-3 border-t border-gray-100 bg-green-50 shrink-0">
           <div className="flex items-center gap-1.5 text-sm2 text-green-700 font-medium"><Icon name="check" size={13} /> 청구항 확정 완료</div>
         </div>
