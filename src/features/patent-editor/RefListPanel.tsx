@@ -6,13 +6,15 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import type { EditorReference } from "./types";
+import type { EditorReference, InventionComponent } from "./types";
 
 interface Props {
   references: EditorReference[];
   onAdd: (ref: EditorReference) => void;
   onUpdate?: (ref: EditorReference) => void;
   onDelete: (refNumber: string) => void;
+  /** 구성요소 목록 (선택 연결용) */
+  inventionComponents?: InventionComponent[];
 }
 
 interface FlatNode {
@@ -44,24 +46,35 @@ function flattenTree(refs: EditorReference[]): FlatNode[] {
   return result;
 }
 
-export function RefListPanel({ references, onAdd, onUpdate, onDelete }: Props) {
+export function RefListPanel({ references, onAdd, onUpdate, onDelete, inventionComponents }: Props) {
+  // 다음 100단위 번호 자동 제안 (100, 200, 300...)
+  const nextNumber = useMemo(() => {
+    if (references.length === 0) return "100";
+    const nums = references.map(r => parseInt(r.number)).filter(n => !isNaN(n) && n % 100 === 0);
+    if (nums.length === 0) return "100";
+    return String(Math.max(...nums) + 100);
+  }, [references]);
+
   const [num, setNum] = useState("");
   const [name, setName] = useState("");
+  const [linkedComp, setLinkedComp] = useState("");
   const [editingNum, setEditingNum] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
 
   const flat = useMemo(() => flattenTree(references), [references]);
 
   const submitNew = () => {
-    const trimmedNum = num.trim();
-    if (!trimmedNum) return;
+    const trimmedNum = (num.trim() || nextNumber);
     if (references.some((r) => r.number === trimmedNum)) {
       alert("이미 존재하는 부호 번호입니다.");
       return;
     }
-    onAdd({ number: trimmedNum, name: name.trim() || undefined });
+    // 구성요소 선택 시 해당 이름 사용
+    const compName = inventionComponents?.find(c => c.number === linkedComp)?.name;
+    onAdd({ number: trimmedNum, name: compName || name.trim() || undefined });
     setNum("");
     setName("");
+    setLinkedComp("");
   };
 
   const commitNameEdit = (ref: EditorReference) => {
@@ -211,31 +224,45 @@ export function RefListPanel({ references, onAdd, onUpdate, onDelete }: Props) {
       </ul>
 
       <div className="mt-2 space-y-1 border-t border-ck-border pt-2">
-        <div className="text-xs2 font-semibold text-gray-500">
-          새 부호 추가
-        </div>
+        <div className="text-xs2 font-semibold text-gray-500">새 부호 추가</div>
+        {/* 번호 (100단위 자동 제안) */}
         <input
           type="text"
           value={num}
           onChange={(e) => setNum(e.target.value)}
-          placeholder="번호"
+          placeholder={`번호 (기본: ${nextNumber})`}
           className="w-full rounded border border-gray-300 px-1.5 py-0.5 text-sm2 focus:border-blue-500 focus:outline-none"
         />
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="이름 (선택)"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") submitNew();
-          }}
-          className="w-full rounded border border-gray-300 px-1.5 py-0.5 text-sm2 focus:border-blue-500 focus:outline-none"
-        />
+        {/* 구성요소 연결 선택 */}
+        {inventionComponents && inventionComponents.length > 0 ? (
+          <select
+            value={linkedComp}
+            onChange={e => {
+              setLinkedComp(e.target.value);
+              const comp = inventionComponents.find(c => c.number === e.target.value);
+              if (comp) setName(comp.name);
+            }}
+            className="w-full rounded border border-gray-300 px-1.5 py-0.5 text-sm2 focus:border-blue-500 focus:outline-none"
+          >
+            <option value="">-- 구성요소 연결 (선택)</option>
+            {inventionComponents.map(c => (
+              <option key={c.number} value={c.number}>({c.number}) {c.name}</option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="이름 (선택)"
+            onKeyDown={(e) => { if (e.key === "Enter") submitNew(); }}
+            className="w-full rounded border border-gray-300 px-1.5 py-0.5 text-sm2 focus:border-blue-500 focus:outline-none"
+          />
+        )}
         <button
           type="button"
           onClick={submitNew}
-          disabled={!num.trim()}
-          className="flex w-full items-center justify-center gap-1 rounded border border-blue-600 bg-blue-600 px-2 py-1 text-xs2 font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-1 rounded border border-blue-600 bg-blue-600 px-2 py-1 text-xs2 font-semibold text-white hover:bg-blue-500"
         >
           <Plus size={10} /> 추가
         </button>

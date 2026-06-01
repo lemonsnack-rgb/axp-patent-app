@@ -3,10 +3,20 @@ import { DrawingListPanel } from "./DrawingListPanel";
 import { EditorCanvas, type EditorCanvasHandle } from "./EditorCanvas";
 import { EditorToolbar } from "./EditorToolbar";
 import { RefListPanel } from "./RefListPanel";
+import { AiRefPanel } from "./AiRefPanel";
 import { binarizeCanvasToBlob } from "./binarize";
 import { useEditorStore } from "./useEditorStore";
 import { CUSTOM_PROPS } from "./canvas/constants";
-import type { EditorReference, PatentEditorProps } from "./types";
+import type { EditorReference, PatentEditorProps, AiRefRecommendation } from "./types";
+
+// 목업 AI 추천 데이터 (실제는 API 응답으로 대체)
+const MOCK_AI_RECS: Omit<AiRefRecommendation, 'status'>[] = [
+  { id: 'r1', refNumber: '100', componentName: '데이터 수집부',  posXPct: 20, posYPct: 30 },
+  { id: 'r2', refNumber: '200', componentName: '전처리부',       posXPct: 42, posYPct: 55 },
+  { id: 'r3', refNumber: '300', componentName: '특징 추출부',    posXPct: 62, posYPct: 35 },
+  { id: 'r4', refNumber: '400', componentName: '인식부',         posXPct: 75, posYPct: 65 },
+  { id: 'r5', refNumber: '500', componentName: '출력부',         posXPct: 88, posYPct: 45 },
+];
 
 const DEFAULT_WIDTH = 1000;
 const DEFAULT_HEIGHT = 700;
@@ -46,6 +56,7 @@ export function PatentEditor({
   onCaptionChange,
   onDescriptionChange,
   availableReferences,
+  inventionComponents,
   onReferenceAdd,
   onReferenceUpdate,
   onReferenceDelete,
@@ -57,6 +68,52 @@ export function PatentEditor({
   const [busy, setBusy] = useState(false);
   const [captionDraft, setCaptionDraft] = useState("");
   const [descriptionDraft, setDescriptionDraft] = useState("");
+
+  // ── AI 부호 추천 상태 ──
+  const [aiLoading, setAiLoading] = useState(true);
+  const [aiRecs, setAiRecs] = useState<AiRefRecommendation[]>([]);
+
+  // 편집기 열릴 때 AI 분석 자동 실행 (mock: 1.5초 후 추천 표시)
+  useEffect(() => {
+    setAiLoading(true);
+    const t = setTimeout(() => {
+      // 구성요소 목록과 매핑 (실제는 API 호출)
+      const components = inventionComponents ?? [];
+      const recs = MOCK_AI_RECS.map((r, i) => ({
+        ...r,
+        // 실제 구성요소 이름이 있으면 그것으로 override
+        componentName: components[i]?.name ?? r.componentName,
+        status: 'pending' as const,
+      }));
+      setAiRecs(recs);
+      setAiLoading(false);
+    }, 1500);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleAiAccept = useCallback((rec: AiRefRecommendation, _linkedComponentNumber: string) => {
+    // 캔버스에 부호 원형 삽입 (위치는 rec.posXPct/posYPct 기반)
+    onReferenceAdd?.({ number: rec.refNumber, name: rec.componentName });
+    // TODO: canvasHandleRef.current?.placeRefCircle(rec.refNumber, rec.posXPct, rec.posYPct)
+    setAiRecs(prev => prev.map(r => r.id === rec.id ? { ...r, status: 'accepted' } : r));
+  }, [onReferenceAdd]);
+
+  const handleAiReject = useCallback((recId: string) => {
+    setAiRecs(prev => prev.map(r => r.id === recId ? { ...r, status: 'rejected' } : r));
+  }, []);
+
+  const handleAiNumberChange = useCallback((recId: string, newNumber: string) => {
+    setAiRecs(prev => prev.map(r => r.id === recId ? { ...r, refNumber: newNumber } : r));
+  }, []);
+
+  const handleAiComponentChange = useCallback((recId: string, compNumber: string) => {
+    const comp = (inventionComponents ?? []).find(c => c.number === compNumber);
+    if (!comp) return;
+    setAiRecs(prev => prev.map(r => r.id === recId ? { ...r, componentName: comp.name } : r));
+  }, [inventionComponents]);
+
+  const components = useMemo(() => inventionComponents ?? [], [inventionComponents]);
   const [leftWidth, setLeftWidth] = useState(() =>
     clamp(readStoredWidth(LEFT_WIDTH_KEY, LEFT_DEFAULT), LEFT_MIN, LEFT_MAX),
   );
@@ -229,6 +286,8 @@ export function PatentEditor({
     );
   }
 
+  const pendingRecs = aiRecs.filter(r => r.status === 'pending');
+
   return (
     <div className="flex flex-col h-full bg-white">
       <EditorToolbar
@@ -237,6 +296,16 @@ export function PatentEditor({
         onClose={handleClose}
         onToggleHatch={handleToggleHatch}
         busy={busy}
+      />
+      {/* AI 부호 추천 패널 */}
+      <AiRefPanel
+        recommendations={aiRecs}
+        loading={aiLoading}
+        components={components}
+        onAccept={handleAiAccept}
+        onReject={handleAiReject}
+        onNumberChange={handleAiNumberChange}
+        onComponentChange={handleAiComponentChange}
       />
       <div className="flex-1 min-h-0 flex">
         <div
@@ -255,8 +324,8 @@ export function PatentEditor({
           className="w-1 shrink-0 cursor-col-resize bg-gray-200 transition hover:bg-blue-400"
           title="패널 크기 조절"
         />
-        <div className="flex flex-1 min-h-0 flex-col">
-          <div className="space-y-2 border-b border-ck-border bg-white px-3 py-2">
+        <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+          <div className="space-y-2 border-b border-ck-border bg-white px-3 py-2 shrink-0">
             <div className="flex items-center gap-2">
               <label
                 htmlFor="patent-caption"
@@ -313,19 +382,43 @@ export function PatentEditor({
               />
             </div>
           </div>
-          <div className="flex flex-1 min-h-0">
+          <div className="flex flex-1 min-h-0 overflow-hidden">
             <div className="flex-1 min-h-0 overflow-auto bg-gray-100 p-4 flex items-center justify-center">
-              {/* key={activeDrawing.id} : 도면 전환 시 fabric 캔버스를 완전히 새로 마운트 */}
-              <EditorCanvas
-                key={activeDrawing.id}
-                ref={canvasHandleRef}
-                sourceImageUrl={activeDrawing.sourceImageUrl}
-                savedEditorDataJson={activeDrawing.savedEditorDataJson}
-                width={DEFAULT_WIDTH}
-                height={DEFAULT_HEIGHT}
-                availableReferences={refs}
-                onReferenceAdd={onReferenceAdd}
-              />
+              {/* 캔버스 + AI pending 배지 오버레이 */}
+              <div className="relative inline-block">
+                {/* key={activeDrawing.id} : 도면 전환 시 fabric 캔버스를 완전히 새로 마운트 */}
+                <EditorCanvas
+                  key={activeDrawing.id}
+                  ref={canvasHandleRef}
+                  sourceImageUrl={activeDrawing.sourceImageUrl}
+                  savedEditorDataJson={activeDrawing.savedEditorDataJson}
+                  width={DEFAULT_WIDTH}
+                  height={DEFAULT_HEIGHT}
+                  availableReferences={refs}
+                  onReferenceAdd={onReferenceAdd}
+                />
+                {/* AI pending 배지 (수락 전 시각화) */}
+                {pendingRecs.map(rec => (
+                  <div
+                    key={rec.id}
+                    className="absolute flex flex-col items-center pointer-events-none"
+                    style={{
+                      left: `${rec.posXPct}%`,
+                      top: `${rec.posYPct}%`,
+                      transform: 'translate(-50%, -100%)',
+                    }}
+                    title={`${rec.refNumber} · ${rec.componentName}`}
+                  >
+                    <div className="bg-amber-500 text-white text-xs2 rounded px-1.5 py-0.5 font-semibold shadow-lg mb-0.5 whitespace-nowrap border border-amber-300">
+                      {rec.refNumber} {rec.componentName}
+                    </div>
+                    <div className="w-5 h-5 rounded-full bg-amber-500 border-2 border-white shadow-lg animate-pulse flex items-center justify-center">
+                      <span className="text-white font-bold" style={{ fontSize: 8 }}>{rec.refNumber.slice(0,3)}</span>
+                    </div>
+                    <div className="w-px h-8 bg-amber-400 opacity-70" />
+                  </div>
+                ))}
+              </div>
             </div>
             <div
               onMouseDown={startResize("right")}
@@ -341,6 +434,7 @@ export function PatentEditor({
                 onAdd={handleReferenceAdd}
                 onUpdate={onReferenceUpdate}
                 onDelete={handleReferenceDelete}
+                inventionComponents={components}
               />
             </div>
           </div>

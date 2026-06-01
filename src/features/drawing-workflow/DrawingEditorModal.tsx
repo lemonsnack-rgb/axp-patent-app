@@ -4,7 +4,16 @@ import clsx from 'clsx';
 import { Icon } from '../../components/Icon';
 import { PatentEditor } from '../patent-editor';
 import type { DrawingItem, CadCandidate } from './types';
-import type { EditorReference, PatentDrawing } from '../patent-editor';
+import type { EditorReference, PatentDrawing, InventionComponent } from '../patent-editor';
+
+// 목업 구성요소 (실제는 SpecView ComponentsPanel 데이터에서 주입)
+const MOCK_COMPONENTS: InventionComponent[] = [
+  { number: '10', name: '데이터 수집부' },
+  { number: '20', name: '전처리부' },
+  { number: '30', name: '특징 추출부' },
+  { number: '40', name: '인식부' },
+  { number: '50', name: '출력부' },
+];
 
 interface Props {
   drawings: DrawingItem[];
@@ -510,6 +519,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
               drawings={patentDrawings}
               activeDrawingId={activeId}
               availableReferences={availableReferences}
+              inventionComponents={MOCK_COMPONENTS}
               onActiveDrawingChange={setActiveId}
               onSaveProject={(id, json) => onSave(id, { savedEditorJson: json, stage: 'editing' })}
               onExportComplete={(id, blob) => {

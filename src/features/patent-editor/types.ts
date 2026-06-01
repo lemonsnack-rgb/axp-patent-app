@@ -32,6 +32,22 @@ export interface PatentDrawing {
   savedEditorDataJson?: string;
 }
 
+/** 발명 구성요소 (ComponentsPanel → 도면 부호 연결용) */
+export interface InventionComponent {
+  number: string;  // e.g. "10", "20"
+  name: string;    // e.g. "데이터 수집부"
+}
+
+/** AI가 추천한 부호 위치 */
+export interface AiRefRecommendation {
+  id: string;
+  refNumber: string;       // "100", "200" ...
+  componentName: string;   // 매핑된 구성요소명
+  posXPct: number;         // 캔버스 기준 x 위치 (0~100%)
+  posYPct: number;         // 캔버스 기준 y 위치 (0~100%)
+  status: 'pending' | 'accepted' | 'rejected';
+}
+
 export interface PatentEditorProps {
   drawings: PatentDrawing[];
   activeDrawingId: string;
@@ -42,6 +58,10 @@ export interface PatentEditorProps {
   onCaptionChange?: (drawingId: string, caption: string) => void;
   onDescriptionChange?: (drawingId: string, description: string) => void;
   availableReferences?: EditorReference[];
+  /** 발명 구성요소 목록 (AI 추천 + 부호 연결용) */
+  inventionComponents?: InventionComponent[];
+  /** 부호 확정 후 구성요소명 일괄 갱신 콜백 */
+  onComponentsSync?: (refs: EditorReference[]) => void;
   onReferenceAdd?: (ref: EditorReference) => void;
   /** 부호 이름·parent 변경 시 호출. 이 모듈 밖에서는 다른 명세서와도 동기화 가능 */
   onReferenceUpdate?: (ref: EditorReference) => void;
