@@ -148,6 +148,36 @@ function makeLeaderObject(
   return line;
 }
 
+/** 앵커 핸들용 META key (isEndpointHandle과 구분) */
+const LEADER_ANCHOR = "leaderAnchorHandle" as const;
+
+function makeLeaderAnchorHandle(anchor: Pt, leaderId: string): fabric.Circle {
+  const h = new fabric.Circle({
+    left: anchor.x,
+    top: anchor.y,
+    radius: 6,
+    fill: "#f59e0b",
+    stroke: "#fff",
+    strokeWidth: 2,
+    originX: "center",
+    originY: "center",
+    hasBorders: false,
+    hasControls: false,
+    objectCaching: false,
+    excludeFromExport: true,
+    hoverCursor: "crosshair",
+  });
+  setMeta(h, LEADER_ANCHOR, true);
+  setMeta(h, META.leaderId, leaderId);
+  return h;
+}
+
+function findLeaderAnchorHandle(fc: fabric.Canvas, leaderId: string): fabric.Object | null {
+  return fc.getObjects().find(
+    o => hasMeta(o, LEADER_ANCHOR) && getMeta<string>(o, META.leaderId) === leaderId
+  ) ?? null;
+}
+
 function spawnLeaderPair(
   fc: fabric.Canvas,
   anchor: Pt,
@@ -174,9 +204,11 @@ function spawnLeaderPair(
   if (ref.name) setMeta(text, META.refName, ref.name);
 
   const leader = makeLeaderObject(anchor, textPos, style, curve, id);
+  const anchorHandle = makeLeaderAnchorHandle(anchor, id);
 
   fc.add(leader);
   fc.add(text);
+  fc.add(anchorHandle);
   fc.setActiveObject(text);
   fc.requestRenderAll();
 }
@@ -269,9 +301,12 @@ function getAbsoluteEndpoints(line: fabric.Line): { start: Pt; end: Pt } {
 function removeAllEndpointHandles(fc: fabric.Canvas): void {
   const handles = fc
     .getObjects()
-    .filter((o) => hasMeta(o, META.isEndpointHandle));
+    .filter((o) => hasMeta(o, META.isEndpointHandle) || hasMeta(o, LEADER_ANCHOR));
   for (const h of handles) fc.remove(h);
 }
+
+// used in handleObjectMoving
+void findLeaderAnchorHandle;
 
 function createEndpointHandles(
   fc: fabric.Canvas,
@@ -566,10 +601,14 @@ function createDragPreview(
     });
   }
   if (tool === "diamond") {
-    // 마름모: Polygon 4점 (초기 1×1, updateDragPreview에서 갱신)
+    // 마름모: 중심 기준 points, originX/Y = center로 위치 계산 일치
     return new fabric.Polygon(
-      [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }],
+      [{ x: 0, y: -1 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }],
       {
+        left: p.x,
+        top: p.y,
+        originX: "center",
+        originY: "center",
         fill: "transparent",
         stroke: "#000",
         strokeWidth: 1.5,
@@ -656,16 +695,22 @@ function updateDragPreview(
     const hw = Math.max(1, Math.abs(end.x - start.x) / 2);
     const hh = Math.max(1, Math.abs(end.y - start.y) / 2);
     const poly = preview as fabric.Polygon;
+    // points는 원점(0,0) 기준 로컬 좌표, left/top이 실제 캔버스 중심 위치
     poly.set({
       points: [
-        { x: cx, y: cy - hh },
-        { x: cx + hw, y: cy },
-        { x: cx, y: cy + hh },
-        { x: cx - hw, y: cy },
+        { x: 0,   y: -hh },
+        { x: hw,  y: 0   },
+        { x: 0,   y: hh  },
+        { x: -hw, y: 0   },
       ],
-      left: cx - hw,
-      top: cy - hh,
+      left: cx,
+      top: cy,
+      originX: "center",
+      originY: "center",
     });
+    // Fabric.js Polygon 내부 pathOffset 재계산 (동적 points 변경 시 필요)
+    (poly as unknown as { _setPositionDimensions: (o: object) => void })
+      ._setPositionDimensions?.({});
     poly.setCoords();
     return;
   }
@@ -1005,6 +1050,27 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
       const handleObjectMoving = (opt: { target?: fabric.Object }) => {
         const target = opt.target;
         if (!target) return;
+
+        // 지시선 앵커 핸들 드래그 → 지시선 앵커 위치 갱신
+        if (hasMeta(target, LEADER_ANCHOR)) {
+          const leaderId = getMeta<string>(target, META.leaderId);
+          if (!leaderId) return;
+          const leader = findLeaderLine(fc, leaderId);
+          const textObj = fc.getObjects().find(
+            o => hasMeta(o, META.isLeaderText) && getMeta<string>(o, META.leaderId) === leaderId
+          );
+          if (!leader || !textObj) return;
+          const newAnchor = { x: target.left ?? 0, y: target.top ?? 0 };
+          const textPos = { x: textObj.left ?? 0, y: textObj.top ?? 0 };
+          const style = useEditorStore.getState().lineStyle;
+          if (leader instanceof fabric.Path) {
+            rebuildLeaderPath(fc, leader, newAnchor, textPos, style);
+          } else if (leader instanceof fabric.Line) {
+            leader.set({ x1: newAnchor.x, y1: newAnchor.y });
+            leader.setCoords();
+          }
+          return;
+        }
 
         // Endpoint handle 드래그 → 선의 해당 끝점 갱신
         if (hasMeta(target, META.isEndpointHandle)) {
