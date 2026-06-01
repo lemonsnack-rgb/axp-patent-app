@@ -56,6 +56,10 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
   const [selectedCandMap, setSelectedCandMap] = useState<Record<string, string>>({});
   const [regenPrompt, setRegenPrompt] = useState('');
   const [showRegenInput, setShowRegenInput] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(() =>
+    drawings.find(d => d.id === initialDrawingId)?.stage === 'done' ||
+    drawings.find(d => d.id === initialDrawingId)?.stage === 'editing'
+  );
 
   const activeDraw = drawings.find(d => d.id === activeId);
   const activeStage = stageMap[activeId] || 'bbox';
@@ -102,12 +106,13 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
     }, 1200);
   };
 
-  // 후보 선택 → 편집
+  // 후보 선택 → 편집 모달 열기
   const goEditing = () => {
     const selId = selectedCandMap[activeId];
     if (!selId) return;
     onSave(activeId, { stage: 'editing', selectedCandidateId: selId });
     goStage('editing');
+    setEditorOpen(true);
   };
 
   // PatentEditor용 데이터
@@ -406,34 +411,28 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
               </div>
             )}
 
-            {/* ── STAGE D: PatentEditor ── */}
-            {activeStage === 'editing' && patentDrawings.length > 0 && (
-              <div className="h-full -m-5">
-                <PatentEditor
-                  drawings={patentDrawings}
-                  activeDrawingId={activeId}
-                  availableReferences={availableReferences}
-                  onActiveDrawingChange={setActiveId}
-                  onSaveProject={(id, json) => onSave(id, { savedEditorJson: json, stage: 'editing' })}
-                  onExportComplete={(id, blob) => {
-                    const url = URL.createObjectURL(blob);
-                    onSave(id, { exportedImageUrl: url, stage: 'done' });
-                  }}
-                  onClose={onClose}
-                />
-              </div>
-            )}
-
-            {/* editing 단계인데 패널데이터 없는 경우 */}
-            {activeStage === 'editing' && patentDrawings.length === 0 && (
-              <div className="flex items-center justify-center h-40 text-gray-400">
-                <p className="text-sm2">편집 데이터를 불러오는 중...</p>
+            {/* ── STAGE D: 편집 대기 (편집기는 별도 모달) ── */}
+            {activeStage === 'editing' && (
+              <div className="max-w-2xl mx-auto space-y-4">
+                <div>
+                  <p className="text-base2 font-bold text-gray-800 mb-1">편집</p>
+                  <p className="text-sm2 text-gray-500">편집기를 열어 도면을 수정하거나 부호를 추가하세요.</p>
+                </div>
+                <div className="card p-5 flex flex-col items-center gap-3 text-center">
+                  <Icon name="image" size={32} className="text-blue-300" />
+                  <p className="text-sm2 text-gray-600">
+                    {activeDraw?.name} 도면이 편집 준비되었습니다.
+                  </p>
+                  <button className="btn-primary btn-sm" onClick={() => setEditorOpen(true)}>
+                    편집기 열기 →
+                  </button>
+                </div>
               </div>
             )}
           </div>
 
           {/* ── 하단 내비게이션 ── */}
-          {activeStage !== 'editing' && (
+          {(activeStage !== 'editing') && (
             <div className="flex items-center justify-between px-5 py-3 border-t border-ck-border bg-ck-bg shrink-0">
               <button className="btn-outline btn-sm" disabled={drawingIdx === 0} onClick={handlePrevDrawing}>
                 ← 이전 도면
@@ -448,6 +447,24 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
           )}
         </div>
       </div>
+
+      {/* ── PatentEditor 별도 모달 (z-60, DrawingEditorModal 위에 겹침) ── */}
+      {editorOpen && patentDrawings.length > 0 && (
+        <div className="fixed inset-0 z-60 flex flex-col bg-white">
+          <PatentEditor
+            drawings={patentDrawings}
+            activeDrawingId={activeId}
+            availableReferences={availableReferences}
+            onActiveDrawingChange={setActiveId}
+            onSaveProject={(id, json) => onSave(id, { savedEditorJson: json, stage: 'editing' })}
+            onExportComplete={(id, blob) => {
+              const url = URL.createObjectURL(blob);
+              onSave(id, { exportedImageUrl: url, stage: 'done' });
+            }}
+            onClose={() => setEditorOpen(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }

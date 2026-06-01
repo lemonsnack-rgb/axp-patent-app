@@ -45,6 +45,7 @@ export default {
         'card-hover':'0 4px 12px rgba(0,0,0,0.05)',
         'card-deep' :'0 6px 16px rgba(0,0,0,0.06)',
       },
+      zIndex: { '60': '60' },
       animation: { 'fade-up':'fadeUp 0.22s ease-out' },
       keyframes: {
         fadeUp: { '0%':{opacity:'0',transform:'translateY(6px)'}, '100%':{opacity:'1',transform:'translateY(0)'} },
