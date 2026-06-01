@@ -205,17 +205,11 @@ function spawnLeaderPair(
   if (ref.name) setMeta(text, META.refName, ref.name);
 
   const leader = makeLeaderObject(anchor, textPos, style, curve, id);
-  const anchorHandle = makeLeaderAnchorHandle(anchor, id);
 
   fc.add(leader);
   fc.add(text);
-  fc.add(anchorHandle);
-  // 핸들이 항상 다른 객체 위에 렌더링 (z-order: 맨 위로)
-  const objs = fc.getObjects();
-  const hIdx = objs.indexOf(anchorHandle);
-  if (hIdx !== -1 && hIdx < objs.length - 1) {
-    fc.moveObjectTo(anchorHandle, objs.length - 1);
-  }
+  // 앵커 핸들은 spawnLeaderPair에서 추가하지 않음
+  // → syncSelectionFromCanvas에서 텍스트/부호 선택 시 생성됨 (user line 패턴)
   fc.setActiveObject(text);
   fc.requestRenderAll();
 }
@@ -1218,6 +1212,13 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
 
       const syncSelectionFromCanvas = () => {
         const active = fc.getActiveObject();
+
+        // 지시선 앵커 핸들 자체가 선택된 경우: 드래그를 위해 핸들 유지
+        if (active && hasMeta(active, LEADER_ANCHOR)) {
+          // handleObjectMoving에서 드래그 처리. 핸들을 제거하지 않음.
+          return;
+        }
+
         removeAllEndpointHandles(fc);
         if (active && active.type !== "activeselection") {
           // Endpoint handle 자체가 선택된 경우엔 무시
@@ -1243,6 +1244,19 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
           ) {
             const lineId = getMeta<string>(active, META.lineId);
             if (lineId) createEndpointHandles(fc, active, lineId);
+          }
+          // 지시선 텍스트/부호 선택 시 앵커 핸들 표시
+          if (isLeaderText(active) || hasMeta(active, META.isRefCircle)) {
+            const leaderId = getMeta<string>(active, META.leaderId);
+            const leader = leaderId ? findLeaderLine(fc, leaderId) : null;
+            if (leader) {
+              const ax = getMeta<number>(leader, META.leaderAnchorX);
+              const ay = getMeta<number>(leader, META.leaderAnchorY);
+              if (ax !== undefined && ay !== undefined) {
+                const handle = makeLeaderAnchorHandle({ x: ax, y: ay }, leaderId!);
+                fc.add(handle);
+              }
+            }
           }
         } else {
           setSelectedObj(null);
