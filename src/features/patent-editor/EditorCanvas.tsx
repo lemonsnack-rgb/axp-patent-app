@@ -1221,15 +1221,10 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
 
         removeAllEndpointHandles(fc);
         if (active && active.type !== "activeselection") {
-          // Endpoint handle 자체가 선택된 경우엔 무시
+          // Endpoint handle 자체가 선택된 경우 — 드래그를 위해 핸들 그대로 유지
+          // (부모 라인으로 redirect하면 drag가 라인 전체 이동이 되어버림)
           if (hasMeta(active, META.isEndpointHandle)) {
-            // 핸들을 직접 선택하지는 않게 — 부모 라인을 재선택
-            const lineId = getMeta<string>(active, META.lineId);
-            const line = lineId ? findUserLineById(fc, lineId) : null;
-            if (line) {
-              fc.setActiveObject(line);
-              createEndpointHandles(fc, line, lineId!);
-            }
+            // handleObjectMoving에서 rebuildUserLineWithEndpoint가 처리
             return;
           }
           setSelectedObj(active);
