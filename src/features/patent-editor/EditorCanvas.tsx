@@ -26,7 +26,12 @@ import {
 } from "./canvas/overlay";
 import { snap } from "./canvas/snap";
 import { reapplyHatchAfterLoad, toggleHatch } from "./canvas/hatch";
-import { buildSCurvePath } from "./canvas/leaderPath";
+import {
+  buildSCurvePath,
+  calcOffsetFromMidHandle,
+  getDefaultOffset,
+  getMidHandlePos,
+} from "./canvas/leaderPath";
 import { getMeta, hasMeta, setMeta } from "./canvas/meta";
 import { RefPickerPopup } from "./RefPickerPopup";
 import type { EditorReference, LeaderCurve, LineEnd, LineStyle, ToolMode } from "./types";
@@ -150,6 +155,33 @@ function makeLeaderObject(
 
 /** 앵커 핸들용 META key (isEndpointHandle과 구분) */
 const LEADER_ANCHOR = "leaderAnchorHandle" as const;
+/** 곡선 중간 핸들 META key */
+const LEADER_MID = "leaderMidHandle" as const;
+/** 사용자 지정 offset META key */
+const LEADER_OFFSET_KEY = "leaderOffset" as const;
+
+/** 곡선 중간 핸들 — 드래그해서 S-curve 모양 변경 */
+function makeLeaderMidHandle(pos: Pt, leaderId: string): fabric.Circle {
+  const h = new fabric.Circle({
+    left: pos.x,
+    top: pos.y,
+    radius: 8,
+    fill: "#10b981",   // 초록색 — 끝점(파란/앰버)과 구분
+    stroke: "#fff",
+    strokeWidth: 2,
+    opacity: 0.85,
+    originX: "center",
+    originY: "center",
+    hasBorders: false,
+    hasControls: false,
+    objectCaching: false,
+    excludeFromExport: true,
+    hoverCursor: "ns-resize",
+  });
+  setMeta(h, LEADER_MID, true);
+  setMeta(h, META.leaderId, leaderId);
+  return h;
+}
 
 function makeLeaderAnchorHandle(anchor: Pt, leaderId: string): fabric.Circle {
   const h = new fabric.Circle({
@@ -308,7 +340,11 @@ function removeAllEndpointHandles(fc: fabric.Canvas): void {
   });
   const handles = fc
     .getObjects()
-    .filter((o) => hasMeta(o, META.isEndpointHandle) || hasMeta(o, LEADER_ANCHOR));
+    .filter((o) =>
+      hasMeta(o, META.isEndpointHandle) ||
+      hasMeta(o, LEADER_ANCHOR) ||
+      hasMeta(o, LEADER_MID)
+    );
   for (const h of handles) fc.remove(h);
 }
 
@@ -523,6 +559,36 @@ function rebuildUserLineWithEndpoint(
   if (idx >= 0) fc.insertAt(idx, newGroup);
   else fc.add(newGroup);
   return newGroup;
+}
+
+/** offset 파라미터를 받는 버전 (중간 핸들 드래그용) */
+function rebuildLeaderPathWithOffset(
+  fc: fabric.Canvas,
+  oldLeader: fabric.Path,
+  anchor: Pt,
+  textPos: Pt,
+  offset: number,
+  style: LineStyle,
+): fabric.Path | null {
+  const idx = fc.getObjects().indexOf(oldLeader);
+  if (idx === -1) return null;
+  const newPath = new fabric.Path(buildSCurvePath(anchor, textPos, offset), {
+    stroke: oldLeader.stroke ?? "#000",
+    strokeWidth: oldLeader.strokeWidth ?? 1.2,
+    strokeDashArray: LINE_DASH_PATTERNS[style],
+    fill: undefined,
+    selectable: false,
+    evented: false,
+    objectCaching: false,
+  });
+  copyLeaderMeta(oldLeader, newPath);
+  setMeta(newPath, META.leaderAnchorX, anchor.x);
+  setMeta(newPath, META.leaderAnchorY, anchor.y);
+  setMeta(newPath, LEADER_OFFSET_KEY, offset);
+  fc.remove(oldLeader);
+  fc.insertAt(idx, newPath);
+  fc.requestRenderAll();
+  return newPath;
 }
 
 function rebuildLeaderPath(
@@ -1059,6 +1125,28 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
         const target = opt.target;
         if (!target) return;
 
+        // 지시선 중간 핸들 드래그 → 곡선 offset(모양) 갱신
+        if (hasMeta(target, LEADER_MID)) {
+          const leaderId = getMeta<string>(target, META.leaderId);
+          if (!leaderId) return;
+          const leader = findLeaderLine(fc, leaderId);
+          const textObj = fc.getObjects().find(
+            o => (hasMeta(o, META.isLeaderText) || hasMeta(o, META.isRefCircle))
+              && getMeta<string>(o, META.leaderId) === leaderId
+          );
+          if (!leader || !textObj || !(leader instanceof fabric.Path)) return;
+          const ax = getMeta<number>(leader, META.leaderAnchorX) ?? 0;
+          const ay = getMeta<number>(leader, META.leaderAnchorY) ?? 0;
+          const anchor = { x: ax, y: ay };
+          const textPos = { x: textObj.left ?? 0, y: textObj.top ?? 0 };
+          const handlePos = { x: target.left ?? 0, y: target.top ?? 0 };
+          const newOffset = calcOffsetFromMidHandle(anchor, textPos, handlePos);
+          const style = useEditorStore.getState().lineStyle;
+          const newPath = rebuildLeaderPathWithOffset(fc, leader, anchor, textPos, newOffset, style);
+          if (newPath) setMeta(newPath, LEADER_OFFSET_KEY, newOffset);
+          return;
+        }
+
         // 지시선 앵커 핸들 드래그 → 앵커 끝점 갱신
         if (hasMeta(target, LEADER_ANCHOR)) {
           const leaderId = getMeta<string>(target, META.leaderId);
@@ -1223,6 +1311,7 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
         // → 핸들을 제거하지 않고 드래그 허용
         if (active && (
           hasMeta(active, LEADER_ANCHOR) ||          // 지시선 앵커 핸들
+          hasMeta(active, LEADER_MID) ||             // 지시선 중간(곡률) 핸들
           hasMeta(active, META.isEndpointHandle)      // user line 끝점 핸들
         )) {
           // handleObjectMoving에서 각각 처리
@@ -1249,16 +1338,28 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
               createEndpointHandles(fc, active, lineId);
             }
           }
-          // 지시선 텍스트/부호 선택 시 앵커 핸들 표시
+          // 지시선 텍스트/부호 선택 시 앵커 핸들 + 중간 핸들 표시
           if (isLeaderText(active) || hasMeta(active, META.isRefCircle)) {
             const leaderId = getMeta<string>(active, META.leaderId);
             const leader = leaderId ? findLeaderLine(fc, leaderId) : null;
-            if (leader) {
+            if (leader && leader instanceof fabric.Path) {
               const ax = getMeta<number>(leader, META.leaderAnchorX);
               const ay = getMeta<number>(leader, META.leaderAnchorY);
               if (ax !== undefined && ay !== undefined) {
-                const handle = makeLeaderAnchorHandle({ x: ax, y: ay }, leaderId!);
-                fc.add(handle);
+                const anchor = { x: ax, y: ay };
+                const textPos = { x: active.left ?? 0, y: active.top ?? 0 };
+
+                // 앵커 핸들 (앰버, 라인 끝점)
+                fc.add(makeLeaderAnchorHandle(anchor, leaderId!));
+
+                // 중간 핸들 (초록, 곡선 모양 조정)
+                const offset =
+                  getMeta<number>(leader, LEADER_OFFSET_KEY) ??
+                  getDefaultOffset(anchor, textPos);
+                fc.add(makeLeaderMidHandle(
+                  getMidHandlePos(anchor, textPos, offset),
+                  leaderId!,
+                ));
               }
             }
           }
