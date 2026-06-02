@@ -300,12 +300,6 @@ export function SpecEditorView({ task, onBack }: { task: any; onBack: () => void
           }}
         >
           <div className="max-w-3xl mx-auto py-6 px-8">
-            {/* 문서 헤더 */}
-            <div className="text-center mb-8">
-              <p className="text-[10px] text-zinc-400 tracking-widest uppercase mb-1">특허 명세서</p>
-              <h1 className="text-xl font-bold text-zinc-900">{taskName}</h1>
-            </div>
-
             {/* 섹션별 단락 */}
             {EDITOR_SECTIONS.map(sec => (
               <div key={sec.id} data-section={sec.id} className="mb-10">
@@ -320,7 +314,7 @@ export function SpecEditorView({ task, onBack }: { task: any; onBack: () => void
                         key={blockIdx}
                         onClick={() => { if (!isSelected) selectBlock(sec.id, blockIdx); }}
                         className={clsx(
-                          'relative rounded-lg border-2 px-4 py-3 transition-all',
+                          'group relative rounded-lg border-2 px-4 py-3 transition-all',
                           isSelected
                             ? 'border-blue-400 bg-white shadow-sm cursor-text'
                             : 'border-transparent hover:border-zinc-300 bg-white cursor-pointer',
@@ -330,6 +324,27 @@ export function SpecEditorView({ task, onBack }: { task: any; onBack: () => void
                         {/* 선택 표시 */}
                         {isSelected && (
                           <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500 rounded-l-lg" />
+                        )}
+                        {/* 단락 삭제 버튼 */}
+                        {blocks[sec.id].length > 1 && (
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              setUndoStack(p => [...p.slice(-20), blocks]);
+                              setBlocks(p => {
+                                const next = p[sec.id].filter((_, i) => i !== blockIdx);
+                                return { ...p, [sec.id]: next };
+                              });
+                              setSaved(false);
+                              if (sel?.sid === sec.id && sel?.idx === blockIdx) setSel(null);
+                            }}
+                            className="absolute top-1.5 right-1.5 w-5 h-5 rounded flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                            title="단락 삭제"
+                          >
+                            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" width="10" height="10">
+                              <line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/>
+                            </svg>
+                          </button>
                         )}
                         {isSelected ? (
                           <textarea
@@ -509,36 +524,48 @@ export function SpecEditorView({ task, onBack }: { task: any; onBack: () => void
 
             {/* ── 도면 탭 ── */}
             {panelTab === 'drawings' && (
-              <div className="p-3 space-y-3">
-                <p className="text-xs2 font-semibold text-zinc-600">도면 목록 ({MOCK_DRAWINGS.length}개)</p>
-                {MOCK_DRAWINGS.map(d => (
-                  <div key={d.id} className="rounded-xl border border-zinc-200 overflow-hidden">
-                    {/* 썸네일 */}
-                    <div className="bg-zinc-50 h-28 flex items-center justify-center border-b border-zinc-200 relative overflow-hidden">
-                      {d.exportedImageUrl ? (
-                        <img src={d.exportedImageUrl} className="max-h-full max-w-full object-contain" alt={d.name} />
-                      ) : (
-                        <div className="flex flex-col items-center gap-1">
-                          <ImageIcon />
-                          <p className="text-xs2 text-zinc-400">미편집</p>
+              <div className="px-3 py-3 space-y-1.5">
+                <p className="text-xs2 font-semibold text-zinc-500 mb-2">
+                  도면 <span className="font-normal text-zinc-400">({MOCK_DRAWINGS.length}개)</span>
+                </p>
+                {MOCK_DRAWINGS.map(d => {
+                  const isDone = d.stage === 'done';
+                  const LABEL_STYLES: Record<string, string> = {
+                    '제안기술': 'bg-blue-100 text-blue-700',
+                    '종래기술': 'bg-zinc-100 text-zinc-600',
+                    'AI생성':   'bg-violet-100 text-violet-700',
+                  };
+                  return (
+                  <div key={d.id}
+                    className={clsx(
+                      'rounded-lg border overflow-hidden transition-all',
+                      isDone ? 'border-green-200 bg-green-50/30' : 'border-zinc-200 bg-white'
+                    )}>
+                    {/* 썸네일 + 메타 (DrawingsPanel과 동일한 compact row) */}
+                    <div className="flex items-center gap-2.5 px-2.5 pt-2 pb-1.5">
+                      <div className="w-10 shrink-0 aspect-[4/3] bg-zinc-100 rounded border border-zinc-200 flex items-center justify-center overflow-hidden">
+                        {d.exportedImageUrl
+                          ? <img src={d.exportedImageUrl} className="w-full h-full object-contain" alt="" />
+                          : <ImageIcon />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1 mb-0.5">
+                          <span className="text-xs2 font-bold text-zinc-700">기호 {d.symbol}</span>
+                          <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', LABEL_STYLES[d.label] ?? 'bg-zinc-100 text-zinc-500')}>
+                            {d.label}
+                          </span>
                         </div>
-                      )}
-                      <span className={clsx(
-                        'absolute top-2 left-2 text-xs2 px-1.5 py-0.5 rounded font-semibold',
-                        d.label === '제안기술' ? 'bg-blue-100 text-blue-700' : 'bg-zinc-200 text-zinc-600'
-                      )}>
-                        기호 {d.symbol}
-                      </span>
-                      {d.stage === 'done' && (
-                        <span className="absolute top-2 right-2 text-xs2 bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">완료</span>
-                      )}
+                        <p className="text-xs2 text-zinc-700 font-semibold truncate">{d.name}</p>
+                      </div>
+                      <div className="shrink-0">
+                        {isDone
+                          ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="11" height="11" className="text-green-500"><polyline points="2,6 5,9 10,3"/></svg>
+                          : <span className="w-2 h-2 rounded-full block bg-zinc-300" />}
+                      </div>
                     </div>
-                    {/* 정보 + 버튼 */}
-                    <div className="p-2.5">
-                      <p className="text-xs2 font-semibold text-zinc-800">{d.name}</p>
-                      <p className="text-xs2 text-zinc-400 mt-0.5 line-clamp-2">{d.description}</p>
-                      <div className="flex gap-1.5 mt-2">
-                        <button
+                    {/* 액션 버튼 */}
+                    <div className={clsx('flex border-t', isDone ? 'border-green-100' : 'border-zinc-100')}>
+                      <button
                           onClick={() => {
                             if (sel) {
                               const cur = blocks[sel.sid][sel.idx] || '';
@@ -546,7 +573,7 @@ export function SpecEditorView({ task, onBack }: { task: any; onBack: () => void
                             }
                           }}
                           disabled={!sel}
-                          className="flex-1 py-1.5 bg-blue-600 text-white rounded text-xs2 font-semibold hover:bg-blue-700 disabled:opacity-40"
+                          className="flex-1 py-1.5 text-xs2 font-semibold text-blue-600 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors border-r border-zinc-100"
                         >
                           참조 삽입
                         </button>
@@ -559,14 +586,17 @@ export function SpecEditorView({ task, onBack }: { task: any; onBack: () => void
                             drawingName: d.name,
                             timestamp: Date.now(),
                           })}
-                          className="px-2.5 py-1.5 border border-zinc-300 text-zinc-600 rounded text-xs2 hover:bg-zinc-50"
+                          className={clsx(
+                            'px-4 py-1.5 text-xs2 font-semibold transition-colors',
+                            isDone ? 'text-green-600 hover:bg-green-50' : 'text-zinc-600 hover:bg-zinc-50'
+                          )}
                         >
                           편집
                         </button>
-                      </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
