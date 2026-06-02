@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { useEffect, useRef, useState } from 'react';
 import { useStore, taskTypeMeta } from '../store';
+import { TaskItemSkeleton } from './ui/Skeleton';
 import { useToast } from './Toast';
 import { Icon } from './Icon';
 import type { Task } from '../types';
@@ -46,8 +47,10 @@ export function Sidebar() {
   return (
     <aside
       className={clsx(
-        'border-r border-zinc-200 bg-white flex flex-col shrink-0 transition-all relative',
+        'border-r border-zinc-200 bg-white flex flex-col shrink-0 transition-all duration-200 relative',
         sidebarCollapsed ? 'w-nav-c min-w-nav-c' : 'w-nav min-w-nav',
+        // 모바일: 접힌 상태에서 콘텐츠가 완전히 보이지 않도록 (아이콘만 표시)
+        'max-md:z-30',
       )}
     >
       <nav className="p-2 flex flex-col gap-0.5">
@@ -85,10 +88,11 @@ export function Sidebar() {
           </div>
           <div className="flex-1 overflow-y-auto scroll-thin px-2 py-1.5">
             {list.length === 0 ? (
-              <div className="text-center text-xs2 text-gray-400 italic px-3 py-6 leading-relaxed">
-                {search ? '검색 결과 없음' : '작업이 없습니다.'}<br/>
-                {!search && '[+ 새 작업]을 클릭하세요.'}
-              </div>
+              search
+                ? <div className="text-center text-xs2 text-neutral-400 px-3 py-6">검색 결과 없음</div>
+                : tasks.length === 0
+                  ? <div className="space-y-1 px-1 py-2">{[0,1,2].map(i => <TaskItemSkeleton key={i} />)}</div>
+                  : <div className="text-center text-xs2 text-neutral-400 px-3 py-6">작업이 없습니다.<br/><span className="mt-1 block">새 작업을 클릭하세요.</span></div>
             ) : list.map(t => (
               <TaskRow
                 key={t.id}

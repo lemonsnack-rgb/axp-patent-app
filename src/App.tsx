@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { StoreProvider, useStore } from './store';
 import { ToastProvider } from './components/Toast';
 import { TopBar } from './components/TopBar';
@@ -15,12 +15,35 @@ import { StandaloneEditor } from './views/StandaloneEditor';
 import { isEditorTab } from './features/drawing-workflow/editorChannel';
 
 function Shell() {
-  const { mode } = useStore();
+  const { mode, sidebarCollapsed, setSidebarCollapsed } = useStore();
+
+  // 모바일(<768px)에서 사이드바 자동 접힘
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const handler = (e: MediaQueryListEvent | MediaQueryList) => {
+      if (e.matches) setSidebarCollapsed(true);
+    };
+    handler(mq); // 초기 실행
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [setSidebarCollapsed]);
+
+  // 모바일에서 사이드바 열릴 때 오버레이 표시 여부
+  const isMobileOpen = !sidebarCollapsed && window.innerWidth < 768;
+
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       <TopBar />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         <Sidebar />
+        {/* 모바일: 사이드바 열릴 때 반투명 오버레이 */}
+        {isMobileOpen && (
+          <div
+            className="fixed inset-0 bg-black/30 z-20 md:hidden"
+            onClick={() => setSidebarCollapsed(true)}
+            aria-hidden="true"
+          />
+        )}
         <main className="flex-1 flex flex-col overflow-hidden">
           {mode === 'newtask' && <NewTaskView />}
           {mode === 'home'    && <HomeView />}
