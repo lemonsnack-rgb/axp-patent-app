@@ -294,7 +294,7 @@ export function EditorToolbar({
             <svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1"/>{[...Array(6)].map((_,i)=><line key={i} x1={2+i*2-2} y1={14} x2={2+i*2+8} y2={2} stroke="currentColor" strokeWidth="0.8" strokeLinecap="round"/>)}</svg>
           </OptBtn>
           <OptBtn active={fillStyle === 'cross-hatch'} onClick={() => setFillStyle('cross-hatch')} title="격자 채우기">
-            <svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1"/>{[...Array(4)].map((_,i)=><><line key={`h${i}`} x1={2} y1={2+i*4} x2={14} y2={2+i*4+4} stroke="currentColor" strokeWidth="0.7"/><line key={`v${i}`} x1={2+i*4} y1={2} x2={2+i*4+4} y2={14} stroke="currentColor" strokeWidth="0.7"/></>)}</svg>
+            <svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1"/>{[...Array(4)].map((_,i)=><g key={i}><line x1={2} y1={2+i*4} x2={14} y2={2+i*4+4} stroke="currentColor" strokeWidth="0.7"/><line x1={2+i*4} y1={2} x2={2+i*4+4} y2={14} stroke="currentColor" strokeWidth="0.7"/></g>)}</svg>
           </OptBtn>
         </Group>
         <div className={DIVIDER} />
