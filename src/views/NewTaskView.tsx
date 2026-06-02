@@ -75,7 +75,7 @@ export function NewTaskView() {
     <div className="flex-1 overflow-y-auto scroll-thin flex flex-col items-center pt-16 pb-12 px-8 bg-zinc-50">
       <div className="max-w-3xl w-full text-center mb-9">
         <h2 className="text-h1 font-bold text-zinc-900 tracking-tight mb-2.5">어떤 작업을 시작하시겠어요?</h2>
-        <p className="text-lg2 text-zinc-500">작업 유형을 선택하고, 필요하면 이름·프로젝트·고객사를 지정하세요.</p>
+        <p className="text-lg2 text-zinc-500">작업 유형을 선택하세요. 작업 이름·프로젝트·고객사는 아래에서 지정할 수 있습니다.</p>
       </div>
 
       <div className="grid grid-cols-3 gap-4 max-w-3xl w-full mb-6">

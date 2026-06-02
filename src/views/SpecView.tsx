@@ -264,7 +264,10 @@ export function SpecView() {
               <div className="card overflow-hidden">
                 <div className="flex items-center gap-3 p-4 border-b border-gray-100 bg-gray-50">
                   <Icon name="edit" size={20} className="text-blue-700" />
-                  <div><h3 className="text-base2 font-semibold text-gray-800">발명 기초 내용 입력</h3><p className="text-sm2 text-gray-500">아래 항목을 입력하면 AI가 명세서 항목을 분석합니다.</p></div>
+                  <div>
+                    <h3 className="text-base2 font-semibold text-gray-800">발명 기초 내용 입력</h3>
+                    <p className="text-sm2 text-gray-500">아래 항목을 입력하면 AI가 명세서 항목을 분석합니다. <span className="text-red-500">*</span> 표시는 필수 항목입니다.</p>
+                  </div>
                 </div>
                 <div className="p-5 space-y-4">
                   {[
@@ -292,7 +295,10 @@ export function SpecView() {
                 {/* flow/done 상태에서는 버튼 숨김 (폼은 읽기전용으로 계속 표시) */}
                 {phase === 'direct' && (
                   <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-100 bg-gray-50">
-                    <button className="btn-outline btn-sm" onClick={() => setPhase('upload')}>취소</button>
+                    <button className="btn-outline btn-sm" onClick={() => {
+                      if ((diTitle || diContent) && !window.confirm('입력한 내용이 삭제됩니다. 계속할까요?')) return;
+                      setPhase('upload');
+                    }}>취소</button>
                     <button className="btn-primary btn-sm" onClick={startFlow} disabled={!diTitle.trim() || !diField.trim() || !diContent.trim()}>
                       <Icon name="star" size={13} /> AI 분석 시작
                     </button>
@@ -686,6 +692,14 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
         >
           ← 이전
         </button>
+        {/* 5단계 도면: 도면 없이 진행 버튼 */}
+        {step === 'drawings' && !isDone && (
+          <button onClick={handleConfirm}
+            className="px-2.5 py-1.5 border border-gray-300 rounded text-xs2 text-gray-500 hover:bg-gray-50 whitespace-nowrap"
+            title="도면 없이 다음 단계로 진행">
+            건너뛰기
+          </button>
+        )}
 
         {/* description diff 모드에서 확인 버튼 숨김 */}
         {!(step === 'description' && descMode === 'diff') && (

@@ -127,7 +127,7 @@ export function Sidebar() {
 
       <div className={clsx('mt-auto border-t border-zinc-100', sidebarCollapsed ? 'p-2' : 'p-3')}>
         <button className={clsx('flex items-center gap-2 w-full px-2 py-1.5 rounded-md hover:bg-zinc-100 active:scale-[0.98] transition-all text-md2 text-zinc-700', sidebarCollapsed && 'justify-center')}
-          onClick={() => toast.show('설정 모달 (구축 중)')}>
+          onClick={() => toast.show('설정 기능은 곧 제공될 예정입니다.')}>
           <Icon name="settings" size={16} />
           {!sidebarCollapsed && <span>설정</span>}
         </button>

@@ -271,8 +271,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle }: { task: any; on
         )}
       </div>
 
-      {/* ② 섹션 탭 (앵커 이동만) */}
-      <div className="flex border-b border-zinc-200 bg-white shrink-0 overflow-x-auto scroll-thin">
+      {/* ② 섹션 탭 (앵커 이동만) — 우측에 페이드 힌트로 스크롤 가능성 표시 */}
+      <div className="flex border-b border-zinc-200 bg-white shrink-0 overflow-x-auto scroll-thin [mask-image:linear-gradient(to_right,transparent_0,black_8px,black_calc(100%-32px),transparent_100%)]">
         {EDITOR_SECTIONS.map(s => (
           <button key={s.id} onClick={() => goToSection(s.id)}
             className={clsx(
@@ -617,7 +617,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle }: { task: any; on
                     </div>
                     <p className="text-sm2 text-zinc-600 font-medium mb-1">저장된 참고문헌 없음</p>
                     <p className="text-xs2 text-zinc-400 leading-relaxed">
-                      특허 검색에서 문헌을 저장하면<br />여기서 불러올 수 있습니다.
+                      특허·논문 검색에서 문헌을 저장하면<br />여기서 인용구로 삽입할 수 있습니다.
                     </p>
                   </div>
                 ) : (

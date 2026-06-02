@@ -48,7 +48,7 @@ export function TopBar() {
           {label}
           {showTaskName && active && (
             <>
-              <span className="mx-1 text-zinc-300">—</span>
+              <span className="mx-1 text-zinc-300">/</span>
               <span className="text-zinc-800 font-medium">{active.name}</span>
             </>
           )}
