@@ -969,45 +969,6 @@ const MOCK_DEPS_BY_INDEP: Record<number, Pick<DepItemState,'text'|'sel'>[]> = {
 
 interface DepGroupState { generated: boolean; items: DepItemState[]; newText: string }
 
-// AI 재생성 인라인 UI — 발명의 설명과 동일 패턴
-function AiRegenBlock({ currentText, open, promptVal, onPromptChange, onSubmit, onCancel }: {
-  currentText: string; open: boolean;
-  promptVal: string; onPromptChange: (v: string) => void;
-  onSubmit: () => void; onCancel: () => void;
-}) {
-  if (!open) return null;
-  return (
-    <div className="mt-2 space-y-2">
-      <div className="rounded border border-gray-200 bg-gray-50 p-2.5">
-        <p className="text-xs2 text-gray-400 mb-1">현재 내용</p>
-        <p className="text-xs2 text-gray-700 leading-relaxed whitespace-pre-line">{currentText}</p>
-      </div>
-      <div className="rounded border border-violet-300 bg-violet-50 p-2.5">
-        <p className="text-xs2 text-violet-700 font-semibold mb-1.5 flex items-center gap-1">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11">
-            <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10" />
-            <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6" />
-          </svg>
-          어떻게 수정할까요?
-        </p>
-        <textarea autoFocus
-          className="w-full text-xs2 bg-white border border-violet-200 rounded px-2 py-1.5 outline-none resize-none"
-          placeholder="예: 더 구체적으로 / 청구범위 넓게 / 구성요소 명칭 포함"
-          value={promptVal} rows={2}
-          onChange={e => onPromptChange(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit(); } }}
-        />
-        <div className="flex gap-1.5 mt-1.5 justify-end">
-          <button onClick={onCancel} className="btn-outline btn-xs text-xs2">취소</button>
-          <button onClick={onSubmit} disabled={!promptVal.trim()}
-            className="px-3 py-1 bg-violet-600 text-white rounded text-xs2 font-semibold hover:bg-violet-700 disabled:opacity-40">
-            수정 생성
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void }) {
   const [claimsPhase, setClaimsPhase] = useState<'indep' | 'dep'>('indep');
@@ -1168,76 +1129,99 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
 
         {cands.map(cand => (
           <div key={cand.id}
-            className={clsx('rounded-lg border-2 p-3 transition-all',
-              cand.selected && !cand.editing ? 'border-blue-600 bg-blue-50' : '',
-              cand.editing ? 'border-blue-400 bg-blue-50' : '',
-              !cand.selected && !cand.editing ? 'border-ck-border bg-ck-bg' : ''
+            className={clsx('rounded-lg border-2 transition-all',
+              cand.selected && !cand.aiOpen && !cand.aiDiffOpen ? 'border-blue-600 bg-blue-50' : '',
+              cand.aiOpen ? 'border-violet-300' : '',
+              cand.aiDiffOpen && !cand.aiOpen ? 'border-blue-300 bg-white' : '',
+              !cand.selected && !cand.aiOpen && !cand.aiDiffOpen ? 'border-ck-border bg-ck-bg' : ''
             )}>
-            {/* 헤더 */}
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2 cursor-pointer" onClick={() => { if (!cand.editing && !done) toggleIndep(cand.id); }}>
-                <button
-                  onClick={e => { e.stopPropagation(); if (!done) toggleIndep(cand.id); }}
-                  className={clsx('w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all',
-                    cand.selected ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 bg-white hover:border-blue-400')}>
-                  {cand.selected && <Icon name="check" size={9} />}
-                </button>
-                <span className={clsx('w-6 h-6 rounded-full flex items-center justify-center text-xs2 font-bold shrink-0',
-                  cand.selected ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-600')}>
-                  {cand.label}
-                </span>
-                <span className="text-xs2 px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">독립항</span>
-              </div>
-              {!done && (
-                <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                  {cand.editing ? (
+
+            {/* 헤더 — 체크박스 + 뱃지만 (버튼 없음, DescriptionPanel 일관성) */}
+            <div className="flex items-center gap-2 px-3 pt-3 pb-2 cursor-pointer"
+              onClick={() => { if (!cand.aiOpen && !cand.aiDiffOpen && !done) toggleIndep(cand.id); }}>
+              <button
+                onClick={e => { e.stopPropagation(); if (!done && !cand.aiOpen && !cand.aiDiffOpen) toggleIndep(cand.id); }}
+                className={clsx('w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all',
+                  cand.selected ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 bg-white hover:border-blue-400')}>
+                {cand.selected && <Icon name="check" size={9} />}
+              </button>
+              <span className={clsx('w-6 h-6 rounded-full flex items-center justify-center text-xs2 font-bold shrink-0',
+                cand.selected ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-600')}>
+                {cand.label}
+              </span>
+              <span className="text-xs2 px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">독립항</span>
+            </div>
+
+            {/* 본문 — 3가지 모드 전환 (DescriptionPanel과 동일 패턴) */}
+            <div className="px-3 pb-3">
+
+              {/* 일반 모드: textarea (항상 편집 가능) + AI로 수정하기 버튼 */}
+              {!cand.aiOpen && !cand.aiDiffOpen && (
+                <div className={clsx('rounded-lg border-2 transition-all',
+                  !done ? 'border-ck-border focus-within:border-blue-400' : 'border-green-300 bg-green-50')}>
+                  {!done ? (
                     <>
-                      <button onClick={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, editing: false } : c))}
-                        className="text-xs2 text-gray-500 hover:text-red-500 px-2 py-0.5 rounded border border-gray-200">취소</button>
-                      <button onClick={() => { const next = cands.map(c => c.id === cand.id ? { ...c, editing: false, text: c.editVal } : c); setCands(next); syncUpdate(next, depGroups); }}
-                        className="text-xs2 text-white bg-blue-600 px-2 py-0.5 rounded">저장</button>
+                      <textarea
+                        className="w-full text-xs2 text-gray-800 bg-transparent px-3 py-3 outline-none resize-none leading-relaxed rounded-t-lg overflow-hidden"
+                        value={cand.text}
+                        rows={Math.max(4, Math.ceil(cand.text.length / 40))}
+                        placeholder="독립항 내용을 입력하거나 수정하세요..."
+                        onClick={e => e.stopPropagation()}
+                        onChange={e => setCands(p => p.map(c => c.id === cand.id ? { ...c, text: e.target.value } : c))}
+                        ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                      />
+                      <div className="flex justify-end px-3 pb-2 pt-1 border-t border-gray-100">
+                        <button
+                          onClick={e => { e.stopPropagation(); setCands(p => p.map(c => c.id === cand.id ? { ...c, aiOpen: true, aiPromptVal: '' } : c)); }}
+                          className="flex items-center gap-1 px-2 py-1 rounded text-xs2 text-violet-600 hover:bg-violet-50 transition-colors">
+                          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11">
+                            <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10"/>
+                            <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6"/>
+                          </svg>
+                          AI로 수정하기
+                        </button>
+                      </div>
                     </>
                   ) : (
-                    <>
-                      <button onClick={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, editing: true, editVal: c.text, aiOpen: false } : c))}
-                        className="text-xs2 text-gray-500 hover:text-blue-600 px-2 py-0.5 rounded border border-gray-200 hover:border-blue-300">
-                        직접 수정
-                      </button>
-                      <button
-                        onClick={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, aiOpen: !c.aiOpen, aiPromptVal: '' } : c))}
-                        className="flex items-center gap-1 text-xs2 text-violet-600 hover:text-violet-800 px-2 py-0.5 rounded border border-violet-200 hover:border-violet-400">
-                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="9" height="9">
-                          <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10" />
-                          <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6" />
-                        </svg>
-                        AI 재생성
-                      </button>
-                    </>
+                    <p className="text-xs2 text-gray-700 leading-relaxed px-3 py-3">{cand.text}</p>
                   )}
                 </div>
               )}
-            </div>
 
-            {/* 본문 */}
-            {cand.editing ? (
-              <textarea
-                className="w-full text-xs2 text-gray-800 bg-white border border-blue-300 rounded px-2 py-2 outline-none resize-none leading-relaxed"
-                rows={5} value={cand.editVal} autoFocus
-                onChange={e => setCands(p => p.map(c => c.id === cand.id ? { ...c, editVal: e.target.value } : c))}
-              />
-            ) : (
-              <p className="text-xs2 text-gray-700 leading-relaxed whitespace-pre-line">{cand.text}</p>
-            )}
-
-            {/* AI 재생성 — prompt 모드 */}
-            <AiRegenBlock
-              currentText={cand.aiDiffOpen && cand.aiProposed ? cand.aiProposed : (cand.editing ? cand.editVal : cand.text)}
-              open={cand.aiOpen}
-              promptVal={cand.aiPromptVal}
-              onPromptChange={v => setCands(p => p.map(c => c.id === cand.id ? { ...c, aiPromptVal: v } : c))}
-              onSubmit={() => regenIndep(cand.id)}
-              onCancel={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, aiOpen: false } : c))}
-            />
+              {/* 프롬프트 모드: 현재 내용 + 수정 지시 입력 (DescriptionPanel 동일 구조) */}
+              {cand.aiOpen && !cand.aiDiffOpen && (
+                <>
+                  <div className={clsx('rounded-lg border p-3 mb-2',
+                    'border-gray-200 bg-gray-50')}>
+                    <p className="text-xs2 font-medium mb-1 text-gray-400">현재 내용</p>
+                    <p className="text-xs2 leading-relaxed text-gray-600">{cand.text}</p>
+                  </div>
+                  <div className="rounded-lg border border-violet-300 bg-violet-50 p-3">
+                    <p className="text-xs2 text-violet-700 font-semibold mb-2 flex items-center gap-1.5">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="12" height="12">
+                        <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10"/>
+                        <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6"/>
+                      </svg>
+                      어떻게 수정할까요?
+                    </p>
+                    <textarea autoFocus
+                      className="w-full text-xs2 bg-white border border-violet-200 rounded px-2 py-1.5 outline-none resize-none"
+                      placeholder="예: 더 구체적으로 / 청구범위 넓게 / 구성요소 명칭 포함"
+                      value={cand.aiPromptVal} rows={3}
+                      onChange={e => setCands(p => p.map(c => c.id === cand.id ? { ...c, aiPromptVal: e.target.value } : c))}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); regenIndep(cand.id); } }}
+                    />
+                    <div className="flex gap-1.5 mt-2 justify-end">
+                      <button onClick={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, aiOpen: false } : c))}
+                        className="btn-outline btn-xs text-xs2">취소</button>
+                      <button onClick={() => regenIndep(cand.id)} disabled={!cand.aiPromptVal.trim()}
+                        className="px-3 py-1 bg-violet-600 text-white rounded text-xs2 font-semibold hover:bg-violet-700 disabled:opacity-40">
+                        수정 생성
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
 
             {/* diff 모드 — 원본 vs. 변경 버전 선택 */}
             {cand.aiDiffOpen && (
@@ -1295,6 +1279,7 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
                 </button>
               </div>
             )}
+            </div>{/* /본문 px-3 pb-3 */}
           </div>
         ))}
 
@@ -1338,36 +1323,75 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
 
           return (
             <div key={indep.id} className="rounded-xl border border-zinc-200 overflow-hidden">
-              {/* 독립항 헤더 */}
-              <div className="bg-blue-50 border-b border-blue-200 px-3 py-2.5">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <Icon name="check" size={11} className="text-blue-600" />
-                    <span className="text-xs2 font-bold text-blue-700">청구항 {indepClaimNum} · 독립항 {indep.label}</span>
-                  </div>
-                  {!done && (
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiOpen: !c.aiOpen, aiPromptVal: '' } : c))}
-                        className="flex items-center gap-1 text-xs2 text-violet-600 hover:text-violet-800 px-2 py-0.5 rounded border border-violet-200">
-                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="9" height="9">
-                          <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10" />
-                          <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6" />
-                        </svg>
-                        AI 재생성
-                      </button>
-                    </div>
-                  )}
+              {/* 독립항 헤더 — 3모드 전환 (DescriptionPanel 일관성) */}
+              <div className={clsx('border-b px-3 py-2.5',
+                indep.aiOpen ? 'bg-violet-50 border-violet-200' : 'bg-blue-50 border-blue-200')}>
+                {/* 타이틀 (항상 표시) */}
+                <div className="flex items-center gap-2 mb-2">
+                  <Icon name="check" size={11} className="text-blue-600" />
+                  <span className="text-xs2 font-bold text-blue-700">청구항 {indepClaimNum} · 독립항 {indep.label}</span>
                 </div>
-                <p className="text-xs2 text-blue-800 leading-relaxed whitespace-pre-line line-clamp-3">{indep.text}</p>
-                <AiRegenBlock
-                  currentText={indep.aiDiffOpen && indep.aiProposed ? indep.aiProposed : indep.text}
-                  open={indep.aiOpen}
-                  promptVal={indep.aiPromptVal}
-                  onPromptChange={v => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiPromptVal: v } : c))}
-                  onSubmit={() => regenIndep(indep.id)}
-                  onCancel={() => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiOpen: false } : c))}
-                />
+
+                {/* 일반 모드: textarea + AI로 수정하기 */}
+                {!indep.aiOpen && !indep.aiDiffOpen && (
+                  <div className="rounded border border-blue-200 focus-within:border-blue-400 transition-all">
+                    <textarea
+                      className="w-full text-xs2 text-blue-900 bg-transparent px-2.5 py-2 outline-none resize-none leading-relaxed overflow-hidden"
+                      value={indep.text}
+                      rows={Math.max(3, Math.ceil(indep.text.length / 45))}
+                      onClick={e => e.stopPropagation()}
+                      onChange={e => setCands(p => p.map(c => c.id === indep.id ? { ...c, text: e.target.value } : c))}
+                      ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                    />
+                    {!done && (
+                      <div className="flex justify-end px-2 pb-1.5 pt-1 border-t border-blue-100">
+                        <button
+                          onClick={() => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiOpen: true, aiPromptVal: '' } : c))}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded text-xs2 text-violet-600 hover:bg-violet-50 transition-colors">
+                          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="10" height="10">
+                            <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10"/>
+                            <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6"/>
+                          </svg>
+                          AI로 수정하기
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 프롬프트 모드 */}
+                {indep.aiOpen && !indep.aiDiffOpen && (
+                  <>
+                    <div className="rounded border p-2.5 bg-white mb-2">
+                      <p className="text-xs2 font-medium text-gray-400 mb-0.5">현재 내용</p>
+                      <p className="text-xs2 text-gray-700 leading-relaxed">{indep.text}</p>
+                    </div>
+                    <div className="rounded border border-violet-300 bg-white p-2.5">
+                      <p className="text-xs2 text-violet-700 font-semibold mb-1.5 flex items-center gap-1">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11">
+                          <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10"/>
+                          <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6"/>
+                        </svg>
+                        어떻게 수정할까요?
+                      </p>
+                      <textarea autoFocus
+                        className="w-full text-xs2 bg-gray-50 border border-violet-200 rounded px-2 py-1.5 outline-none resize-none"
+                        placeholder="예: 더 구체적으로 / 청구범위 넓게"
+                        value={indep.aiPromptVal} rows={2}
+                        onChange={e => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiPromptVal: e.target.value } : c))}
+                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); regenIndep(indep.id); } }}
+                      />
+                      <div className="flex gap-1.5 mt-1.5 justify-end">
+                        <button onClick={() => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiOpen: false } : c))}
+                          className="btn-outline btn-xs text-xs2">취소</button>
+                        <button onClick={() => regenIndep(indep.id)} disabled={!indep.aiPromptVal.trim()}
+                          className="px-3 py-1 bg-violet-600 text-white rounded text-xs2 font-semibold hover:bg-violet-700 disabled:opacity-40">
+                          수정 생성
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
                 {/* diff 모드 */}
                 {indep.aiDiffOpen && (
                   <div className="mt-2 space-y-1.5">
@@ -1467,48 +1491,65 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
 
                           {dep.expanded && (
                             <div className="px-2.5 pb-2.5 border-t border-gray-100 pt-2">
-                              {dep.editing ? (
-                                <>
-                                  <textarea className="w-full text-xs2 text-gray-800 border border-blue-300 rounded px-2 py-1.5 outline-none resize-none leading-relaxed"
-                                    rows={4} value={dep.editVal} autoFocus
-                                    onChange={e => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, editVal: e.target.value } : d) })}
-                                  />
-                                  <div className="flex justify-end gap-1.5 mt-1.5">
-                                    <button onClick={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, editing: false } : d) })}
-                                      className="text-xs2 text-gray-500 px-2 py-0.5 rounded border border-gray-200">취소</button>
-                                    <button onClick={() => {
-                                      const next = { ...depGroups, [indep.id]: { ...grp, items: grp.items.map(d => d.id === dep.id ? { ...d, editing: false, text: d.editVal } : d) } };
-                                      setDepGroups(next); syncUpdate(cands, next);
-                                    }} className="text-xs2 text-white bg-blue-600 px-2 py-0.5 rounded">저장</button>
-                                  </div>
-                                </>
-                              ) : (
-                                <>
-                                  <p className="text-xs2 text-gray-700 leading-relaxed">{dep.text}</p>
-                                  {!done && (
-                                    <div className="flex gap-1.5 mt-2">
-                                      <button onClick={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, editing: true, editVal: d.text, aiOpen: false } : d) })}
-                                        className="text-xs2 text-gray-500 hover:text-blue-600 flex items-center gap-0.5">
-                                        <Icon name="edit" size={9} /> 직접 수정
-                                      </button>
-                                      <button onClick={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiOpen: !d.aiOpen, aiPromptVal: '' } : d) })}
-                                        className="text-xs2 text-violet-600 hover:text-violet-800 flex items-center gap-0.5">
-                                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="9" height="9">
-                                          <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10" />
-                                          <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6" />
-                                        </svg>
-                                        AI 재생성
-                                      </button>
+                              {/* 종속항도 DescriptionPanel 동일 3모드 패턴 */}
+                              <>
+                                  {/* 일반 모드: textarea + AI로 수정하기 */}
+                                  {!dep.aiOpen && !dep.aiDiffOpen && (
+                                    <div className="rounded border border-gray-200 focus-within:border-blue-400 transition-all">
+                                      <textarea
+                                        className="w-full text-xs2 text-gray-800 bg-transparent px-2.5 py-2 outline-none resize-none leading-relaxed overflow-hidden"
+                                        value={dep.text}
+                                        rows={Math.max(3, Math.ceil(dep.text.length / 45))}
+                                        onChange={e => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, text: e.target.value } : d) })}
+                                        ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                                      />
+                                      {!done && (
+                                        <div className="flex justify-end px-2 pb-1.5 pt-1 border-t border-gray-100">
+                                          <button onClick={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiOpen: true, aiPromptVal: '' } : d) })}
+                                            className="flex items-center gap-1 px-2 py-0.5 rounded text-xs2 text-violet-600 hover:bg-violet-50 transition-colors">
+                                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="10" height="10">
+                                              <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10"/>
+                                              <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6"/>
+                                            </svg>
+                                            AI로 수정하기
+                                          </button>
+                                        </div>
+                                      )}
                                     </div>
                                   )}
-                                  <AiRegenBlock
-                                    currentText={dep.aiDiffOpen && dep.aiProposed ? dep.aiProposed : dep.text}
-                                    open={dep.aiOpen}
-                                    promptVal={dep.aiPromptVal}
-                                    onPromptChange={v => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiPromptVal: v } : d) })}
-                                    onSubmit={() => regenDep(indep.id, dep.id)}
-                                    onCancel={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiOpen: false } : d) })}
-                                  />
+                                  {/* 프롬프트 모드 */}
+                                  {dep.aiOpen && !dep.aiDiffOpen && (
+                                    <>
+                                      <div className="rounded border p-2.5 bg-gray-50 mb-2">
+                                        <p className="text-xs2 font-medium text-gray-400 mb-0.5">현재 내용</p>
+                                        <p className="text-xs2 text-gray-700 leading-relaxed">{dep.text}</p>
+                                      </div>
+                                      <div className="rounded border border-violet-300 bg-violet-50 p-2.5">
+                                        <p className="text-xs2 text-violet-700 font-semibold mb-1.5 flex items-center gap-1">
+                                          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11">
+                                            <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10"/>
+                                            <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6"/>
+                                          </svg>
+                                          어떻게 수정할까요?
+                                        </p>
+                                        <textarea autoFocus
+                                          className="w-full text-xs2 bg-white border border-violet-200 rounded px-2 py-1.5 outline-none resize-none"
+                                          placeholder="예: 더 구체적으로 / 청구범위 넓게"
+                                          value={dep.aiPromptVal} rows={2}
+                                          onChange={e => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiPromptVal: e.target.value } : d) })}
+                                          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); regenDep(indep.id, dep.id); } }}
+                                        />
+                                        <div className="flex gap-1.5 mt-1.5 justify-end">
+                                          <button onClick={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiOpen: false } : d) })}
+                                            className="btn-outline btn-xs text-xs2">취소</button>
+                                          <button onClick={() => regenDep(indep.id, dep.id)} disabled={!dep.aiPromptVal.trim()}
+                                            className="px-3 py-1 bg-violet-600 text-white rounded text-xs2 font-semibold hover:bg-violet-700 disabled:opacity-40">
+                                            수정 생성
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </>
+                                  )}
                                   {/* 종속항 diff 모드 */}
                                   {dep.aiDiffOpen && (
                                     <div className="mt-2 space-y-1.5">
@@ -1548,8 +1589,7 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
                                         className="w-full py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800 mt-1">선택 완료 →</button>
                                     </div>
                                   )}
-                                </>
-                              )}
+                              </>
                             </div>
                           )}
                         </div>
