@@ -9,8 +9,16 @@
     text-rendering: optimizeLegibility;
   }
   html, body, #root { height: 100%; margin: 0; }
-  body { background: #fafafa; color: #27272a; font-size: 14px; line-height: 1.6; }
+  body { background: #F8F9FB; color: #212529; font-size: 14px; line-height: 1.6; }
   * { box-sizing: border-box; }
+
+  /* 접근성: focus-visible ring — brand-400 통일 (DESIGN_GUIDE 4-2) */
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px #3B8EF5;
+  }
+  /* 버튼/링크는 outline 제거 후 ring으로 처리 */
+  button:focus, a:focus, input:focus, select:focus, textarea:focus { outline: none; }
 }
 
 @layer utilities {

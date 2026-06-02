@@ -44,7 +44,7 @@ function Shell() {
             aria-hidden="true"
           />
         )}
-        <main className="flex-1 flex flex-col overflow-hidden">
+        <main className="flex-1 flex flex-col overflow-hidden animate-fade-up" key={mode}>
           {mode === 'newtask' && <NewTaskView />}
           {mode === 'home'    && <HomeView />}
           {mode === 'project' && <ProjectDetailView />}
