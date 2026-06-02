@@ -2,6 +2,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadSpecState, saveSpecState } from '../features/spec/specStore';
 import type { SpecAnalysisState } from '../features/spec/types';
+import {
+  generateTitleCandidates, generateAbstractCandidates,
+  generateComponentCandidates, generateMockDrawings,
+} from '../features/spec/mockAiService';
+import type { InventionInput } from '../features/spec/types';
 import { SpecEditorView } from './SpecEditorView';
 import { DrawingEditorModal } from '../features/drawing-workflow/DrawingEditorModal';
 import { MOCK_DRAWINGS } from '../features/drawing-workflow/types';
@@ -136,6 +141,11 @@ export function SpecView() {
   }, [taskId]);
 
   const flowRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadProgress, setUploadProgress] = useState<'idle' | 'loading' | 'done'>('idle');
+  const [titleCandidates, setTitleCandidates] = useState<string[]>(() => loadSpecState(taskId)?.titleCandidates ?? []);
+  const [abstractCandidates, setAbstractCandidates] = useState<string[]>(() => loadSpecState(taskId)?.abstractCandidates ?? []);
+  const [analyzing, setAnalyzing] = useState(false);
   const si = (id: StepId) => STEPS.findIndex(s => s.id === id);
   const isConfirmed = (id: StepId) => id in confirmed;
   const isVisible = (id: StepId) => {
@@ -157,8 +167,56 @@ export function SpecView() {
     setConfirmed(p); setCurStep(id); setGuideStep(id);
   };
   const startFlow = () => {
-    setPhase('flow'); setCurStep('title'); setGuideStep('title');
-    setTimeout(() => flowRef.current?.scrollTo({ top: 99999, behavior: 'smooth' }), 50);
+    if (!diTitle.trim() || !diField.trim() || !diContent.trim()) return;
+    setAnalyzing(true);
+    const input: InventionInput = { title: diTitle, field: diField, content: diContent, problem: diProblem, keywords: diKeywords };
+    setTimeout(() => {
+      const tCandidates = generateTitleCandidates(input);
+      const aCandidates = generateAbstractCandidates(input);
+      setTitleCandidates(tCandidates);
+      setAbstractCandidates(aCandidates);
+      setPhase('flow');
+      setCurStep('title');
+      setGuideStep('title');
+      saveSpecState(taskId, {
+        phase: 'flow',
+        curStep: 'title',
+        titleCandidates: tCandidates,
+        abstractCandidates: aCandidates,
+        componentItems: generateComponentCandidates(input),
+        drawings: generateMockDrawings(input),
+      });
+      setAnalyzing(false);
+      setTimeout(() => flowRef.current?.scrollTo({ top: 99999, behavior: 'smooth' }), 50);
+    }, 1500);
+  };
+
+  const handleFileSelect = (file: File) => {
+    const baseName = file.name.replace(/\.[^.]+$/, '');
+    setDiTitle(baseName);
+    saveSpecState(taskId, { uploadedFileName: file.name, diTitle: baseName });
+    setUploadProgress('loading');
+    setTimeout(() => {
+      const input: InventionInput = { title: baseName, field: '기술', content: `${file.name} 파일에서 추출된 내용입니다.` };
+      setPhase('flow');
+      setCurStep('title');
+      setGuideStep('title');
+      const tCandidates = generateTitleCandidates(input);
+      const aCandidates = generateAbstractCandidates(input);
+      setTitleCandidates(tCandidates);
+      setAbstractCandidates(aCandidates);
+      saveSpecState(taskId, {
+        phase: 'flow',
+        curStep: 'title',
+        titleCandidates: tCandidates,
+        abstractCandidates: aCandidates,
+        componentItems: generateComponentCandidates(input),
+        drawings: generateMockDrawings(input),
+        uploadedFileName: file.name,
+      });
+      setUploadProgress('done');
+      setTimeout(() => flowRef.current?.scrollTo({ top: 99999, behavior: 'smooth' }), 50);
+    }, 1500);
   };
   const doneCount = Object.keys(confirmed).length;
 
@@ -284,13 +342,29 @@ export function SpecView() {
                 <Icon name="doc" size={48} className="text-blue-700 mx-auto mb-3" />
                 <h2 className="text-lg2 font-bold text-gray-800 mb-2">???뱁뿀 紐낆꽭???묒꽦</h2>
                 <p className="text-md2 text-gray-500 mb-6">?꾨옒 ??媛吏 諛⑸쾿 以??섎굹濡?湲곗큹?먮즺瑜??쒓났?섏꽭??</p>
-                <div onClick={phase === 'upload' ? startFlow : undefined}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx,.hwp,.doc,.jpg,.jpeg,.png"
+                  className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); e.target.value = ''; }}
+                />
+                <div onClick={phase === 'upload' ? () => fileInputRef.current?.click() : undefined}
                   className={`border-2 border-dashed rounded-xl p-10 mb-5 transition-all ${phase === 'upload' ? 'border-gray-300 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30' : 'border-gray-200 opacity-50'}`}>
-                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 text-gray-400">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                  </svg>
-                  <p className="text-md2 text-gray-600">?뚯씪???쒕옒洹명븯嫄곕굹 ?대┃?섏뿬 ?낅줈??/p>
-                  <p className="text-sm2 text-gray-400 mt-1">PDF, DOCX, HWP, ?대?吏 ?뚯씪 吏??/p>
+                  {uploadProgress === 'loading' ? (
+                    <div className="text-center">
+                      <span className="inline-block animate-spin text-3xl mb-3">&#8635;</span>
+                      <p className="text-md2 text-blue-600 font-semibold">직무발명서 분석 중...</p>
+                    </div>
+                  ) : (
+                    <>
+                      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 text-gray-400">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                      </svg>
+                      <p className="text-md2 text-gray-600">?뚯씪???쒕옒洹명븯嫄곕굹 ?대┃?섏뿬 ?낅줈??</p>
+                      <p className="text-sm2 text-gray-400 mt-1">PDF, DOCX, HWP, ?대?吏 ?뚯씪 吏??</p>
+                    </>
+                  )}
                 </div>
                 {phase === 'upload' && (
                   <>
@@ -349,8 +423,11 @@ export function SpecView() {
                       if ((diTitle || diContent) && !window.confirm('?낅젰???댁슜????젣?⑸땲?? 怨꾩냽?좉퉴??')) return;
                       setPhase('upload');
                     }}>痍⑥냼</button>
-                    <button className="btn-primary btn-sm" onClick={startFlow} disabled={!diTitle.trim() || !diField.trim() || !diContent.trim()}>
-                      <Icon name="star" size={13} /> AI 遺꾩꽍 ?쒖옉
+                    <button className="btn-primary btn-sm" onClick={startFlow} disabled={!diTitle.trim() || !diField.trim() || !diContent.trim() || analyzing}>
+                      {analyzing
+                        ? <><span className="inline-block animate-spin mr-1">&#8635;</span>AI 분석 중...</>
+                        : <><Icon name="star" size={13} /> AI 遺꾩꽍 ?쒖옉</>
+                      }
                     </button>
                   </div>
                 )}
@@ -474,6 +551,10 @@ export function SpecView() {
             hasPrev={STEPS.findIndex(s => s.id === guideStep) > 1}
             allDone={doneCount >= 5}
             onGenerateSpec={() => handleSetMainView('editor')}
+            customCandidates={{
+              title:    titleCandidates.length > 0 ? titleCandidates : undefined,
+              abstract: abstractCandidates.length > 0 ? abstractCandidates : undefined,
+            }}
           />
         )}
       </div>
@@ -493,7 +574,7 @@ function AiMsg({ text }: { text: React.ReactNode }) {
   );
 }
 
-function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev, allDone, onGenerateSpec }: {
+function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev, allDone, onGenerateSpec, customCandidates }: {
   step: StepId;
   gSel: Partial<Record<StepId, string>>;
   setGSel: React.Dispatch<React.SetStateAction<Partial<Record<StepId, string>>>>;
@@ -503,11 +584,12 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
   hasPrev: boolean;
   allDone?: boolean;
   onGenerateSpec?: () => void;
+  customCandidates?: Partial<Record<StepId, string[]>>;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const isDone = step in confirmed;
   const isSpecial = step === 'description' || step === 'components' || step === 'drawings' || step === 'claims' || step === 'abstract';
-  const cands = GUIDE_CANDS[step] || [];
+  const cands = customCandidates?.[step] ?? GUIDE_CANDS[step] ?? [];
   const curSel = gSel[step] || cands[0] || '';
   const letters = ['A', 'B', 'C', 'D', 'E'];
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
