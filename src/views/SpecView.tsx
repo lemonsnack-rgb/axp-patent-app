@@ -1737,11 +1737,8 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
 
                 {!grp.generated ? (
                   <div className="rounded-lg border border-dashed border-gray-200 py-3 text-center">
-                    <p className="text-xs2 text-gray-400 mb-2">독립항을 기반으로 종속항을 자동 생성합니다</p>
-                    <button onClick={() => generateDeps(indep.id)}
-                      className="px-4 py-1.5 bg-violet-600 text-white rounded-lg text-xs2 font-semibold hover:bg-violet-700">
-                      AI 종속항 생성
-                    </button>
+                    <p className="text-xs2 text-gray-400">독립항을 기반으로 종속항을 자동 생성합니다</p>
+                    <p className="text-xs2 text-gray-300 mt-1">위 버튼을 눌러 생성하세요</p>
                   </div>
                 ) : (
                   <>
@@ -1754,7 +1751,7 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
                             !dep.sel ? 'border-gray-200 bg-gray-50 opacity-60' : '',
                             done && dep.sel ? 'border-green-200 bg-green-50/30' : ''
                           )}>
-                          <div className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer"
+                          <div className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none"
                             onClick={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, expanded: !d.expanded } : d) })}>
                             <button
                               onClick={e => { e.stopPropagation(); toggleDep(indep.id, dep.id); }}
@@ -1768,13 +1765,18 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
                             <span className="text-xs2 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 shrink-0 text-[10px]">
                               종속(→{indepClaimNum})
                             </span>
-                            <span className="text-xs2 text-gray-500 flex-1 truncate text-[10px]">{dep.text.slice(0, 28)}...</span>
+                            <span className="text-xs2 text-gray-500 flex-1 truncate text-[10px] min-w-0">{dep.text.slice(0, 28)}...</span>
                             {!done && (
                               <button onClick={e => { e.stopPropagation(); removeDep(indep.id, dep.id); }}
                                 className="shrink-0 text-gray-300 hover:text-red-400">
                                 <Icon name="close" size={9} />
                               </button>
                             )}
+                            {/* 펼침 화살표 */}
+                            <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"
+                              className={clsx('shrink-0 text-gray-300 transition-transform', dep.expanded && 'rotate-180')}>
+                              <path d="M2 4l3 3 3-3"/>
+                            </svg>
                           </div>
 
                           {dep.expanded && (
@@ -1785,11 +1787,10 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
                                   {!dep.aiOpen && !dep.aiDiffOpen && (
                                     <div className="rounded border border-gray-200 focus-within:border-blue-400 transition-all">
                                       <textarea
-                                        className="w-full text-xs2 text-gray-800 bg-transparent px-2.5 py-2 outline-none resize-none leading-relaxed overflow-hidden"
+                                        className="w-full text-xs2 text-gray-800 bg-transparent px-2.5 py-2 outline-none resize-none leading-relaxed"
                                         value={dep.text}
-                                        rows={Math.max(3, Math.ceil(dep.text.length / 45))}
+                                        rows={Math.max(6, Math.ceil(dep.text.length / 40))}
                                         onChange={e => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, text: e.target.value } : d) })}
-                                        ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                                       />
                                       {!done && (
                                         <div className="flex justify-end px-2 pb-1.5 pt-1 border-t border-gray-100">
