@@ -1850,7 +1850,13 @@ function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChan
                 </div>
               </>
             ) : (
-              <p className="text-xs2 text-green-800 leading-relaxed px-3 py-3">{curText}</p>
+              <>
+                <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1">
+                  <Icon name="check" size={10} className="text-green-600 shrink-0" />
+                  <span className="text-xs2 font-bold text-green-700">{sec.label}</span>
+                </div>
+                <p className="text-xs2 text-green-800 leading-relaxed px-3 pb-3">{curText}</p>
+              </>
             )}
           </div>
         )}
