@@ -10,6 +10,8 @@ import { MOCK_DRAWINGS } from '../features/drawing-workflow/types';
 import { openEditorTab } from '../features/drawing-workflow/editorChannel';
 import type { SpecAnalysisResult } from '../features/spec/types';
 import { loadSpecState, saveSpecState } from '../features/spec/specStore';
+import { PreviewModal } from '../components/PreviewModal';
+import type { PreviewSection } from '../components/PreviewModal';
 
 // ── 섹션 정의 ──────────────────────────────────────────────────────────────
 const EDITOR_SECTIONS = [
@@ -154,6 +156,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
 
   // 저장 상태
   const [saved, setSaved] = useState(true);
+  const [editorPreviewOpen, setEditorPreviewOpen] = useState(false);
 
   // undo/redo
   const [undoStack, setUndoStack] = useState<Record<SectionId, string[]>[]>([]);
@@ -253,7 +256,21 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
   const selText = sel ? (blocks[sel.sid]?.[sel.idx] || '') : '';
 
   // ── 렌더 ────────────────────────────────────────────────────────────────
+  // 에디터 미리보기 섹션 (#80 fix)
+  const editorPreviewSections: PreviewSection[] = EDITOR_SECTIONS.map(s => ({
+    label: s.label,
+    content: (blocks[s.id] ?? []).join('\n\n'),
+  })).filter(s => s.content.trim());
+
   return (
+    <>
+    {editorPreviewOpen && (
+      <PreviewModal
+        taskName={task?.name}
+        sections={editorPreviewSections}
+        onClose={() => setEditorPreviewOpen(false)}
+      />
+    )}
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
 
       {/* ① 편집 툴바 */}
@@ -304,10 +321,22 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
 
         {/* 선택 블록 표시 */}
         {sel && (
-          <span className="ml-auto text-xs2 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-medium">
+          <span className="mr-auto ml-1 text-xs2 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-medium">
             {EDITOR_SECTIONS.find(s => s.id === sel.sid)?.short} · 블록 {sel.idx + 1}
           </span>
         )}
+
+        {/* 미리보기 버튼 (#80 fix) */}
+        <div className="ml-auto flex items-center gap-1">
+          <button onClick={() => setEditorPreviewOpen(true)}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs2 text-zinc-600 hover:bg-zinc-100 transition-colors"
+            title="명세서 미리보기">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="12" height="12">
+              <circle cx="8" cy="8" r="3"/><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/>
+            </svg>
+            미리보기
+          </button>
+        </div>
       </div>
 
       {/* ② 섹션 탭 (앵커 이동만) — 우측에 페이드 힌트로 스크롤 가능성 표시 */}
@@ -757,5 +786,6 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
         </div>
       )}
     </div>
+    </>
   );
 }

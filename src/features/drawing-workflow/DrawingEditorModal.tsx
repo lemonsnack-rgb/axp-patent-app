@@ -402,8 +402,8 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                         style={{ cursor: 'crosshair' }}
                       >
                         {/* 배경 이미지 */}
-                        {(activeDraw.sourceImageUrl || activeDraw.exportedImageUrl)
-                          ? <img src={activeDraw.sourceImageUrl || activeDraw.exportedImageUrl} className="w-full h-full object-contain" alt="" />
+                        {(activeDraw.originalImageUrl || activeDraw.exportedImageUrl)
+                          ? <img src={activeDraw.originalImageUrl || activeDraw.exportedImageUrl} className="w-full h-full object-contain" alt="" />
                           : <div className="absolute inset-0 flex items-center justify-center text-gray-300 text-sm2">원본 이미지</div>}
                         {/* 어두운 마스크 */}
                         <div className="absolute inset-0 bg-black/30 pointer-events-none" />

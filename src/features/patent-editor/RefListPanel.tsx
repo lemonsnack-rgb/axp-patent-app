@@ -42,29 +42,7 @@ function buildFlat(refs: EditorReference[]): FlatItem[] {
   return result;
 }
 
-// ── 부호 자동 부여 (ComponentsPanel calcAutoNums와 동일 로직) ────
-function calcAutoNums(flat: FlatItem[]): EditorReference[] {
-  const counters: number[] = [0, 0, 0];
-  return flat.map(({ ref, depth }) => {
-    counters[depth] = (counters[depth] ?? 0) + 1;
-    // 하위 레벨 카운터 리셋
-    for (let d = depth + 1; d < counters.length; d++) counters[d] = 0;
-    let num = '';
-    if (depth === 0) num = String(counters[0] * 100);
-    else if (depth === 1) {
-      const base = Math.floor((counters.slice(0, 1).reduce((_, v) => v, 0)) ) ;
-      // 부모(depth 0)의 번호 기반
-      const parentNum = flat.slice(0, flat.indexOf(flat.find(f => f.ref.number === ref.parentNumber) ?? flat[0]))
-        .filter(f => f.depth === 0).length;
-      num = String((parentNum || counters[0]) * 100 + counters[1] * 10);
-    } else {
-      num = String(parseInt(ref.parentNumber || '100') + counters[2]);
-    }
-    return { ...ref, number: num };
-  });
-}
-
-// 더 단순한 자동 번호 부여: 트리 순회 순서 기반
+// 자동 번호 부여: 트리 순회 순서 기반
 function autoAssignNumbers(refs: EditorReference[]): EditorReference[] {
   const flat = buildFlat(refs);
   const d0Counter = { v: 0 };

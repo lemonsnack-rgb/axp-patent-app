@@ -12,6 +12,11 @@ import { Icon } from '../components/Icon';
 import { PreviewModal } from '../components/PreviewModal';
 import type { PreviewSection } from '../components/PreviewModal';
 import clsx from 'clsx';
+import {
+  generateTitleCandidates, generateAbstractCandidates,
+  generateComponentCandidates,
+} from '../features/spec/mockAiService';
+import type { SpecAnalysisResult } from '../features/spec/types';
 
 type StepId = 'upload' | 'title' | 'description' | 'components' | 'drawings' | 'claims' | 'abstract';
 const STEPS: { id: StepId; num: number; short: string }[] = [
@@ -93,6 +98,12 @@ export function SpecView() {
   // 기초자료 보기 패널
   const [sourceDataOpen, setSourceDataOpen] = useState(false);
 
+  // AI 분석 생성 후보 (mockAiService 연결)
+  const [titleCandidates, setTitleCandidates] = useState<string[]>([]);
+  const [abstractCandidates, setAbstractCandidates] = useState<string[]>([]);
+  const [aiComponents, setAiComponents] = useState<{ id: number; text: string; sel: boolean; num: string; depth: number }[]>([]);
+  const [analyzing, setAnalyzing] = useState(false);
+
   const flowRef = useRef<HTMLDivElement>(null);
 
   // U7: 분석 진행 중 이탈 확인
@@ -129,8 +140,23 @@ export function SpecView() {
     setConfirmed(p); setCurStep(id); setGuideStep(id);
   };
   const startFlow = () => {
-    setPhase('flow'); setCurStep('title'); setGuideStep('title');
-    setTimeout(() => flowRef.current?.scrollTo({ top: 99999, behavior: 'smooth' }), 50);
+    if (!diTitle.trim() || !diField.trim() || !diContent.trim()) return;
+    setAnalyzing(true);
+    const input = { title: diTitle.trim(), field: diField.trim(), content: diContent.trim(), problem: diProblem.trim(), keywords: diKeywords.trim() };
+    setTimeout(() => {
+      const comps = generateComponentCandidates(input);
+      setTitleCandidates(generateTitleCandidates(input));
+      setAbstractCandidates(generateAbstractCandidates(input));
+      setAiComponents(comps);
+      // 이전 확정 상태 초기화 (새 분석 시작)
+      setConfirmed({});
+      setGSel({});
+      setPhase('flow');
+      setCurStep('title');
+      setGuideStep('title');
+      setAnalyzing(false);
+      setTimeout(() => flowRef.current?.scrollTo({ top: 99999, behavior: 'smooth' }), 50);
+    }, 1500);
   };
   const doneCount = Object.keys(confirmed).length;
 
@@ -156,10 +182,48 @@ export function SpecView() {
     ].filter(s => s.content.trim());
   };
 
+  // 에디터 진입 시 analysisResult 구성 (#58 fix)
+  const makeAnalysisResult = (): SpecAnalysisResult => {
+    const title = gSel['title'] || confirmed['title'] || diTitle || task?.name || '';
+    const descRaw = gSel['description'] || confirmed['description'] || '';
+    const extractDescSec = (label: string) => {
+      const m = descRaw.match(new RegExp(`【${label}】\\n([^【]*)`));
+      return m?.[1]?.trim() || '';
+    };
+    const comps = aiComponents.filter(c => c.sel);
+    const drawDesc = (MOCK_DRAWINGS as any[]).map((d, i) => `도 ${i + 1}은 ${d.name}.`).join('\n');
+    const detail = comps.length > 0
+      ? comps.map(c => {
+          const name = c.text.split(':')[0];
+          const desc = (c.text.split(':')[1] || '').trim();
+          return `상기 ${name}${c.num ? `(${c.num})` : ''}은 ${desc || '관련 기능을 수행한다.'}`;
+        }).join('\n\n')
+      : '';
+    return {
+      title,
+      tech: extractDescSec('기술분야'),
+      bg: extractDescSec('배경기술'),
+      problem: extractDescSec('해결하려는 과제'),
+      solution: extractDescSec('과제해결수단'),
+      effect: extractDescSec('발명의 효과'),
+      drawDesc,
+      detail,
+      claims: gSel['claims'] || confirmed['claims'] || '',
+      abstract: gSel['abstract'] || confirmed['abstract'] || '',
+      drawings: MOCK_DRAWINGS as any[],
+      componentItems: comps as any[],
+    };
+  };
+
   if (mainView === 'editor') {
     return (
       <>
-        <SpecEditorView task={task} onBack={() => handleSetMainView('analysis')} confirmedTitle={gSel['title'] || confirmed['title']} />
+        <SpecEditorView
+          task={task}
+          onBack={() => handleSetMainView('analysis')}
+          confirmedTitle={gSel['title'] || confirmed['title'] || diTitle}
+          analysisResult={makeAnalysisResult()}
+        />
         {previewOpen && <PreviewModal taskName={task?.name} sections={makePreviewSections()} onClose={() => setPreviewOpen(false)} />}
       </>
     );
@@ -346,8 +410,11 @@ export function SpecView() {
                       if ((diTitle || diContent) && !window.confirm('입력한 내용이 삭제됩니다. 계속할까요?')) return;
                       setPhase('upload');
                     }}>취소</button>
-                    <button className="btn-primary btn-sm" onClick={startFlow} disabled={!diTitle.trim() || !diField.trim() || !diContent.trim()}>
-                      <Icon name="star" size={13} /> AI 분석 시작
+                    <button className="btn-primary btn-sm" onClick={startFlow}
+                      disabled={!diTitle.trim() || !diField.trim() || !diContent.trim() || analyzing}>
+                      {analyzing
+                        ? <><span className="inline-block animate-spin mr-1">↻</span>AI 분석 중...</>
+                        : <><Icon name="star" size={13} /> AI 분석 시작</>}
                     </button>
                   </div>
                 )}
@@ -395,7 +462,10 @@ export function SpecView() {
                                   <span className="w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center shrink-0"><Icon name="check" size={10} /></span>
                                   <span className="text-sm2 font-semibold text-blue-700 flex-1">{CONFIRM_LABEL[s.id]}</span>
                                   {!isExpanded && <span className="text-xs2 text-gray-400 truncate max-w-[160px]">{summary}</span>}
-                                  <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} size={11} className="text-gray-400 shrink-0" />
+                                  <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="10" height="10"
+                                    className={clsx('text-gray-400 shrink-0 transition-transform', isExpanded && 'rotate-180')}>
+                                    <path d="M2 4l3 3 3-3"/>
+                                  </svg>
                                 </button>
                                 {/* 상세 내용: 펼쳐진 상태에서만 */}
                                 {isExpanded && (
@@ -493,6 +563,11 @@ export function SpecView() {
             hasPrev={STEPS.findIndex(s => s.id === guideStep) > 1}
             allDone={doneCount >= 5}
             onGenerateSpec={() => handleSetMainView('editor')}
+            customCandidates={{
+              title:    titleCandidates.length > 0 ? titleCandidates : undefined,
+              abstract: abstractCandidates.length > 0 ? abstractCandidates : undefined,
+            }}
+            aiComponents={aiComponents.length > 0 ? aiComponents : undefined}
           />
         )}
       </div>
@@ -512,7 +587,7 @@ function AiMsg({ text }: { text: React.ReactNode }) {
   );
 }
 
-function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev, allDone, onGenerateSpec }: {
+function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev, allDone, onGenerateSpec, customCandidates, aiComponents }: {
   step: StepId;
   gSel: Partial<Record<StepId, string>>;
   setGSel: React.Dispatch<React.SetStateAction<Partial<Record<StepId, string>>>>;
@@ -522,15 +597,18 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
   hasPrev: boolean;
   allDone?: boolean;
   onGenerateSpec?: () => void;
+  customCandidates?: Partial<Record<StepId, string[]>>;
+  aiComponents?: { id: number; text: string; sel: boolean; num: string; depth: number }[];
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const isDone = step in confirmed;
   const isSpecial = step === 'description' || step === 'components' || step === 'drawings' || step === 'claims' || step === 'abstract';
-  const cands = GUIDE_CANDS[step] || [];
+  const cands = customCandidates?.[step] || GUIDE_CANDS[step] || [];
   const curSel = gSel[step] || cands[0] || '';
   const letters = ['A', 'B', 'C', 'D', 'E'];
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editVals, setEditVals] = useState<Record<number, string>>({});
+  const [regenCounts, setRegenCounts] = useState<Record<number, number>>({}); // #9: 재생성 카운트
   // description 패널 내부 모드 추적 (view/edit/prompt/diff)
   const [descMode, setDescMode] = useState<string>('view');
   // description 패널의 prompt 재입력 요청 콜백
@@ -639,7 +717,7 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
 
       {/* 단계별 특수 패널 */}
       {step === 'description' && <DescriptionPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} onModeChange={setDescMode} promptTrigger={descPromptTrigger} onSubInfoChange={setDescSubInfo} />}
-      {step === 'components' && <ComponentsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} onComponentsChange={setConfirmedComponents} />}
+      {step === 'components' && <ComponentsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} onComponentsChange={setConfirmedComponents} initialItems={aiComponents} />}
       {step === 'drawings' && <DrawingsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} inventionComponents={confirmedComponents} />}
       {step === 'claims' && <ClaimsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} />}
       {step === 'abstract' && <AbstractPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} />}
@@ -676,7 +754,16 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
                     {!isDone && (
                       <>
                         <button
-                          onClick={e => { e.stopPropagation(); }}
+                          onClick={e => {
+                            e.stopPropagation();
+                            // #9 fix: 재생성 — 카운트 기반으로 후보 순환
+                            const cnt = (regenCounts[i] ?? 0) + 1;
+                            setRegenCounts(p => ({ ...p, [i]: cnt }));
+                            const suffixes = ['장치 및 방법', '시스템 및 방법', '장치 및 이를 이용한 방법', '방법 및 시스템'];
+                            const newVal = cardVal.replace(/(장치|시스템|방법).*$/, '') + suffixes[cnt % suffixes.length];
+                            setEditVals(p => ({ ...p, [i]: newVal }));
+                            setGSel(p => ({ ...p, [step]: newVal }));
+                          }}
                           className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700"
                           title="이 후보 재생성"
                         >
@@ -865,17 +952,20 @@ function calcAutoNums(items: CompItem[]): CompItem[] {
   return next;
 }
 
-function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
+function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
   done: boolean;
   onConfirm: () => void;
   onUpdate: (v: string) => void;
   onComponentsChange?: (comps: InventionComponent[]) => void;
+  initialItems?: { id: number; text: string; sel: boolean; num: string; depth: number }[];
 }) {
-  const [items, setItems] = useState<CompItem[]>(INIT_COMPS);
+  const initData = (initialItems && initialItems.length > 0) ? initialItems : INIT_COMPS;
+  const [items, setItems] = useState<CompItem[]>(initData as CompItem[]);
   const [newText, setNewText] = useState('');
 
   useEffect(() => {
-    const selected = INIT_COMPS.filter(it => it.sel);
+    const data = (initialItems && initialItems.length > 0) ? initialItems : INIT_COMPS;
+    const selected = (data as CompItem[]).filter(it => it.sel);
     onUpdate(selected.map(it => `${it.num || '—'} ${it.text}`).join('\n'));
     onComponentsChange?.(selected.map(it => ({ number: it.num || '', name: extractCompName(it.text) })));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1936,6 +2026,10 @@ const DESC_SECTIONS: { key: string; label: string; badge2?: string; text: string
   {
     key: 'solution', label: '과제해결수단',
     text: '상기 과제를 해결하기 위해, 본 발명은 라이다 센서로부터 3차원 포인트 클라우드 데이터를 수신하는 데이터 수신부; 상기 포인트 클라우드 데이터에서 RANSAC 알고리즘을 이용하여 지면 포인트를 분리하고 노이즈를 제거하는 전처리부; 전처리된 포인트 클라우드를 기둥(pillar) 단위로 구성하여 2D 의사 이미지를 생성하고, PointNet++ 기반 딥러닝 모델을 이용하여 객체를 인식하는 인식부를 포함하는 라이다 기반 객체 인식 장치를 제공한다.',
+  },
+  {
+    key: 'effect', label: '발명의 효과',
+    text: '본 발명에 의하면, 딥러닝 기반의 포인트 클라우드 처리를 통해 기존 방식 대비 처리 속도가 40% 향상되고, 객체 인식 정확도가 95% 이상 달성된다. 또한, 야간 및 악천후 환경에서도 안정적인 객체 인식 성능을 유지할 수 있으며, 다양한 자율주행 플랫폼에 적용 가능하다.',
   },
 ];
 
