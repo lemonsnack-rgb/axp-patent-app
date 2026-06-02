@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <rect width="800" height="600" fill="#f5f5f5" stroke="#ddd" stroke-width="2"/>
+  <!-- 기계 부품 목업 -->
+  <rect x="100" y="100" width="200" height="150" fill="none" stroke="#333" stroke-width="2"/>
+  <text x="200" y="185" text-anchor="middle" font-size="14" fill="#666">메인 하우징</text>
+  <rect x="120" y="120" width="60" height="40" fill="#e8e8e8" stroke="#333" stroke-width="1.5"/>
+  <rect x="200" y="120" width="60" height="40" fill="#e8e8e8" stroke="#333" stroke-width="1.5"/>
+  <!-- 연결선 -->
+  <line x1="300" y1="175" x2="420" y2="175" stroke="#333" stroke-width="2" stroke-dasharray="5,3"/>
+  <circle cx="420" cy="175" r="40" fill="none" stroke="#333" stroke-width="2"/>
+  <circle cx="420" cy="175" r="15" fill="#e8e8e8" stroke="#333" stroke-width="1.5"/>
+  <!-- 부품 B -->
+  <rect x="500" y="80" width="180" height="120" fill="none" stroke="#333" stroke-width="2"/>
+  <text x="590" y="145" text-anchor="middle" font-size="13" fill="#666">서브 어셈블리</text>
+  <rect x="520" y="100" width="50" height="35" rx="4" fill="#d0e8ff" stroke="#336699" stroke-width="1.5"/>
+  <rect x="590" y="100" width="50" height="35" rx="4" fill="#d0e8ff" stroke="#336699" stroke-width="1.5"/>
+  <!-- 하단 부품 -->
+  <path d="M150 320 L650 320 L620 450 L180 450 Z" fill="none" stroke="#333" stroke-width="2"/>
+  <text x="400" y="395" text-anchor="middle" font-size="14" fill="#666">베이스 플레이트</text>
+  <rect x="250" y="340" width="40" height="25" fill="#ffe0c0" stroke="#cc6600" stroke-width="1.5"/>
+  <rect x="350" y="340" width="40" height="25" fill="#ffe0c0" stroke="#cc6600" stroke-width="1.5"/>
+  <rect x="450" y="340" width="40" height="25" fill="#ffe0c0" stroke="#cc6600" stroke-width="1.5"/>
+  <!-- 참조 부호 라인 -->
+  <line x1="200" y1="100" x2="200" y2="60" stroke="#555" stroke-width="1"/>
+  <text x="205" y="55" font-size="12" fill="#333" font-weight="bold">100</text>
+  <line x1="420" y1="135" x2="480" y2="60" stroke="#555" stroke-width="1"/>
+  <text x="485" y="55" font-size="12" fill="#333" font-weight="bold">200</text>
+  <line x1="590" y1="80" x2="650" y2="45" stroke="#555" stroke-width="1"/>
+  <text x="655" y="40" font-size="12" fill="#333" font-weight="bold">300</text>
+  <line x1="400" y1="320" x2="400" y2="280" stroke="#555" stroke-width="1"/>
+  <text x="405" y="275" font-size="12" fill="#333" font-weight="bold">400</text>
+  <!-- 테두리 및 제목 -->
+  <rect x="10" y="10" width="780" height="580" fill="none" stroke="#999" stroke-width="1"/>
+  <text x="400" y="540" text-anchor="middle" font-size="12" fill="#999">도 1 — 본 발명의 일 실시예에 따른 장치의 전체 구성도</text>
+</svg>
