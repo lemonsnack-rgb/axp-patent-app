@@ -5,6 +5,7 @@ import type { SpecAnalysisState } from '../features/spec/types';
 import {
   generateTitleCandidates, generateAbstractCandidates,
   generateComponentCandidates, generateMockDrawings,
+  generateDescriptionSection,
 } from '../features/spec/mockAiService';
 import type { InventionInput } from '../features/spec/types';
 import { SpecEditorView } from './SpecEditorView';
@@ -555,6 +556,11 @@ export function SpecView() {
               title:    titleCandidates.length > 0 ? titleCandidates : undefined,
               abstract: abstractCandidates.length > 0 ? abstractCandidates : undefined,
             }}
+            taskId={taskId}
+            diTitle={diTitle}
+            diField={diField}
+            diContent={diContent}
+            diProblem={diProblem}
           />
         )}
       </div>
@@ -574,7 +580,7 @@ function AiMsg({ text }: { text: React.ReactNode }) {
   );
 }
 
-function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev, allDone, onGenerateSpec, customCandidates }: {
+function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev, allDone, onGenerateSpec, customCandidates, taskId, diTitle, diField, diContent, diProblem }: {
   step: StepId;
   gSel: Partial<Record<StepId, string>>;
   setGSel: React.Dispatch<React.SetStateAction<Partial<Record<StepId, string>>>>;
@@ -585,6 +591,11 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
   allDone?: boolean;
   onGenerateSpec?: () => void;
   customCandidates?: Partial<Record<StepId, string[]>>;
+  taskId?: string;
+  diTitle?: string;
+  diField?: string;
+  diContent?: string;
+  diProblem?: string;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const isDone = step in confirmed;
@@ -701,7 +712,29 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
       </div>
 
       {/* ?④퀎蹂??뱀닔 ?⑤꼸 */}
-      {step === 'description' && <DescriptionPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} onModeChange={setDescMode} promptTrigger={descPromptTrigger} onSubInfoChange={setDescSubInfo} />}
+      {step === 'description' && (() => {
+        const saved = taskId ? loadSpecState(taskId) : null;
+        const inputObj = { title: diTitle || 'X', field: diField || 'Y', content: diContent || '', problem: diProblem || '' };
+        const initTexts: Record<string, string> = {
+          tech:     saved?.descTexts?.tech     ?? (diTitle ? generateDescriptionSection('tech', inputObj)     : ''),
+          bg:       saved?.descTexts?.bg       ?? (diTitle ? generateDescriptionSection('bg', inputObj)       : ''),
+          problem:  saved?.descTexts?.problem  ?? (diTitle ? generateDescriptionSection('problem', inputObj)  : ''),
+          solution: saved?.descTexts?.solution ?? (diTitle ? generateDescriptionSection('solution', inputObj) : ''),
+          effect:   saved?.descTexts?.effect   ?? (diTitle ? generateDescriptionSection('effect', inputObj)   : ''),
+        };
+        return (
+          <DescriptionPanel
+            done={isDone}
+            onConfirm={handleConfirm}
+            onUpdate={v => setGSel(p => ({ ...p, [step]: v }))}
+            onModeChange={setDescMode}
+            promptTrigger={descPromptTrigger}
+            onSubInfoChange={setDescSubInfo}
+            initialTexts={initTexts}
+            onTextsChange={texts => taskId && saveSpecState(taskId, { descTexts: texts })}
+          />
+        );
+      })()}
       {step === 'components' && <ComponentsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} onComponentsChange={setConfirmedComponents} />}
       {step === 'drawings' && <DrawingsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} inventionComponents={confirmedComponents} />}
       {step === 'claims' && <ClaimsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} />}
@@ -1983,35 +2016,26 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
 
 // ?? 諛쒕챸???ㅻ챸 ?⑤꼸 ???뱀뀡蹂?1媛??앹꽦, ?몄쭛/?꾨＼?꾪듃 ?섏젙/Diff 梨꾪깮 ??
 const DESC_SECTIONS: { key: string; label: string; badge2?: string; text: string }[] = [
-  {
-    key: 'tech', label: '湲곗닠遺꾩빞',
-    text: '蹂?諛쒕챸? ?먯쑉二쇳뻾 湲곗닠??愿??寃껋쑝濡? 蹂대떎 援ъ껜?곸쑝濡쒕뒗 ?쇱씠??LiDAR) ?쇱꽌 ?곗씠?곕? ?쒖슜???ㅼ떆媛?3D 媛앹껜 ?몄떇 ?μ튂 諛?諛⑸쾿??愿??寃껋씠?? ?뱁엳, ?ъ씤???대씪?곕뱶 ?곗씠?곗쓽 ?⑥쑉?곸씤 ?꾩쿂由ъ? ?λ윭??湲곕컲 媛앹껜 ?먯?瑜?寃고빀?섏뿬 ?먯쑉二쇳뻾 ?섍꼍?먯꽌???덉쟾?깆쓣 ?μ긽?쒗궎??湲곗닠??愿??寃껋씠??',
-  },
-  {
-    key: 'bg', label: '諛곌꼍湲곗닠', badge2: '?좏뻾湲곗닠 3嫄?湲곕컲',
-    text: '?먯쑉二쇳뻾 李⑤웾?먯꽌 二쇰? ?섍꼍 ?몄떇? ?덉쟾??二쇳뻾???꾪븳 ?듭떖 湲곗닠?대떎. 湲곗〈??移대찓??湲곕컲 ?몄떇 諛⑸쾿? 議곕챸 議곌굔??誘쇨컧?섍퀬 嫄곕━ ?뺣낫媛 遺?뺥솗???쒓퀎媛 ?덈떎. ?댁뿉 ?쇱씠???쇱꽌瑜??쒖슜??3D ?몄떇 湲곗닠??二쇰ぉ諛쏄퀬 ?덉쑝?? 湲곗〈 蹂듭?(Voxel) 湲곕컲 泥섎━ 諛⑹떇? ?곗궛?됱씠 留롮븘 ?ㅼ떆媛?泥섎━???대젮????덉쑝硫? ?ъ씤???⑥쐞 泥섎━ 諛⑹떇? 洹쇨굅由?룹썝嫄곕━ 媛앹껜 媛?諛??李⑥씠濡??명빐 ?먯? ?뺥솗?꾧? 遺덇퇏?쇳븳 臾몄젣媛 ?덈떎.',
-  },
-  {
-    key: 'problem', label: '?닿껐?섎젮??怨쇱젣',
-    text: '蹂?諛쒕챸? ?곴린? 媛숈? 臾몄젣?먯쓣 ?닿껐?섍린 ?꾪빐 ?덉텧??寃껋쑝濡? ?쇱씠???ъ씤???대씪?곕뱶 ?곗씠?곕? ?⑥쑉?곸쑝濡??꾩쿂由ы븯???ㅼ떆媛?泥섎━ ?띾룄瑜??뺣낫?섎㈃?쒕룄, 洹쇨굅由?룹썝嫄곕━ 媛앹껜 紐⑤몢??????믪? ?먯? ?뺥솗?꾨? ?ъ꽦?????덈뒗 3D 媛앹껜 ?몄떇 ?μ튂 諛?諛⑸쾿???쒓났?섎뒗 寃껋쓣 紐⑹쟻?쇰줈 ?쒕떎.',
-  },
-  {
-    key: 'solution', label: '怨쇱젣?닿껐?섎떒',
-    text: '?곴린 怨쇱젣瑜??닿껐?섍린 ?꾪빐, 蹂?諛쒕챸? ?쇱씠???쇱꽌濡쒕???3李⑥썝 ?ъ씤???대씪?곕뱶 ?곗씠?곕? ?섏떊?섎뒗 ?곗씠???섏떊遺; ?곴린 ?ъ씤???대씪?곕뱶 ?곗씠?곗뿉??RANSAC ?뚭퀬由ъ쬁???댁슜?섏뿬 吏硫??ъ씤?몃? 遺꾨━?섍퀬 ?몄씠利덈? ?쒓굅?섎뒗 ?꾩쿂由щ?; ?꾩쿂由щ맂 ?ъ씤???대씪?곕뱶瑜?湲곕뫁(pillar) ?⑥쐞濡?援ъ꽦?섏뿬 2D ?섏궗 ?대?吏瑜??앹꽦?섍퀬, PointNet++ 湲곕컲 ?λ윭??紐⑤뜽???댁슜?섏뿬 媛앹껜瑜??몄떇?섎뒗 ?몄떇遺瑜??ы븿?섎뒗 ?쇱씠??湲곕컲 媛앹껜 ?몄떇 ?μ튂瑜??쒓났?쒕떎.',
-  },
+  { key: 'tech',     label: '기술분야',         text: '' },
+  { key: 'bg',       label: '배경기술',         badge2: '선행기술 3건 기준', text: '' },
+  { key: 'problem',  label: '해결하려는 과제', text: '' },
+  { key: 'solution', label: '과제해결수단',   text: '' },
+  { key: 'effect',   label: '발명의 효과',    text: '' },
 ];
 
 // 諛쒕챸???ㅻ챸 ?⑤꼸 ??1媛??앹꽦 + view/edit/prompt/diff 紐⑤뱶
-function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChange }: {
+function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChange, initialTexts, onTextsChange }: {
   done: boolean; onConfirm: () => void; onUpdate: (v: string) => void;
   onModeChange?: (mode: string) => void;
   promptTrigger?: number;
   onSubInfoChange?: (info: { subStep: number; currentLabel: string; allDone: boolean; doConfirm: (() => void) | null }) => void;
+  initialTexts?: Record<string, string>;
+  onTextsChange?: (texts: Record<string, string>) => void;
 }) {
   const [subStep, setSubStep] = useState(0);
   const [confirmed, setConfirmed] = useState<Record<string, string>>({});
   const [texts, setTexts] = useState<Record<string, string>>(
-    Object.fromEntries(DESC_SECTIONS.map(s => [s.key, s.text]))
+    () => Object.fromEntries(DESC_SECTIONS.map(s => [s.key, initialTexts?.[s.key] ?? s.text ?? '']))
   );
   const [mode, _setMode] = useState<'view' | 'edit' | 'prompt' | 'diff'>('view');
   const setMode = (m: 'view' | 'edit' | 'prompt' | 'diff') => { _setMode(m); onModeChange?.(m); };
@@ -2124,7 +2148,9 @@ function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChan
                   rows={Math.max(4, Math.ceil(curText.length / 40))}
                   placeholder="?띿뒪?몃? 吏곸젒 ?낅젰?섍굅???섏젙?섏꽭??.."
                   onChange={e => {
-                    setTexts(p => ({ ...p, [sec.key]: e.target.value }));
+                    const next = { ...texts, [sec.key]: e.target.value };
+                    setTexts(next);
+                    onTextsChange?.(next);
                     e.target.style.height = 'auto';
                     e.target.style.height = e.target.scrollHeight + 'px';
                   }}
@@ -2300,7 +2326,7 @@ function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChan
       {allDone && (
         <div className="px-3 py-2 border-t border-ck-border bg-green-50 shrink-0 ml-1.5">
           <div className="flex items-center gap-1.5 text-xs2 text-green-700 font-medium">
-            <Icon name="check" size={11} /> 4媛??뱀뀡 紐⑤몢 ?뺤젙?????섎떒 踰꾪듉?쇰줈 ?ㅼ쓬 ?④퀎 吏꾪뻾
+            <Icon name="check" size={11} /> 5媛??뱀뀡 紐⑤몢 ?뺤젙?????섎떒 踰꾪듉?쇰줈 ?ㅼ쓬 ?④퀎 吏꾪뻾
           </div>
         </div>
       )}
