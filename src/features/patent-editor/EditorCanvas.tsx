@@ -1268,7 +1268,9 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
         const preview = previewObjectRef.current;
         dragStartRef.current = null;
         previewObjectRef.current = null;
-        if (!start || !preview) return;
+        // hexagon·arrow-shape·dimension은 preview 없이 dragStart만으로 작동
+        const isNoPrevieTool = state.tool === 'hexagon' || state.tool === 'arrow-shape' || state.tool === 'dimension';
+        if (!start || (!preview && !isNoPrevieTool)) return;
 
         const p = fc.getScenePoint(opt.e);
         const dx = Math.abs(p.x - start.x);
@@ -1282,15 +1284,14 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
           state.tool === "marquee-eraser"
         ) {
           if (dx < 4 && dy < 4) {
-            fc.remove(preview);
-          } else {
+            if (preview) fc.remove(preview);
+          } else if (preview) {
             commitShape(preview, state.tool);
             fc.setActiveObject(preview);
             useEditorStore.setState({ tool: "select" });
           }
         } else if (state.tool === "hexagon") {
-          // B-1: 육각형
-          fc.remove(preview);
+          // B-1: 육각형 (preview 없음)
           if (dx >= 4 || dy >= 4) {
             const cx = (start.x + p.x) / 2, cy = (start.y + p.y) / 2;
             const r = Math.min(dx, dy) / 2;
@@ -1310,8 +1311,7 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
             }
           }
         } else if (state.tool === "arrow-shape") {
-          // B-1: 화살표 도형
-          fc.remove(preview);
+          // B-1: 화살표 도형 (preview 없음)
           const len2 = Math.hypot(p.x - start.x, p.y - start.y);
           if (len2 >= 10) {
             const angle2 = Math.atan2(p.y - start.y, p.x - start.x) * (180 / Math.PI);
@@ -1336,13 +1336,12 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
             useEditorStore.setState({ tool: 'select' });
           }
         } else if (state.tool === "dimension") {
-          // B-2: 치수선
-          fc.remove(preview);
+          // B-2: 치수선 (preview 없음)
           if (dx >= 4 || dy >= 4) {
             createDimensionLine(fc, start, { x: p.x, y: p.y }, state.lineWeight === 'thin' ? 1 : state.lineWeight === 'thick' ? 2.5 : 1.5);
             useEditorStore.setState({ tool: 'select' });
           }
-        } else {
+        } else if (preview) {
           fc.remove(preview);
         }
         fc.requestRenderAll();
