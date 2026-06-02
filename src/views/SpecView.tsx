@@ -873,6 +873,17 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
               </div>
             </div>
           ))}
+
+          {/* 하단 드롭 존 — 마지막 위치로 드래그 허용 */}
+          {!done && (
+            <div
+              onDragOver={e => { e.preventDefault(); setDropIdx(items.length); }}
+              className={clsx(
+                'h-3 rounded transition-all',
+                dropIdx === items.length && dragIdx !== null ? 'ring-2 ring-blue-400 ring-offset-1 bg-blue-50' : ''
+              )}
+            />
+          )}
         </div>
 
         {/* 새 구성요소 추가 */}
