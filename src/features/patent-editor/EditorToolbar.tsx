@@ -16,8 +16,19 @@ interface Props {
   onClose: () => void;
   onToggleHatch: () => void;
   busy?: boolean;
-  /** 독립 탭(standalone)에서는 종료 버튼 숨김 — StandaloneEditor가 담당 */
   standalone?: boolean;
+  // B-4: 트레이스
+  showUnderlayer: boolean;
+  underlayerOpacity: number;
+  onToggleUnderlayer: () => void;
+  onUnderlayerOpacity: (v: number) => void;
+  // B-5: 정렬
+  onAlign: (dir: 'left'|'right'|'top'|'bottom'|'centerH'|'centerV') => void;
+  // B-6: 도면 번호
+  onInsertDrawingTitle?: () => void;
+  // B-8: 해상도
+  exportScale: 1|2|3|4;
+  onExportScale: (v: 1|2|3|4) => void;
 }
 
 // ── 공통 버튼 크기: 모든 버튼 h-8 기준 ────────────────────
@@ -131,7 +142,12 @@ const LINE_ENDS: { v: LineEnd; label: string; title: string }[] = [
   { v: 'open-arrow',  label: '▷',   title: '속이 빈 화살표' },
 ];
 
-export function EditorToolbar({ onSave, onExport, onClose, onToggleHatch, busy, standalone }: Props) {
+export function EditorToolbar({
+  onSave, onExport, onClose, onToggleHatch, busy, standalone,
+  showUnderlayer, underlayerOpacity, onToggleUnderlayer, onUnderlayerOpacity,
+  onAlign, onInsertDrawingTitle,
+  exportScale, onExportScale,
+}: Props) {
   const tool          = useEditorStore(s => s.tool);
   const lineStyle     = useEditorStore(s => s.lineStyle);
   const lineWeight    = useEditorStore(s => s.lineWeight);
@@ -168,11 +184,25 @@ export function EditorToolbar({ onSave, onExport, onClose, onToggleHatch, busy, 
             title="참조번호 달기 (T)" icon={<span className="font-bold text-sm">A</span>} label="번호달기" />
           <ToolBtn active={tool === 'ref-circle'} onClick={() => setTool('ref-circle')}
             title="원형 부호 달기 (C)" icon={<CircleDot size={14} />} label="원형번호" />
+          {/* B-2: 치수선 */}
+          <ToolBtn active={tool === 'dimension'} onClick={() => setTool('dimension')}
+            title="치수선 (D)"
+            icon={<svg width="16" height="14" viewBox="0 0 16 14" fill="none" stroke="currentColor" strokeWidth="1.3">
+              <line x1="1" y1="7" x2="15" y2="7"/>
+              <polyline points="3,4 1,7 3,10"/>
+              <polyline points="13,4 15,7 13,10"/>
+              <line x1="1" y1="3" x2="1" y2="11"/>
+              <line x1="15" y1="3" x2="15" y2="11"/>
+            </svg>}
+            label="치수선" />
         </Group>
         <div className={DIVIDER} />
 
         {/* ── 도형 ── */}
         <Group label="도형">
+          {/* B-3: 텍스트 단독 */}
+          <ToolBtn active={tool === 'standalone-text'} onClick={() => setTool('standalone-text')}
+            title="텍스트 단독 삽입 (T키)" icon={<span className="font-serif font-bold text-base leading-none">T</span>} label="텍스트" />
           <ToolBtn active={tool === 'rect'} onClick={() => setTool('rect')}
             title="사각형 (R)" icon={<Square size={14} />} label="사각형" />
           <ToolBtn active={tool === 'circle'} onClick={() => setTool('circle')}
@@ -184,10 +214,10 @@ export function EditorToolbar({ onSave, onExport, onClose, onToggleHatch, busy, 
           <MoreBtn label="도형 더보기">
             <MoreItem icon={<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="7,1 13,13 1,13"/></svg>} label="삼각형" onClick={() => setTool('triangle')} />
             <MoreItem icon={<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="7,1 13,7 7,13 1,7"/></svg>} label="마름모" onClick={() => setTool('diamond')} />
-            <MoreItem icon={<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="3,1 11,1 13,7 11,13 3,13 1,7"/></svg>} label="육각형" onClick={() => setTool('polygon')} disabled />
-            <MoreItem icon={<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="7,1 9,5 13,5 10,8 11,13 7,10 3,13 4,8 1,5 5,5"/></svg>} label="별" onClick={() => setTool('polygon')} disabled />
-            <MoreItem icon={<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M1,7 H8 M8,3 L13,7 L8,11"/></svg>} label="화살표 도형" onClick={() => setTool('arrow-shape')} disabled />
-            <MoreItem icon={<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="1,1 4,4 7,1 10,4 13,1"/></svg>} label="자유 다각형" onClick={() => setTool('polygon')} disabled />
+            {/* B-1: 활성화된 도형들 */}
+            <MoreItem icon={<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="7,1 13,4 13,10 7,13 1,10 1,4"/></svg>} label="육각형" onClick={() => setTool('hexagon')} />
+            <MoreItem icon={<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" stroke="none"><path d="M1,6 H8 M8,3 L13,7 L8,11 Z"/></svg>} label="화살표 도형" onClick={() => setTool('arrow-shape')} />
+            <MoreItem icon={<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="1,13 4,7 7,10 10,4 13,8"/></svg>} label="자유 폴리라인" onClick={() => setTool('polygon')} />
           </MoreBtn>
         </Group>
         <div className={DIVIDER} />
@@ -244,6 +274,14 @@ export function EditorToolbar({ onSave, onExport, onClose, onToggleHatch, busy, 
             <Spline size={13} />
             <span className="ml-1 text-xs2">S자</span>
           </OptBtn>
+          {/* B-7: 꺾인 지시선 */}
+          <OptBtn active={leaderCurve === 'elbow'} onClick={() => setLeaderCurve('elbow')} title="꺾인 지시선 (L자)">
+            <svg width="22" height="16" viewBox="0 0 22 16" fill="none" stroke="currentColor" strokeWidth="1.3">
+              <path d="M4,13 L4,4 L18,4"/>
+              <polygon points="2,14 4,11 6,14" fill="currentColor" stroke="none"/>
+            </svg>
+            <span className="ml-1 text-xs2">꺾임</span>
+          </OptBtn>
         </Group>
         <div className={DIVIDER} />
 
@@ -280,6 +318,50 @@ export function EditorToolbar({ onSave, onExport, onClose, onToggleHatch, busy, 
             <Frame size={13} />
             <span className="ml-1 text-xs2">여백</span>
           </OptBtn>
+          {/* B-4: 트레이스 */}
+          <OptBtn active={showUnderlayer} onClick={onToggleUnderlayer} title="원본 이미지 트레이스 모드">
+            <svg width="16" height="14" viewBox="0 0 16 14" fill="none" stroke="currentColor" strokeWidth="1.2">
+              <rect x="2" y="2" width="12" height="10" rx="1" opacity="0.35" fill="currentColor"/>
+              <path d="M2,10 L5,7 L8,9 L11,6 L14,9" strokeWidth="1.6"/>
+            </svg>
+            <span className="ml-1 text-xs2">트레이스</span>
+          </OptBtn>
+          {showUnderlayer && (
+            <div className="flex items-center gap-1 h-8 ml-1">
+              <input type="range" min={10} max={70} step={5}
+                value={underlayerOpacity}
+                onChange={e => onUnderlayerOpacity(Number(e.target.value))}
+                className="w-16 accent-blue-600" style={{ height: 4 }} />
+              <span className="text-xs2 text-zinc-400 w-7">{underlayerOpacity}%</span>
+            </div>
+          )}
+          {/* B-6: 도면 번호 */}
+          <MoreBtn label="보기 더보기">
+            <MoreItem
+              icon={<svg width="14" height="14" viewBox="0 0 14 14"><text x="1" y="11" fontSize="9" fontWeight="bold" fill="currentColor" stroke="none">도1</text></svg>}
+              label="도면 번호 삽입 (도 N)"
+              onClick={() => onInsertDrawingTitle?.()}
+            />
+          </MoreBtn>
+        </Group>
+
+        {/* B-5: 정렬 */}
+        <div className={DIVIDER} />
+        <Group label="정렬">
+          <MoreBtn label="정렬">
+            <MoreItem icon={<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="2" y1="2" x2="2" y2="12"/><rect x="4" y="4" width="4" height="3" rx="0.5"/><rect x="4" y="8" width="6" height="3" rx="0.5"/></svg>}
+              label="왼쪽 정렬" onClick={() => onAlign('left')} />
+            <MoreItem icon={<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="12" y1="2" x2="12" y2="12"/><rect x="6" y="4" width="4" height="3" rx="0.5"/><rect x="4" y="8" width="6" height="3" rx="0.5"/></svg>}
+              label="오른쪽 정렬" onClick={() => onAlign('right')} />
+            <MoreItem icon={<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="2" y1="2" x2="12" y2="2"/><rect x="3" y="4" width="3" height="4" rx="0.5"/><rect x="7" y="4" width="3" height="6" rx="0.5"/></svg>}
+              label="위쪽 정렬" onClick={() => onAlign('top')} />
+            <MoreItem icon={<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="2" y1="12" x2="12" y2="12"/><rect x="3" y="4" width="3" height="4" rx="0.5"/><rect x="7" y="2" width="3" height="6" rx="0.5"/></svg>}
+              label="아래쪽 정렬" onClick={() => onAlign('bottom')} />
+            <MoreItem icon={<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="7" y1="2" x2="7" y2="12"/><rect x="4" y="4" width="6" height="3" rx="0.5"/><rect x="3" y="8" width="8" height="3" rx="0.5"/></svg>}
+              label="수평 중앙 정렬" onClick={() => onAlign('centerH')} />
+            <MoreItem icon={<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="2" y1="7" x2="12" y2="7"/><rect x="4" y="4" width="3" height="6" rx="0.5"/><rect x="8" y="3" width="3" height="8" rx="0.5"/></svg>}
+              label="수직 중앙 정렬" onClick={() => onAlign('centerV')} />
+          </MoreBtn>
         </Group>
 
         {/* ── 작업 (우측 정렬) ── */}
@@ -290,13 +372,20 @@ export function EditorToolbar({ onSave, onExport, onClose, onToggleHatch, busy, 
             <Save size={13} />
             <span>저장</span>
           </button>
+          {/* B-8: 해상도 선택 */}
+          <select value={exportScale} onChange={e => onExportScale(Number(e.target.value) as 1|2|3|4)}
+            className="h-8 border border-zinc-300 rounded px-1.5 text-xs2 bg-white text-zinc-600" title="내보내기 해상도">
+            <option value={1}>×1 · 화면</option>
+            <option value={2}>×2 · 144dpi</option>
+            <option value={3}>×3 · 216dpi</option>
+            <option value={4}>×4 · 288dpi</option>
+          </select>
           <button type="button" onClick={onExport} disabled={busy}
-            title="1-bit 흑백 PNG 내보내기"
+            title="PNG 내보내기"
             className="inline-flex items-center gap-1.5 h-8 px-3 border border-blue-600 rounded-md bg-blue-600 text-sm2 text-white hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 transition-all">
             <Download size={13} />
             <span>{busy ? '처리 중…' : '내보내기'}</span>
           </button>
-          {/* standalone 모드에서는 StandaloneEditor의 ✕ 닫기가 담당 — 종료 버튼 숨김 */}
           {!standalone && (
             <button type="button" onClick={onClose} title="편집 종료"
               className="inline-flex items-center gap-1.5 h-8 px-3 border border-zinc-300 rounded-md bg-white text-sm2 text-zinc-700 hover:bg-zinc-50 active:scale-[0.98] transition-all">
@@ -304,8 +393,49 @@ export function EditorToolbar({ onSave, onExport, onClose, onToggleHatch, busy, 
               <span>종료</span>
             </button>
           )}
+          {/* B-9: 단축키 도움말 */}
+          <div className={DIVIDER} />
+          <ShortcutHelpBtn />
         </div>
       </div>
+    </div>
+  );
+}
+
+// B-9: 단축키 도움말 버튼
+function ShortcutHelpBtn() {
+  const [open, setOpen] = useState(false);
+  const SHORTCUTS = [
+    ['V', '선택'],      ['L', '지시선'],
+    ['T', '텍스트'],    ['R', '사각형'],
+    ['O', '원'],        ['P', '폴리라인'],
+    ['D', '치수선'],    ['E', '지우기'],
+    ['G', '그리드'],    ['Esc', '선택해제'],
+    ['Ctrl+C', '복사'], ['Ctrl+V', '붙여넣기'],
+    ['Delete', '삭제'], ['Ctrl+A', '전체선택'],
+    ['Ctrl+Z', '취소'], ['Ctrl+Y', '다시실행'],
+  ];
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(o => !o)}
+        className={`${BTN_BASE} w-7 ${open ? BTN_ACTIVE : BTN_INACTIVE}`}
+        title="단축키 도움말">
+        <span className="text-sm font-bold">?</span>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 bg-white border border-zinc-200 rounded-xl shadow-lg z-50 p-3 w-56"
+          onMouseLeave={() => setOpen(false)}>
+          <p className="text-xs2 font-bold text-zinc-600 mb-2">단축키</p>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+            {SHORTCUTS.map(([k, v]) => (
+              <div key={k} className="flex items-center gap-1.5">
+                <kbd className="px-1.5 py-0.5 bg-zinc-100 border border-zinc-300 rounded text-xs2 font-mono shrink-0">{k}</kbd>
+                <span className="text-xs2 text-zinc-500">{v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

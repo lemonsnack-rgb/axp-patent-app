@@ -61,6 +61,10 @@ interface Props {
   availableReferences: EditorReference[];
   onReferenceAdd?: (ref: EditorReference) => void;
   onZoomChange?: (zoom: number) => void;
+  // B-4: 트레이스 모드
+  underlayerImageUrl?: string;
+  showUnderlayer?: boolean;
+  underlayerOpacity?: number;
 }
 
 type Pt = { x: number; y: number };
@@ -128,6 +132,23 @@ function makeLeaderObject(
   leaderId: string,
 ): fabric.Object {
   const dash = LINE_DASH_PATTERNS[style];
+
+  // B-7: 꺾인 지시선
+  if (curve === 'elbow') {
+    const elbowX = textPos.x;
+    const pathStr = `M ${anchor.x},${anchor.y} L ${elbowX},${anchor.y} L ${elbowX},${textPos.y}`;
+    const path = new fabric.Path(pathStr, {
+      stroke: '#000', strokeWidth: 1.2, strokeDashArray: dash,
+      fill: undefined, selectable: false, evented: false, objectCaching: false,
+    });
+    setMeta(path, META.leaderId, leaderId);
+    setMeta(path, META.isLeaderLine, true);
+    setMeta(path, META.leaderCurveType, 'elbow');
+    setMeta(path, META.leaderAnchorX, anchor.x);
+    setMeta(path, META.leaderAnchorY, anchor.y);
+    return path;
+  }
+
   if (curve === "s-curve") {
     const path = new fabric.Path(buildSCurvePath(anchor, textPos), {
       stroke: "#000",
@@ -799,6 +820,44 @@ function updateDragPreview(
   }
 }
 
+// ── B-2: 치수선 헬퍼 ────────────────────────────────────────────────────
+function createDimensionLine(
+  fc: fabric.Canvas,
+  from: Pt, to: Pt,
+  strokeWidth: number,
+): void {
+  const dx = to.x - from.x, dy = to.y - from.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 5) return;
+  const angle = Math.atan2(dy, dx);
+  const perp = angle + Math.PI / 2;
+  const extLen = 14;
+
+  const mainLine = new fabric.Line([from.x, from.y, to.x, to.y], {
+    stroke: '#000', strokeWidth, objectCaching: false,
+  });
+  const makeExt = (pt: Pt) => new fabric.Line([
+    pt.x + Math.cos(perp) * extLen, pt.y + Math.sin(perp) * extLen,
+    pt.x - Math.cos(perp) * extLen, pt.y - Math.sin(perp) * extLen,
+  ], { stroke: '#000', strokeWidth: strokeWidth * 0.7, objectCaching: false });
+
+  const arrL = buildEndDecoration('arrow', to, from);
+  const arrR = buildEndDecoration('arrow', from, to);
+
+  const label = new fabric.IText(`${Math.round(len)}`, {
+    left: (from.x + to.x) / 2, top: (from.y + to.y) / 2 - 16,
+    fontSize: 12, fontFamily: FIXED_FONT_FAMILY, fill: '#000',
+    originX: 'center', originY: 'center', objectCaching: false,
+  });
+
+  const objs: fabric.Object[] = [mainLine, makeExt(from), makeExt(to), label];
+  if (arrL) objs.push(arrL);
+  if (arrR) objs.push(arrR);
+  fc.add(new fabric.Group(objs, { objectCaching: false }));
+  fc.renderAll();
+}
+
+
 function commitShape(preview: fabric.Object, tool: ToolMode): void {
   preview.set({ selectable: true, evented: true });
   if (tool === "marquee-eraser") {
@@ -829,6 +888,9 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
       availableReferences,
       onReferenceAdd,
       onZoomChange,
+      underlayerImageUrl,
+      showUnderlayer,
+      underlayerOpacity = 30,
     },
     ref,
   ) {
@@ -837,6 +899,9 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
     const pendingAnchorRef = useRef<Pt | null>(null);
     const dragStartRef = useRef<Pt | null>(null);
     const previewObjectRef = useRef<fabric.Object | null>(null);
+    // B-1: 폴리라인 점 누적 refs
+    const polylinePointsRef = useRef<Pt[]>([]);
+    const polylinePreviewRef = useRef<fabric.Polyline | null>(null);
     // 참조번호/원형부호 도구 진입 시 picker에서 미리 고른 부호
     const selectedRefRef = useRef<EditorReference | null>(null);
     // 외부(배치 버튼)에서 툴 변경과 동시에 전달된 부호 (툴 변경 effect 이후에 복원)
@@ -1015,6 +1080,41 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
         const p = fc.getScenePoint(opt.e);
         const cp = { x: p.x, y: p.y };
 
+        // B-1: 폴리라인 클릭 누적
+        if (tool === "polygon") {
+          polylinePointsRef.current.push(cp);
+          if (polylinePreviewRef.current) fc.remove(polylinePreviewRef.current);
+          const preview = new fabric.Polyline(
+            [...polylinePointsRef.current, cp],
+            {
+              fill: 'transparent', stroke: '#000',
+              strokeWidth: state.lineWeight === 'thin' ? 1 : state.lineWeight === 'thick' ? 2.5 : 1.5,
+              strokeDashArray: LINE_DASH_PATTERNS[state.lineStyle],
+              objectCaching: false, selectable: false, evented: false,
+            }
+          );
+          polylinePreviewRef.current = preview;
+          fc.add(preview);
+          fc.requestRenderAll();
+          return;
+        }
+
+        // B-3: 텍스트 단독 삽입
+        if (tool === "standalone-text") {
+          const textObj = new fabric.IText('텍스트 입력', {
+            left: cp.x, top: cp.y,
+            fontSize: 14, fontFamily: FIXED_FONT_FAMILY, fill: '#000',
+            originX: 'center', originY: 'center', objectCaching: false,
+          });
+          fc.add(textObj);
+          fc.setActiveObject(textObj);
+          textObj.enterEditing();
+          textObj.selectAll();
+          fc.requestRenderAll();
+          useEditorStore.setState({ tool: 'select' });
+          return;
+        }
+
         if (tool === "text" || tool === "ref-circle") {
           // 부호 미선택 상태면 picker 다시 띄움 (방어)
           if (!selectedRefRef.current) {
@@ -1185,9 +1285,62 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
             fc.remove(preview);
           } else {
             commitShape(preview, state.tool);
-            // PPT 스타일: 삽입 후 자동 선택 모드 + 새 도형 선택
             fc.setActiveObject(preview);
             useEditorStore.setState({ tool: "select" });
+          }
+        } else if (state.tool === "hexagon") {
+          // B-1: 육각형
+          fc.remove(preview);
+          if (dx >= 4 || dy >= 4) {
+            const cx = (start.x + p.x) / 2, cy = (start.y + p.y) / 2;
+            const r = Math.min(dx, dy) / 2;
+            if (r >= 5) {
+              const pts = Array.from({ length: 6 }, (_, i) => ({
+                x: cx + r * Math.cos((Math.PI / 3) * i - Math.PI / 6),
+                y: cy + r * Math.sin((Math.PI / 3) * i - Math.PI / 6),
+              }));
+              const hex = new fabric.Polygon(pts, {
+                fill: state.fillStyle === 'none' ? 'transparent' : '#000',
+                stroke: '#000', strokeWidth: state.lineWeight === 'thin' ? 1 : state.lineWeight === 'thick' ? 2.5 : 1.5,
+                objectCaching: false,
+              });
+              fc.add(hex);
+              fc.setActiveObject(hex);
+              useEditorStore.setState({ tool: 'select' });
+            }
+          }
+        } else if (state.tool === "arrow-shape") {
+          // B-1: 화살표 도형
+          fc.remove(preview);
+          const len2 = Math.hypot(p.x - start.x, p.y - start.y);
+          if (len2 >= 10) {
+            const angle2 = Math.atan2(p.y - start.y, p.x - start.x) * (180 / Math.PI);
+            const bodyH = len2 * 0.15, headH = len2 * 0.35, headW = len2 * 0.25;
+            const d = [
+              `M 0,${-bodyH / 2}`,
+              `L ${len2 - headH},${-bodyH / 2}`,
+              `L ${len2 - headH},${-headW / 2}`,
+              `L ${len2},0`,
+              `L ${len2 - headH},${headW / 2}`,
+              `L ${len2 - headH},${bodyH / 2}`,
+              `L 0,${bodyH / 2}`, 'Z',
+            ].join(' ');
+            const arrow = new fabric.Path(d, {
+              fill: '#000', stroke: 'none',
+              left: start.x, top: start.y,
+              originX: 'left', originY: 'center',
+              angle: angle2, objectCaching: false,
+            });
+            fc.add(arrow);
+            fc.setActiveObject(arrow);
+            useEditorStore.setState({ tool: 'select' });
+          }
+        } else if (state.tool === "dimension") {
+          // B-2: 치수선
+          fc.remove(preview);
+          if (dx >= 4 || dy >= 4) {
+            createDimensionLine(fc, start, { x: p.x, y: p.y }, state.lineWeight === 'thin' ? 1 : state.lineWeight === 'thick' ? 2.5 : 1.5);
+            useEditorStore.setState({ tool: 'select' });
           }
         } else {
           fc.remove(preview);
@@ -1356,8 +1509,33 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
       // 더블클릭: 기존 leader 또는 ref-circle 편집
       const handleDoubleClick = (opt: { target?: fabric.Object }) => {
         const target = opt.target;
+        const currentTool = useEditorStore.getState().tool;
+
+        // B-1: 폴리라인 더블클릭 완성
+        if (currentTool === 'polygon') {
+          if (polylinePreviewRef.current) {
+            fc.remove(polylinePreviewRef.current);
+            polylinePreviewRef.current = null;
+          }
+          if (polylinePointsRef.current.length >= 2) {
+            const state2 = useEditorStore.getState();
+            const poly = new fabric.Polyline([...polylinePointsRef.current], {
+              fill: 'transparent', stroke: '#000',
+              strokeWidth: state2.lineWeight === 'thin' ? 1 : state2.lineWeight === 'thick' ? 2.5 : 1.5,
+              strokeDashArray: LINE_DASH_PATTERNS[state2.lineStyle],
+              objectCaching: false,
+            });
+            fc.add(poly);
+            fc.setActiveObject(poly);
+          }
+          polylinePointsRef.current = [];
+          useEditorStore.setState({ tool: 'select' });
+          fc.requestRenderAll();
+          return;
+        }
+
         if (!target) return;
-        if (useEditorStore.getState().tool !== "select") return;
+        if (currentTool !== "select") return;
         let pendingObj: PendingSpawn | null = null;
         let canvasPos: Pt | null = null;
         if (isLeaderText(target) && target instanceof fabric.IText) {
@@ -1592,6 +1770,39 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
       }
       fc.requestRenderAll();
     }, [tool]);
+
+    // B-4: 트레이스 underlayer useEffect
+    useEffect(() => {
+      const fc = fabricRef.current;
+      if (!fc) return;
+      const UNDERLAYER_KEY = 'underlayer';
+      const existing = fc.getObjects().find(
+        o => getMeta(o, META.isOverlay) === UNDERLAYER_KEY
+      );
+      if (existing) { fc.remove(existing); fc.renderAll(); }
+      if (!showUnderlayer || !underlayerImageUrl) return;
+
+      fabric.FabricImage.fromURL(underlayerImageUrl).then(img => {
+        const scaleX = (fc.width  ?? 800) / (img.width  ?? 1);
+        const scaleY = (fc.height ?? 600) / (img.height ?? 1);
+        const scale  = Math.min(scaleX, scaleY);
+        img.set({
+          left: 0, top: 0,
+          scaleX: scale, scaleY: scale,
+          opacity: (underlayerOpacity) / 100,
+          selectable: false, evented: false,
+          objectCaching: false,
+        });
+        setMeta(img, META.isOverlay, UNDERLAYER_KEY as unknown as boolean);
+        fc.add(img);
+        fc.sendObjectToBack(img);
+        fc.getObjects()
+          .filter(o => isOverlay(o) && getMeta(o, META.isOverlay) !== UNDERLAYER_KEY)
+          .forEach(o => fc.bringObjectToFront(o));
+        fc.renderAll();
+      }).catch(() => { /* CORS or missing image — silently ignore */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fabricRef.current, showUnderlayer, underlayerOpacity, underlayerImageUrl]);
 
     // 객체 삭제 (선택된 항목들 + 짝지어진 leader line / endpoint handle)
     const deleteSelectedObjects = useRef(() => {});
@@ -1895,17 +2106,20 @@ function ToolHint({
 }) {
   if (pickerOpen || tool === "select") return null;
   const HINTS: Record<Exclude<ToolMode, "select">, string> = {
-    line:             "선/지시선: 시작점 클릭 → 끝점 클릭",
-    text:             "참조번호: 부호 선택 → 지시 대상 클릭 → 텍스트 위치 클릭",
-    "ref-circle":     "원형 부호: 부호 선택 → 지시 대상 클릭 → 원형 위치 클릭",
-    rect:             "사각형: 드래그",
-    circle:           "원/타원: 드래그",
-    triangle:         "삼각형: 드래그",
-    diamond:          "마름모: 드래그",
-    polygon:          "다각형: 클릭으로 꼭짓점 추가, 더블클릭으로 완성 (개발 예정)",
-    "arrow-shape":    "화살표 도형: 드래그 (개발 예정)",
-    "marquee-eraser": "영역 지움: 드래그로 흰색 마스크",
-    "brush-eraser":   "브러시 지움: 자유 드로잉 (흰색)",
+    line:              "선/지시선: 시작점 클릭 → 끝점 클릭",
+    text:              "참조번호: 부호 선택 → 지시 대상 클릭 → 텍스트 위치 클릭",
+    "ref-circle":      "원형 부호: 부호 선택 → 지시 대상 클릭 → 원형 위치 클릭",
+    rect:              "사각형: 드래그",
+    circle:            "원/타원: 드래그",
+    triangle:          "삼각형: 드래그",
+    diamond:           "마름모: 드래그",
+    hexagon:           "육각형: 드래그",
+    polygon:           "폴리라인: 클릭으로 점 추가 → 더블클릭으로 완성",
+    "arrow-shape":     "화살표 도형: 드래그 (방향 = 드래그 방향)",
+    dimension:         "치수선: 드래그 (본선 + 연장선 + 거리 텍스트)",
+    "standalone-text": "텍스트: 삽입 위치 클릭",
+    "marquee-eraser":  "영역 지움: 드래그로 흰색 마스크",
+    "brush-eraser":    "브러시 지움: 자유 드로잉 (흰색)",
   };
   return (
     <div className="pointer-events-none absolute top-2 left-2 text-xs bg-blue-600 text-white px-2 py-1 rounded shadow">

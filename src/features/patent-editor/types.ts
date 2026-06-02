@@ -11,9 +11,13 @@ export type ToolMode =
   | "circle"
   | "triangle"
   | "diamond"
-  // 확장 도형 (개발 예정 — 현재 시각적 버튼만 제공)
-  | "polygon"        // 자유 다각형
-  | "arrow-shape"    // 화살표 도형
+  // 확장 도형
+  | "polygon"         // 자유 폴리라인 (클릭×n + 더블클릭 완성)
+  | "hexagon"         // 육각형
+  | "arrow-shape"     // 화살표 도형
+  // 측량/보조
+  | "dimension"       // 치수선
+  | "standalone-text" // 텍스트 단독 삽입
   // 지우기
   | "marquee-eraser"
   | "brush-eraser";
@@ -30,7 +34,7 @@ export type LineStyle =
 export type LineWeight = "thin" | "normal" | "thick";
 
 export type LineEnd = "plain" | "dot" | "arrow" | "open-arrow";
-export type LeaderCurve = "straight" | "s-curve";
+export type LeaderCurve = "straight" | "s-curve" | "elbow";
 
 // 채우기 스타일
 export type FillStyle = "none" | "hatch" | "cross-hatch";

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import * as fabric from "fabric";
 import { DrawingListPanel } from "./DrawingListPanel";
 import { EditorCanvas, type EditorCanvasHandle } from "./EditorCanvas";
 import { EditorToolbar } from "./EditorToolbar";
 import { RefListPanel } from "./RefListPanel";
-import { binarizeCanvasToBlob } from "./binarize";
 import { useEditorStore } from "./useEditorStore";
-import { CUSTOM_PROPS, META } from "./canvas/constants";
-import type { EditorReference, PatentEditorProps } from "./types";
+import { isOverlay } from "./canvas/overlay";
+import { CUSTOM_PROPS, META, FIXED_FONT_FAMILY } from "./canvas/constants";
+import type { EditorReference, PatentEditorProps, ToolMode } from "./types";
 
 const DEFAULT_WIDTH = 1000;
 const DEFAULT_HEIGHT = 700;
@@ -59,6 +60,13 @@ export function PatentEditor({
 }: PatentEditorProps) {
   const canvasHandleRef = useRef<EditorCanvasHandle>(null);
   const [busy, setBusy] = useState(false);
+  // B-4: 트레이스 모드
+  const [showUnderlayer, setShowUnderlayer] = useState(false);
+  const [underlayerOpacity, setUnderlayerOpacity] = useState(30);
+  // B-5: 클립보드
+  const clipboardRef = useRef<fabric.Object | null>(null);
+  // B-8: 내보내기 해상도
+  const [exportScale, setExportScale] = useState<1|2|3|4>(2);
   const [captionDraft, setCaptionDraft] = useState("");
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [zoom, setZoom] = useState(1);
@@ -215,27 +223,140 @@ export function PatentEditor({
   }, [activeDrawingId, onSaveProject, serializeCurrentCanvas]);
 
   const handleExport = useCallback(async () => {
-    const handle = canvasHandleRef.current;
-    if (!handle) return;
+    const fc = canvasHandleRef.current?.getCanvas();
+    if (!fc) return;
     try {
       setBusy(true);
-      const merged = handle.exportBinaryReady();
-      if (!merged) return;
-      const blob = await binarizeCanvasToBlob(merged);
+      // overlay 임시 숨김
+      const overlayObjs = fc.getObjects().filter(o => isOverlay(o));
+      overlayObjs.forEach(o => o.set({ visible: false }));
+      fc.renderAll();
+      const dataUrl = fc.toDataURL({ format: 'png', multiplier: exportScale, quality: 1 });
+      overlayObjs.forEach(o => o.set({ visible: true }));
+      fc.renderAll();
+      // dataUrl → Blob
+      const [header, body] = dataUrl.split(',');
+      const mime = header.match(/:(.*?);/)?.[1] ?? 'image/png';
+      const binary = atob(body);
+      const u8 = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) u8[i] = binary.charCodeAt(i);
+      const blob = new Blob([u8], { type: mime });
       onExportComplete(activeDrawingId, blob);
     } catch (err) {
       console.error("[PatentEditor] export failed:", err);
-      const tainted =
-        err instanceof DOMException && err.name === "SecurityError";
-      alert(
-        tainted
-          ? "캔버스가 CORS로 오염되어 내보내기에 실패했습니다."
-          : "내보내기에 실패했습니다. 콘솔을 확인하세요.",
-      );
+      const tainted = err instanceof DOMException && err.name === "SecurityError";
+      alert(tainted ? "캔버스가 CORS로 오염되어 내보내기에 실패했습니다." : "내보내기에 실패했습니다.");
     } finally {
       setBusy(false);
     }
-  }, [activeDrawingId, onExportComplete]);
+  }, [activeDrawingId, onExportComplete, exportScale]);
+
+  // B-5: 정렬
+  const alignObjects = useCallback((dir: 'left'|'right'|'top'|'bottom'|'centerH'|'centerV') => {
+    const fc = canvasHandleRef.current?.getCanvas();
+    if (!fc) return;
+    const objs = fc.getActiveObjects();
+    if (objs.length < 2) return;
+    const bounds = objs.reduce(
+      (b, o) => {
+        const l = o.left ?? 0, t = o.top ?? 0;
+        const w = (o.width ?? 0) * (o.scaleX ?? 1), h = (o.height ?? 0) * (o.scaleY ?? 1);
+        return { l: Math.min(b.l, l), t: Math.min(b.t, t), r: Math.max(b.r, l+w), b: Math.max(b.b, t+h) };
+      }, { l: Infinity, t: Infinity, r: -Infinity, b: -Infinity }
+    );
+    objs.forEach(o => {
+      const w = (o.width ?? 0) * (o.scaleX ?? 1), h = (o.height ?? 0) * (o.scaleY ?? 1);
+      if (dir === 'left')    o.set({ left: bounds.l });
+      if (dir === 'right')   o.set({ left: bounds.r - w });
+      if (dir === 'top')     o.set({ top: bounds.t });
+      if (dir === 'bottom')  o.set({ top: bounds.b - h });
+      if (dir === 'centerH') o.set({ left: (bounds.l + bounds.r) / 2 - w / 2 });
+      if (dir === 'centerV') o.set({ top: (bounds.t + bounds.b) / 2 - h / 2 });
+    });
+    fc.renderAll();
+  }, []);
+
+  // B-6: 도면 번호 삽입
+  const insertDrawingTitle = useCallback(() => {
+    const fc = canvasHandleRef.current?.getCanvas();
+    if (!fc) return;
+    const existing = fc.getObjects().find(
+      o => o instanceof fabric.IText && /^도\s\d+$/.test((o as fabric.IText).text ?? '')
+    );
+    if (existing) fc.remove(existing);
+    const idx = drawings.findIndex(d => d.id === activeDrawingId);
+    const titleObj = new fabric.IText(`도 ${idx + 1}`, {
+      left: (fc.width ?? 800) / 2, top: (fc.height ?? 600) - 30,
+      fontSize: 16, fontFamily: FIXED_FONT_FAMILY, fontWeight: 'bold',
+      fill: '#000', originX: 'center', originY: 'center', objectCaching: false,
+    });
+    fc.add(titleObj);
+    fc.renderAll();
+  }, [drawings, activeDrawingId]);
+
+  // B-5+B-9: 통합 단축키 리스너
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      const tag = (document.activeElement as HTMLElement)?.tagName ?? '';
+      if (['INPUT', 'TEXTAREA'].includes(tag)) return;
+      const fc = canvasHandleRef.current?.getCanvas();
+      if (!fc) return;
+
+      // 도구 전환 (단일 키)
+      if (!e.metaKey && !e.ctrlKey) {
+        const keyMap: Record<string, ToolMode | 'grid'> = {
+          v: 'select', l: 'line', r: 'rect', o: 'circle',
+          p: 'polygon', d: 'dimension', e: 'marquee-eraser', g: 'grid',
+        };
+        const mapped = keyMap[e.key.toLowerCase()];
+        if (mapped) {
+          if (mapped === 'grid') { useEditorStore.getState().toggleGrid(); return; }
+          useEditorStore.getState().setTool(mapped as ToolMode);
+          return;
+        }
+        if (e.key === 'Escape') {
+          fc.discardActiveObject();
+          useEditorStore.getState().setTool('select');
+          fc.renderAll();
+          return;
+        }
+        if ((e.key === 'Delete' || e.key === 'Backspace')) {
+          const actives = fc.getActiveObjects();
+          if (actives.length) { fc.remove(...actives); fc.discardActiveObject(); fc.renderAll(); }
+          return;
+        }
+      }
+
+      // Ctrl 단축키
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key === 'c') {
+          const active = fc.getActiveObject();
+          if (active) active.clone().then((cloned: fabric.Object) => { clipboardRef.current = cloned; });
+        }
+        if (e.key === 'v' && clipboardRef.current) {
+          clipboardRef.current.clone().then((cloned: fabric.Object) => {
+            cloned.set({ left: (cloned.left ?? 0) + 20, top: (cloned.top ?? 0) + 20 });
+            fc.add(cloned);
+            fc.setActiveObject(cloned);
+            clipboardRef.current = cloned;
+            fc.renderAll();
+          });
+        }
+        if (e.key === 'a') {
+          e.preventDefault();
+          const targets = fc.getObjects().filter(o => !isOverlay(o));
+          if (targets.length) {
+            const sel = new fabric.ActiveSelection(targets, { canvas: fc });
+            fc.setActiveObject(sel);
+            fc.renderAll();
+          }
+        }
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleToggleHatch = useCallback(() => {
     canvasHandleRef.current?.toggleHatchOnSelection();
@@ -286,6 +407,14 @@ export function PatentEditor({
         onToggleHatch={handleToggleHatch}
         busy={busy}
         standalone={standalone}
+        showUnderlayer={showUnderlayer}
+        underlayerOpacity={underlayerOpacity}
+        onToggleUnderlayer={() => setShowUnderlayer(o => !o)}
+        onUnderlayerOpacity={setUnderlayerOpacity}
+        onAlign={alignObjects}
+        onInsertDrawingTitle={insertDrawingTitle}
+        exportScale={exportScale}
+        onExportScale={setExportScale}
       />
       <div className="flex-1 min-h-0 flex">
         {/* 단일 도면 모드에서는 도면 목록 패널 숨김 */}
@@ -359,6 +488,9 @@ export function PatentEditor({
                 availableReferences={refs}
                 onReferenceAdd={onReferenceAdd}
                 onZoomChange={setZoom}
+                underlayerImageUrl={activeDrawing.sourceImageUrl}
+                showUnderlayer={showUnderlayer}
+                underlayerOpacity={underlayerOpacity}
               />
               {/* 줌 컨트롤 */}
               <div className="absolute bottom-4 left-4 flex items-center gap-0.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-sm px-1 py-1">
