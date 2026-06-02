@@ -88,6 +88,8 @@ export function SpecView() {
   const [diContent, setDiContent] = useState('');
   const [diProblem, setDiProblem] = useState('');
   const [diKeywords, setDiKeywords] = useState('');
+  // 기초자료 보기 패널
+  const [sourceDataOpen, setSourceDataOpen] = useState(false);
 
   const flowRef = useRef<HTMLDivElement>(null);
   const si = (id: StepId) => STEPS.findIndex(s => s.id === id);
@@ -135,6 +137,12 @@ export function SpecView() {
           <span className="text-xs2 text-gray-400 font-normal ml-1">· 자동 저장됨 (방금)</span>
         </div>
         <div className="flex items-center gap-2">
+          {(diTitle || phase === 'flow' || phase === 'done') && (
+            <button onClick={() => setSourceDataOpen(o => !o)}
+              className={clsx('btn-outline btn-xs', sourceDataOpen && 'bg-zinc-100 border-zinc-400 text-zinc-700')}>
+              <Icon name="doc" size={11} /> 기초자료
+            </button>
+          )}
           <button onClick={() => setGuideOpen(o => !o)}
             className={clsx('btn-outline btn-xs', guideOpen && 'bg-violet-50 border-violet-400 text-violet-700')}>
             <Icon name="star" size={11} /> AI 가이드
@@ -176,13 +184,13 @@ export function SpecView() {
                   locked && 'border-gray-300 bg-white text-gray-400',
                   !active && !isDone && !locked && 'border-gray-400 bg-white text-gray-500',
                 )}>
-                  {isDone ? <Icon name="check" size={10} /> : s.num}
+                  {isDone && !active ? <Icon name="check" size={10} /> : s.num}
                 </span>
                 {/* step-label */}
                 <span className={clsx(
                   'text-sm2',
                   active && 'text-blue-700 font-semibold',
-                  isDone && !active && 'text-green-700',
+                  isDone && !active && 'text-green-700 font-medium',
                   locked && 'text-gray-400',
                   !active && !isDone && !locked && 'text-gray-500',
                 )}>{s.short}</span>
@@ -192,8 +200,37 @@ export function SpecView() {
         })}
       </div>
 
+      {/* 기초자료 보기 슬라이드 패널 */}
+      {sourceDataOpen && (
+        <div className="absolute inset-y-0 right-0 z-30 w-80 bg-white border-l border-gray-200 shadow-xl flex flex-col" style={{ top: 0 }}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0">
+            <span className="text-sm2 font-semibold text-gray-800">기초자료</span>
+            <button onClick={() => setSourceDataOpen(false)} className="text-gray-400 hover:text-gray-600">
+              <Icon name="close" size={14} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto scroll-thin p-4 space-y-3 text-xs2">
+            {diTitle ? (
+              <>
+                <div><p className="font-semibold text-gray-500 mb-1">발명의 명칭 (가제)</p><p className="text-gray-800 bg-gray-50 rounded px-2 py-1.5">{diTitle}</p></div>
+                {diField && <div><p className="font-semibold text-gray-500 mb-1">기술 분야</p><p className="text-gray-800 bg-gray-50 rounded px-2 py-1.5">{diField}</p></div>}
+                {diContent && <div><p className="font-semibold text-gray-500 mb-1">발명의 핵심 내용</p><p className="text-gray-800 bg-gray-50 rounded px-2 py-1.5 whitespace-pre-wrap">{diContent}</p></div>}
+                {diProblem && <div><p className="font-semibold text-gray-500 mb-1">해결하려는 과제</p><p className="text-gray-800 bg-gray-50 rounded px-2 py-1.5 whitespace-pre-wrap">{diProblem}</p></div>}
+                {diKeywords && <div><p className="font-semibold text-gray-500 mb-1">참고 키워드 / 선행기술</p><p className="text-gray-800 bg-gray-50 rounded px-2 py-1.5">{diKeywords}</p></div>}
+              </>
+            ) : (
+              <div className="text-center py-8 text-gray-400">
+                <Icon name="doc" size={32} className="mx-auto mb-2 text-gray-200" />
+                <p className="text-sm2">직접 입력한 기초자료가 없습니다.</p>
+                <p className="text-xs2 mt-1">파일 업로드 또는 직접 입력으로<br/>기초자료를 추가해주세요.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Body */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
+      <div className="flex-1 flex overflow-hidden min-h-0 relative">
         <div ref={flowRef} className="flex-1 overflow-y-auto scroll-thin bg-ck-bg">
           <div className="max-w-3xl mx-auto py-8 px-4 space-y-3">
 
@@ -341,11 +378,22 @@ export function SpecView() {
                   <div className="text-center py-8">
                     <Icon name="logo" size={40} className="text-blue-700 mx-auto mb-3" />
                     <h3 className="text-lg2 font-bold text-gray-800 mb-2">모든 분석이 완료되었습니다</h3>
-                    <p className="text-md2 text-gray-500">
-                      확정된 내용을 바탕으로 특허 명세서를 AI가 생성합니다.<br/>
-                      <span className="text-blue-700 font-medium">오른쪽 패널</span>의{' '}
-                      <strong>명세서 AI 생성</strong> 버튼을 눌러 시작하세요.
-                    </p>
+                    {task?.id && sessionStorage.getItem(`axp_mainview_${task.id}`) === 'editor' ? (
+                      <>
+                        <p className="text-md2 text-gray-500 mb-4">이미 생성된 명세서 에디터로 돌아갈 수 있습니다.</p>
+                        <button
+                          onClick={() => handleSetMainView('editor')}
+                          className="btn-primary btn-sm mx-auto flex items-center gap-1.5">
+                          <Icon name="doc" size={13} /> 명세서 에디터 열기 →
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-md2 text-gray-500">
+                        확정된 내용을 바탕으로 특허 명세서를 AI가 생성합니다.<br/>
+                        <span className="text-blue-700 font-medium">오른쪽 패널</span>의{' '}
+                        <strong>명세서 AI 생성</strong> 버튼을 눌러 시작하세요.
+                      </p>
+                    )}
                   </div>
                 )}
               </>

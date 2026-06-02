@@ -17,7 +17,10 @@ const MODE_LABELS: Record<string, string> = {
 export function TopBar() {
   const { mode, sidebarCollapsed, setSidebarCollapsed, setMode, tasks, activeTaskId } = useStore();
   const active = activeTaskId ? tasks.find(t => t.id === activeTaskId) : null;
-  const label = MODE_LABELS[mode] || '';
+  // 검색 모드에서 작업 유형에 따라 레이블 구분
+  const label = mode === 'search' && active
+    ? (active.type === 'patent_search' ? '특허 검색' : active.type === 'paper_search' ? '논문 검색' : '선행기술 검색')
+    : MODE_LABELS[mode] || '';
   const showTaskName = (mode === 'spec' || mode === 'search') && active;
 
   return (

@@ -103,7 +103,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle }: { task: any; on
   );
 
   // 선택된 블록 (sectionId + blockIdx)
-  const [sel, setSel] = useState<{ sid: SectionId; idx: number } | null>(null);
+  // 에디터 진입 시 첫 번째 단락 자동 선택 (기술분야 첫 블록)
+  const [sel, setSel] = useState<{ sid: SectionId; idx: number } | null>({ sid: 'tech', idx: 0 });
 
   // 활성 섹션 탭
   const [activeSec, setActiveSec] = useState<SectionId>('tech');
@@ -528,7 +529,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle }: { task: any; on
             {panelTab === 'drawings' && (
               <div className="px-3 py-3 space-y-1.5">
                 <p className="text-xs2 font-semibold text-zinc-500 mb-2">
-                  도면 <span className="font-normal text-zinc-400">({MOCK_DRAWINGS.length}개)</span>
+                  추출된 도면 <span className="font-normal text-zinc-400">
+                    ({MOCK_DRAWINGS.length}개 · 완료 {MOCK_DRAWINGS.filter(d => d.stage === 'done').length}개)
+                  </span>
                 </p>
                 {MOCK_DRAWINGS.map(d => {
                   const isDone = d.stage === 'done';

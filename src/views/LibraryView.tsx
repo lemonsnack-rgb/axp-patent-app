@@ -49,6 +49,15 @@ export function LibraryView() {
         )}
       </div>
 
+      {/* 빈 상태 안내 */}
+      {collections.length === 0 && (
+        <div className="text-center py-12 text-gray-400">
+          <Icon name="library" size={40} className="mx-auto mb-3 text-gray-200" />
+          <p className="text-md2 font-medium text-gray-600 mb-1">라이브러리가 비어 있습니다</p>
+          <p className="text-sm2 text-gray-400">특허·논문 검색에서 저장한 자료가 여기에 표시됩니다.<br/>폴더를 만들어 자료를 분류해 보세요.</p>
+        </div>
+      )}
+
       {/* 폴더 그리드 */}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
         <button
