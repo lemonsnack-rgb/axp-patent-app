@@ -649,8 +649,10 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
                 <Icon name="star" size={10} /> 명세서 AI 생성
               </button>
             ) : (
-              <button className="flex-1 py-1.5 bg-green-600 text-white rounded text-xs2 font-semibold cursor-default">
-                <Icon name="check" size={10} /> 확정 완료
+              // 이미 확정된 단계 재방문 시 — 다음 단계로 이동 가능하도록 "다음 →"
+              <button onClick={handleConfirm}
+                className="flex-1 py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800">
+                다음 →
               </button>
             )
           )
@@ -928,9 +930,10 @@ interface IndepCandState {
   selected: boolean;
   editing: boolean; editVal: string;
   aiOpen: boolean; aiPromptVal: string;
+  aiProposed: string; aiDiffOpen: boolean; aiDiffSel: 'current' | 'proposed';
 }
 
-const INDEP_CANDS_INIT: Omit<IndepCandState, 'selected'|'editing'|'editVal'|'aiOpen'|'aiPromptVal'>[] = [
+const INDEP_CANDS_INIT: Omit<IndepCandState, 'selected'|'editing'|'editVal'|'aiOpen'|'aiPromptVal'|'aiProposed'|'aiDiffOpen'|'aiDiffSel'>[] = [
   {
     id: 1, label: 'A',
     text: '라이다 센서로부터 3차원 포인트 클라우드 데이터를 획득하는 데이터 수집부;\n상기 포인트 클라우드 데이터에서 지면 포인트를 분리하고 노이즈를 제거하는 전처리부;\n딥러닝 모델을 적용하여 객체를 분류하는 인식부를 포함하며,\n실시간 3D 객체 인식이 가능한 라이다 기반 객체 감지 장치.',
@@ -945,6 +948,7 @@ interface DepItemState {
   id: number; text: string; sel: boolean; expanded: boolean;
   editing: boolean; editVal: string;
   aiOpen: boolean; aiPromptVal: string;
+  aiProposed: string; aiDiffOpen: boolean; aiDiffSel: 'current' | 'proposed';
 }
 
 // 독립항별 더미 종속항 — 실제에서는 AI가 독립항 텍스트 기반으로 생성
@@ -1010,7 +1014,7 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
 
   // 독립항 후보 상태 (n개 다중 선택)
   const [cands, setCands] = useState<IndepCandState[]>(
-    INDEP_CANDS_INIT.map(c => ({ ...c, selected: c.id === 1, editing: false, editVal: c.text, aiOpen: false, aiPromptVal: '' }))
+    INDEP_CANDS_INIT.map(c => ({ ...c, selected: c.id === 1, editing: false, editVal: c.text, aiOpen: false, aiPromptVal: '', aiProposed: '', aiDiffOpen: false, aiDiffSel: 'proposed' as const }))
   );
 
   // 독립항별 종속항 그룹
@@ -1063,12 +1067,22 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
     syncUpdate(cands, depGroups);
   };
 
-  // 독립항 AI 재생성 (mock)
+  // 독립항 AI 재생성 — prompt → diff 모드로 전환 (mock 생성)
   const regenIndep = (id: number) => {
     const c = cands.find(x => x.id === id);
     if (!c) return;
-    const newText = `${c.aiPromptVal.trim() ? `[${c.aiPromptVal.trim()} 반영] ` : ''}${c.text.split('.')[0]}${c.text.includes('장치') ? ' 및 이를 이용한 감지 방법.' : ' 방법 및 시스템.'}`;
-    const next = cands.map(x => x.id === id ? { ...x, text: newText, aiOpen: false, aiPromptVal: '' } : x);
+    const baseText = c.aiDiffOpen && c.aiProposed ? c.aiProposed : (c.editing ? c.editVal : c.text);
+    const proposed = `${c.aiPromptVal.trim() ? `[${c.aiPromptVal.trim()} 반영] ` : ''}${baseText.split(';')[0]}; 상기 구성의 유기적 결합을 통해 높은 정확도와 실시간 처리를 달성하는, ${baseText.includes('장치') ? '라이다 기반 객체 감지 장치.' : '라이다 기반 객체 감지 방법.'}`;
+    const next = cands.map(x => x.id === id ? { ...x, aiOpen: false, aiPromptVal: '', aiProposed: proposed, aiDiffOpen: true, aiDiffSel: 'proposed' as const } : x);
+    setCands(next);
+  };
+
+  // 독립항 diff 선택 완료
+  const applyIndepDiff = (id: number) => {
+    const c = cands.find(x => x.id === id);
+    if (!c) return;
+    const finalText = c.aiDiffSel === 'proposed' ? c.aiProposed : (c.editing ? c.editVal : c.text);
+    const next = cands.map(x => x.id === id ? { ...x, text: finalText, editVal: finalText, aiDiffOpen: false, aiProposed: '', aiDiffSel: 'proposed' as const } : x);
     setCands(next);
     syncUpdate(next, depGroups);
   };
@@ -1076,7 +1090,7 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
   // 종속항 AI 생성 (mock)
   const generateDeps = (indepId: number) => {
     const mockItems = (MOCK_DEPS_BY_INDEP[indepId] ?? MOCK_DEPS_BY_INDEP[1]).map((d, i) => ({
-      id: i + 1, ...d, expanded: false, editing: false, editVal: d.text, aiOpen: false, aiPromptVal: '',
+      id: i + 1, ...d, expanded: false, editing: false, editVal: d.text, aiOpen: false, aiPromptVal: '', aiProposed: '', aiDiffOpen: false, aiDiffSel: 'proposed' as const,
     }));
     const next: Record<number, DepGroupState> = { ...depGroups, [indepId]: { generated: true, items: mockItems, newText: '' } };
     setDepGroups(next);
@@ -1105,7 +1119,7 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
     const grp = depGroups[indepId];
     if (!grp || !grp.newText.trim()) return;
     const maxId = grp.items.reduce((m, d) => Math.max(m, d.id), 0);
-    const newItem: DepItemState = { id: maxId + 1, text: grp.newText.trim(), sel: true, expanded: false, editing: false, editVal: grp.newText.trim(), aiOpen: false, aiPromptVal: '' };
+    const newItem: DepItemState = { id: maxId + 1, text: grp.newText.trim(), sel: true, expanded: false, editing: false, editVal: grp.newText.trim(), aiOpen: false, aiPromptVal: '', aiProposed: '', aiDiffOpen: false, aiDiffSel: 'proposed' };
     const next = { ...depGroups, [indepId]: { ...grp, items: [...grp.items, newItem], newText: '' } };
     setDepGroups(next);
     syncUpdate(cands, next);
@@ -1116,9 +1130,21 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
     if (!grp) return;
     const dep = grp.items.find(d => d.id === depId);
     if (!dep) return;
-    const suffix = dep.text.includes('장치') ? ', 라이다 기반 객체 감지 장치.' : ', 라이다 기반 객체 감지 방법.';
-    const newText = `${dep.text.split('있어서')[0]}있어서, ${dep.aiPromptVal.trim() || '상기 구성을 더 포함하는'}${suffix}`;
-    const next = { ...depGroups, [indepId]: { ...grp, items: grp.items.map(d => d.id === depId ? { ...d, text: newText, aiOpen: false, aiPromptVal: '' } : d) } };
+    const baseText = dep.aiDiffOpen && dep.aiProposed ? dep.aiProposed : dep.text;
+    const suffix = baseText.includes('장치') ? ', 라이다 기반 객체 감지 장치.' : ', 라이다 기반 객체 감지 방법.';
+    const proposed = `${baseText.split('있어서')[0]}있어서, ${dep.aiPromptVal.trim() || '상기 구성을 더 구체적으로 포함하는'}${suffix}`;
+    const next = { ...depGroups, [indepId]: { ...grp, items: grp.items.map(d => d.id === depId ? { ...d, aiOpen: false, aiPromptVal: '', aiProposed: proposed, aiDiffOpen: true, aiDiffSel: 'proposed' as const } : d) } };
+    setDepGroups(next);
+  };
+
+  // 종속항 diff 선택 완료
+  const applyDepDiff = (indepId: number, depId: number) => {
+    const grp = depGroups[indepId];
+    if (!grp) return;
+    const dep = grp.items.find(d => d.id === depId);
+    if (!dep) return;
+    const finalText = dep.aiDiffSel === 'proposed' ? dep.aiProposed : dep.text;
+    const next = { ...depGroups, [indepId]: { ...grp, items: grp.items.map(d => d.id === depId ? { ...d, text: finalText, editVal: finalText, aiDiffOpen: false, aiProposed: '', aiDiffSel: 'proposed' as const } : d) } };
     setDepGroups(next);
     syncUpdate(cands, next);
   };
@@ -1203,15 +1229,60 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
               <p className="text-xs2 text-gray-700 leading-relaxed whitespace-pre-line">{cand.text}</p>
             )}
 
-            {/* AI 재생성 인라인 */}
+            {/* AI 재생성 — prompt 모드 */}
             <AiRegenBlock
-              currentText={cand.editing ? cand.editVal : cand.text}
+              currentText={cand.aiDiffOpen && cand.aiProposed ? cand.aiProposed : (cand.editing ? cand.editVal : cand.text)}
               open={cand.aiOpen}
               promptVal={cand.aiPromptVal}
               onPromptChange={v => setCands(p => p.map(c => c.id === cand.id ? { ...c, aiPromptVal: v } : c))}
               onSubmit={() => regenIndep(cand.id)}
               onCancel={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, aiOpen: false } : c))}
             />
+
+            {/* diff 모드 — 원본 vs. 변경 버전 선택 */}
+            {cand.aiDiffOpen && (
+              <div className="mt-2 space-y-1.5">
+                <p className="text-xs2 text-gray-500 font-semibold">버전을 선택하세요</p>
+                {/* 현재 버전 */}
+                <div onClick={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, aiDiffSel: 'current' } : c))}
+                  className={clsx('rounded-lg border-2 p-2.5 cursor-pointer transition-all',
+                    cand.aiDiffSel === 'current' ? 'border-gray-400 bg-gray-50' : 'border-gray-200 bg-gray-50/50 opacity-60 hover:opacity-80')}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className={clsx('w-3 h-3 rounded-full border-2 flex items-center justify-center shrink-0',
+                      cand.aiDiffSel === 'current' ? 'border-gray-500 bg-gray-500' : 'border-gray-300')}>
+                      {cand.aiDiffSel === 'current' && <span className="w-1 h-1 rounded-full bg-white" />}
+                    </span>
+                    <span className="text-xs2 font-medium text-gray-500">현재 버전 유지</span>
+                  </div>
+                  <p className="text-xs2 text-gray-400 leading-relaxed line-clamp-2">{cand.editing ? cand.editVal : cand.text}</p>
+                </div>
+                {/* 변경 버전 */}
+                <div onClick={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, aiDiffSel: 'proposed' } : c))}
+                  className={clsx('rounded-lg border-2 p-2.5 cursor-pointer transition-all',
+                    cand.aiDiffSel === 'proposed' ? 'border-blue-600 bg-blue-50 shadow-sm' : 'border-blue-200 bg-white hover:border-blue-400')}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className={clsx('w-3 h-3 rounded-full border-2 flex items-center justify-center shrink-0',
+                      cand.aiDiffSel === 'proposed' ? 'border-blue-600 bg-blue-600' : 'border-blue-300')}>
+                      {cand.aiDiffSel === 'proposed' && <span className="w-1 h-1 rounded-full bg-white" />}
+                    </span>
+                    <span className="text-xs2 font-bold text-blue-700">변경 버전 채택</span>
+                    <span className="ml-auto text-xs2 px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 font-semibold">수정됨</span>
+                  </div>
+                  <p className={clsx('text-xs2 leading-relaxed', cand.aiDiffSel === 'proposed' ? 'text-gray-800 font-medium' : 'text-gray-600')}>{cand.aiProposed}</p>
+                </div>
+                <div className="flex gap-1.5 mt-1">
+                  <button onClick={() => applyIndepDiff(cand.id)}
+                    className="flex-1 py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800">
+                    선택 완료 →
+                  </button>
+                  <button
+                    onClick={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, aiOpen: true, aiPromptVal: '' } : c))}
+                    className="px-2 py-1.5 border border-violet-300 text-violet-600 rounded text-xs2 hover:bg-violet-50">
+                    다시 수정
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
 
@@ -1278,12 +1349,38 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
                 </div>
                 <p className="text-xs2 text-blue-800 leading-relaxed whitespace-pre-line line-clamp-3">{indep.text}</p>
                 <AiRegenBlock
-                  currentText={indep.text} open={indep.aiOpen}
+                  currentText={indep.aiDiffOpen && indep.aiProposed ? indep.aiProposed : indep.text}
+                  open={indep.aiOpen}
                   promptVal={indep.aiPromptVal}
                   onPromptChange={v => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiPromptVal: v } : c))}
                   onSubmit={() => regenIndep(indep.id)}
                   onCancel={() => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiOpen: false } : c))}
                 />
+                {/* diff 모드 */}
+                {indep.aiDiffOpen && (
+                  <div className="mt-2 space-y-1.5">
+                    <p className="text-xs2 text-gray-500 font-semibold">버전을 선택하세요</p>
+                    <div onClick={() => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiDiffSel: 'current' } : c))}
+                      className={clsx('rounded border-2 p-2 cursor-pointer transition-all', indep.aiDiffSel === 'current' ? 'border-gray-400 bg-gray-50' : 'border-gray-200 opacity-60 hover:opacity-80')}>
+                      <p className="text-xs2 text-gray-400 mb-0.5 font-medium">현재 버전</p>
+                      <p className="text-xs2 text-gray-600 line-clamp-2">{indep.text}</p>
+                    </div>
+                    <div onClick={() => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiDiffSel: 'proposed' } : c))}
+                      className={clsx('rounded border-2 p-2 cursor-pointer transition-all', indep.aiDiffSel === 'proposed' ? 'border-blue-600 bg-blue-50' : 'border-blue-200 hover:border-blue-400')}>
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <p className="text-xs2 font-bold text-blue-700">변경 버전</p>
+                        <span className="text-xs2 px-1 py-0.5 rounded bg-blue-100 text-blue-600 font-semibold">수정됨</span>
+                      </div>
+                      <p className={clsx('text-xs2 line-clamp-2', indep.aiDiffSel === 'proposed' ? 'text-gray-800' : 'text-gray-600')}>{indep.aiProposed}</p>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <button onClick={() => applyIndepDiff(indep.id)}
+                        className="flex-1 py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800">선택 완료 →</button>
+                      <button onClick={() => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiOpen: true, aiPromptVal: '' } : c))}
+                        className="px-2 py-1.5 border border-violet-300 text-violet-600 rounded text-xs2 hover:bg-violet-50">다시 수정</button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 종속항 섹션 */}
@@ -1379,12 +1476,38 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
                                     </div>
                                   )}
                                   <AiRegenBlock
-                                    currentText={dep.text} open={dep.aiOpen}
+                                    currentText={dep.aiDiffOpen && dep.aiProposed ? dep.aiProposed : dep.text}
+                                    open={dep.aiOpen}
                                     promptVal={dep.aiPromptVal}
                                     onPromptChange={v => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiPromptVal: v } : d) })}
                                     onSubmit={() => regenDep(indep.id, dep.id)}
                                     onCancel={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiOpen: false } : d) })}
                                   />
+                                  {/* 종속항 diff 모드 */}
+                                  {dep.aiDiffOpen && (
+                                    <div className="mt-2 space-y-1.5">
+                                      <p className="text-xs2 text-gray-500 font-semibold">버전을 선택하세요</p>
+                                      <div onClick={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiDiffSel: 'current' } : d) })}
+                                        className={clsx('rounded border-2 p-2 cursor-pointer', dep.aiDiffSel === 'current' ? 'border-gray-400 bg-gray-50' : 'border-gray-200 opacity-60 hover:opacity-80')}>
+                                        <p className="text-xs2 text-gray-400 mb-0.5 font-medium">현재 버전</p>
+                                        <p className="text-xs2 text-gray-600 line-clamp-2">{dep.text}</p>
+                                      </div>
+                                      <div onClick={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiDiffSel: 'proposed' } : d) })}
+                                        className={clsx('rounded border-2 p-2 cursor-pointer', dep.aiDiffSel === 'proposed' ? 'border-blue-600 bg-blue-50' : 'border-blue-200 hover:border-blue-400')}>
+                                        <div className="flex items-center gap-1.5 mb-0.5">
+                                          <p className="text-xs2 font-bold text-blue-700">변경 버전</p>
+                                          <span className="text-xs2 px-1 rounded bg-blue-100 text-blue-600 font-semibold">수정됨</span>
+                                        </div>
+                                        <p className={clsx('text-xs2 line-clamp-2', dep.aiDiffSel === 'proposed' ? 'text-gray-800' : 'text-gray-600')}>{dep.aiProposed}</p>
+                                      </div>
+                                      <div className="flex gap-1.5">
+                                        <button onClick={() => applyDepDiff(indep.id, dep.id)}
+                                          className="flex-1 py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800">선택 완료 →</button>
+                                        <button onClick={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiOpen: true, aiPromptVal: '' } : d) })}
+                                          className="px-2 py-1.5 border border-violet-300 text-violet-600 rounded text-xs2 hover:bg-violet-50">다시 수정</button>
+                                      </div>
+                                    </div>
+                                  )}
                                 </>
                               )}
                             </div>
@@ -1697,8 +1820,15 @@ function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChan
             {/* 단일 CTA: 선택 완료 */}
             <button
               onClick={() => {
-                if (diffSel === 'proposed') setTexts(p => ({ ...p, [sec.key]: proposed }));
+                const newText = diffSel === 'proposed' ? proposed : curText;
+                if (diffSel === 'proposed') setTexts(p => ({ ...p, [sec.key]: newText }));
                 setMode('view'); setProposed(''); setDiffSel('proposed');
+                // 이미 확정된 섹션이면 새 텍스트로 재확정 → doConfirm이 null이 되는 문제 방지
+                if (isDone) {
+                  const next = { ...confirmed, [sec.key]: newText };
+                  setConfirmed(next);
+                  onUpdate(DESC_SECTIONS.map(s => `【${s.label}】\n${next[s.key] || s.text}`).join('\n\n'));
+                }
               }}
               className="w-full py-2 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800 mt-1"
             >
