@@ -746,43 +746,23 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
     onComponentsChange?.(selected.map(it => ({ number: it.num || '', name: extractCompName(it.text) })));
   };
 
-  const moveUp = (idx: number) => {
-    if (idx === 0 || done) return;
-    const a = [...items]; [a[idx - 1], a[idx]] = [a[idx], a[idx - 1]]; upd(a);
-  };
-  const moveDown = (idx: number) => {
-    if (idx === items.length - 1 || done) return;
-    const a = [...items]; [a[idx], a[idx + 1]] = [a[idx + 1], a[idx]]; upd(a);
-  };
-  const toggle = (id: number) => { if (!done) upd(items.map(it => it.id === id ? { ...it, sel: !it.sel } : it)); };
-  const remove = (id: number) => { if (!done) upd(items.filter(it => it.id !== id)); };
-
-  // 해당 항목 바로 아래에 하위 항목 삽입
-  const addChild = (idx: number) => {
-    if (done) return;
-    const parentDepth = items[idx].depth;
-    const childDepth = Math.min(parentDepth + 1, 2);
-    const newItem: CompItem = { id: Date.now(), text: '', sel: true, num: '', depth: childDepth };
-    const next = [...items];
-    next.splice(idx + 1, 0, newItem);
-    upd(next);
-  };
-
-  // 부호 자동 부여
+  const moveUp   = (idx: number) => { if (idx === 0 || done) return; const a = [...items]; [a[idx-1],a[idx]]=[a[idx],a[idx-1]]; upd(a); };
+  const moveDown = (idx: number) => { if (idx === items.length-1 || done) return; const a=[...items]; [a[idx],a[idx+1]]=[a[idx+1],a[idx]]; upd(a); };
+  const indent   = (id: number)  => { if (!done) upd(items.map(it => it.id===id ? {...it, depth: Math.min(it.depth+1,2)} : it)); };
+  const outdent  = (id: number)  => { if (!done) upd(items.map(it => it.id===id ? {...it, depth: Math.max(it.depth-1,0)} : it)); };
+  const remove   = (id: number)  => { if (!done) upd(items.filter(it => it.id!==id)); };
   const autoAssign = () => { if (!done) upd(calcAutoNums(items)); };
-
-  // 새 최상위 항목 추가
   const add = () => {
     if (!newText.trim() || done) return;
     upd([...items, { id: Date.now(), text: newText.trim(), sel: true, num: '', depth: 0 }]);
     setNewText('');
   };
 
-  const DEPTH_INDENT = 14;
+  const DEPTH_INDENT = 16;
 
   return (
     <>
-      <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-1.5">
+      <div className="flex-1 overflow-y-auto scroll-thin p-3">
         {/* 헤더 + 부호 자동 부여 */}
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs2 font-semibold text-gray-600">AI 추출 구성요소</span>
@@ -797,77 +777,82 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
           )}
         </div>
 
-        {items.map((item, idx) => (
-          <div key={item.id}
-            style={{ marginLeft: item.depth * DEPTH_INDENT }}
-            className={clsx('rounded-lg border transition-all',
-              item.sel && !done ? 'border-blue-300 bg-blue-50' : '',
-              !item.sel ? 'border-gray-200 bg-gray-50 opacity-60' : '',
-              done && item.sel ? 'border-green-200 bg-green-50' : '')}>
-            {/* 메인 행 */}
-            <div className="flex items-center gap-1.5 px-2 py-1.5">
-              {/* 부호 배지 */}
-              <span className={clsx(
-                'w-9 text-xs2 font-bold rounded px-1 py-0.5 shrink-0 text-center',
-                item.num ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'
+        <div className="space-y-0.5">
+          {items.map((item, idx) => (
+            <div key={item.id}
+              style={{ paddingLeft: item.depth * DEPTH_INDENT }}
+              className={clsx(!item.sel && 'opacity-50')}>
+              <div className={clsx(
+                'flex items-center gap-1 rounded px-1.5 py-1 transition-all group',
+                item.sel && !done ? 'bg-white border border-gray-200 hover:border-blue-300' : '',
+                !item.sel ? 'bg-gray-50 border border-dashed border-gray-200' : '',
+                done && item.sel ? 'bg-green-50 border border-green-200' : ''
               )}>
-                {item.num || '—'}
-              </span>
+                {/* 드래그 핸들 (시각 표시) */}
+                <span className="text-gray-300 cursor-grab shrink-0 select-none text-xs leading-none">⠿</span>
 
-              {/* 텍스트 (편집 가능) */}
-              {!done ? (
-                <input
-                  className="text-xs2 text-gray-700 flex-1 bg-transparent outline-none border-b border-transparent focus:border-blue-300 py-0.5"
-                  value={item.text}
-                  placeholder="구성요소 이름..."
-                  onChange={e => upd(items.map(it => it.id === item.id ? { ...it, text: e.target.value } : it))}
-                />
-              ) : (
-                <span className="text-xs2 text-gray-700 flex-1 leading-relaxed">{item.text}</span>
-              )}
+                {/* 부호 배지 */}
+                <span className={clsx(
+                  'w-8 text-xs2 font-bold rounded px-1 py-0.5 shrink-0 text-center',
+                  item.num ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'
+                )}>
+                  {item.num || '—'}
+                </span>
 
-              {/* 액션 버튼 */}
-              {!done && (
-                <div className="flex items-center gap-0.5 shrink-0">
-                  <button onClick={() => moveUp(idx)} disabled={idx === 0}
-                    className="text-gray-300 hover:text-blue-500 disabled:opacity-20 p-0.5" title="위로">
-                    <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" width="9" height="9"><path d="M2 7l3-4 3 4"/></svg>
-                  </button>
-                  <button onClick={() => moveDown(idx)} disabled={idx === items.length - 1}
-                    className="text-gray-300 hover:text-blue-500 disabled:opacity-20 p-0.5" title="아래로">
-                    <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" width="9" height="9"><path d="M2 3l3 4 3-4"/></svg>
-                  </button>
-                  <div className="w-px h-3 bg-gray-200 mx-0.5" />
-                  <button onClick={() => toggle(item.id)}
-                    className="text-gray-300 hover:text-amber-500 p-0.5" title="포함/제외">
-                    <Icon name="check" size={9} />
-                  </button>
-                  <button onClick={() => remove(item.id)}
-                    className="text-gray-300 hover:text-red-500 p-0.5" title="삭제">
-                    <Icon name="close" size={9} />
-                  </button>
-                </div>
-              )}
+                {/* 텍스트 */}
+                {!done ? (
+                  <input
+                    className="text-xs2 text-gray-700 flex-1 bg-transparent outline-none min-w-0 py-0.5"
+                    value={item.text}
+                    placeholder="구성요소 이름..."
+                    onChange={e => upd(items.map(it => it.id===item.id ? {...it, text: e.target.value} : it))}
+                  />
+                ) : (
+                  <span className="text-xs2 text-gray-700 flex-1 min-w-0 truncate">{item.text}</span>
+                )}
+
+                {/* 액션 버튼 — hover 시 표시 */}
+                {!done && (
+                  <div className="flex items-center gap-px shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* 순서 */}
+                    <button onClick={() => moveUp(idx)} disabled={idx===0}
+                      className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20" title="위로">
+                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 7l3-4 3 4"/></svg>
+                    </button>
+                    <button onClick={() => moveDown(idx)} disabled={idx===items.length-1}
+                      className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20" title="아래로">
+                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 3l3 4 3-4"/></svg>
+                    </button>
+                    {/* 구분선 */}
+                    <span className="w-px h-3 bg-gray-200 mx-0.5" />
+                    {/* 위계 */}
+                    <button onClick={() => indent(item.id)} disabled={item.depth>=2}
+                      className="p-0.5 text-gray-400 hover:text-violet-500 disabled:opacity-20" title="하위로 (→)">
+                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 5h6M6 3l2 2-2 2"/></svg>
+                    </button>
+                    <button onClick={() => outdent(item.id)} disabled={item.depth<=0}
+                      className="p-0.5 text-gray-400 hover:text-violet-500 disabled:opacity-20" title="상위로 (←)">
+                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M8 5H2M4 3L2 5l2 2"/></svg>
+                    </button>
+                    {/* 구분선 */}
+                    <span className="w-px h-3 bg-gray-200 mx-0.5" />
+                    {/* 삭제 */}
+                    <button onClick={() => remove(item.id)}
+                      className="p-0.5 text-gray-400 hover:text-red-500" title="삭제">
+                      <Icon name="close" size={9} />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-
-            {/* 하위 추가 버튼 (depth < 2인 경우만) */}
-            {!done && item.depth < 2 && (
-              <button onClick={() => addChild(idx)}
-                className="w-full flex items-center gap-1 px-3 pb-1 text-xs2 text-gray-400 hover:text-blue-600 transition-colors">
-                <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="9" height="9">
-                  <path d="M5 2v6M2 5h6"/>
-                </svg>
-                하위 추가
-              </button>
-            )}
-          </div>
-        ))}
+          ))}
+        </div>
 
         {/* 새 구성요소 추가 */}
         {!done && (
-          <div className="flex gap-1 mt-2">
+          <div className="flex gap-1 mt-3">
             <input className="input text-xs2 py-1.5 flex-1" placeholder="새 구성요소 추가..." value={newText}
-              onChange={e => setNewText(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} />
+              onChange={e => setNewText(e.target.value)} onKeyDown={e => e.key==='Enter' && add()} />
             <button onClick={add} className="btn-outline btn-xs px-2"><Icon name="plus" size={12} /></button>
           </div>
         )}
