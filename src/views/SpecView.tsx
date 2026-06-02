@@ -23,48 +23,48 @@ import clsx from 'clsx';
 
 type StepId = 'upload' | 'title' | 'description' | 'components' | 'drawings' | 'claims' | 'abstract';
 const STEPS: { id: StepId; num: number; short: string }[] = [
-  { id: 'upload', num: 1, short: '?쒖옉' },
-  { id: 'title', num: 2, short: '紐낆묶' },
-  { id: 'description', num: 3, short: '?ㅻ챸' },
-  { id: 'components', num: 4, short: '援ъ꽦?붿냼' },
-  { id: 'drawings', num: 5, short: '?꾨㈃' },
-  { id: 'claims', num: 6, short: '泥?뎄?? },
-  { id: 'abstract', num: 7, short: '?붿빟?? },
+  { id: 'upload', num: 1, short: '시작' },
+  { id: 'title', num: 2, short: '명칭' },
+  { id: 'description', num: 3, short: '설명' },
+  { id: 'components', num: 4, short: '구성요소' },
+  { id: 'drawings', num: 5, short: '도면' },
+  { id: 'claims', num: 6, short: '청구항' },
+  { id: 'abstract', num: 7, short: '요약서' },
 ];
 
 const STEP_LABEL: Partial<Record<StepId, string>> = {
-  title: '諛쒕챸??紐낆묶', description: '諛쒕챸???ㅻ챸', components: '援ъ꽦?붿냼',
-  drawings: '?꾨㈃', claims: '泥?뎄??, abstract: '?붿빟??,
+  title: '발명의 명칭', description: '발명의 설명', components: '구성요소',
+  drawings: '도면', claims: '청구항', abstract: '요약서',
 };
 const CONFIRM_LABEL: Partial<Record<StepId, string>> = {
-  title: '諛쒕챸??紐낆묶 ?좏깮 ?꾨즺', description: '諛쒕챸???ㅻ챸 ?좏깮 ?꾨즺',
-  components: '援ъ꽦?붿냼 ?좏깮 ?꾨즺', drawings: '?꾨㈃ ?좏깮 ?꾨즺',
-  claims: '泥?뎄???좏깮 ?꾨즺', abstract: '?붿빟???좏깮 ?꾨즺',
+  title: '발명의 명칭 선택 완료', description: '발명의 설명 선택 완료',
+  components: '구성요소 선택 완료', drawings: '도면 선택 완료',
+  claims: '청구항 선택 완료', abstract: '요약서 선택 완료',
 };
 const AI_NEXT: Record<StepId, string> = {
-  upload: '?낅줈?쒗븯??臾몄꽌瑜?遺꾩꽍?덉뒿?덈떎. 諛쒕챸??紐낆묶 ?꾨낫瑜??앹꽦?⑸땲??',
-  title: '諛쒕챸 紐낆묶???뺤젙?덉뒿?덈떎. 諛쒕챸???ㅻ챸 ??ぉ??遺꾩꽍?⑸땲??',
-  description: '?ㅻ챸 ??ぉ???뺤젙?덉뒿?덈떎. 諛쒕챸??援ъ꽦?붿냼瑜?異붿텧?⑸땲??',
-  components: '援ъ꽦?붿냼瑜??뺤젙?덉뒿?덈떎. ?낅줈?쒕맂 ?꾨㈃??遺꾩꽍?⑸땲??',
-  drawings: '?꾨㈃???뺤젙?덉뒿?덈떎. 泥?뎄??쓣 ?앹꽦?⑸땲??',
-  claims: '泥?뎄??쓣 ?뺤젙?덉뒿?덈떎. ?붿빟?쒕? ?앹꽦?⑸땲??',
-  abstract: '紐⑤뱺 遺꾩꽍 ??ぉ???뺤젙?섏뿀?듬땲?? 紐낆꽭?쒕? ?앹꽦??以鍮꾧? ?꾨즺?섏뿀?듬땲??',
+  upload: '업로드하신 문서를 분석했습니다. 발명의 명칭 후보를 생성합니다.',
+  title: '발명 명칭을 확정했습니다. 발명의 설명 항목을 분석합니다.',
+  description: '설명 항목을 확정했습니다. 발명의 구성요소를 추출합니다.',
+  components: '구성요소를 확정했습니다. 업로드된 도면을 분석합니다.',
+  drawings: '도면을 확정했습니다. 청구항을 생성합니다.',
+  claims: '청구항을 확정했습니다. 요약서를 생성합니다.',
+  abstract: '모든 분석 항목이 확정되었습니다. 명세서를 생성할 준비가 완료되었습니다.',
 };
 const GUIDE_CANDS: Record<string, string[]> = {
   title: [
-    '?멸났吏??湲곕컲 ?먯쑉二쇳뻾 李⑤웾???쇱씠??媛앹껜 媛먯? ?μ튂 諛?諛⑸쾿',
-    '?λ윭?앹쓣 ?댁슜??3D ?ъ씤???대씪?곕뱶 ?ㅼ떆媛?媛앹껜 ?몄떇 ?쒖뒪??,
-    '?먯쑉二쇳뻾 ?섍꼍?먯꽌???ㅼ쨷 ?쇱꽌 ?듯빀 湲곕컲 媛앹껜 寃異?諛⑸쾿',
+    '인공지능 기반 자율주행 차량의 라이다 객체 감지 장치 및 방법',
+    '딥러닝을 이용한 3D 포인트 클라우드 실시간 객체 인식 시스템',
+    '자율주행 환경에서의 다중 센서 융합 기반 객체 검출 방법',
   ],
   description: [
-    '湲곗닠遺꾩빞: 蹂?諛쒕챸? ?먯쑉二쇳뻾 李⑤웾?먯꽌 ?쇱씠???쇱꽌瑜??댁슜??媛앹껜 媛먯? 遺꾩빞??愿??寃껋씠??',
-    '諛곌꼍湲곗닠: ?먯쑉二쇳뻾 湲곗닠??諛쒖쟾?쇰줈 LiDAR 湲곕컲 3D 媛앹껜 媛먯?媛 ?듭떖 湲곗닠濡?遺媛곷릺怨??덈떎.',
-    '?닿껐怨쇱젣: 湲곗〈 諛⑹떇???ㅼ떆媛?泥섎━ ?띾룄 ?쒓퀎 諛?遺덉셿?꾪븳 ?ъ씤???대씪?곕뱶 泥섎━ 臾몄젣瑜??닿껐?쒕떎.',
-    '?닿껐?섎떒: ?λ윭??湲곕컲 PointNet++ ?꾪궎?띿쿂瑜??곸슜?섏뿬 ?ъ씤???대씪?곕뱶瑜?吏곸젒 泥섎━?쒕떎.',
-    '?④낵: 泥섎━ ?띾룄 40% ?μ긽 諛?媛앹껜 ?몄떇 ?뺥솗??95% ?댁긽 ?ъ꽦.',
+    '기술분야: 본 발명은 자율주행 차량에서 라이다 센서를 이용한 객체 감지 분야에 관한 것이다.',
+    '배경기술: 자율주행 기술의 발전으로 LiDAR 기반 3D 객체 감지가 핵심 기술로 부각되고 있다.',
+    '해결과제: 기존 방식의 실시간 처리 속도 한계 및 불완전한 포인트 클라우드 처리 문제를 해결한다.',
+    '해결수단: 딥러닝 기반 PointNet++ 아키텍처를 적용하여 포인트 클라우드를 직접 처리한다.',
+    '효과: 처리 속도 40% 향상 및 객체 인식 정확도 95% 이상 달성.',
   ],
   abstract: [
-    '蹂?諛쒕챸? ?먯쑉二쇳뻾 李⑤웾?먯꽌 ?쇱씠???쇱꽌瑜??댁슜?섏뿬 二쇰? 媛앹껜瑜??ㅼ떆媛꾩쑝濡?媛먯??섍퀬 遺꾨쪟?섎뒗 ?μ튂 諛?諛⑸쾿??愿??寃껋씠??',
+    '본 발명은 자율주행 차량에서 라이다 센서를 이용하여 주변 객체를 실시간으로 감지하고 분류하는 장치 및 방법에 관한 것이다.',
   ],
 };
 
