@@ -1,5 +1,6 @@
 // SpecView
 import { useEffect, useRef, useState } from 'react';
+import { SpecEditorView } from './SpecEditorView';
 import { DrawingEditorModal } from '../features/drawing-workflow/DrawingEditorModal';
 import { MOCK_DRAWINGS } from '../features/drawing-workflow/types';
 import {
@@ -103,6 +104,15 @@ export function SpecView() {
     setTimeout(() => flowRef.current?.scrollTo({ top: 99999, behavior: 'smooth' }), 50);
   };
   const doneCount = Object.keys(confirmed).length;
+
+  if (mainView === 'editor') {
+    return (
+      <>
+        <SpecEditorView task={task} onBack={() => setMainView('analysis')} />
+        {previewOpen && <PreviewModal taskName={task?.name} onClose={() => setPreviewOpen(false)} />}
+      </>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
@@ -352,7 +362,6 @@ export function SpecView() {
           />
         )}
       </div>
-      {mainView === 'editor' && <EditorView task={task} onBack={() => setMainView('analysis')} />}
       {previewOpen && <PreviewModal taskName={task?.name} onClose={() => setPreviewOpen(false)} />}
     </div>
   );
@@ -2052,8 +2061,8 @@ const SPEC_DOC_SECTIONS = [
   { id: 'abstract', label: '요약서' },
 ];
 
-// 명세서 편집기 뷰 (#23) — 단락형 문서 출력 + 섹션별 AI 어시스트
-function EditorView({ task, onBack }: { task: any; onBack: () => void }) {
+// 구 EditorView — SpecEditorView로 교체됨 (src/views/SpecEditorView.tsx)
+export function _EditorView_legacy({ task, onBack }: { task: any; onBack: () => void }) {
   const [activeSection, setActiveSection] = useState('tech');
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [sectionTexts, setSectionTexts] = useState<Record<string, string>>(
