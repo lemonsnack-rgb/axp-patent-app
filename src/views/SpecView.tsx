@@ -685,37 +685,42 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
 }
 
 // 구성요소 패널 (#20)
-interface CompItem { id: number; text: string; sel: boolean; num: string }
+interface CompItem { id: number; text: string; sel: boolean; num: string; depth: number }
 const INIT_COMPS: CompItem[] = [
-  { id: 1, text: '데이터 수집부: 라이다 센서로부터 3D 포인트 클라우드 데이터를 수집', sel: true, num: '' },
-  { id: 2, text: '전처리부: 노이즈 제거 및 다운샘플링을 통해 데이터 전처리 수행', sel: true, num: '' },
-  { id: 3, text: '특징 추출부: PointNet++ 아키텍처를 적용하여 포인트 특징 추출', sel: true, num: '' },
-  { id: 4, text: '인식부: 딥러닝 모델을 이용하여 객체 분류 및 위치 추정', sel: true, num: '' },
-  { id: 5, text: '출력부: 인식된 객체의 3D 위치, 크기, 종류를 출력', sel: true, num: '' },
+  { id: 1, text: '데이터 수집부: 라이다 센서로부터 3D 포인트 클라우드 데이터를 수집', sel: true, num: '', depth: 0 },
+  { id: 2, text: '전처리부: 노이즈 제거 및 다운샘플링을 통해 데이터 전처리 수행', sel: true, num: '', depth: 0 },
+  { id: 3, text: '특징 추출부: PointNet++ 아키텍처를 적용하여 포인트 특징 추출', sel: true, num: '', depth: 0 },
+  { id: 4, text: '인식부: 딥러닝 모델을 이용하여 객체 분류 및 위치 추정', sel: true, num: '', depth: 0 },
+  { id: 5, text: '출력부: 인식된 객체의 3D 위치, 크기, 종류를 출력', sel: true, num: '', depth: 0 },
 ];
 
-// 구성요소 텍스트에서 이름 추출 (":  " 앞부분)
 function extractCompName(text: string): string {
   const colonIdx = text.indexOf(':');
   return colonIdx > 0 ? text.slice(0, colonIdx).trim() : text.trim();
 }
 
-// 부호 기반 들여쓰기 레벨: 100→0단계, 110→1단계, 111→2단계
-function getNumLevel(num: string): number {
-  const n = parseInt(num);
-  if (!n || n <= 0) return 0;
-  if (n % 100 === 0) return 0;
-  if (n % 10 === 0) return 1;
-  return 2;
-}
-
-// 부호 기반 정렬 (빈 부호는 뒤로)
-function sortByNum(items: CompItem[]): CompItem[] {
-  return [...items].sort((a, b) => {
-    const na = parseInt(a.num) || Infinity;
-    const nb = parseInt(b.num) || Infinity;
-    return na - nb;
+// depth+순서 기반 부호 자동 계산
+function calcAutoNums(items: CompItem[]): CompItem[] {
+  const next = items.map(it => ({ ...it }));
+  let d0 = 0, d1 = 0, d2 = 0;
+  let base0 = 0, base1 = 0;
+  next.forEach(item => {
+    if (!item.sel) { item.num = ''; return; }
+    const d = item.depth ?? 0;
+    if (d === 0) {
+      d0++; d1 = 0; d2 = 0;
+      base0 = d0 * 100; base1 = 0;
+      item.num = String(base0);
+    } else if (d === 1) {
+      d1++; d2 = 0;
+      base1 = base0 + d1 * 10;
+      item.num = String(base1);
+    } else {
+      d2++;
+      item.num = String(base1 + d2);
+    }
   });
+  return next;
 }
 
 function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
@@ -727,14 +732,10 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
   const [items, setItems] = useState<CompItem[]>(INIT_COMPS);
   const [newText, setNewText] = useState('');
 
-  // 마운트 시 초기값 전달
   useEffect(() => {
     const selected = INIT_COMPS.filter(it => it.sel);
     onUpdate(selected.map(it => `${it.num || '—'} ${it.text}`).join('\n'));
-    onComponentsChange?.(selected.map(it => ({
-      number: it.num || '',
-      name: extractCompName(it.text),
-    })));
+    onComponentsChange?.(selected.map(it => ({ number: it.num || '', name: extractCompName(it.text) })));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -742,72 +743,127 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
     setItems(next);
     const selected = next.filter(it => it.sel);
     onUpdate(selected.map(it => `${it.num || '—'} ${it.text}`).join('\n'));
-    onComponentsChange?.(selected.map(it => ({
-      number: it.num || '',
-      name: extractCompName(it.text),
-    })));
+    onComponentsChange?.(selected.map(it => ({ number: it.num || '', name: extractCompName(it.text) })));
   };
 
+  const moveUp = (idx: number) => {
+    if (idx === 0 || done) return;
+    const a = [...items]; [a[idx - 1], a[idx]] = [a[idx], a[idx - 1]]; upd(a);
+  };
+  const moveDown = (idx: number) => {
+    if (idx === items.length - 1 || done) return;
+    const a = [...items]; [a[idx], a[idx + 1]] = [a[idx + 1], a[idx]]; upd(a);
+  };
   const toggle = (id: number) => { if (!done) upd(items.map(it => it.id === id ? { ...it, sel: !it.sel } : it)); };
   const remove = (id: number) => { if (!done) upd(items.filter(it => it.id !== id)); };
-  const setNum = (id: number, num: string) => {
+
+  // 해당 항목 바로 아래에 하위 항목 삽입
+  const addChild = (idx: number) => {
     if (done) return;
-    // 숫자만 허용
-    const cleaned = num.replace(/\D/g, '').slice(0, 5);
-    upd(items.map(it => it.id === id ? { ...it, num: cleaned } : it));
+    const parentDepth = items[idx].depth;
+    const childDepth = Math.min(parentDepth + 1, 2);
+    const newItem: CompItem = { id: Date.now(), text: '', sel: true, num: '', depth: childDepth };
+    const next = [...items];
+    next.splice(idx + 1, 0, newItem);
+    upd(next);
   };
+
+  // 부호 자동 부여
+  const autoAssign = () => { if (!done) upd(calcAutoNums(items)); };
+
+  // 새 최상위 항목 추가
   const add = () => {
     if (!newText.trim() || done) return;
-    upd([...items, { id: Date.now(), text: newText.trim(), sel: true, num: '' }]);
+    upd([...items, { id: Date.now(), text: newText.trim(), sel: true, num: '', depth: 0 }]);
     setNewText('');
   };
 
-  const displayItems = sortByNum(items);
+  const DEPTH_INDENT = 14;
 
   return (
     <>
       <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-1.5">
-        <div className="flex items-center justify-between mb-1">
+        {/* 헤더 + 부호 자동 부여 */}
+        <div className="flex items-center justify-between mb-2">
           <span className="text-xs2 font-semibold text-gray-600">AI 추출 구성요소</span>
-          <span className="text-xs2 text-gray-400">부호를 직접 입력하면 위계가 정렬됩니다</span>
+          {!done && (
+            <button onClick={autoAssign}
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs2 font-semibold bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition-colors">
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="10" height="10">
+                <path d="M2 6h8M8 4l2 2-2 2"/>
+              </svg>
+              부호 자동 부여
+            </button>
+          )}
         </div>
-        {displayItems.map((item) => {
-          const level = getNumLevel(item.num);
-          return (
-            <div key={item.id}
-              style={{ marginLeft: level * 14 }}
-              className={clsx('flex items-start gap-1.5 rounded-lg border p-2 transition-all',
-                item.sel && !done ? 'border-blue-300 bg-blue-50' : '',
-                !item.sel ? 'border-gray-200 bg-gray-50 opacity-60' : '',
-                done && item.sel ? 'border-green-200 bg-green-50' : '')}>
-              {/* 부호 입력 */}
+
+        {items.map((item, idx) => (
+          <div key={item.id}
+            style={{ marginLeft: item.depth * DEPTH_INDENT }}
+            className={clsx('rounded-lg border transition-all',
+              item.sel && !done ? 'border-blue-300 bg-blue-50' : '',
+              !item.sel ? 'border-gray-200 bg-gray-50 opacity-60' : '',
+              done && item.sel ? 'border-green-200 bg-green-50' : '')}>
+            {/* 메인 행 */}
+            <div className="flex items-center gap-1.5 px-2 py-1.5">
+              {/* 부호 배지 */}
+              <span className={clsx(
+                'w-9 text-xs2 font-bold rounded px-1 py-0.5 shrink-0 text-center',
+                item.num ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'
+              )}>
+                {item.num || '—'}
+              </span>
+
+              {/* 텍스트 (편집 가능) */}
               {!done ? (
                 <input
-                  type="text"
-                  value={item.num}
-                  onChange={e => setNum(item.id, e.target.value)}
-                  placeholder="부호"
-                  className={clsx(
-                    'w-10 text-xs2 font-bold text-center rounded border px-1 py-0.5 shrink-0 mt-0.5 outline-none',
-                    item.num ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white border-gray-300 text-gray-400'
-                  )}
+                  className="text-xs2 text-gray-700 flex-1 bg-transparent outline-none border-b border-transparent focus:border-blue-300 py-0.5"
+                  value={item.text}
+                  placeholder="구성요소 이름..."
+                  onChange={e => upd(items.map(it => it.id === item.id ? { ...it, text: e.target.value } : it))}
                 />
               ) : (
-                <span className={clsx('w-10 text-xs2 font-bold rounded px-1 py-0.5 shrink-0 mt-0.5 text-center',
-                  item.num ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400')}>
-                  {item.num || '—'}
-                </span>
+                <span className="text-xs2 text-gray-700 flex-1 leading-relaxed">{item.text}</span>
               )}
-              <span className="text-xs2 text-gray-700 flex-1 leading-relaxed break-words">{item.text}</span>
+
+              {/* 액션 버튼 */}
               {!done && (
-                <div className="flex flex-col gap-0.5 shrink-0">
-                  <button onClick={() => toggle(item.id)} className="text-gray-400 hover:text-amber-600 p-0.5" title="포함/제외"><Icon name="check" size={10} /></button>
-                  <button onClick={() => remove(item.id)} className="text-gray-400 hover:text-red-500 p-0.5" title="삭제"><Icon name="close" size={10} /></button>
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <button onClick={() => moveUp(idx)} disabled={idx === 0}
+                    className="text-gray-300 hover:text-blue-500 disabled:opacity-20 p-0.5" title="위로">
+                    <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" width="9" height="9"><path d="M2 7l3-4 3 4"/></svg>
+                  </button>
+                  <button onClick={() => moveDown(idx)} disabled={idx === items.length - 1}
+                    className="text-gray-300 hover:text-blue-500 disabled:opacity-20 p-0.5" title="아래로">
+                    <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" width="9" height="9"><path d="M2 3l3 4 3-4"/></svg>
+                  </button>
+                  <div className="w-px h-3 bg-gray-200 mx-0.5" />
+                  <button onClick={() => toggle(item.id)}
+                    className="text-gray-300 hover:text-amber-500 p-0.5" title="포함/제외">
+                    <Icon name="check" size={9} />
+                  </button>
+                  <button onClick={() => remove(item.id)}
+                    className="text-gray-300 hover:text-red-500 p-0.5" title="삭제">
+                    <Icon name="close" size={9} />
+                  </button>
                 </div>
               )}
             </div>
-          );
-        })}
+
+            {/* 하위 추가 버튼 (depth < 2인 경우만) */}
+            {!done && item.depth < 2 && (
+              <button onClick={() => addChild(idx)}
+                className="w-full flex items-center gap-1 px-3 pb-1 text-xs2 text-gray-400 hover:text-blue-600 transition-colors">
+                <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="9" height="9">
+                  <path d="M5 2v6M2 5h6"/>
+                </svg>
+                하위 추가
+              </button>
+            )}
+          </div>
+        ))}
+
+        {/* 새 구성요소 추가 */}
         {!done && (
           <div className="flex gap-1 mt-2">
             <input className="input text-xs2 py-1.5 flex-1" placeholder="새 구성요소 추가..." value={newText}
