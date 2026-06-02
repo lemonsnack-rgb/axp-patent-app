@@ -1,6 +1,6 @@
 // RefListPanel — 도면 부호 목록 (검색·100단위 그룹·계층·도면설명)
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, ChevronsUp, ChevronsDown } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, ChevronsUp, ChevronsDown, GripVertical } from 'lucide-react';
 import type { EditorReference, InventionComponent } from './types';
 
 interface Props {
@@ -98,6 +98,9 @@ export function RefListPanel({
   const [linkedComp, setLinkedComp] = useState('');
   // addingChildOf: 향후 인라인 하위 추가 UI 확장 시 사용 예정
   const setAddingChildOf = (_: string | null) => {};
+  // 드래그 앤 드롭 상태
+  const [dragNum, setDragNum] = useState<string | null>(null);
+  const [dropNum, setDropNum] = useState<string | null>(null);
 
   const tree = useMemo(() => buildTree(references), [references]);
   const flat = useMemo(() => flattenTree(tree), [tree]);
@@ -234,10 +237,28 @@ export function RefListPanel({
               {/* 그룹 아이템 */}
               {!collapsed && items.map(({ ref: r, depth }) => {
                 const isEditing = editingNum === r.number;
+                const isDragging = dragNum === r.number;
+                const isDropTarget = dropNum === r.number && dragNum !== r.number;
                 return (
                   <div key={r.number}
-                    className="flex items-center gap-0.5 border-b border-ck-border/50 bg-white hover:bg-ck-bg text-sm2 group"
+                    draggable
+                    onDragStart={() => setDragNum(r.number)}
+                    onDragOver={e => { e.preventDefault(); setDropNum(r.number); }}
+                    onDragEnd={() => {
+                      if (dragNum && dropNum && dragNum !== dropNum) {
+                        const dragRef = references.find(x => x.number === dragNum);
+                        const dropRef = references.find(x => x.number === dropNum);
+                        if (dragRef && dropRef && onUpdate) {
+                          // 드롭 위치의 parentNumber를 드래그 항목에 적용 (위계 유지하며 그룹 이동)
+                          onUpdate({ ...dragRef, parentNumber: dropRef.parentNumber });
+                        }
+                      }
+                      setDragNum(null); setDropNum(null);
+                    }}
+                    className={`flex items-center gap-0.5 border-b border-ck-border/50 bg-white hover:bg-ck-bg text-sm2 group transition-all ${isDragging ? 'opacity-30' : ''} ${isDropTarget ? 'ring-2 ring-inset ring-blue-400' : ''}`}
                     style={{ paddingLeft: 8 + depth * 12, paddingRight: 4, paddingTop: 3, paddingBottom: 3 }}>
+                    {/* 드래그 핸들 */}
+                    <GripVertical size={10} className="text-gray-300 cursor-grab shrink-0" />
                     {depth > 0 && <span className="text-gray-300 text-xs2 shrink-0">↳</span>}
 
                     {/* 번호 */}
@@ -270,17 +291,21 @@ export function RefListPanel({
                         className="rounded p-0.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600">
                         <ChevronsDown size={10} />
                       </button>
-                      {/* 상위로 이동 */}
+                      {/* 상위로 이동 (← 상위로) */}
                       {r.parentNumber && onUpdate && (
                         <button type="button" onClick={() => {
                           const parent = references.find(x => x.number === r.parentNumber);
                           onUpdate({ ...r, parentNumber: parent?.parentNumber });
-                        }} title="상위로 이동" className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+                        }} title="상위로 이동 (←)" className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
                           <ChevronsUp size={10} />
                         </button>
                       )}
-                      {/* 삭제 */}
-                      <button type="button" onClick={() => onDelete(r.number)} title="삭제"
+                      {/* 삭제 — 확인 얼럿 */}
+                      <button type="button"
+                        onClick={() => {
+                          if (window.confirm(`"${r.name || r.number}" 부호를 삭제하시겠습니까?`)) onDelete(r.number);
+                        }}
+                        title="삭제"
                         className="rounded p-0.5 text-red-400 hover:bg-red-50 hover:text-red-600">
                         <Trash2 size={10} />
                       </button>

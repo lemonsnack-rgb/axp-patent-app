@@ -754,7 +754,13 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
   const moveDown = (idx: number) => { if (idx===items.length-1||done) return; const a=[...items]; [a[idx],a[idx+1]]=[a[idx+1],a[idx]]; applyUpd(a); };
   const indent   = (id: number)  => { if (!done) applyUpd(items.map(it => it.id===id ? {...it, depth: Math.min(it.depth+1,2)} : it)); };
   const outdent  = (id: number)  => { if (!done) applyUpd(items.map(it => it.id===id ? {...it, depth: Math.max(it.depth-1,0)} : it)); };
-  const remove   = (id: number)  => { if (!done) upd(items.filter(it => it.id!==id)); };
+  const remove   = (id: number)  => {
+    if (!done) {
+      const item = items.find(it => it.id === id);
+      if (!window.confirm(`"${item?.text ? item.text.slice(0, 30) : '이 구성요소'}"를 삭제하시겠습니까?`)) return;
+      upd(items.filter(it => it.id !== id));
+    }
+  };
   const autoAssign = () => { if (!done) upd(calcAutoNums(items)); };
   const add = () => {
     if (!newText.trim()||done) return;
