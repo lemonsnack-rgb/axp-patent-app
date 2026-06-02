@@ -1257,30 +1257,42 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
                   <p className="text-xs2 text-gray-400 leading-relaxed line-clamp-2">{cand.editing ? cand.editVal : cand.text}</p>
                 </div>
                 {/* 변경 버전 */}
-                <div onClick={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, aiDiffSel: 'proposed' } : c))}
-                  className={clsx('rounded-lg border-2 p-2.5 cursor-pointer transition-all',
-                    cand.aiDiffSel === 'proposed' ? 'border-blue-600 bg-blue-50 shadow-sm' : 'border-blue-200 bg-white hover:border-blue-400')}>
-                  <div className="flex items-center gap-1.5 mb-1">
+                <div
+                  className={clsx('rounded-lg border-2 transition-all',
+                    cand.aiDiffSel === 'proposed' ? 'border-blue-600 bg-blue-50 shadow-sm' : 'border-blue-200 bg-white hover:border-blue-400')}
+                  onClick={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, aiDiffSel: 'proposed' } : c))}>
+                  <div className="flex items-center gap-1.5 px-2.5 pt-2 mb-1">
                     <span className={clsx('w-3 h-3 rounded-full border-2 flex items-center justify-center shrink-0',
                       cand.aiDiffSel === 'proposed' ? 'border-blue-600 bg-blue-600' : 'border-blue-300')}>
                       {cand.aiDiffSel === 'proposed' && <span className="w-1 h-1 rounded-full bg-white" />}
                     </span>
                     <span className="text-xs2 font-bold text-blue-700">변경 버전 채택</span>
-                    <span className="ml-auto text-xs2 px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 font-semibold">수정됨</span>
+                    <span className="ml-auto text-xs2 px-1 py-0.5 rounded bg-blue-100 text-blue-600 font-semibold">수정됨</span>
                   </div>
-                  <p className={clsx('text-xs2 leading-relaxed', cand.aiDiffSel === 'proposed' ? 'text-gray-800 font-medium' : 'text-gray-600')}>{cand.aiProposed}</p>
+                  <textarea
+                    className={clsx('w-full text-xs2 leading-relaxed bg-transparent px-2.5 pb-1.5 outline-none resize-none',
+                      cand.aiDiffSel === 'proposed' ? 'text-gray-800' : 'text-gray-600')}
+                    rows={Math.max(3, Math.ceil(cand.aiProposed.length / 45))}
+                    value={cand.aiProposed}
+                    onClick={e => { e.stopPropagation(); setCands(p => p.map(c => c.id === cand.id ? { ...c, aiDiffSel: 'proposed' } : c)); }}
+                    onChange={e => setCands(p => p.map(c => c.id === cand.id ? { ...c, aiProposed: e.target.value } : c))}
+                    placeholder="AI 생성 내용을 직접 수정..."
+                  />
+                  <div className="px-2.5 pb-1.5 pt-1 border-t border-blue-100" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, aiOpen: true, aiPromptVal: '' } : c))}
+                      className="flex items-center gap-1 text-xs2 text-violet-600 hover:text-violet-800">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="9" height="9">
+                        <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10"/>
+                        <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6"/>
+                      </svg>
+                      AI로 추가 수정
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-1.5 mt-1">
-                  <button onClick={() => applyIndepDiff(cand.id)}
-                    className="flex-1 py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800">
-                    선택 완료 →
-                  </button>
-                  <button
-                    onClick={() => setCands(p => p.map(c => c.id === cand.id ? { ...c, aiOpen: true, aiPromptVal: '' } : c))}
-                    className="px-2 py-1.5 border border-violet-300 text-violet-600 rounded text-xs2 hover:bg-violet-50">
-                    다시 수정
-                  </button>
-                </div>
+                <button onClick={() => applyIndepDiff(cand.id)}
+                  className="w-full py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800 mt-1">
+                  선택 완료 →
+                </button>
               </div>
             )}
           </div>
@@ -1365,20 +1377,34 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
                       <p className="text-xs2 text-gray-400 mb-0.5 font-medium">현재 버전</p>
                       <p className="text-xs2 text-gray-600 line-clamp-2">{indep.text}</p>
                     </div>
-                    <div onClick={() => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiDiffSel: 'proposed' } : c))}
-                      className={clsx('rounded border-2 p-2 cursor-pointer transition-all', indep.aiDiffSel === 'proposed' ? 'border-blue-600 bg-blue-50' : 'border-blue-200 hover:border-blue-400')}>
-                      <div className="flex items-center gap-1.5 mb-0.5">
+                    <div
+                      className={clsx('rounded border-2 transition-all', indep.aiDiffSel === 'proposed' ? 'border-blue-600 bg-blue-50' : 'border-blue-200 hover:border-blue-400')}
+                      onClick={() => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiDiffSel: 'proposed' } : c))}>
+                      <div className="flex items-center gap-1.5 px-2 pt-1.5 mb-0.5">
                         <p className="text-xs2 font-bold text-blue-700">변경 버전</p>
-                        <span className="text-xs2 px-1 py-0.5 rounded bg-blue-100 text-blue-600 font-semibold">수정됨</span>
+                        <span className="text-xs2 px-1 rounded bg-blue-100 text-blue-600 font-semibold">수정됨</span>
                       </div>
-                      <p className={clsx('text-xs2 line-clamp-2', indep.aiDiffSel === 'proposed' ? 'text-gray-800' : 'text-gray-600')}>{indep.aiProposed}</p>
+                      <textarea
+                        className={clsx('w-full text-xs2 bg-transparent px-2 pb-1 outline-none resize-none leading-relaxed',
+                          indep.aiDiffSel === 'proposed' ? 'text-gray-800' : 'text-gray-600')}
+                        rows={Math.max(2, Math.ceil(indep.aiProposed.length / 45))}
+                        value={indep.aiProposed}
+                        onClick={e => { e.stopPropagation(); setCands(p => p.map(c => c.id === indep.id ? { ...c, aiDiffSel: 'proposed' } : c)); }}
+                        onChange={e => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiProposed: e.target.value } : c))}
+                      />
+                      <div className="px-2 pb-1.5 pt-0.5 border-t border-blue-100" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiOpen: true, aiPromptVal: '' } : c))}
+                          className="flex items-center gap-1 text-xs2 text-violet-600 hover:text-violet-800">
+                          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="9" height="9">
+                            <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10"/>
+                            <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6"/>
+                          </svg>
+                          AI로 추가 수정
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex gap-1.5">
-                      <button onClick={() => applyIndepDiff(indep.id)}
-                        className="flex-1 py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800">선택 완료 →</button>
-                      <button onClick={() => setCands(p => p.map(c => c.id === indep.id ? { ...c, aiOpen: true, aiPromptVal: '' } : c))}
-                        className="px-2 py-1.5 border border-violet-300 text-violet-600 rounded text-xs2 hover:bg-violet-50">다시 수정</button>
-                    </div>
+                    <button onClick={() => applyIndepDiff(indep.id)}
+                      className="w-full py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800 mt-1">선택 완료 →</button>
                   </div>
                 )}
               </div>
@@ -1492,20 +1518,34 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
                                         <p className="text-xs2 text-gray-400 mb-0.5 font-medium">현재 버전</p>
                                         <p className="text-xs2 text-gray-600 line-clamp-2">{dep.text}</p>
                                       </div>
-                                      <div onClick={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiDiffSel: 'proposed' } : d) })}
-                                        className={clsx('rounded border-2 p-2 cursor-pointer', dep.aiDiffSel === 'proposed' ? 'border-blue-600 bg-blue-50' : 'border-blue-200 hover:border-blue-400')}>
-                                        <div className="flex items-center gap-1.5 mb-0.5">
+                                      <div
+                                        className={clsx('rounded border-2 transition-all', dep.aiDiffSel === 'proposed' ? 'border-blue-600 bg-blue-50' : 'border-blue-200 hover:border-blue-400')}
+                                        onClick={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiDiffSel: 'proposed' } : d) })}>
+                                        <div className="flex items-center gap-1.5 px-2 pt-1.5 mb-0.5">
                                           <p className="text-xs2 font-bold text-blue-700">변경 버전</p>
                                           <span className="text-xs2 px-1 rounded bg-blue-100 text-blue-600 font-semibold">수정됨</span>
                                         </div>
-                                        <p className={clsx('text-xs2 line-clamp-2', dep.aiDiffSel === 'proposed' ? 'text-gray-800' : 'text-gray-600')}>{dep.aiProposed}</p>
+                                        <textarea
+                                          className={clsx('w-full text-xs2 bg-transparent px-2 pb-1 outline-none resize-none leading-relaxed',
+                                            dep.aiDiffSel === 'proposed' ? 'text-gray-800' : 'text-gray-600')}
+                                          rows={Math.max(2, Math.ceil(dep.aiProposed.length / 40))}
+                                          value={dep.aiProposed}
+                                          onClick={e => { e.stopPropagation(); updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiDiffSel: 'proposed' } : d) }); }}
+                                          onChange={e => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiProposed: e.target.value } : d) })}
+                                        />
+                                        <div className="px-2 pb-1.5 pt-0.5 border-t border-blue-100" onClick={e => e.stopPropagation()}>
+                                          <button onClick={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiOpen: true, aiPromptVal: '' } : d) })}
+                                            className="flex items-center gap-1 text-xs2 text-violet-600 hover:text-violet-800">
+                                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="9" height="9">
+                                              <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10"/>
+                                              <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6"/>
+                                            </svg>
+                                            AI로 추가 수정
+                                          </button>
+                                        </div>
                                       </div>
-                                      <div className="flex gap-1.5">
-                                        <button onClick={() => applyDepDiff(indep.id, dep.id)}
-                                          className="flex-1 py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800">선택 완료 →</button>
-                                        <button onClick={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, aiOpen: true, aiPromptVal: '' } : d) })}
-                                          className="px-2 py-1.5 border border-violet-300 text-violet-600 rounded text-xs2 hover:bg-violet-50">다시 수정</button>
-                                      </div>
+                                      <button onClick={() => applyDepDiff(indep.id, dep.id)}
+                                        className="w-full py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800 mt-1">선택 완료 →</button>
                                     </div>
                                   )}
                                 </>
@@ -1791,17 +1831,17 @@ function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChan
               <p className="text-xs2 text-gray-400 leading-relaxed line-clamp-3">{curText}</p>
             </div>
 
-            {/* 변경 버전 — 크고 파란색, 기본 선택, NEW 배지 */}
+            {/* 변경 버전 — 편집 가능 + AI 추가 수정 지원 */}
             <div
-              onClick={() => setDiffSel('proposed')}
               className={clsx(
-                'rounded-lg border-2 p-3 cursor-pointer transition-all',
+                'rounded-lg border-2 transition-all',
                 diffSel === 'proposed'
                   ? 'border-blue-600 bg-blue-50 shadow-sm'
                   : 'border-blue-200 bg-white hover:border-blue-400',
               )}
+              onClick={() => setDiffSel('proposed')}
             >
-              <div className="flex items-center gap-2 mb-1.5">
+              <div className="flex items-center gap-2 px-3 pt-2.5 mb-1">
                 <span className={clsx(
                   'w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0',
                   diffSel === 'proposed' ? 'border-blue-600 bg-blue-600' : 'border-blue-300 bg-white',
@@ -1811,10 +1851,31 @@ function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChan
                 <span className="text-xs2 font-bold text-blue-700">변경 버전 채택</span>
                 <span className="ml-auto text-xs2 px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 font-semibold">수정됨</span>
               </div>
-              <p className={clsx(
-                'text-xs2 leading-relaxed',
-                diffSel === 'proposed' ? 'text-gray-800 font-medium' : 'text-gray-600',
-              )}>{proposed}</p>
+              {/* 직접 편집 가능 textarea */}
+              <textarea
+                className={clsx(
+                  'w-full text-xs2 leading-relaxed bg-transparent px-3 pb-2 outline-none resize-none',
+                  diffSel === 'proposed' ? 'text-gray-800 font-medium' : 'text-gray-600',
+                )}
+                value={proposed}
+                rows={Math.max(3, Math.ceil(proposed.length / 45))}
+                onClick={e => { e.stopPropagation(); setDiffSel('proposed'); }}
+                onChange={e => setProposed(e.target.value)}
+                placeholder="AI 생성 내용을 직접 수정할 수 있습니다..."
+              />
+              {/* AI 추가 수정 버튼 */}
+              <div className="px-3 pb-2 pt-1 border-t border-blue-100" onClick={e => e.stopPropagation()}>
+                <button
+                  onClick={() => { setPromptBase('proposed'); setMode('prompt'); }}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-xs2 text-violet-600 hover:bg-violet-50 transition-colors"
+                >
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="10" height="10">
+                    <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10"/>
+                    <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6"/>
+                  </svg>
+                  AI로 추가 수정하기
+                </button>
+              </div>
             </div>
 
             {/* 단일 CTA: 선택 완료 */}
