@@ -100,4 +100,6 @@ export interface PatentEditorProps {
   onSaveProject: (drawingId: string, editorDataJson: string) => void;
   onExportComplete: (drawingId: string, finalBlob: Blob) => void;
   onClose: () => void;
+  /** true: standalone 탭 — 종료 버튼 숨김 (StandaloneEditor가 ✕ 담당) */
+  standalone?: boolean;
 }

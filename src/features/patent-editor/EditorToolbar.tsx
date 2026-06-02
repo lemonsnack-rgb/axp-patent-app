@@ -16,6 +16,8 @@ interface Props {
   onClose: () => void;
   onToggleHatch: () => void;
   busy?: boolean;
+  /** 독립 탭(standalone)에서는 종료 버튼 숨김 — StandaloneEditor가 담당 */
+  standalone?: boolean;
 }
 
 // ── 공통 버튼 크기: 모든 버튼 h-8 기준 ────────────────────
@@ -129,7 +131,7 @@ const LINE_ENDS: { v: LineEnd; label: string; title: string }[] = [
   { v: 'open-arrow',  label: '▷',   title: '속이 빈 화살표' },
 ];
 
-export function EditorToolbar({ onSave, onExport, onClose, onToggleHatch, busy }: Props) {
+export function EditorToolbar({ onSave, onExport, onClose, onToggleHatch, busy, standalone }: Props) {
   const tool          = useEditorStore(s => s.tool);
   const lineStyle     = useEditorStore(s => s.lineStyle);
   const lineWeight    = useEditorStore(s => s.lineWeight);
@@ -294,11 +296,14 @@ export function EditorToolbar({ onSave, onExport, onClose, onToggleHatch, busy }
             <Download size={13} />
             <span>{busy ? '처리 중…' : '내보내기'}</span>
           </button>
-          <button type="button" onClick={onClose} title="편집 종료"
-            className="inline-flex items-center gap-1.5 h-8 px-3 border border-zinc-300 rounded-md bg-white text-sm2 text-zinc-700 hover:bg-zinc-50 active:scale-[0.98] transition-all">
-            <X size={13} />
-            <span>종료</span>
-          </button>
+          {/* standalone 모드에서는 StandaloneEditor의 ✕ 닫기가 담당 — 종료 버튼 숨김 */}
+          {!standalone && (
+            <button type="button" onClick={onClose} title="편집 종료"
+              className="inline-flex items-center gap-1.5 h-8 px-3 border border-zinc-300 rounded-md bg-white text-sm2 text-zinc-700 hover:bg-zinc-50 active:scale-[0.98] transition-all">
+              <X size={13} />
+              <span>종료</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

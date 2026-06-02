@@ -64,37 +64,41 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
   // B-box 상태 (퍼센트, 0~100)
   const [cropBox, setCropBox] = useState({ x1: 15, y1: 15, x2: 85, y2: 85 });
   const cropContainerRef = React.useRef<HTMLDivElement>(null);
-  const cropDragRef = React.useRef<{
-    type: 'move' | 'nw'|'n'|'ne'|'e'|'se'|'s'|'sw'|'w';
-    startX: number; startY: number;
-    startBox: typeof cropBox;
-  } | null>(null);
+  type CropHandle = 'move'|'nw'|'n'|'ne'|'e'|'se'|'s'|'sw'|'w';
+  const cropDragRef = React.useRef<{ type: CropHandle; startX: number; startY: number; startBox: { x1:number; y1:number; x2:number; y2:number }; } | null>(null);
 
-  const startCropDrag = (type: typeof cropDragRef.current extends null ? never : NonNullable<typeof cropDragRef.current>['type'], e: React.MouseEvent) => {
+  const startCropDrag = (type: CropHandle, e: React.MouseEvent) => {
     e.preventDefault();
-    const rect = cropContainerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    cropDragRef.current = {
-      type, startX: e.clientX, startY: e.clientY, startBox: { ...cropBox }
-    };
+    e.stopPropagation();
+    if (!cropContainerRef.current) return;
+    cropDragRef.current = { type, startX: e.clientX, startY: e.clientY, startBox: { ...cropBox } };
+
     const onMove = (ev: MouseEvent) => {
-      if (!cropDragRef.current || !cropContainerRef.current) return;
-      const r = cropContainerRef.current.getBoundingClientRect();
-      const dx = ((ev.clientX - cropDragRef.current.startX) / r.width) * 100;
-      const dy = ((ev.clientY - cropDragRef.current.startY) / r.height) * 100;
-      const b = cropDragRef.current.startBox;
-      const minSize = 10;
-      setCropBox(prev => {
-        let { x1, y1, x2, y2 } = b;
-        const t = cropDragRef.current!.type;
-        if (t === 'move') { x1=b.x1+dx; y1=b.y1+dy; x2=b.x2+dx; y2=b.y2+dy; }
-        else { if (t.includes('w')) x1=Math.min(b.x1+dx, b.x2-minSize); if (t.includes('e')) x2=Math.max(b.x2+dx, b.x1+minSize); if (t.includes('n')) y1=Math.min(b.y1+dy, b.y2-minSize); if (t.includes('s')) y2=Math.max(b.y2+dy, b.y1+minSize); }
-        x1=Math.max(0,Math.min(x1,100)); y1=Math.max(0,Math.min(y1,100)); x2=Math.max(0,Math.min(x2,100)); y2=Math.max(0,Math.min(y2,100));
-        return { x1, y1, x2, y2 };
-      });
-      void prev; // suppress unused warning
+      const d = cropDragRef.current;
+      const c = cropContainerRef.current;
+      if (!d || !c) return;
+      const r = c.getBoundingClientRect();
+      const dx = ((ev.clientX - d.startX) / r.width) * 100;
+      const dy = ((ev.clientY - d.startY) / r.height) * 100;
+      const b = d.startBox;
+      const M = 10; // 최소 크기 %
+      let x1=b.x1, y1=b.y1, x2=b.x2, y2=b.y2;
+      if (d.type === 'move') { x1=b.x1+dx; y1=b.y1+dy; x2=b.x2+dx; y2=b.y2+dy; }
+      else {
+        if (d.type.includes('w')) x1 = Math.min(b.x1+dx, b.x2-M);
+        if (d.type.includes('e')) x2 = Math.max(b.x2+dx, b.x1+M);
+        if (d.type.includes('n')) y1 = Math.min(b.y1+dy, b.y2-M);
+        if (d.type.includes('s')) y2 = Math.max(b.y2+dy, b.y1+M);
+      }
+      x1=Math.max(0,Math.min(x1,100)); y1=Math.max(0,Math.min(y1,100));
+      x2=Math.max(0,Math.min(x2,100)); y2=Math.max(0,Math.min(y2,100));
+      setCropBox({ x1, y1, x2, y2 });
     };
-    const onUp = () => { cropDragRef.current = null; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    const onUp = () => {
+      cropDragRef.current = null;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   };
@@ -277,11 +281,14 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
               )}
             </>
           )}
-          <div className="ml-auto flex items-center gap-2">
-            <button className="btn-outline btn-xs" onClick={onClose}>
-              <Icon name="close" size={12} /> 닫기
-            </button>
-          </div>
+          {/* standalone 모드에서는 StandaloneEditor의 ✕ 버튼이 담당 */}
+          {!standalone && (
+            <div className="ml-auto flex items-center gap-2">
+              <button className="btn-outline btn-xs" onClick={onClose}>
+                <Icon name="close" size={12} /> 닫기
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ── 서브헤더: 단계 표시 (도면 편집 단계에서는 숨김 — 헤더에 이미 표시) ── */}
@@ -622,6 +629,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                       setTimeout(() => setSyncNotice(null), 4000);
                     }}
                     onClose={() => goStage('decide')}
+                    standalone={standalone}
                   />
                 ) : (
                   <div className="flex-1 flex items-center justify-center text-gray-400">

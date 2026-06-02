@@ -55,6 +55,7 @@ export function PatentEditor({
   onSaveProject,
   onExportComplete,
   onClose,
+  standalone = false,
 }: PatentEditorProps) {
   const canvasHandleRef = useRef<EditorCanvasHandle>(null);
   const [busy, setBusy] = useState(false);
@@ -284,6 +285,7 @@ export function PatentEditor({
         onClose={handleClose}
         onToggleHatch={handleToggleHatch}
         busy={busy}
+        standalone={standalone}
       />
       <div className="flex-1 min-h-0 flex">
         {/* 단일 도면 모드에서는 도면 목록 패널 숨김 */}
