@@ -2604,6 +2604,35 @@ function getDefault(section: string, task: any): string {
   };
   return d[section] || '';
 }
+
+// 요약서 패널 — A(상세) + B(간결) 2개 후보
+const ABSTRACT_CANDS = [
+  {
+    letter: 'A', charCount: 187, badge2: null,
+    text: '본 발명은 자율주행 차량에 탑재된 라이다 센서에서 획득한 3차원 포인트 클라우드 데이터를 기반으로 실시간 객체 인식 및 분류를 수행하는 장치 및 방법에 관한 것이다. RANSAC 알고리즘으로 지면 포인트를 분리하고 PointNet++ 기반 딥러닝 모델로 객체를 감지한다.',
+  },
+  {
+    letter: 'B', charCount: 132, badge2: '간결 버전',
+    text: '포인트 클라우드 데이터 전처리와 딥러닝 기반 3D 객체 인식을 결합하여, 자율주행 환경에서 다양한 객체를 정확하게 인식·추적하는 라이다 기반 객체 감지 장치 및 방법.',
+  },
+];
+
+function AbstractPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void }) {
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [editVals, setEditVals] = useState<Record<number, string>>({});
+
+  const getVal = (i: number) => editVals[i] ?? ABSTRACT_CANDS[i].text;
+
+  return (
+    <>
+      {/* 안내 배너 */}
+      <div className="mx-3 mt-3 mb-2 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 shrink-0">
+        <p className="text-xs2 text-blue-700">명세서 전체 내용을 기반으로 <strong>요약서 2개 후보</strong>를 생성했습니다. 선택하거나 수정하세요.</p>
+      </div>
+
+      <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2 ml-1.5">
+        {ABSTRACT_CANDS.map((cand, i) => {
+          const isSelected = selectedIdx === i && !done;
           const isConfirmed = done && selectedIdx === i;
           return (
             <div
@@ -2625,7 +2654,7 @@ function getDefault(section: string, task: any): string {
                 {cand.badge2 && (
                   <span className="text-xs2 text-gray-500 font-medium">{cand.badge2}</span>
                 )}
-                <span className="text-xs2 text-gray-400">{cand.charCount}자/span>
+                <span className="text-xs2 text-gray-400">{cand.charCount}자</span>
                 {!done && (
                   <div className="ml-auto flex gap-1">
                     <button onClick={e => e.stopPropagation()} title="AI 재생성" className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400">
