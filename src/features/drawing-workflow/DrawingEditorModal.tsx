@@ -378,9 +378,21 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                     </p>
                     {workStage === 'crop' ? (
                       <div className="flex-1 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
-                        {activeDraw.exportedImageUrl
-                          ? <img src={activeDraw.exportedImageUrl} className="max-w-full max-h-full object-contain p-3" alt="" />
-                          : <div className="text-center text-gray-400"><Icon name="image" size={48} className="mx-auto mb-2 text-gray-200" /><p className="text-sm2">도면 이미지</p></div>}
+                        {/* B10: originalImageUrl → exportedImageUrl 순서로 폴백 */}
+                        {(activeDraw.originalImageUrl || activeDraw.exportedImageUrl)
+                          ? <img src={activeDraw.originalImageUrl || activeDraw.exportedImageUrl} className="max-w-full max-h-full object-contain p-3" alt="" />
+                          : (
+                            <div className="text-center text-gray-400 px-6">
+                              <Icon name="image" size={48} className="mx-auto mb-3 text-gray-200" />
+                              <p className="text-sm2 font-semibold mb-1">수집된 도면 이미지</p>
+                              <p className="text-xs2 text-gray-400 leading-relaxed">
+                                {activeDraw.description || activeDraw.name || '도면 이미지'}
+                              </p>
+                              <p className="text-xs2 text-gray-300 mt-2">
+                                실제 서비스에서는 직무발명서에서 추출된<br/>원본 도면 이미지가 표시됩니다
+                              </p>
+                            </div>
+                          )}
                       </div>
                     ) : (
                       /* 대화형 B-box 크롭 */

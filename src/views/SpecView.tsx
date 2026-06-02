@@ -78,6 +78,7 @@ export function SpecView() {
   };
   const [guideOpen, setGuideOpen] = useState(true);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [expandedCards, setExpandedCards] = useState<Set<StepId>>(new Set()); // U5: 확정 카드 접힘
   const [phase, setPhase] = useState<'upload' | 'direct' | 'flow' | 'done'>('upload');
   const [curStep, setCurStep] = useState<StepId>('upload');
   const [confirmed, setConfirmed] = useState<Partial<Record<StepId, string>>>({});
@@ -93,6 +94,18 @@ export function SpecView() {
   const [sourceDataOpen, setSourceDataOpen] = useState(false);
 
   const flowRef = useRef<HTMLDivElement>(null);
+
+  // U7: 분석 진행 중 이탈 확인
+  useEffect(() => {
+    if (phase !== 'flow') return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '분석이 진행 중입니다. 페이지를 떠나시겠습니까?';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [phase]);
+
   const si = (id: StepId) => STEPS.findIndex(s => s.id === id);
   const isConfirmed = (id: StepId) => id in confirmed;
   const isVisible = (id: StepId) => {
@@ -104,6 +117,8 @@ export function SpecView() {
   const confirm = (id: StepId) => {
     const val = gSel[id] || GUIDE_CANDS[id]?.[0] || '(확정)';
     setConfirmed(p => ({ ...p, [id]: val }));
+    // U5: 이전 확정 카드 자동 접기
+    setExpandedCards(new Set()); // 새 단계 확정 시 모두 접음
     const next = STEPS[si(id) + 1];
     if (next) { setCurStep(next.id); setGuideStep(next.id); }
     else setPhase('done');
@@ -223,9 +238,11 @@ export function SpecView() {
         })}
       </div>
 
-      {/* 기초자료 보기 슬라이드 패널 */}
+      {/* 기초자료 보기 슬라이드 패널 — fixed overlay (B9: absolute → content 가림 수정) */}
       {sourceDataOpen && (
-        <div className="absolute inset-y-0 right-0 z-30 w-80 bg-white border-l border-gray-200 shadow-xl flex flex-col" style={{ top: 0 }}>
+        <>
+          <div className="fixed inset-0 z-20 bg-black/20" onClick={() => setSourceDataOpen(false)} aria-hidden="true" />
+          <div className="fixed top-0 right-0 z-30 h-full w-80 bg-white border-l border-gray-200 shadow-xl flex flex-col" style={{ maxHeight: '100vh' }}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0">
             <span className="text-sm2 font-semibold text-gray-800">기초자료</span>
             <button onClick={() => setSourceDataOpen(false)} className="text-gray-400 hover:text-gray-600">
@@ -250,6 +267,7 @@ export function SpecView() {
             )}
           </div>
         </div>
+        </>
       )}
 
       {/* Body */}
@@ -350,62 +368,84 @@ export function SpecView() {
                         업로드 내용을 기반으로 {STEP_LABEL[s.id]} 후보를 생성했습니다.{' '}
                         <span className="text-blue-700 font-semibold">오른쪽 분석결과</span>에서 적합한 항목을 선택하거나 직접 입력하세요.</>
                       } />
-                      {isDone && (
-                        <>
-                          <div className="flex items-start gap-3 flex-row-reverse">
-                            <div className="w-8 h-8 rounded-full bg-blue-700 text-white text-xs2 font-bold flex items-center justify-center shrink-0">나</div>
-                            <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 max-w-2xl shadow-xs">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center shrink-0"><Icon name="check" size={10} /></span>
-                                <span className="text-sm2 font-semibold text-blue-700">{CONFIRM_LABEL[s.id]}</span>
-                              </div>
-                              <div className="bg-white rounded-lg border border-blue-100 p-3 mb-2">
-                                {/* 발명의 설명: 섹션별 구조화 표시 */}
-                                {s.id === 'description' ? (
-                                  <div className="space-y-2">
-                                    {(confirmed[s.id] || '').split('\n\n').filter(Boolean).map((block, bi) => {
-                                      const lines = block.split('\n');
-                                      const label = lines[0]?.replace(/[【】]/g, '').trim();
-                                      const content = lines.slice(1).join('\n').trim();
-                                      return (
-                                        <div key={bi}>
-                                          <p className="text-xs2 font-bold text-blue-700 mb-0.5">{label}</p>
-                                          <p className="text-xs2 text-gray-700 leading-relaxed">{content}</p>
+                      {isDone && (() => {
+                        const isExpanded = expandedCards.has(s.id);
+                        const confirmedVal = confirmed[s.id] || '';
+                        // U4: 도면 완료 요약 표시
+                        const drawingSummary = s.id === 'drawings'
+                          ? confirmedVal.split('\n')[0] // "도면 N개 중 M개 편집 완료"
+                          : null;
+                        // 짧은 요약 (접힌 상태에서 표시)
+                        const summary = drawingSummary ||
+                          confirmedVal.split('\n')[0]?.slice(0, 60) + (confirmedVal.length > 60 ? '...' : '');
+                        return (
+                          <>
+                            <div className="flex items-start gap-3 flex-row-reverse">
+                              <div className="w-8 h-8 rounded-full bg-blue-700 text-white text-xs2 font-bold flex items-center justify-center shrink-0">나</div>
+                              <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 max-w-2xl shadow-xs w-full">
+                                {/* 헤더: 항상 표시 (U5: 클릭으로 접기/펼치기) */}
+                                <button
+                                  className="w-full flex items-center gap-2 text-left"
+                                  onClick={() => setExpandedCards(prev => {
+                                    const next = new Set(prev);
+                                    next.has(s.id) ? next.delete(s.id) : next.add(s.id);
+                                    return next;
+                                  })}
+                                >
+                                  <span className="w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center shrink-0"><Icon name="check" size={10} /></span>
+                                  <span className="text-sm2 font-semibold text-blue-700 flex-1">{CONFIRM_LABEL[s.id]}</span>
+                                  {!isExpanded && <span className="text-xs2 text-gray-400 truncate max-w-[160px]">{summary}</span>}
+                                  <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} size={11} className="text-gray-400 shrink-0" />
+                                </button>
+                                {/* 상세 내용: 펼쳐진 상태에서만 */}
+                                {isExpanded && (
+                                  <div className="mt-2">
+                                    <div className="bg-white rounded-lg border border-blue-100 p-3 mb-2">
+                                      {s.id === 'description' ? (
+                                        <div className="space-y-2">
+                                          {confirmedVal.split('\n\n').filter(Boolean).map((block, bi) => {
+                                            const lines = block.split('\n');
+                                            const label = lines[0]?.replace(/[【】]/g, '').trim();
+                                            const content = lines.slice(1).join('\n').trim();
+                                            return (
+                                              <div key={bi}>
+                                                <p className="text-xs2 font-bold text-blue-700 mb-0.5">{label}</p>
+                                                <p className="text-xs2 text-gray-700 leading-relaxed">{content}</p>
+                                              </div>
+                                            );
+                                          })}
                                         </div>
-                                      );
-                                    })}
-                                  </div>
-                                ) : s.id === 'claims' ? (
-                                  // 청구항: 독립항/종속항 구조화 표시
-                                  <div className="space-y-2">
-                                    {(confirmed[s.id] || '').split('\n\n').filter(Boolean).map((block, bi) => {
-                                      if (bi === 0) {
-                                        return <p key={bi} className="text-xs2 font-bold text-green-700">{block}</p>;
-                                      }
-                                      const lines = block.split('\n');
-                                      const header = lines[0];
-                                      const content = lines.slice(1).join(' ').trim();
-                                      const isFirst = bi === 1;
-                                      return (
-                                        <div key={bi} className={clsx('pl-2 border-l-2', isFirst ? 'border-purple-400' : 'border-amber-300')}>
-                                          <p className={clsx('text-xs2 font-bold mb-0.5', isFirst ? 'text-purple-700' : 'text-amber-700')}>{header}</p>
-                                          <p className="text-xs2 text-gray-600 leading-relaxed line-clamp-2">{content}</p>
+                                      ) : s.id === 'claims' ? (
+                                        <div className="space-y-2">
+                                          {confirmedVal.split('\n\n').filter(Boolean).map((block, bi) => {
+                                            if (bi === 0) return <p key={bi} className="text-xs2 font-bold text-green-700">{block}</p>;
+                                            const lines = block.split('\n');
+                                            const header = lines[0];
+                                            const content = lines.slice(1).join(' ').trim();
+                                            const isFirst = bi === 1;
+                                            return (
+                                              <div key={bi} className={clsx('pl-2 border-l-2', isFirst ? 'border-purple-400' : 'border-amber-300')}>
+                                                <p className={clsx('text-xs2 font-bold mb-0.5', isFirst ? 'text-purple-700' : 'text-amber-700')}>{header}</p>
+                                                <p className="text-xs2 text-gray-600 leading-relaxed line-clamp-2">{content}</p>
+                                              </div>
+                                            );
+                                          })}
                                         </div>
-                                      );
-                                    })}
+                                      ) : (
+                                        <p className="text-sm2 text-gray-700 leading-relaxed">{confirmedVal}</p>
+                                      )}
+                                    </div>
+                                    <button onClick={() => reselect(s.id)} className="text-xs2 text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                                      <Icon name="chevron-left" size={10} /> 다시 선택
+                                    </button>
                                   </div>
-                                ) : (
-                                  <p className="text-sm2 text-gray-700 leading-relaxed">{confirmed[s.id]}</p>
                                 )}
                               </div>
-                              <button onClick={() => reselect(s.id)} className="text-xs2 text-blue-600 hover:text-blue-800 flex items-center gap-1">
-                                <Icon name="chevron-left" size={10} /> 다시 선택
-                              </button>
                             </div>
-                          </div>
-                          <AiMsg text={AI_NEXT[s.id]} />
-                        </>
-                      )}
+                            <AiMsg text={AI_NEXT[s.id]} />
+                          </>
+                        );
+                      })()}
                     </div>
                   );
                 })}

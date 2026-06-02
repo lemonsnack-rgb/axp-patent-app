@@ -57,7 +57,7 @@ export function Sidebar() {
         <NavItem icon="edit"    label="새 작업"    active={isActive('newtask')} collapsed={sidebarCollapsed} onClick={() => setMode('newtask')} primary />
         <NavItem icon="folder"  label="프로젝트"   active={isActive('home')}    collapsed={sidebarCollapsed} onClick={() => setMode('home')} />
         <NavItem icon="library" label="라이브러리" active={isActive('library')} collapsed={sidebarCollapsed} onClick={() => setMode('library')} />
-        <NavItem icon="search"  label="작업 검색"  active={false}               collapsed={sidebarCollapsed} onClick={() => toast.show('작업 검색은 후순위 기능')} />
+        <NavItem icon="search"  label="작업 검색"  active={isActive('search')}   collapsed={sidebarCollapsed} onClick={() => setMode('search')} />
       </nav>
 
       {!sidebarCollapsed && (
@@ -131,7 +131,7 @@ export function Sidebar() {
 
       <div className={clsx('mt-auto border-t border-zinc-100', sidebarCollapsed ? 'p-2' : 'p-3')}>
         <button className={clsx('flex items-center gap-2 w-full px-2 py-1.5 rounded-md hover:bg-zinc-100 active:scale-[0.98] transition-all text-md2 text-zinc-700', sidebarCollapsed && 'justify-center')}
-          onClick={() => toast.show('설정 기능은 곧 제공될 예정입니다.')}>
+          onClick={() => setMode('clients')}>
           <Icon name="settings" size={16} />
           {!sidebarCollapsed && <span>설정</span>}
         </button>
