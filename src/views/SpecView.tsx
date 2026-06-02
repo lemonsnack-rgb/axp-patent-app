@@ -1,5 +1,7 @@
 ﻿// SpecView
 import { useEffect, useRef, useState } from 'react';
+import { loadSpecState, saveSpecState } from '../features/spec/specStore';
+import type { SpecAnalysisState } from '../features/spec/types';
 import { SpecEditorView } from './SpecEditorView';
 import { DrawingEditorModal } from '../features/drawing-workflow/DrawingEditorModal';
 import { MOCK_DRAWINGS } from '../features/drawing-workflow/types';
@@ -62,34 +64,76 @@ const GUIDE_CANDS: Record<string, string[]> = {
 export function SpecView() {
   const { tasks, activeTaskId } = useStore();
   const task = activeTaskId ? tasks.find(t => t.id === activeTaskId) : null;
+  const taskId = task?.id ?? '';
 
-  // mainView瑜?sessionStorage??persist ???ъ씠?쒕컮 ?ы겢由????먮뵒???곹깭 ?좎?
+  // localStorage에서 저장된 상태 로드 (없으면 기본값)
+  const savedState = loadSpecState(taskId);
+
   const [mainView, setMainView] = useState<'analysis' | 'editor'>(() => {
-    if (task?.id) {
-      const saved = sessionStorage.getItem(`axp_mainview_${task.id}`);
-      if (saved === 'editor') return 'editor';
-    }
-    return 'analysis';
+    return savedState?.mainView ?? 'analysis';
   });
   const handleSetMainView = (v: 'analysis' | 'editor') => {
     setMainView(v);
-    if (task?.id) sessionStorage.setItem(`axp_mainview_${task.id}`, v);
+    saveSpecState(taskId, { mainView: v });
   };
   const [guideOpen, setGuideOpen] = useState(true);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [phase, setPhase] = useState<'upload' | 'direct' | 'flow' | 'done'>('upload');
-  const [curStep, setCurStep] = useState<StepId>('upload');
-  const [confirmed, setConfirmed] = useState<Partial<Record<StepId, string>>>({});
-  const [guideStep, setGuideStep] = useState<StepId>('title');
-  const [gSel, setGSel] = useState<Partial<Record<StepId, string>>>({});
+  const [phase, setPhase] = useState<'upload' | 'direct' | 'flow' | 'done'>(() =>
+    savedState?.phase ?? 'upload'
+  );
+  const [curStep, setCurStep] = useState<StepId>(() =>
+    (savedState?.curStep as StepId | undefined) ?? 'upload'
+  );
+  const [confirmed, setConfirmed] = useState<Partial<Record<StepId, string>>>(() =>
+    (savedState?.confirmed as Partial<Record<StepId, string>> | undefined) ?? {}
+  );
+  const [guideStep, setGuideStep] = useState<StepId>(() =>
+    (savedState?.curStep !== 'upload' ? (savedState?.curStep as StepId | undefined) : undefined) ?? 'title'
+  );
+  const [gSel, setGSel] = useState<Partial<Record<StepId, string>>>(() =>
+    (savedState?.gSel as Partial<Record<StepId, string>> | undefined) ?? {}
+  );
 
-  const [diTitle, setDiTitle] = useState('');
-  const [diField, setDiField] = useState('');
-  const [diContent, setDiContent] = useState('');
-  const [diProblem, setDiProblem] = useState('');
-  const [diKeywords, setDiKeywords] = useState('');
+  const [diTitle, setDiTitle] = useState(() => savedState?.diTitle ?? '');
+  const [diField, setDiField] = useState(() => savedState?.diField ?? '');
+  const [diContent, setDiContent] = useState(() => savedState?.diContent ?? '');
+  const [diProblem, setDiProblem] = useState(() => savedState?.diProblem ?? '');
+  const [diKeywords, setDiKeywords] = useState(() => savedState?.diKeywords ?? '');
   // 湲곗큹?먮즺 蹂닿린 ?⑤꼸
   const [sourceDataOpen, setSourceDataOpen] = useState(false);
+
+  // 상태 변경 시 localStorage에 동기화
+  useEffect(() => {
+    if (!taskId) return;
+    saveSpecState(taskId, {
+      mainView, phase, curStep,
+      confirmed: confirmed as Partial<Record<string, string>>,
+      gSel: gSel as Partial<Record<string, string>>,
+      diTitle, diField, diContent, diProblem, diKeywords,
+    } as Partial<SpecAnalysisState>);
+  }, [taskId, mainView, phase, curStep, confirmed, gSel, diTitle, diField, diContent, diProblem, diKeywords]);
+
+  // taskId 변경 시 해당 task의 저장 상태로 리로드
+  useEffect(() => {
+    if (!taskId) return;
+    const saved = loadSpecState(taskId);
+    if (saved) {
+      setMainView(saved.mainView ?? 'analysis');
+      setPhase(saved.phase ?? 'upload');
+      setCurStep((saved.curStep as StepId | undefined) ?? 'upload');
+      setConfirmed((saved.confirmed as Partial<Record<StepId, string>> | undefined) ?? {});
+      setGSel((saved.gSel as Partial<Record<StepId, string>> | undefined) ?? {});
+      setDiTitle(saved.diTitle ?? '');
+      setDiField(saved.diField ?? '');
+      setDiContent(saved.diContent ?? '');
+      setDiProblem(saved.diProblem ?? '');
+      setDiKeywords(saved.diKeywords ?? '');
+      if (saved.curStep && saved.curStep !== 'upload') {
+        setGuideStep(saved.curStep as StepId);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskId]);
 
   const flowRef = useRef<HTMLDivElement>(null);
   const si = (id: StepId) => STEPS.findIndex(s => s.id === id);
@@ -390,7 +434,7 @@ export function SpecView() {
                   <div className="text-center py-8">
                     <Icon name="logo" size={40} className="text-blue-700 mx-auto mb-3" />
                     <h3 className="text-lg2 font-bold text-gray-800 mb-2">紐⑤뱺 遺꾩꽍???꾨즺?섏뿀?듬땲??/h3>
-                    {task?.id && sessionStorage.getItem(`axp_mainview_${task.id}`) === 'editor' ? (
+                    {mainView === 'editor' ? (
                       <>
                         <p className="text-md2 text-gray-500 mb-4">?대? ?앹꽦??紐낆꽭???먮뵒?곕줈 ?뚯븘媛????덉뒿?덈떎.</p>
                         <button
