@@ -41,12 +41,12 @@ export interface DrawingItem {
   drawingDescription?: string; // 명세서에 들어갈 도면의 설명
 }
 
-// CK.Patent 포맷 mock 데이터
+// 중립 샘플 도면 데이터 (발명 내용과 무관한 일반 구성도)
 export const MOCK_DRAWINGS: DrawingItem[] = [
   {
     id: 'd1', symbol: 1, label: '종래기술',
-    name: '드럼 브레이크',
-    description: '드럼 브레이크의 구성을 보여주는 도면으로, 드럼, 슈 어셈블리, 라이닝 등의 부품이 표시되어 있습니다.',
+    name: '종래 장치 전체 구성도',
+    description: '종래 기술에 따른 장치의 전체적인 구성을 나타내는 블록도입니다.',
     applied: false,
     pageNumber: 1, imageSize: { w: 376, h: 273 },
     stage: 'extracted',
@@ -54,8 +54,8 @@ export const MOCK_DRAWINGS: DrawingItem[] = [
   },
   {
     id: 'd2', symbol: 2, label: '종래기술',
-    name: '디스크 브레이크',
-    description: '디스크 브레이크의 주요 구성 요소인 캘리퍼, 디스크 로터, 브레이크 패드를 보여주는 도면입니다.',
+    name: '종래 처리 흐름도',
+    description: '종래 기술에 따른 처리 순서를 나타내는 순서도입니다.',
     applied: false,
     pageNumber: 1, imageSize: { w: 336, h: 259 },
     stage: 'extracted',
@@ -63,8 +63,8 @@ export const MOCK_DRAWINGS: DrawingItem[] = [
   },
   {
     id: 'd3', symbol: 3, label: '제안기술',
-    name: '마스터 실린더 & 부스터 어셈블리',
-    description: '마스터 실린더와 부스터 어셈블리의 작동 원리를 설명하는 순서도 및 구성도입니다.',
+    name: '제안 장치 구성도',
+    description: '본 발명의 일 실시예에 따른 장치 구성을 나타내는 블록도입니다.',
     applied: true,
     pageNumber: 1, imageSize: { w: 406, h: 315 },
     stage: 'done',
@@ -76,8 +76,8 @@ export const MOCK_DRAWINGS: DrawingItem[] = [
   },
   {
     id: 'd4', symbol: 4, label: '제안기술',
-    name: '캘리퍼 어셈블리',
-    description: '캘리퍼 어셈블리가 장착된 디스크 브레이크의 전체적인 구조를 보여주는 측면도입니다.',
+    name: '제안 처리 흐름도',
+    description: '본 발명의 일 실시예에 따른 처리 순서를 나타내는 순서도입니다.',
     applied: true,
     pageNumber: 1, imageSize: { w: 237, h: 271 },
     stage: 'bbox-adjusted',

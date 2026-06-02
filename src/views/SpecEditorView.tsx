@@ -89,14 +89,16 @@ const SaveIcon = () => (
 );
 
 // ── 메인 컴포넌트 ──────────────────────────────────────────────────────────
-export function SpecEditorView({ task, onBack }: { task: any; onBack: () => void }) {
+export function SpecEditorView({ task, onBack, confirmedTitle }: { task: any; onBack: () => void; confirmedTitle?: string }) {
   const { library } = useStore();
   const taskName: string = task?.name || '새 명세서';
+  // 위저드에서 확정된 발명 명칭이 있으면 title 섹션에 사용
+  const effectiveTitle = confirmedTitle || taskName;
 
   // 섹션별 블록 배열
   const [blocks, setBlocks] = useState<Record<SectionId, string[]>>(
     () => Object.fromEntries(
-      EDITOR_SECTIONS.map(s => [s.id, toBlocks(getDefault(s.id, taskName))])
+      EDITOR_SECTIONS.map(s => [s.id, toBlocks(getDefault(s.id, s.id === 'title' ? effectiveTitle : taskName))])
     ) as Record<SectionId, string[]>
   );
 

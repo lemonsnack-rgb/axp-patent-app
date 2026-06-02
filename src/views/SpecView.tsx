@@ -63,7 +63,18 @@ export function SpecView() {
   const { tasks, activeTaskId } = useStore();
   const task = activeTaskId ? tasks.find(t => t.id === activeTaskId) : null;
 
-  const [mainView, setMainView] = useState<'analysis' | 'editor'>('analysis');
+  // mainView를 sessionStorage에 persist — 사이드바 재클릭 시 에디터 상태 유지
+  const [mainView, setMainView] = useState<'analysis' | 'editor'>(() => {
+    if (task?.id) {
+      const saved = sessionStorage.getItem(`axp_mainview_${task.id}`);
+      if (saved === 'editor') return 'editor';
+    }
+    return 'analysis';
+  });
+  const handleSetMainView = (v: 'analysis' | 'editor') => {
+    setMainView(v);
+    if (task?.id) sessionStorage.setItem(`axp_mainview_${task.id}`, v);
+  };
   const [guideOpen, setGuideOpen] = useState(true);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [phase, setPhase] = useState<'upload' | 'direct' | 'flow' | 'done'>('upload');
@@ -108,7 +119,7 @@ export function SpecView() {
   if (mainView === 'editor') {
     return (
       <>
-        <SpecEditorView task={task} onBack={() => setMainView('analysis')} />
+        <SpecEditorView task={task} onBack={() => handleSetMainView('analysis')} confirmedTitle={gSel['title'] || confirmed['title']} />
         {previewOpen && <PreviewModal taskName={task?.name} onClose={() => setPreviewOpen(false)} />}
       </>
     );
@@ -358,7 +369,7 @@ export function SpecView() {
             }}
             hasPrev={STEPS.findIndex(s => s.id === guideStep) > 1}
             allDone={doneCount >= 5}
-            onGenerateSpec={() => setMainView('editor')}
+            onGenerateSpec={() => handleSetMainView('editor')}
           />
         )}
       </div>
