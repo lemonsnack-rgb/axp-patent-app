@@ -11,6 +11,7 @@ import type { InventionInput } from '../features/spec/types';
 import { SpecEditorView } from './SpecEditorView';
 import { DrawingEditorModal } from '../features/drawing-workflow/DrawingEditorModal';
 import { MOCK_DRAWINGS } from '../features/drawing-workflow/types';
+import type { DrawingItem } from '../features/drawing-workflow/types';
 import {
   openEditorTab, onEditorResult, isMobile,
 } from '../features/drawing-workflow/editorChannel';
@@ -735,9 +736,55 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
           />
         );
       })()}
-      {step === 'components' && <ComponentsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} onComponentsChange={setConfirmedComponents} />}
-      {step === 'drawings' && <DrawingsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} inventionComponents={confirmedComponents} />}
-      {step === 'claims' && <ClaimsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} />}
+      {step === 'components' && (
+        <ComponentsPanel
+          done={isDone}
+          onConfirm={handleConfirm}
+          onUpdate={v => setGSel(p => ({ ...p, [step]: v }))}
+          onComponentsChange={comps => {
+            setConfirmedComponents(comps);
+            if (taskId) {
+              const specItems = comps.map((c, i) => ({
+                id: i + 1, text: c.name, sel: true, num: c.number, depth: 0,
+              }));
+              saveSpecState(taskId, { componentItems: specItems });
+            }
+          }}
+          initialItems={(() => {
+            if (!taskId) return undefined;
+            const saved = loadSpecState(taskId);
+            if (saved?.componentItems && saved.componentItems.length > 0) {
+              return saved.componentItems.map(c => ({
+                id: c.id, text: c.text, sel: c.sel, num: c.num, depth: c.depth,
+              })) as CompItem[];
+            }
+            return undefined;
+          })()}
+        />
+      )}
+      {step === 'drawings' && (
+        <DrawingsPanel
+          done={isDone}
+          onConfirm={handleConfirm}
+          onUpdate={v => setGSel(p => ({ ...p, [step]: v }))}
+          inventionComponents={confirmedComponents}
+          initialDrawings={(() => {
+            if (!taskId) return undefined;
+            const saved = loadSpecState(taskId);
+            return (saved?.drawings && saved.drawings.length > 0) ? saved.drawings as DrawingItem[] : undefined;
+          })()}
+          onDrawingsChange={(drws) => taskId && saveSpecState(taskId, { drawings: drws as any })}
+        />
+      )}
+      {step === 'claims' && (
+        <ClaimsPanel
+          done={isDone}
+          onConfirm={handleConfirm}
+          onUpdate={v => setGSel(p => ({ ...p, [step]: v }))}
+          initialClaimsState={taskId ? loadSpecState(taskId)?.claimsState : undefined}
+          onClaimsStateChange={(s) => taskId && saveSpecState(taskId, { claimsState: s })}
+        />
+      )}
       {step === 'abstract' && <AbstractPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} />}
 
       {/* ?쇰컲 ?④퀎 A/B/C/D 移대뱶 */}
@@ -961,18 +1008,22 @@ function calcAutoNums(items: CompItem[]): CompItem[] {
   return next;
 }
 
-function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
+function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
   done: boolean;
   onConfirm: () => void;
   onUpdate: (v: string) => void;
   onComponentsChange?: (comps: InventionComponent[]) => void;
+  initialItems?: CompItem[];
 }) {
-  const [items, setItems] = useState<CompItem[]>(INIT_COMPS);
+  const [items, setItems] = useState<CompItem[]>(
+    () => (initialItems && initialItems.length > 0) ? initialItems : INIT_COMPS
+  );
   const [newText, setNewText] = useState('');
 
   useEffect(() => {
-    const selected = INIT_COMPS.filter(it => it.sel);
-    onUpdate(selected.map(it => `${it.num || '??} ${it.text}`).join('\n'));
+    const initSource = (initialItems && initialItems.length > 0) ? initialItems : INIT_COMPS;
+    const selected = initSource.filter(it => it.sel);
+    onUpdate(selected.map(it => `${it.num || '??'} ${it.text}`).join('\n'));
     onComponentsChange?.(selected.map(it => ({ number: it.num || '', name: extractCompName(it.text) })));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1156,21 +1207,28 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
 // ?꾨㈃ ?⑤꼸 (#21)
 
 // DrawingsPanel ???몃꽕??湲고샇/?쇰꺼/?꾨㈃紐??쒖떆, ?⑥씪 ?몄쭛 踰꾪듉
-function DrawingsPanel({ done, onUpdate, inventionComponents }: {
+function DrawingsPanel({ done, onUpdate, inventionComponents, initialDrawings, onDrawingsChange }: {
   done: boolean;
   onConfirm: () => void;
   onUpdate: (v: string) => void;
   inventionComponents?: InventionComponent[];
+  initialDrawings?: DrawingItem[];
+  onDrawingsChange?: (drawings: DrawingItem[]) => void;
 }) {
-  const [drawings, setDrawings] = useState(() => MOCK_DRAWINGS.map(d => ({ ...d })));
+  const [drawings, setDrawings] = useState<DrawingItem[]>(() =>
+    (initialDrawings && initialDrawings.length > 0)
+      ? initialDrawings.map(d => ({ ...d }))
+      : MOCK_DRAWINGS.map(d => ({ ...d }))
+  );
   // 紐⑤컮???꾩슜 紐⑤떖 ?곹깭
   const [modalOpen, setModalOpen] = useState(false);
   const [modalStartId, setModalStartId] = useState('');
 
-  const handleSave = (drawingId: string, updates: Partial<typeof drawings[0]>) => {
+  const handleSave = (drawingId: string, updates: Partial<DrawingItem>) => {
     setDrawings(prev => {
       const next = prev.map(d => d.id === drawingId ? { ...d, ...updates } : d);
       onUpdate(next.filter(d => d.stage === 'done').map(d => `湲고샇${d.symbol} ${d.name}: ${d.description}`).join('\n\n'));
+      onDrawingsChange?.(next);
       return next;
     });
   };
@@ -1214,6 +1272,15 @@ function DrawingsPanel({ done, onUpdate, inventionComponents }: {
     'AI?앹꽦':   'bg-violet-100 text-violet-700',
   };
 
+  const STAGE_BADGE: Record<string, { label: string; cls: string }> = {
+    'extracted':        { label: '영역 확인 필요', cls: 'bg-amber-100 text-amber-700' },
+    'bbox-adjusted':    { label: '변환 대기',       cls: 'bg-blue-100 text-blue-700' },
+    'converting':       { label: '변환 중',          cls: 'bg-violet-100 text-violet-700' },
+    'candidate-select': { label: '후보 선택 필요',   cls: 'bg-orange-100 text-orange-700' },
+    'editing':          { label: '편집 중',           cls: 'bg-sky-100 text-sky-700' },
+    'done':             { label: '편집 완료',         cls: 'bg-green-100 text-green-700' },
+  };
+
   const STAGE_DOT: Record<string, string> = {
     'extracted': 'bg-gray-300', 'bbox-adjusted': 'bg-amber-400',
     'converting': 'bg-amber-400', 'candidate-select': 'bg-violet-400',
@@ -1254,6 +1321,11 @@ function DrawingsPanel({ done, onUpdate, inventionComponents }: {
                     <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', LABEL_STYLES[d.label])}>
                       {d.label}
                     </span>
+                    {STAGE_BADGE[d.stage] && (
+                      <span className={`text-xs2 px-1.5 py-0.5 rounded font-semibold ${STAGE_BADGE[d.stage].cls}`}>
+                        {STAGE_BADGE[d.stage].label}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs2 text-gray-700 font-semibold truncate">{d.name}</p>
                 </div>
@@ -1354,19 +1426,73 @@ const MOCK_DEPS_BY_INDEP: Record<number, Pick<DepItemState,'text'|'sel'>[]> = {
 interface DepGroupState { generated: boolean; items: DepItemState[]; newText: string }
 
 
-function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void }) {
-  const [claimsPhase, setClaimsPhase] = useState<'indep' | 'dep'>('indep');
-
-  // ?낅┰???꾨낫 ?곹깭 (n媛??ㅼ쨷 ?좏깮)
-  const [cands, setCands] = useState<IndepCandState[]>(
-    INDEP_CANDS_INIT.map(c => ({ ...c, selected: c.id === 1, editing: false, editVal: c.text, aiOpen: false, aiPromptVal: '', aiProposed: '', aiDiffOpen: false, aiDiffSel: 'proposed' as const }))
+function ClaimsPanel({ done, onUpdate, initialClaimsState, onClaimsStateChange }: {
+  done: boolean;
+  onConfirm: () => void;
+  onUpdate: (v: string) => void;
+  initialClaimsState?: { phase: 'indep' | 'dep'; indepCands: any[]; depGroups: Record<number, any> };
+  onClaimsStateChange?: (s: any) => void;
+}) {
+  const [claimsPhase, setClaimsPhase] = useState<'indep' | 'dep'>(
+    () => initialClaimsState?.phase ?? 'indep'
   );
 
-  // ?낅┰??퀎 醫낆냽??洹몃９
-  const [depGroups, setDepGroups] = useState<Record<number, DepGroupState>>({});
+  // 독립항 후보 상태 (n개 중 선택)
+  const [cands, setCands] = useState<IndepCandState[]>(
+    () => {
+      if (initialClaimsState?.indepCands && initialClaimsState.indepCands.length > 0) {
+        return initialClaimsState.indepCands.map((c: any) => ({
+          id: c.id, label: c.label, text: c.text, selected: c.selected,
+          editing: false, editVal: c.text, aiOpen: false, aiPromptVal: '',
+          aiProposed: '', aiDiffOpen: false, aiDiffSel: 'proposed' as const,
+        }));
+      }
+      return INDEP_CANDS_INIT.map(c => ({
+        ...c, selected: c.id === 1, editing: false, editVal: c.text,
+        aiOpen: false, aiPromptVal: '', aiProposed: '', aiDiffOpen: false, aiDiffSel: 'proposed' as const,
+      }));
+    }
+  );
+
+  // 독립항 별 종속항 그룹
+  const [depGroups, setDepGroups] = useState<Record<number, DepGroupState>>(() => {
+    if (initialClaimsState?.depGroups) {
+      const restored: Record<number, DepGroupState> = {};
+      for (const [k, v] of Object.entries(initialClaimsState.depGroups)) {
+        const vv = v as any;
+        restored[Number(k)] = {
+          generated: vv.generated ?? false,
+          newText: vv.newText ?? '',
+          items: (vv.items ?? []).map((d: any, i: number) => ({
+            id: d.id ?? i + 1, text: d.text, sel: d.sel ?? true,
+            expanded: false, editing: false, editVal: d.text,
+            aiOpen: false, aiPromptVal: '', aiProposed: '', aiDiffOpen: false, aiDiffSel: 'proposed' as const,
+          })),
+        };
+      }
+      return restored;
+    }
+    return {};
+  });
 
   // ?좏깮???낅┰??紐⑸줉
   const selectedCands = cands.filter(c => c.selected);
+
+  // 상태 변경 알림 함수
+  const notifyChange = (updCands: IndepCandState[], updGroups: Record<number, DepGroupState>, phase: 'indep' | 'dep') => {
+    onClaimsStateChange?.({
+      phase,
+      indepCands: updCands.map(c => ({ id: c.id, label: c.label, text: c.text, selected: c.selected })),
+      depGroups: Object.fromEntries(
+        Object.entries(updGroups).map(([k, v]) => [k, {
+          generated: (v as any).generated,
+          newText: (v as any).newText ?? '',
+          items: (v as any).items?.map((d: any) => ({ id: d.id, text: d.text, sel: d.sel })) ?? [],
+        }])
+      ),
+    });
+  };
+
 
   // 留덉슫????珥덇린 ?붿빟???곸쐞濡??꾨떖 ???뺤젙 移대뱶???ㅼ젣 ?댁슜 ?쒖떆
   useEffect(() => {
@@ -1403,6 +1529,7 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
     const next = cands.map(c => c.id === id ? { ...c, selected: !c.selected } : c);
     setCands(next);
     syncUpdate(next, depGroups);
+    notifyChange(next, depGroups, claimsPhase);
   };
 
   // ?낅┰??Phase B濡??대룞
@@ -1410,6 +1537,7 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
     if (selectedCands.length === 0) return;
     setClaimsPhase('dep');
     syncUpdate(cands, depGroups);
+    notifyChange(cands, depGroups, 'dep');
   };
 
   // ?낅┰??AI ?ъ깮????prompt ??diff 紐⑤뱶濡??꾪솚 (mock ?앹꽦)
@@ -1440,6 +1568,7 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
     const next: Record<number, DepGroupState> = { ...depGroups, [indepId]: { generated: true, items: mockItems, newText: '' } };
     setDepGroups(next);
     syncUpdate(cands, next);
+    notifyChange(cands, next, claimsPhase);
   };
 
   // 醫낆냽???좉?
@@ -1450,6 +1579,7 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
     const next = { ...depGroups, [indepId]: { ...grp, items: grp.items.map(d => d.id === depId ? { ...d, sel: !d.sel } : d) } };
     setDepGroups(next);
     syncUpdate(cands, next);
+    notifyChange(cands, next, claimsPhase);
   };
 
   const removeDep = (indepId: number, depId: number) => {
