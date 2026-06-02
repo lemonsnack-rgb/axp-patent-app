@@ -19,6 +19,8 @@ interface Props {
   inventionComponents?: InventionComponent[];
   /** 캔버스에 실제 배치된 부호 번호 세트 */
   placedNums?: Set<string>;
+  /** 외부에서 참조번호를 선택해 캔버스에 배치 요청 */
+  onPlaceRef?: (ref: EditorReference) => void;
   /** 명세서에 들어갈 도면의 설명 */
   drawingDescription?: string;
   onDrawingDescriptionChange?: (value: string) => void;
@@ -97,6 +99,7 @@ export function RefListPanel({
   references, onAdd, onUpdate, onDelete,
   inventionComponents,
   placedNums,
+  onPlaceRef,
   drawingDescription = '',
   onDrawingDescriptionChange,
 }: Props) {
@@ -312,6 +315,15 @@ export function RefListPanel({
 
                     {/* 액션 버튼 */}
                     <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {/* 도면에 배치 */}
+                      {onPlaceRef && (
+                        <button type="button"
+                          onClick={() => onPlaceRef(r)}
+                          title="도면에 배치 — 클릭 후 캔버스에서 위치 지정"
+                          className="rounded px-1 py-0.5 text-blue-600 hover:bg-blue-50 text-xs2 font-semibold border border-blue-200 hover:border-blue-400 transition-colors">
+                          배치
+                        </button>
+                      )}
                       {/* 하위 추가 */}
                       <button type="button" onClick={() => submitChild(r.number)} title="하위 항목 추가"
                         className="rounded p-0.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600">

@@ -405,6 +405,7 @@ export function PatentEditor({
                 onDelete={handleReferenceDelete}
                 inventionComponents={components}
                 placedNums={placedNums}
+                onPlaceRef={(ref) => canvasHandleRef.current?.selectRefForPlacement(ref)}
                 drawingDescription={singleDrawingMode ? (descriptionDraft || activeDrawing?.description) : undefined}
                 onDrawingDescriptionChange={singleDrawingMode ? (val) => {
                   setDescriptionDraft(val);

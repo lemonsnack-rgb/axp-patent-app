@@ -49,6 +49,8 @@ export interface EditorCanvasHandle {
   fitToScreen: () => void;
   resetZoom: () => void;
   getZoom: () => number;
+  /** 외부에서 참조번호를 미리 선택하고 지시선 도구 활성화 */
+  selectRefForPlacement: (ref: EditorReference) => void;
 }
 
 interface Props {
@@ -837,6 +839,8 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
     const previewObjectRef = useRef<fabric.Object | null>(null);
     // 참조번호/원형부호 도구 진입 시 picker에서 미리 고른 부호
     const selectedRefRef = useRef<EditorReference | null>(null);
+    // 외부(배치 버튼)에서 툴 변경과 동시에 전달된 부호 (툴 변경 effect 이후에 복원)
+    const pendingPlacementRef = useRef<EditorReference | null>(null);
     const [picker, setPicker] = useState<PickerState | null>(null);
     const [selectedObj, setSelectedObj] = useState<fabric.Object | null>(null);
     const [shapeNameInput, setShapeNameInput] = useState("");
@@ -896,6 +900,13 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
         fc.setZoom(1);
         fc.absolutePan(new fabric.Point(0, 0));
         onZoomChange?.(1);
+      },
+      selectRefForPlacement: (ref: EditorReference) => {
+        // pendingPlacementRef에 먼저 설정 → 툴 변경 effect 후 selectedRefRef로 복원됨
+        pendingPlacementRef.current = ref;
+        pendingAnchorRef.current = null;
+        setPicker(null);
+        useEditorStore.setState({ tool: 'text' });
       },
       toggleHatchOnSelection: () => {
         const fc = fabricRef.current;
@@ -1519,7 +1530,13 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
       }
       dragStartRef.current = null;
       // 도구 변경 시 미리 고른 부호 초기화 + picker 닫기
-      selectedRefRef.current = null;
+      // 단, 외부 배치 버튼으로 예약된 부호가 있으면 복원
+      if (pendingPlacementRef.current) {
+        selectedRefRef.current = pendingPlacementRef.current;
+        pendingPlacementRef.current = null;
+      } else {
+        selectedRefRef.current = null;
+      }
 
       // 선택 도구가 아닌 모드에서는 endpoint handle 정리
       if (tool !== "select") {
@@ -1527,13 +1544,14 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
       }
 
       // 참조번호/원형부호 진입 시 picker 자동 표시
-      if (tool === "text") {
+      // (단, 배치 버튼으로 부호가 미리 선택된 경우 picker 생략)
+      if (tool === "text" && !selectedRefRef.current) {
         setPicker({
           position: { x: 12, y: 12 },
           pending: { kind: "select-for-text" },
           title: "참조번호 선택 — 부호를 먼저 고르세요",
         });
-      } else if (tool === "ref-circle") {
+      } else if (tool === "ref-circle" && !selectedRefRef.current) {
         setPicker({
           position: { x: 12, y: 12 },
           pending: { kind: "select-for-ref-circle" },

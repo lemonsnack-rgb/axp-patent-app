@@ -1,6 +1,6 @@
 // DrawingEditorModal — 3단계 (영역 확인 → 스타일 변환 → 도면 편집)
 // 모든 단계가 하나의 UI 안에서 연속적으로 진행됨
-import { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import clsx from 'clsx';
 import { Icon } from '../../components/Icon';
 import { PatentEditor } from '../patent-editor';
@@ -61,6 +61,43 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
+  // B-box 상태 (퍼센트, 0~100)
+  const [cropBox, setCropBox] = useState({ x1: 15, y1: 15, x2: 85, y2: 85 });
+  const cropContainerRef = React.useRef<HTMLDivElement>(null);
+  const cropDragRef = React.useRef<{
+    type: 'move' | 'nw'|'n'|'ne'|'e'|'se'|'s'|'sw'|'w';
+    startX: number; startY: number;
+    startBox: typeof cropBox;
+  } | null>(null);
+
+  const startCropDrag = (type: typeof cropDragRef.current extends null ? never : NonNullable<typeof cropDragRef.current>['type'], e: React.MouseEvent) => {
+    e.preventDefault();
+    const rect = cropContainerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    cropDragRef.current = {
+      type, startX: e.clientX, startY: e.clientY, startBox: { ...cropBox }
+    };
+    const onMove = (ev: MouseEvent) => {
+      if (!cropDragRef.current || !cropContainerRef.current) return;
+      const r = cropContainerRef.current.getBoundingClientRect();
+      const dx = ((ev.clientX - cropDragRef.current.startX) / r.width) * 100;
+      const dy = ((ev.clientY - cropDragRef.current.startY) / r.height) * 100;
+      const b = cropDragRef.current.startBox;
+      const minSize = 10;
+      setCropBox(prev => {
+        let { x1, y1, x2, y2 } = b;
+        const t = cropDragRef.current!.type;
+        if (t === 'move') { x1=b.x1+dx; y1=b.y1+dy; x2=b.x2+dx; y2=b.y2+dy; }
+        else { if (t.includes('w')) x1=Math.min(b.x1+dx, b.x2-minSize); if (t.includes('e')) x2=Math.max(b.x2+dx, b.x1+minSize); if (t.includes('n')) y1=Math.min(b.y1+dy, b.y2-minSize); if (t.includes('s')) y2=Math.max(b.y2+dy, b.y1+minSize); }
+        x1=Math.max(0,Math.min(x1,100)); y1=Math.max(0,Math.min(y1,100)); x2=Math.max(0,Math.min(x2,100)); y2=Math.max(0,Math.min(y2,100));
+        return { x1, y1, x2, y2 };
+      });
+      void prev; // suppress unused warning
+    };
+    const onUp = () => { cropDragRef.current = null; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
   const [isRepresentative, setIsRepresentative] = useState(() =>
     drawings.find(d => d.id === initialDrawingId)?.isRepresentative ?? false
   );
@@ -339,15 +376,33 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                           : <div className="text-center text-gray-400"><Icon name="image" size={48} className="mx-auto mb-2 text-gray-200" /><p className="text-sm2">도면 이미지</p></div>}
                       </div>
                     ) : (
-                      <div className="flex-1 bg-gray-50 rounded-lg border-2 border-blue-400 relative flex items-center justify-center overflow-hidden">
-                        <div className="text-center text-gray-400">
-                          <Icon name="image" size={40} className="mx-auto mb-2 text-gray-300" />
-                          <p className="text-sm2">원본 전체 이미지</p>
-                          <p className="text-xs2 text-gray-400 mt-1">드래그하여 변환 영역 지정</p>
-                        </div>
-                        <div className="absolute border-2 border-blue-500 bg-blue-500/10 rounded"
-                          style={{ left: '15%', top: '15%', right: '15%', bottom: '15%' }}>
-                          <span className="absolute -top-5 left-0 text-xs2 text-blue-600 bg-white px-1 rounded font-semibold border border-blue-200">변환 영역</span>
+                      /* 대화형 B-box 크롭 */
+                      <div
+                        ref={cropContainerRef}
+                        className="flex-1 bg-gray-100 rounded-lg border border-gray-200 relative overflow-hidden select-none"
+                        style={{ cursor: 'crosshair' }}
+                      >
+                        {/* 배경 이미지 */}
+                        {(activeDraw.sourceImageUrl || activeDraw.exportedImageUrl)
+                          ? <img src={activeDraw.sourceImageUrl || activeDraw.exportedImageUrl} className="w-full h-full object-contain" alt="" />
+                          : <div className="absolute inset-0 flex items-center justify-center text-gray-300 text-sm2">원본 이미지</div>}
+                        {/* 어두운 마스크 */}
+                        <div className="absolute inset-0 bg-black/30 pointer-events-none" />
+                        {/* B-box 밝은 영역 + 핸들 */}
+                        <div
+                          className="absolute border-2 border-blue-500 bg-white/10"
+                          style={{ left:`${cropBox.x1}%`, top:`${cropBox.y1}%`, width:`${cropBox.x2-cropBox.x1}%`, height:`${cropBox.y2-cropBox.y1}%`, cursor:'move' }}
+                          onMouseDown={e => startCropDrag('move', e)}
+                        >
+                          <span className="absolute -top-5 left-0 text-xs2 text-white bg-blue-600 px-1.5 py-0.5 rounded font-semibold shadow">변환 영역</span>
+                          {/* 8방향 핸들 */}
+                          {(['nw','n','ne','e','se','s','sw','w'] as const).map(h => {
+                            const pos: React.CSSProperties = {};
+                            if (h.includes('n')) pos.top='-4px'; if (h.includes('s')) pos.bottom='-4px'; if (!h.includes('n')&&!h.includes('s')) pos.top='calc(50% - 4px)';
+                            if (h.includes('w')) pos.left='-4px'; if (h.includes('e')) pos.right='-4px'; if (!h.includes('w')&&!h.includes('e')) pos.left='calc(50% - 4px)';
+                            const cursors: Record<string,string> = {nw:'nw-resize',n:'n-resize',ne:'ne-resize',e:'e-resize',se:'se-resize',s:'s-resize',sw:'sw-resize',w:'w-resize'};
+                            return <div key={h} className="absolute w-2 h-2 bg-white border-2 border-blue-500 rounded-sm z-10" style={{...pos, cursor: cursors[h]}} onMouseDown={e => { e.stopPropagation(); startCropDrag(h, e); }} />;
+                          })}
                         </div>
                       </div>
                     )}
@@ -381,13 +436,20 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                 <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-t border-ck-border bg-white shrink-0">
                   {workStage === 'crop' ? (
                     <>
-                      <button className="btn-outline btn-sm" onClick={() => goStage('reselect')}>영역 재지정</button>
+                      <button className="btn-outline btn-sm" onClick={() => { setCropBox({ x1:15, y1:15, x2:85, y2:85 }); goStage('reselect'); }}>
+                        영역 편집
+                      </button>
                       <button className="btn-primary btn-sm" onClick={startConvert}>스타일 변환 시작 →</button>
                     </>
                   ) : (
                     <>
                       <button className="btn-outline btn-sm" onClick={() => goStage('crop')}>← 취소</button>
-                      <button className="btn-primary btn-sm" onClick={startConvert}>이 영역으로 변환 →</button>
+                      <div className="flex items-center gap-1.5 text-xs2 text-gray-500">
+                        <span>영역: {Math.round(cropBox.x2-cropBox.x1)}% × {Math.round(cropBox.y2-cropBox.y1)}%</span>
+                      </div>
+                      <button className="btn-primary btn-sm" onClick={startConvert}>
+                        ✓ 확인 후 변환 →
+                      </button>
                     </>
                   )}
                 </div>
