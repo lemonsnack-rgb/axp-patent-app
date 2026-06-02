@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useStore } from '../store';
+import { useStore, taskTypeMeta } from '../store';
 import { useToast } from '../components/Toast';
 import type { TaskType } from '../types';
 import { Icon } from '../components/Icon';
@@ -98,6 +98,31 @@ export function NewTaskView() {
           </button>
         ))}
       </div>
+
+      {/* 최근 작업 — 빈 공간 활용 (작업 미선택 시 표시) */}
+      {!type && tasks.length > 0 && (
+        <div className="max-w-3xl w-full mt-6">
+          <p className="text-sm2 font-semibold text-zinc-500 mb-3">최근 작업</p>
+          <div className="grid grid-cols-3 gap-3">
+            {tasks.slice(0, 3).map(t => {
+              const meta = taskTypeMeta(t.type);
+              return (
+                <button key={t.id} onClick={() => {
+                  setActiveTaskId(t.id);
+                  setMode(t.type === 'spec' ? 'spec' : 'search');
+                }} className="card p-3.5 text-left hover:border-blue-400 hover:-translate-y-0.5 hover:shadow-card-hover active:scale-[0.98] transition-all">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Icon name={meta.icon} size={14} className={`text-${meta.color}-600`} />
+                    <span className={`text-xs2 px-1.5 py-0.5 rounded-full font-medium bg-${meta.color}-50 text-${meta.color}-700`}>{meta.label}</span>
+                  </div>
+                  <p className="text-sm2 font-semibold text-zinc-800 truncate">{t.name}</p>
+                  <p className="text-xs2 text-zinc-400 mt-0.5">{new Date(t.updatedAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} 수정</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {type && (
         <div className="card max-w-[760px] w-full p-5 animate-fade-up">

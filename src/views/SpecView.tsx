@@ -239,7 +239,7 @@ export function SpecView() {
               <div className="text-center py-4">
                 <Icon name="doc" size={48} className="text-blue-700 mx-auto mb-3" />
                 <h2 className="text-lg2 font-bold text-gray-800 mb-2">새 특허 명세서 작성</h2>
-                <p className="text-md2 text-gray-500 mb-6">발명 관련 파일을 업로드하거나, 기초 내용을 직접 입력하세요.</p>
+                <p className="text-md2 text-gray-500 mb-6">아래 두 가지 방법 중 하나로 기초자료를 제공하세요.</p>
                 <div onClick={phase === 'upload' ? startFlow : undefined}
                   className={`border-2 border-dashed rounded-xl p-10 mb-5 transition-all ${phase === 'upload' ? 'border-gray-300 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30' : 'border-gray-200 opacity-50'}`}>
                   <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 text-gray-400">
@@ -250,10 +250,16 @@ export function SpecView() {
                 </div>
                 {phase === 'upload' && (
                   <>
-                    <div className="flex items-center gap-3 mb-5">
-                      <div className="flex-1 h-px bg-gray-200" /><span className="text-sm2 text-gray-400">또는</span><div className="flex-1 h-px bg-gray-200" />
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="flex-1 h-px bg-gray-200" />
+                      <span className="text-sm2 text-gray-400 font-medium px-2">또는</span>
+                      <div className="flex-1 h-px bg-gray-200" />
                     </div>
-                    <button onClick={() => setPhase('direct')} className="btn-outline"><Icon name="edit" size={14} /> 기초 내용 직접 입력</button>
+                    <button onClick={() => setPhase('direct')}
+                      className="btn-outline flex items-center gap-2 mx-auto">
+                      <Icon name="edit" size={14} /> 기초 내용 직접 입력하기
+                    </button>
+                    <p className="text-xs2 text-gray-400 mt-2">파일 없이 발명 내용을 텍스트로 직접 입력할 수 있습니다.</p>
                   </>
                 )}
               </div>
@@ -867,7 +873,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
     <>
       <div className="flex-1 overflow-y-auto scroll-thin p-3">
         {/* 헤더 + 부호 자동 부여 */}
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-1">
           <span className="text-xs2 font-semibold text-gray-600">AI 추출 구성요소</span>
           {!done && (
             <button onClick={autoAssign}
@@ -879,6 +885,11 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
             </button>
           )}
         </div>
+        {!done && (
+          <p className="text-xs2 text-gray-400 mb-2">
+            순서 조정 후 <strong className="text-blue-600">부호 자동 부여</strong>를 클릭하면 100, 200... 번호가 할당됩니다.
+          </p>
+        )}
 
         <div className="space-y-0.5">
           {items.map((item, idx) => (
@@ -1344,10 +1355,10 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
         {cands.map(cand => (
           <div key={cand.id}
             className={clsx('rounded-lg border-2 transition-all',
-              cand.selected && !cand.aiOpen && !cand.aiDiffOpen ? 'border-blue-600 bg-blue-50' : '',
+              cand.selected && !cand.aiOpen && !cand.aiDiffOpen ? 'border-blue-600 bg-blue-50 shadow-sm' : '',
               cand.aiOpen ? 'border-violet-300' : '',
               cand.aiDiffOpen && !cand.aiOpen ? 'border-blue-300 bg-white' : '',
-              !cand.selected && !cand.aiOpen && !cand.aiDiffOpen ? 'border-ck-border bg-ck-bg' : ''
+              !cand.selected && !cand.aiOpen && !cand.aiDiffOpen ? 'border-ck-border bg-ck-bg opacity-70' : ''
             )}>
 
             {/* 헤더 — 체크박스 + 뱃지만 (버튼 없음, DescriptionPanel 일관성) */}
@@ -2224,13 +2235,13 @@ function AbstractPanel({ done, onUpdate }: { done: boolean; onConfirm: () => voi
                 <span className="text-xs2 text-gray-400">{cand.charCount}자</span>
                 {!done && (
                   <div className="ml-auto flex gap-1">
-                    <button onClick={e => e.stopPropagation()} className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400">
+                    <button onClick={e => e.stopPropagation()} title="AI로 다시 생성" className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400">
                       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11">
                         <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10"/>
                         <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6"/>
                       </svg>
                     </button>
-                    <button onClick={e => { e.stopPropagation(); setSelectedIdx(i); }} className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400">
+                    <button onClick={e => { e.stopPropagation(); setSelectedIdx(i); }} title="직접 수정" className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400">
                       <Icon name="edit" size={11} />
                     </button>
                   </div>
