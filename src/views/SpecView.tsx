@@ -362,7 +362,7 @@ export function SpecView() {
                   isDone && !active && 'text-green-700 font-medium',
                   locked && 'text-gray-400',
                   !active && !isDone && !locked && 'text-gray-500',
-                )}>{s.short}</span>
+                )}>{isDone && !active ? `✓ ${s.short}` : s.short}</span>
               </button>
             </div>
           );
@@ -451,7 +451,8 @@ export function SpecView() {
             )}
 
             {/* 吏곸젒?낅젰 ?????먮낯: AI 遺꾩꽍 ?쒖옉 ?꾩뿉??怨꾩냽 ?쒖떆 (?꾨뱶 ?좉툑) */}
-            {(phase === 'direct' || ((phase === 'flow' || phase === 'done') && diTitle.trim())) && (
+            {/* 직접입력 폼 — direct 단계에서만 전체 표시 */}
+            {phase === 'direct' && (
               <div className="card overflow-hidden">
                 <div className="flex items-center gap-3 p-4 border-b border-gray-100 bg-gray-50">
                   <Icon name="edit" size={20} className="text-blue-700" />
@@ -496,6 +497,41 @@ export function SpecView() {
                         : <><Icon name="star" size={13} /> AI 遺꾩꽍 ?쒖옉</>
                       }
                     </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* flow/done 단계에서 기초자료 접힘 헤더 */}
+            {(phase === 'flow' || phase === 'done') && diTitle.trim() && (
+              <div className="card overflow-hidden">
+                <button
+                  className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 transition-colors"
+                  onClick={() => setSourceDataOpen(o => !o)}
+                >
+                  <Icon name="edit" size={16} className="text-blue-600 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm2 font-semibold text-gray-700">기초자료</p>
+                    <p className="text-xs2 text-gray-400 truncate">{diTitle} · {diField}</p>
+                  </div>
+                  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" width="12" height="12" className={sourceDataOpen ? 'rotate-180' : ''}>
+                    <path d="M2 4l4 4 4-4"/>
+                  </svg>
+                </button>
+                {sourceDataOpen && (
+                  <div className="p-4 space-y-2 border-t border-gray-100 bg-gray-50/50">
+                    {[
+                      { label: '발명의 명칭', val: diTitle },
+                      { label: '기술 분야', val: diField },
+                      diContent && { label: '발명의 핵심 내용', val: diContent },
+                      diProblem && { label: '해결하려는 과제', val: diProblem },
+                      diKeywords && { label: '키워드', val: diKeywords },
+                    ].filter(Boolean).map((f: any) => (
+                      <div key={f.label}>
+                        <p className="text-xs2 font-semibold text-gray-500 mb-0.5">{f.label}</p>
+                        <p className="text-xs2 text-gray-700 bg-white rounded px-2.5 py-2 border border-gray-200 whitespace-pre-wrap">{f.val}</p>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -578,21 +614,31 @@ export function SpecView() {
                   <div className="text-center py-8">
                     <Icon name="logo" size={40} className="text-blue-700 mx-auto mb-3" />
                     <h3 className="text-lg2 font-bold text-gray-800 mb-2">紐⑤뱺 遺꾩꽍???꾨즺?섏뿀?듬땲??/h3>
-                    {mainView === 'editor' ? (
+                    {task?.id && loadSpecState(task?.id ?? '')?.mainView === 'editor' ? (
                       <>
                         <p className="text-md2 text-gray-500 mb-4">?대? ?앹꽦??紐낆꽭???먮뵒?곕줈 ?뚯븘媛????덉뒿?덈떎.</p>
                         <button
-                          onClick={() => openEditor()}
+                          onClick={() => openEditor?.()}
                           className="btn-primary btn-sm mx-auto flex items-center gap-1.5">
                           <Icon name="doc" size={13} /> 紐낆꽭???먮뵒???닿린 ??
                         </button>
                       </>
                     ) : (
-                      <p className="text-md2 text-gray-500">
-                        ?뺤젙???댁슜??諛뷀깢?쇰줈 ?뱁뿀 紐낆꽭?쒕? AI媛 ?앹꽦?⑸땲??<br/>
-                        <span className="text-blue-700 font-medium">?ㅻⅨ履??⑤꼸</span>??' '}
-                        <strong>紐낆꽭??AI ?앹꽦</strong> 踰꾪듉???뚮윭 ?쒖옉?섏꽭??
-                      </p>
+                      <>
+                        <p className="text-md2 text-gray-500 mb-6">
+                          확정된 내용을 바탕으로 특허 명세서를 생성합니다.
+                        </p>
+                        <button
+                          onClick={() => openEditor?.()}
+                          disabled={generatingSpec}
+                          className="btn-primary px-8 py-3 text-base2 font-bold mx-auto flex items-center gap-2 rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all active:scale-[0.98]"
+                        >
+                          {generatingSpec
+                            ? <><span className="inline-block animate-spin mr-2">↻</span>명세서 생성 중...</>
+                            : <><Icon name="doc" size={16} /> 명세서 AI 생성 →</>
+                          }
+                        </button>
+                      </>
                     )}
                   </div>
                 )}
@@ -1867,7 +1913,7 @@ function ClaimsPanel({ done, onUpdate, initialClaimsState, onClaimsStateChange }
             onClick={confirmIndep}
             disabled={selectedCands.length === 0}
             className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm2 font-semibold hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed mt-1">
-            ?좏깮???낅┰??{selectedCands.length > 0 ? `${selectedCands.length}媛? : ''} ?쇰줈 醫낆냽??援ъ꽦 ??
+            ?좏깮???낅┰??{selectedCands.length > 0 ? `${selectedCands.length}媛? : ''}?쇰줈 醫낆냽??援ъ꽦 ??
           </button>
         )}
       </div>
