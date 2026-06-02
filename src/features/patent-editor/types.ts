@@ -35,11 +35,15 @@ export type LeaderCurve = "straight" | "s-curve";
 // 채우기 스타일
 export type FillStyle = "none" | "hatch" | "cross-hatch";
 
+export type RefShape = 'rect' | 'circle' | 'diamond' | 'cylinder';
+
 export interface EditorReference {
   number: string;
   name?: string;
   /** 상위 부호의 번호 (계층구조). 미지정이면 root */
   parentNumber?: string;
+  /** 도형 유형 (캔버스 심볼 표시용) */
+  shape?: RefShape;
 }
 
 /**

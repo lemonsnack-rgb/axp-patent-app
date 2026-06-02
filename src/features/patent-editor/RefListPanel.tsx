@@ -1,7 +1,15 @@
 // RefListPanel — 도면 부호 목록 (검색·100단위 그룹·계층·도면설명)
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, ChevronsUp, ChevronsDown, GripVertical } from 'lucide-react';
-import type { EditorReference, InventionComponent } from './types';
+import type { EditorReference, InventionComponent, RefShape } from './types';
+
+// 도형 선택 아이콘 SVG
+const SHAPES: { id: RefShape; label: string; icon: React.ReactNode }[] = [
+  { id: 'rect', label: '사각형', icon: <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="14" height="14"><rect x="1" y="3" width="14" height="10" rx="1"/></svg> },
+  { id: 'circle', label: '원형', icon: <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="14" height="14"><ellipse cx="8" cy="8" rx="7" ry="5"/></svg> },
+  { id: 'diamond', label: '다이아몬드', icon: <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="14" height="14"><polygon points="8,1 15,8 8,15 1,8"/></svg> },
+  { id: 'cylinder', label: '실린더', icon: <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="14" height="14"><ellipse cx="8" cy="4" rx="6" ry="2.5"/><line x1="2" y1="4" x2="2" y2="12"/><line x1="14" y1="4" x2="14" y2="12"/><ellipse cx="8" cy="12" rx="6" ry="2.5"/></svg> },
+];
 
 interface Props {
   references: EditorReference[];
@@ -101,6 +109,8 @@ export function RefListPanel({
   // 드래그 앤 드롭 상태
   const [dragNum, setDragNum] = useState<string | null>(null);
   const [dropNum, setDropNum] = useState<string | null>(null);
+  // 도형 편집 패널 (확장된 항목)
+  const [expandedNum, setExpandedNum] = useState<string | null>(null);
 
   const tree = useMemo(() => buildTree(references), [references]);
   const flat = useMemo(() => flattenTree(tree), [tree]);
@@ -240,7 +250,8 @@ export function RefListPanel({
                 const isDragging = dragNum === r.number;
                 const isDropTarget = dropNum === r.number && dragNum !== r.number;
                 return (
-                  <div key={r.number}
+                  <div key={r.number}>
+                  <div
                     draggable
                     onDragStart={() => setDragNum(r.number)}
                     onDragOver={e => { e.preventDefault(); setDropNum(r.number); }}
@@ -249,7 +260,6 @@ export function RefListPanel({
                         const dragRef = references.find(x => x.number === dragNum);
                         const dropRef = references.find(x => x.number === dropNum);
                         if (dragRef && dropRef && onUpdate) {
-                          // 드롭 위치의 parentNumber를 드래그 항목에 적용 (위계 유지하며 그룹 이동)
                           onUpdate({ ...dragRef, parentNumber: dropRef.parentNumber });
                         }
                       }
@@ -277,10 +287,15 @@ export function RefListPanel({
                         className="flex-1 min-w-0 rounded border border-blue-400 px-1 py-0 text-sm2 focus:outline-none"
                       />
                     ) : (
-                      <button type="button" onClick={() => { if (!onUpdate) return; setEditingNum(r.number); setEditName(r.name ?? ''); }}
+                      <button type="button"
+                        onClick={() => setExpandedNum(expandedNum === r.number ? null : r.number)}
                         className="flex-1 min-w-0 text-left text-gray-600 hover:text-blue-700 flex items-center gap-0.5">
                         <span className="truncate">{r.name ?? <span className="italic text-gray-400">(이름 없음)</span>}</span>
-                        {onUpdate && <Pencil size={8} className="shrink-0 opacity-0 group-hover:opacity-60" />}
+                        {r.shape && (
+                          <span className="shrink-0 text-gray-300 text-xs2 ml-0.5">
+                            {SHAPES.find(s => s.id === r.shape)?.icon}
+                          </span>
+                        )}
                       </button>
                     )}
 
@@ -311,6 +326,44 @@ export function RefListPanel({
                       </button>
                     </div>
                   </div>
+
+                  {/* 확장 편집 패널 (도형 선택 + 이름 편집) */}
+                  {expandedNum === r.number && onUpdate && (
+                    <div
+                      className="bg-blue-50 border-b border-blue-100 px-3 py-2 space-y-1.5"
+                      style={{ paddingLeft: 8 + depth * 12 + 8 }}
+                    >
+                      {/* 이름 편집 */}
+                      <input
+                        type="text"
+                        defaultValue={r.name ?? ''}
+                        placeholder="이름 (선택)"
+                        onBlur={e => {
+                          const v = e.target.value.trim();
+                          if (v !== (r.name ?? '')) onUpdate({ ...r, name: v || undefined });
+                        }}
+                        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setExpandedNum(null); }}
+                        className="w-full text-xs2 rounded border border-blue-200 bg-white px-1.5 py-0.5 focus:border-blue-400 focus:outline-none"
+                      />
+                      {/* 도형 선택 */}
+                      <div className="flex gap-1">
+                        {SHAPES.map(s => (
+                          <button key={s.id} type="button"
+                            onClick={() => onUpdate({ ...r, shape: r.shape === s.id ? undefined : s.id })}
+                            title={s.label}
+                            className={`flex-1 flex flex-col items-center gap-0.5 py-1 rounded border text-xs2 transition-all ${
+                              r.shape === s.id
+                                ? 'bg-blue-600 border-blue-600 text-white'
+                                : 'bg-white border-gray-200 text-gray-500 hover:border-blue-400 hover:text-blue-600'
+                            }`}>
+                            {s.icon}
+                            <span className="text-[9px] leading-none">{s.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
                 );
               })}
             </div>
