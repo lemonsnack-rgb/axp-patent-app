@@ -43,6 +43,12 @@ export interface EditorCanvasHandle {
   removeAllUsesOfRef: (refNumber: string) => number;
   /** AI 추천 위치에 참조 부호를 자동 배치 */
   placeInitialRefs: (refs: EditorReference[]) => void;
+  /** 줌 제어 */
+  zoomIn: () => void;
+  zoomOut: () => void;
+  fitToScreen: () => void;
+  resetZoom: () => void;
+  getZoom: () => number;
 }
 
 interface Props {
@@ -52,6 +58,7 @@ interface Props {
   height: number;
   availableReferences: EditorReference[];
   onReferenceAdd?: (ref: EditorReference) => void;
+  onZoomChange?: (zoom: number) => void;
 }
 
 type Pt = { x: number; y: number };
@@ -819,6 +826,7 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
       height,
       availableReferences,
       onReferenceAdd,
+      onZoomChange,
     },
     ref,
   ) {
@@ -846,6 +854,49 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
 
     useImperativeHandle(ref, () => ({
       getCanvas: () => fabricRef.current,
+      getZoom: () => fabricRef.current?.getZoom() ?? 1,
+      zoomIn: () => {
+        const fc = fabricRef.current;
+        if (!fc) return;
+        const newZoom = Math.min(fc.getZoom() * 1.15, 4);
+        fc.zoomToPoint(new fabric.Point(fc.getWidth() / 2, fc.getHeight() / 2), newZoom);
+        onZoomChange?.(newZoom);
+      },
+      zoomOut: () => {
+        const fc = fabricRef.current;
+        if (!fc) return;
+        const newZoom = Math.max(fc.getZoom() / 1.15, 0.2);
+        fc.zoomToPoint(new fabric.Point(fc.getWidth() / 2, fc.getHeight() / 2), newZoom);
+        onZoomChange?.(newZoom);
+      },
+      fitToScreen: () => {
+        const fc = fabricRef.current;
+        if (!fc) return;
+        const objs = fc.getObjects().filter(o => !isOverlay(o));
+        if (objs.length === 0) { fc.setZoom(1); fc.absolutePan(new fabric.Point(0, 0)); onZoomChange?.(1); return; }
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        objs.forEach(o => {
+          const b = o.getBoundingRect();
+          minX = Math.min(minX, b.left); minY = Math.min(minY, b.top);
+          maxX = Math.max(maxX, b.left + b.width); maxY = Math.max(maxY, b.top + b.height);
+        });
+        const pad = 40;
+        const scaleX = fc.getWidth() / (maxX - minX + pad * 2);
+        const scaleY = fc.getHeight() / (maxY - minY + pad * 2);
+        const newZoom = Math.min(scaleX, scaleY, 2);
+        const cx = (minX + maxX) / 2 * newZoom - fc.getWidth() / 2;
+        const cy = (minY + maxY) / 2 * newZoom - fc.getHeight() / 2;
+        fc.setZoom(newZoom);
+        fc.absolutePan(new fabric.Point(cx, cy));
+        onZoomChange?.(newZoom);
+      },
+      resetZoom: () => {
+        const fc = fabricRef.current;
+        if (!fc) return;
+        fc.setZoom(1);
+        fc.absolutePan(new fabric.Point(0, 0));
+        onZoomChange?.(1);
+      },
       toggleHatchOnSelection: () => {
         const fc = fabricRef.current;
         if (!fc) return;
@@ -929,6 +980,18 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
       pencil.color = "#FFFFFF";
       pencil.width = BRUSH_WIDTH;
       fc.freeDrawingBrush = pencil;
+
+      // 마우스 휠 줌
+      fc.on('mouse:wheel', (opt) => {
+        const delta = (opt.e as WheelEvent).deltaY;
+        let zoom = fc.getZoom();
+        zoom *= 0.999 ** delta;
+        zoom = Math.min(Math.max(zoom, 0.2), 4);
+        fc.zoomToPoint(fc.getScenePoint(opt.e as WheelEvent), zoom);
+        (opt.e as WheelEvent).preventDefault();
+        (opt.e as WheelEvent).stopPropagation();
+        onZoomChange?.(zoom);
+      });
 
       const handleMouseDown = (
         opt: fabric.TPointerEventInfo<fabric.TPointerEvent>,

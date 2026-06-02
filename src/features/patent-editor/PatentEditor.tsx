@@ -60,6 +60,7 @@ export function PatentEditor({
   const [busy, setBusy] = useState(false);
   const [captionDraft, setCaptionDraft] = useState("");
   const [descriptionDraft, setDescriptionDraft] = useState("");
+  const [zoom, setZoom] = useState(1);
 
   const components = useMemo(() => inventionComponents ?? [], [inventionComponents]);
   const [leftWidth, setLeftWidth] = useState(() =>
@@ -315,7 +316,7 @@ export function PatentEditor({
             </div>
           )}
           <div className="flex flex-1 min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-auto bg-gray-100 p-4 flex items-center justify-center">
+            <div className="flex-1 min-h-0 overflow-auto bg-gray-100 p-4 flex items-center justify-center relative">
               {/* key={activeDrawing.id} : 도면 전환 시 fabric 캔버스를 완전히 새로 마운트 */}
               <EditorCanvas
                 key={activeDrawing.id}
@@ -326,7 +327,38 @@ export function PatentEditor({
                 height={DEFAULT_HEIGHT}
                 availableReferences={refs}
                 onReferenceAdd={onReferenceAdd}
+                onZoomChange={setZoom}
               />
+              {/* 줌 컨트롤 */}
+              <div className="absolute bottom-4 left-4 flex items-center gap-0.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-sm px-1 py-1">
+                <button
+                  onClick={() => canvasHandleRef.current?.zoomOut()}
+                  className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-600 text-base font-medium transition-colors"
+                  title="축소 (Ctrl+-)"
+                >−</button>
+                <button
+                  onClick={() => { canvasHandleRef.current?.resetZoom(); setZoom(1); }}
+                  className="min-w-[3.5rem] h-7 px-1 flex items-center justify-center rounded hover:bg-gray-100 text-gray-600 text-xs2 font-mono transition-colors"
+                  title="100% 원본 크기"
+                >
+                  {Math.round(zoom * 100)}%
+                </button>
+                <button
+                  onClick={() => canvasHandleRef.current?.zoomIn()}
+                  className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-600 text-base font-medium transition-colors"
+                  title="확대 (Ctrl++)"
+                >+</button>
+                <div className="w-px h-4 bg-gray-200 mx-0.5" />
+                <button
+                  onClick={() => canvasHandleRef.current?.fitToScreen()}
+                  className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500 transition-colors"
+                  title="전체 맞춤"
+                >
+                  <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="13" height="13">
+                    <path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9"/>
+                  </svg>
+                </button>
+              </div>
             </div>
             <div
               onMouseDown={startResize("right")}
