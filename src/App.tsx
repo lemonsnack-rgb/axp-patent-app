@@ -15,7 +15,7 @@ import { StandaloneEditor } from './views/StandaloneEditor';
 import { isEditorTab } from './features/drawing-workflow/editorChannel';
 
 function Shell() {
-  const { mode, sidebarCollapsed, setSidebarCollapsed } = useStore();
+  const { mode, sidebarCollapsed, setSidebarCollapsed, activeTaskId } = useStore();
 
   // 모바일(<768px)에서 사이드바 자동 접힘
   useEffect(() => {
@@ -44,7 +44,8 @@ function Shell() {
             aria-hidden="true"
           />
         )}
-        <main className="flex-1 flex flex-col overflow-hidden animate-fade-up" key={mode}>
+        <main className="flex-1 flex flex-col overflow-hidden animate-fade-up"
+          key={mode === 'spec' ? `spec-${activeTaskId}` : mode}>
           {mode === 'newtask' && <NewTaskView />}
           {mode === 'home'    && <HomeView />}
           {mode === 'project' && <ProjectDetailView />}

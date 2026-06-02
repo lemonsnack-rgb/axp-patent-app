@@ -10,6 +10,7 @@ import type { InventionComponent } from '../features/patent-editor';
 import { useStore } from '../store';
 import { Icon } from '../components/Icon';
 import { PreviewModal } from '../components/PreviewModal';
+import type { PreviewSection } from '../components/PreviewModal';
 import clsx from 'clsx';
 
 type StepId = 'upload' | 'title' | 'description' | 'components' | 'drawings' | 'claims' | 'abstract';
@@ -118,11 +119,33 @@ export function SpecView() {
   };
   const doneCount = Object.keys(confirmed).length;
 
+  // 미리보기 섹션 구성 — 확정된 내용 기반 (B16 fix)
+  const makePreviewSections = (): PreviewSection[] => {
+    const title = gSel['title'] || confirmed['title'] || task?.name || '';
+    const descRaw = gSel['description'] || confirmed['description'] || '';
+    const extractDesc = (label: string) => {
+      const m = descRaw.match(new RegExp(`【${label}】\\n([^【]*)`));
+      return m?.[1]?.trim() || '';
+    };
+    const claims = gSel['claims'] || confirmed['claims'] || '';
+    const abstract = gSel['abstract'] || confirmed['abstract'] || '';
+    return [
+      { label: '발명의 명칭', content: title },
+      { label: '기술분야', content: extractDesc('기술분야') },
+      { label: '배경기술', content: extractDesc('배경기술') },
+      { label: '해결하고자 하는 과제', content: extractDesc('해결하려는 과제') },
+      { label: '과제의 해결 수단', content: extractDesc('과제해결수단') },
+      { label: '발명의 효과', content: extractDesc('발명의 효과') },
+      { label: '청구범위', content: claims },
+      { label: '요약서', content: abstract },
+    ].filter(s => s.content.trim());
+  };
+
   if (mainView === 'editor') {
     return (
       <>
         <SpecEditorView task={task} onBack={() => handleSetMainView('analysis')} confirmedTitle={gSel['title'] || confirmed['title']} />
-        {previewOpen && <PreviewModal taskName={task?.name} onClose={() => setPreviewOpen(false)} />}
+        {previewOpen && <PreviewModal taskName={task?.name} sections={makePreviewSections()} onClose={() => setPreviewOpen(false)} />}
       </>
     );
   }
@@ -433,7 +456,7 @@ export function SpecView() {
           />
         )}
       </div>
-      {previewOpen && <PreviewModal taskName={task?.name} onClose={() => setPreviewOpen(false)} />}
+      {previewOpen && <PreviewModal taskName={task?.name} sections={makePreviewSections()} onClose={() => setPreviewOpen(false)} />}
     </div>
   );
 }
