@@ -7,7 +7,7 @@ import {
   generateComponentCandidates, generateMockDrawings,
   generateDescriptionSection,
 } from '../features/spec/mockAiService';
-import type { InventionInput } from '../features/spec/types';
+import type { InventionInput, SpecAnalysisResult } from '../features/spec/types';
 import { SpecEditorView } from './SpecEditorView';
 import { DrawingEditorModal } from '../features/drawing-workflow/DrawingEditorModal';
 import { MOCK_DRAWINGS } from '../features/drawing-workflow/types';
@@ -222,10 +222,75 @@ export function SpecView() {
   };
   const doneCount = Object.keys(confirmed).length;
 
+  // ── U6: 에디터 진입 로딩 ──────────────────────────────────────────────
+  const [generatingSpec, setGeneratingSpec] = useState(false);
+
+  const openEditor = () => {
+    setGeneratingSpec(true);
+    setTimeout(() => {
+      setGeneratingSpec(false);
+      handleSetMainView('editor');
+    }, 800);
+  };
+
+  // ── makeAnalysisResult: analysisResult 빌드 ──────────────────────────
+  const makeAnalysisResult = (): SpecAnalysisResult => {
+    const saved = loadSpecState(taskId);
+    const comps = (saved?.componentItems ?? []).filter(c => c.sel);
+    const doneDrawings = (saved?.drawings ?? []).filter(d => d.applied || d.stage === 'done');
+    const drawDesc = doneDrawings.map((d, i) => `도 ${i + 1}은 ${d.name}.`).join('\n\n');
+    const detail = comps.map(c => {
+      const name = c.text.split(':')[0];
+      const desc = (c.text.split(':')[1] || '').trim();
+      const numStr = c.num ? `(${c.num})` : '';
+      return `상기 ${name}${numStr}은 ${desc || '관련 기능을 수행한다.'}`;
+    }).join('\n\n');
+
+    const extractDescSection = (key: string): string => {
+      const raw = gSel['description'] || confirmed['description'] || '';
+      const labelMap: Record<string, string> = {
+        tech: '기술분야', bg: '배경기술', problem: '해결하려는 과제',
+        solution: '과제해결수단', effect: '발명의 효과',
+      };
+      const label = labelMap[key] || key;
+      const match = raw.match(new RegExp(`【${label}】\\n([^【]*)`));
+      return match?.[1]?.trim() || saved?.descTexts?.[key as keyof typeof saved.descTexts] || '';
+    };
+
+    return {
+      title:    gSel['title'] || confirmed['title'] || diTitle,
+      tech:     extractDescSection('tech'),
+      bg:       extractDescSection('bg'),
+      problem:  extractDescSection('problem'),
+      solution: extractDescSection('solution'),
+      effect:   extractDescSection('effect'),
+      drawDesc,
+      detail,
+      claims:   gSel['claims'] || confirmed['claims'] || '',
+      abstract: gSel['abstract'] || confirmed['abstract'] || '',
+      drawings: (saved?.drawings ?? []) as any,
+      componentItems: comps as any,
+    };
+  };
+
+  if (generatingSpec) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center bg-white gap-4">
+        <div className="w-10 h-10 rounded-full border-4 border-blue-200 border-t-blue-600 animate-spin" />
+        <p className="text-sm2 text-zinc-500 font-medium">명세서 에디터 준비 중...</p>
+      </div>
+    );
+  }
+
   if (mainView === 'editor') {
     return (
       <>
-        <SpecEditorView task={task} onBack={() => handleSetMainView('analysis')} confirmedTitle={gSel['title'] || confirmed['title']} />
+        <SpecEditorView
+          task={task}
+          onBack={() => handleSetMainView('analysis')}
+          confirmedTitle={gSel['title'] || confirmed['title']}
+          analysisResult={makeAnalysisResult()}
+        />
         {previewOpen && <PreviewModal taskName={task?.name} onClose={() => setPreviewOpen(false)} />}
       </>
     );
@@ -517,7 +582,7 @@ export function SpecView() {
                       <>
                         <p className="text-md2 text-gray-500 mb-4">?대? ?앹꽦??紐낆꽭???먮뵒?곕줈 ?뚯븘媛????덉뒿?덈떎.</p>
                         <button
-                          onClick={() => handleSetMainView('editor')}
+                          onClick={() => openEditor()}
                           className="btn-primary btn-sm mx-auto flex items-center gap-1.5">
                           <Icon name="doc" size={13} /> 紐낆꽭???먮뵒???닿린 ??
                         </button>
@@ -552,7 +617,7 @@ export function SpecView() {
             }}
             hasPrev={STEPS.findIndex(s => s.id === guideStep) > 1}
             allDone={doneCount >= 5}
-            onGenerateSpec={() => handleSetMainView('editor')}
+            onGenerateSpec={() => openEditor()}
             customCandidates={{
               title:    titleCandidates.length > 0 ? titleCandidates : undefined,
               abstract: abstractCandidates.length > 0 ? abstractCandidates : undefined,

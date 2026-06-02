@@ -8,6 +8,8 @@ import clsx from 'clsx';
 import { useStore } from '../store';
 import { MOCK_DRAWINGS } from '../features/drawing-workflow/types';
 import { openEditorTab } from '../features/drawing-workflow/editorChannel';
+import type { SpecAnalysisResult } from '../features/spec/types';
+import { loadSpecState, saveSpecState } from '../features/spec/specStore';
 
 // ── 섹션 정의 ──────────────────────────────────────────────────────────────
 const EDITOR_SECTIONS = [
@@ -25,21 +27,6 @@ const EDITOR_SECTIONS = [
 type SectionId = typeof EDITOR_SECTIONS[number]['id'];
 
 // ── 초기 텍스트 ────────────────────────────────────────────────────────────
-function getDefault(id: SectionId, name: string): string {
-  const d: Partial<Record<SectionId, string>> = {
-    title:     name,
-    tech:      `본 발명은 ${name}에 관한 것으로, 특히 자율주행 차량에서 라이다 센서를 이용한 객체 감지 기술에 관한 것이다.\n\n포인트 클라우드 데이터의 효율적인 전처리와 딥러닝 기반 객체 탐지를 결합하여 자율주행 환경에서의 안전성을 향상시키는 기술에 관한 것이다.`,
-    bg:        '종래 기술에서는 카메라만을 이용한 2D 객체 감지 방식이 주로 사용되었으나, 이는 야간이나 악천후 상황에서 성능이 저하되는 문제점이 있었다.\n\n라이다 센서를 이용한 3D 방식이 주목받고 있으나, 기존 복셀 기반 처리는 연산량이 많아 실시간 적용에 어려움이 있었다.',
-    problem:   '본 발명이 해결하고자 하는 과제는 라이다 센서와 딥러닝을 결합하여 다양한 환경 조건에서도 안정적으로 객체를 실시간으로 감지할 수 있는 장치 및 방법을 제공하는 것이다.',
-    solution:  '상기 과제를 해결하기 위한 본 발명의 일 실시예에 따른 라이다 기반 객체 감지 장치는, 라이다 센서로부터 3D 포인트 클라우드 데이터를 수집하는 데이터 수집부;\n\n상기 포인트 클라우드 데이터를 전처리하는 전처리부;\n\nPointNet++ 기반 딥러닝 모델을 이용하여 객체를 분류하는 인식부를 포함한다.',
-    effect:    '본 발명에 의하면, 딥러닝 기반의 포인트 클라우드 처리를 통해 기존 방식 대비 처리 속도가 40% 향상되고, 객체 인식 정확도가 95% 이상 달성된다.\n\n또한 악천후 및 야간 환경에서도 안정적인 객체 감지가 가능하다.',
-    draw_desc: '도 1은 본 발명의 일 실시예에 따른 라이다 기반 객체 감지 장치의 전체 블록도이다.\n\n도 2는 데이터 전처리 흐름도이다.\n\n도 3은 PointNet++ 신경망 구조도이다.\n\n도 4는 객체 인식 결과 예시이다.',
-    detail:    '이하, 첨부된 도면을 참조하여 본 발명의 실시예를 상세히 설명한다.\n\n도 1을 참조하면, 본 발명의 라이다 기반 객체 감지 장치(10)는 데이터 수집부(100), 전처리부(200), 인식부(300), 출력부(400)를 포함한다.\n\n상기 데이터 수집부(100)는 라이다 센서로부터 3차원 포인트 클라우드 데이터를 수집한다.',
-    claims:    '청구항 1.\n라이다 센서로부터 3차원 포인트 클라우드 데이터를 획득하는 데이터 수집부;\n상기 포인트 클라우드 데이터를 전처리하는 전처리부;\n딥러닝 모델을 적용하여 객체를 분류하는 인식부를 포함하는, 라이다 기반 객체 감지 장치.',
-    abstract:  '본 발명은 자율주행 차량에서 라이다 센서를 이용하여 주변 객체를 실시간으로 감지하고 분류하는 장치 및 방법에 관한 것으로, 포인트 클라우드 데이터의 효율적인 전처리와 딥러닝 기반 객체 탐지를 결합하여 높은 정확도와 실시간 처리를 달성한다.',
-  };
-  return d[id] || '';
-}
 
 // 텍스트 → 단락 배열
 function toBlocks(text: string): string[] {
@@ -89,18 +76,59 @@ const SaveIcon = () => (
 );
 
 // ── 메인 컴포넌트 ──────────────────────────────────────────────────────────
-export function SpecEditorView({ task, onBack, confirmedTitle }: { task: any; onBack: () => void; confirmedTitle?: string }) {
+export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }: {
+  task: any; onBack: () => void; confirmedTitle?: string; analysisResult?: SpecAnalysisResult;
+}) {
   const { library } = useStore();
   const taskName: string = task?.name || '새 명세서';
   // 위저드에서 확정된 발명 명칭이 있으면 title 섹션에 사용
   const effectiveTitle = confirmedTitle || taskName;
 
-  // 섹션별 블록 배열
-  const [blocks, setBlocks] = useState<Record<SectionId, string[]>>(
-    () => Object.fromEntries(
-      EDITOR_SECTIONS.map(s => [s.id, toBlocks(getDefault(s.id, s.id === 'title' ? effectiveTitle : taskName))])
-    ) as Record<SectionId, string[]>
-  );
+  // ── 초기 콘텐츠 헬퍼 (analysisResult 우선, 없으면 중립 플레이스홀더) ──
+  function getInitialContent(id: SectionId, name: string, ar?: SpecAnalysisResult): string {
+    if (ar) {
+      const map: Partial<Record<SectionId, string>> = {
+        title:     ar.title || name,
+        tech:      ar.tech,
+        bg:        ar.bg,
+        problem:   ar.problem,
+        solution:  ar.solution,
+        effect:    ar.effect,
+        draw_desc: ar.drawDesc,
+        detail:    ar.detail,
+        claims:    ar.claims,
+        abstract:  ar.abstract,
+      };
+      if (map[id]) return map[id]!;
+    }
+    // fallback — 중립 플레이스홀더
+    const fallback: Partial<Record<SectionId, string>> = {
+      title:     name,
+      tech:      `본 발명은 ${name}에 관한 것이다.`,
+      bg:        '관련 배경기술을 기술하세요.',
+      problem:   '해결하려는 과제를 기술하세요.',
+      solution:  '과제의 해결 수단을 기술하세요.',
+      effect:    '발명의 효과를 기술하세요.',
+      draw_desc: '도면에 대한 설명을 기술하세요.',
+      detail:    '발명의 구체적인 내용을 기술하세요.',
+      claims:    `청구항 1.\n${name} 장치.`,
+      abstract:  `${name}에 관한 발명입니다.`,
+    };
+    return fallback[id] || '';
+  }
+
+  // 섹션별 블록 배열 (localStorage 복원 우선)
+  const [blocks, setBlocks] = useState<Record<SectionId, string[]>>(() => {
+    if (task?.id) {
+      const saved = loadSpecState(task.id);
+      if (saved?.editorBlocks && Object.keys(saved.editorBlocks).length > 0) {
+        return saved.editorBlocks as Record<SectionId, string[]>;
+      }
+    }
+    return Object.fromEntries(
+      EDITOR_SECTIONS.map(s => [s.id, toBlocks(getInitialContent(s.id, effectiveTitle, analysisResult))])
+    ) as Record<SectionId, string[]>;
+  });
 
   // 선택된 블록 (sectionId + blockIdx)
   // 에디터 진입 시 첫 번째 단락 자동 선택 (기술분야 첫 블록)
@@ -132,12 +160,23 @@ export function SpecEditorView({ task, onBack, confirmedTitle }: { task: any; on
   const [redoStack, setRedoStack] = useState<Record<SectionId, string[]>[]>([]);
 
   const centerRef = useRef<HTMLDivElement>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── 블록 업데이트 ──────────────────────────────────────────────────────
+  // ── 블록 업데이트 (500ms debounce 자동저장) ──────────────────────────
   const updateBlock = (sid: SectionId, idx: number, text: string) => {
     setUndoStack(p => [...p.slice(-20), blocks]);
     setRedoStack([]);
-    setBlocks(p => ({ ...p, [sid]: p[sid].map((b, i) => i === idx ? text : b) }));
+    setBlocks(p => {
+      const next = { ...p, [sid]: p[sid].map((b, i) => i === idx ? text : b) };
+      // 500ms debounce 자동저장
+      if (task?.id) {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() =>
+          saveSpecState(task.id, { editorBlocks: next as any }), 500
+        );
+      }
+      return next;
+    });
     setSaved(false);
   };
 
@@ -528,12 +567,16 @@ export function SpecEditorView({ task, onBack, confirmedTitle }: { task: any; on
             {/* ── 도면 탭 ── */}
             {panelTab === 'drawings' && (
               <div className="px-3 py-3 space-y-1.5">
+                {(() => {
+                  const drawings = analysisResult?.drawings ?? MOCK_DRAWINGS;
+                  return (
+                  <>
                 <p className="text-xs2 font-semibold text-zinc-500 mb-2">
                   추출된 도면 <span className="font-normal text-zinc-400">
-                    ({MOCK_DRAWINGS.length}개 · 완료 {MOCK_DRAWINGS.filter(d => d.stage === 'done').length}개)
+                    ({drawings.length}개 · 완료 {drawings.filter(d => d.stage === 'done').length}개)
                   </span>
                 </p>
-                {MOCK_DRAWINGS.map(d => {
+                {drawings.map(d => {
                   const isDone = d.stage === 'done';
                   const LABEL_STYLES: Record<string, string> = {
                     '제안기술': 'bg-blue-100 text-blue-700',
@@ -585,7 +628,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle }: { task: any; on
                         <button
                           onClick={() => openEditorTab({
                             drawingId: d.id,
-                            drawings: MOCK_DRAWINGS,
+                            drawings: drawings as any,
                             components: [],
                             references: [],
                             drawingName: d.name,
@@ -602,6 +645,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle }: { task: any; on
                   </div>
                   );
                 })}
+                  </>
+                  );
+                })()}
               </div>
             )}
 
