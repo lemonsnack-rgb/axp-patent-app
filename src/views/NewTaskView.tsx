@@ -84,17 +84,17 @@ export function NewTaskView() {
             key={t.type}
             onClick={() => setType(t.type)}
             className={clsx(
-              'flex flex-col gap-2 p-5 bg-white rounded-xl text-left border-2 transition-all min-h-[140px] active:scale-[0.98]',
+              'flex flex-col gap-2 p-5 bg-white rounded-xl text-left border transition-all duration-200 min-h-[140px] active:scale-[0.98] shadow-card',
               type === t.type
-                ? 'border-blue-600 bg-blue-50 shadow-card-deep'
-                : 'border-zinc-200 hover:border-blue-500 hover:-translate-y-0.5 hover:shadow-card-hover',
+                ? 'border-brand-400 bg-brand-50 shadow-[0_0_0_2px_rgba(59,142,245,0.2)]'
+                : 'border-neutral-150 hover:border-brand-200 hover:-translate-y-px hover:shadow-card-hover',
             )}
           >
             <span className={`w-12 h-12 rounded-lg flex items-center justify-center bg-${t.color}-50 text-${t.color}-700`}>
               <Icon name={t.icon} size={28} />
             </span>
-            <div className="text-lg2 font-bold text-zinc-800">{t.title}</div>
-            <div className="text-sm2 text-zinc-500 leading-snug">{t.desc}</div>
+            <div className="text-lg2 font-bold text-neutral-700">{t.title}</div>
+            <div className="text-sm2 text-neutral-400 leading-snug">{t.desc}</div>
           </button>
         ))}
       </div>

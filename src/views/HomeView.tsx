@@ -50,9 +50,9 @@ export function HomeView() {
       <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
         <button
           onClick={() => setNewOpen(true)}
-          className="card border-dashed border-zinc-300 p-4 flex flex-col items-center justify-center gap-2 min-h-[120px] hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700 active:scale-[0.98] transition-all text-zinc-500"
+          className="bg-white rounded-xl border-2 border-dashed border-neutral-200 p-4 flex flex-col items-center justify-center gap-2 min-h-[120px] hover:border-brand-300 hover:bg-brand-50 hover:text-brand-400 active:scale-[0.98] transition-all duration-200 text-neutral-400"
         >
-          <Icon name="plus" size={28} />
+          <Icon name="plus" size={32} />
           <div className="font-semibold text-base2">새 프로젝트</div>
           <div className="text-sm2">고객사 / 담당자 정보 포함</div>
         </button>
@@ -81,25 +81,35 @@ function ProjectCard({ p, count, onOpen, onToggleFav }: {
     <button
       onClick={onOpen}
       className={clsx(
-        'card p-4 text-left hover:border-blue-500 hover:shadow-card-hover active:scale-[0.98] transition-all min-h-[120px] flex flex-col gap-2 relative',
-        p.favorite && 'border-amber-300',
+        'bg-white rounded-xl border shadow-card p-4 text-left transition-all duration-200 min-h-[120px] flex flex-col gap-2 relative active:scale-[0.98]',
+        p.favorite ? 'border-amber-300' : 'border-neutral-150',
+        'hover:border-brand-200 hover:-translate-y-px hover:shadow-card-hover',
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <Icon name="folder" size={20} style={{ color: p.color || '#2563eb' }} />
+        <Icon name="folder" size={20} style={{ color: p.color || '#3B8EF5' }} />
         <span
           onClick={(e) => { e.stopPropagation(); onToggleFav(); }}
-          className={clsx(p.favorite ? 'text-amber-500' : 'text-zinc-300 hover:text-zinc-500')}
+          className={clsx(p.favorite ? 'text-amber-500' : 'text-neutral-300 hover:text-neutral-500', 'transition-colors')}
+          aria-label={p.favorite ? '즐겨찾기 해제' : '즐겨찾기 추가'}
         >
           <Icon name={p.favorite ? 'star-filled' : 'star'} size={13} />
         </span>
       </div>
-      <div className="font-semibold text-base2 text-zinc-800 line-clamp-2">{p.name}</div>
-      {p.description && <div className="text-sm2 text-zinc-500 line-clamp-2">{p.description}</div>}
-      <div className="mt-auto flex items-center justify-between text-xs2 text-zinc-500">
-        <span className="font-semibold text-blue-600">{count}건</span>
-        <span className="truncate">{client?.name || '비어있음'}</span>
+      <div className="font-semibold text-base2 text-neutral-700 line-clamp-2">{p.name}</div>
+      {p.description && <div className="text-sm2 text-neutral-400 line-clamp-2">{p.description}</div>}
+      <div className="mt-auto flex items-center justify-between text-xs2">
+        <span className={clsx('font-semibold', count > 0 ? 'text-brand-400' : 'text-neutral-300')}>
+          {count > 0 ? `${count}건` : '작업 없음'}
+        </span>
+        {client && <span className="text-neutral-400 truncate">{client.name}</span>}
       </div>
+      {/* 진행률 바 (count > 0일 때) */}
+      {count > 0 && (
+        <div className="h-1 w-full bg-neutral-100 rounded-full mt-1">
+          <div className="h-1 bg-brand-400 rounded-full" style={{ width: `${Math.min((count / 5) * 100, 100)}%` }} />
+        </div>
+      )}
     </button>
   );
 }
