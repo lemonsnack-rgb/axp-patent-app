@@ -487,7 +487,11 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
         <div className="flex items-center gap-2 mb-1.5">
           <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs2 font-bold shrink-0"
             style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
-          <span className="text-base2 font-bold text-gray-800">{STEP_LABEL[step] || step}</span>
+          <span className="text-base2 font-bold text-gray-800">
+            {step === 'description' && descSubInfo?.currentLabel
+              ? descSubInfo.currentLabel
+              : STEP_LABEL[step] || step}
+          </span>
           {isDone && (
             <span className="ml-auto inline-flex items-center gap-1 text-xs2 px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
               <Icon name="check" size={10} /> 확정됨
@@ -672,19 +676,37 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
 }
 
 // 구성요소 패널 (#20)
-interface CompItem { id: number; text: string; sel: boolean }
+interface CompItem { id: number; text: string; sel: boolean; num: string }
 const INIT_COMPS: CompItem[] = [
-  { id: 1, text: '데이터 수집부: 라이다 센서로부터 3D 포인트 클라우드 데이터를 수집', sel: true },
-  { id: 2, text: '전처리부: 노이즈 제거 및 다운샘플링을 통해 데이터 전처리 수행', sel: true },
-  { id: 3, text: '특징 추출부: PointNet++ 아키텍처를 적용하여 포인트 특징 추출', sel: true },
-  { id: 4, text: '인식부: 딥러닝 모델을 이용하여 객체 분류 및 위치 추정', sel: true },
-  { id: 5, text: '출력부: 인식된 객체의 3D 위치, 크기, 종류를 출력', sel: true },
+  { id: 1, text: '데이터 수집부: 라이다 센서로부터 3D 포인트 클라우드 데이터를 수집', sel: true, num: '' },
+  { id: 2, text: '전처리부: 노이즈 제거 및 다운샘플링을 통해 데이터 전처리 수행', sel: true, num: '' },
+  { id: 3, text: '특징 추출부: PointNet++ 아키텍처를 적용하여 포인트 특징 추출', sel: true, num: '' },
+  { id: 4, text: '인식부: 딥러닝 모델을 이용하여 객체 분류 및 위치 추정', sel: true, num: '' },
+  { id: 5, text: '출력부: 인식된 객체의 3D 위치, 크기, 종류를 출력', sel: true, num: '' },
 ];
 
 // 구성요소 텍스트에서 이름 추출 (":  " 앞부분)
 function extractCompName(text: string): string {
   const colonIdx = text.indexOf(':');
   return colonIdx > 0 ? text.slice(0, colonIdx).trim() : text.trim();
+}
+
+// 부호 기반 들여쓰기 레벨: 100→0단계, 110→1단계, 111→2단계
+function getNumLevel(num: string): number {
+  const n = parseInt(num);
+  if (!n || n <= 0) return 0;
+  if (n % 100 === 0) return 0;
+  if (n % 10 === 0) return 1;
+  return 2;
+}
+
+// 부호 기반 정렬 (빈 부호는 뒤로)
+function sortByNum(items: CompItem[]): CompItem[] {
+  return [...items].sort((a, b) => {
+    const na = parseInt(a.num) || Infinity;
+    const nb = parseInt(b.num) || Infinity;
+    return na - nb;
+  });
 }
 
 function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
@@ -696,14 +718,12 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
   const [items, setItems] = useState<CompItem[]>(INIT_COMPS);
   const [newText, setNewText] = useState('');
 
-  // 마운트 시 초기값을 상위에 전달 (확정 카드에 "(확정)" 대신 실제 내용 표시)
+  // 마운트 시 초기값 전달
   useEffect(() => {
-    let n = 0;
     const selected = INIT_COMPS.filter(it => it.sel);
-    onUpdate(selected.map(it => `${++n * 100} ${it.text}`).join('\n'));
-    let m = 0;
+    onUpdate(selected.map(it => `${it.num || '—'} ${it.text}`).join('\n'));
     onComponentsChange?.(selected.map(it => ({
-      number: String(++m * 100),
+      number: it.num || '',
       name: extractCompName(it.text),
     })));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -711,51 +731,69 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
 
   const upd = (next: CompItem[]) => {
     setItems(next);
-    // 번호 체계: 100, 200, 300... (특허 도면 부호 규격)
-    let n = 0;
     const selected = next.filter(it => it.sel);
-    onUpdate(selected.map(it => `${++n * 100} ${it.text}`).join('\n'));
-    // 구조화 데이터를 상위로 전달 (DrawingsPanel에서 사용)
-    let m = 0;
+    onUpdate(selected.map(it => `${it.num || '—'} ${it.text}`).join('\n'));
     onComponentsChange?.(selected.map(it => ({
-      number: String(++m * 100),
+      number: it.num || '',
       name: extractCompName(it.text),
     })));
   };
+
   const toggle = (id: number) => { if (!done) upd(items.map(it => it.id === id ? { ...it, sel: !it.sel } : it)); };
-  const moveUp = (i: number) => { if (i > 0 && !done) { const a = [...items]; [a[i - 1], a[i]] = [a[i], a[i - 1]]; upd(a); } };
-  const moveDown = (i: number) => { if (i < items.length - 1 && !done) { const a = [...items]; [a[i], a[i + 1]] = [a[i + 1], a[i]]; upd(a); } };
   const remove = (id: number) => { if (!done) upd(items.filter(it => it.id !== id)); };
-  const add = () => { if (!newText.trim() || done) return; upd([...items, { id: Date.now(), text: newText.trim(), sel: true }]); setNewText(''); };
+  const setNum = (id: number, num: string) => {
+    if (done) return;
+    // 숫자만 허용
+    const cleaned = num.replace(/\D/g, '').slice(0, 5);
+    upd(items.map(it => it.id === id ? { ...it, num: cleaned } : it));
+  };
+  const add = () => {
+    if (!newText.trim() || done) return;
+    upd([...items, { id: Date.now(), text: newText.trim(), sel: true, num: '' }]);
+    setNewText('');
+  };
 
-
-  let autoN = 0;
+  const displayItems = sortByNum(items);
 
   return (
     <>
       <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-1.5">
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs2 font-semibold text-gray-600">AI 추출 구성요소</span>
-          <span className="text-xs2 text-gray-400">100, 200... 자동 부여</span>
+          <span className="text-xs2 text-gray-400">부호를 직접 입력하면 위계가 정렬됩니다</span>
         </div>
-        {items.map((item, idx) => {
-          const num = item.sel ? (autoN += 100) : null;
+        {displayItems.map((item) => {
+          const level = getNumLevel(item.num);
           return (
-            <div key={item.id} className={clsx('flex items-start gap-1.5 rounded-lg border p-2 transition-all',
-              item.sel && !done ? 'border-blue-300 bg-blue-50' : '',
-              !item.sel ? 'border-gray-200 bg-gray-50 opacity-60' : '',
-              done && item.sel ? 'border-green-200 bg-green-50' : '')}>
-              <span className={clsx('w-9 text-xs2 font-bold rounded px-1 py-0.5 shrink-0 mt-0.5 text-center',
-                item.sel ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-400')}>
-                {num ? `${num}` : '—'}
-              </span>
+            <div key={item.id}
+              style={{ marginLeft: level * 14 }}
+              className={clsx('flex items-start gap-1.5 rounded-lg border p-2 transition-all',
+                item.sel && !done ? 'border-blue-300 bg-blue-50' : '',
+                !item.sel ? 'border-gray-200 bg-gray-50 opacity-60' : '',
+                done && item.sel ? 'border-green-200 bg-green-50' : '')}>
+              {/* 부호 입력 */}
+              {!done ? (
+                <input
+                  type="text"
+                  value={item.num}
+                  onChange={e => setNum(item.id, e.target.value)}
+                  placeholder="부호"
+                  className={clsx(
+                    'w-10 text-xs2 font-bold text-center rounded border px-1 py-0.5 shrink-0 mt-0.5 outline-none',
+                    item.num ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white border-gray-300 text-gray-400'
+                  )}
+                />
+              ) : (
+                <span className={clsx('w-10 text-xs2 font-bold rounded px-1 py-0.5 shrink-0 mt-0.5 text-center',
+                  item.num ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400')}>
+                  {item.num || '—'}
+                </span>
+              )}
               <span className="text-xs2 text-gray-700 flex-1 leading-relaxed break-words">{item.text}</span>
               {!done && (
                 <div className="flex flex-col gap-0.5 shrink-0">
-                  <button onClick={() => moveUp(idx)} disabled={idx === 0} className="text-gray-400 hover:text-blue-600 disabled:opacity-30 p-0.5"><Icon name="chevron-left" size={10} className="rotate-90" /></button>
-                  <button onClick={() => moveDown(idx)} disabled={idx === items.length - 1} className="text-gray-400 hover:text-blue-600 disabled:opacity-30 p-0.5"><Icon name="chevron-right" size={10} className="rotate-90" /></button>
-                  <button onClick={() => toggle(item.id)} className="text-gray-400 hover:text-amber-600 p-0.5"><Icon name="check" size={10} /></button>
-                  <button onClick={() => remove(item.id)} className="text-gray-400 hover:text-red-500 p-0.5"><Icon name="close" size={10} /></button>
+                  <button onClick={() => toggle(item.id)} className="text-gray-400 hover:text-amber-600 p-0.5" title="포함/제외"><Icon name="check" size={10} /></button>
+                  <button onClick={() => remove(item.id)} className="text-gray-400 hover:text-red-500 p-0.5" title="삭제"><Icon name="close" size={10} /></button>
                 </div>
               )}
             </div>
