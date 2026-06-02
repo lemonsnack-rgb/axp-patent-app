@@ -17,6 +17,8 @@ interface Props {
   onUpdate?: (ref: EditorReference) => void;
   onDelete: (refNumber: string) => void;
   inventionComponents?: InventionComponent[];
+  /** 캔버스에 실제 배치된 부호 번호 세트 */
+  placedNums?: Set<string>;
   /** 명세서에 들어갈 도면의 설명 */
   drawingDescription?: string;
   onDrawingDescriptionChange?: (value: string) => void;
@@ -94,6 +96,7 @@ function getGroupPrefix(number: string): number {
 export function RefListPanel({
   references, onAdd, onUpdate, onDelete,
   inventionComponents,
+  placedNums,
   drawingDescription = '',
   onDrawingDescriptionChange,
 }: Props) {
@@ -270,6 +273,14 @@ export function RefListPanel({
                     {/* 드래그 핸들 */}
                     <GripVertical size={10} className="text-gray-300 cursor-grab shrink-0" />
                     {depth > 0 && <span className="text-gray-300 text-xs2 shrink-0">↳</span>}
+
+                    {/* 연결 상태 인디케이터 */}
+                    {placedNums && (
+                      <span
+                        className={`w-2 h-2 rounded-full shrink-0 transition-colors ${placedNums.has(r.number) ? 'bg-blue-500' : 'bg-gray-200'}`}
+                        title={placedNums.has(r.number) ? '캔버스에 배치됨' : '미배치'}
+                      />
+                    )}
 
                     {/* 번호 */}
                     <span className="font-mono font-semibold text-gray-800 shrink-0 min-w-[2.8em]">{r.number}</span>

@@ -5,7 +5,7 @@ import { EditorToolbar } from "./EditorToolbar";
 import { RefListPanel } from "./RefListPanel";
 import { binarizeCanvasToBlob } from "./binarize";
 import { useEditorStore } from "./useEditorStore";
-import { CUSTOM_PROPS } from "./canvas/constants";
+import { CUSTOM_PROPS, META } from "./canvas/constants";
 import type { EditorReference, PatentEditorProps } from "./types";
 
 const DEFAULT_WIDTH = 1000;
@@ -61,6 +61,20 @@ export function PatentEditor({
   const [captionDraft, setCaptionDraft] = useState("");
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [zoom, setZoom] = useState(1);
+  // 캔버스에 배치된 부호 번호 세트 (연결 상태 표시용)
+  const [placedNums, setPlacedNums] = useState<Set<string>>(new Set());
+
+  // 캔버스 객체 변경 시 배치된 부호 목록 갱신
+  const refreshPlacedNums = useCallback(() => {
+    const fc = canvasHandleRef.current?.getCanvas();
+    if (!fc) return;
+    const nums = new Set<string>();
+    fc.getObjects().forEach(obj => {
+      const num = (obj as unknown as Record<string, unknown>)[META.refNumber] as string | undefined;
+      if (num) nums.add(num);
+    });
+    setPlacedNums(nums);
+  }, []);
 
   const components = useMemo(() => inventionComponents ?? [], [inventionComponents]);
   const [leftWidth, setLeftWidth] = useState(() =>
@@ -133,6 +147,21 @@ export function PatentEditor({
     setCaptionDraft(activeDrawing?.caption ?? "");
     setDescriptionDraft(activeDrawing?.description ?? "");
   }, [activeDrawing?.id, activeDrawing?.caption, activeDrawing?.description]);
+
+  // 활성 도면 변경 시 캔버스 이벤트 등록 → 배치 부호 목록 갱신
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const fc = canvasHandleRef.current?.getCanvas();
+      if (!fc) return;
+      refreshPlacedNums();
+      const handler = () => refreshPlacedNums();
+      fc.on('object:added', handler);
+      fc.on('object:removed', handler);
+      return () => { fc.off('object:added', handler); fc.off('object:removed', handler); };
+    }, 400);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDrawing?.id]);
 
   // 저장 데이터 없을 때 구성요소를 캔버스에 자동 배치 (AI 추천 위치)
   useEffect(() => {
@@ -375,6 +404,7 @@ export function PatentEditor({
                 onUpdate={onReferenceUpdate}
                 onDelete={handleReferenceDelete}
                 inventionComponents={components}
+                placedNums={placedNums}
                 drawingDescription={singleDrawingMode ? (descriptionDraft || activeDrawing?.description) : undefined}
                 onDrawingDescriptionChange={singleDrawingMode ? (val) => {
                   setDescriptionDraft(val);
