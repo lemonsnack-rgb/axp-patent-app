@@ -282,6 +282,25 @@ export function SpecView() {
                                       );
                                     })}
                                   </div>
+                                ) : s.id === 'claims' ? (
+                                  // 청구항: 독립항/종속항 구조화 표시
+                                  <div className="space-y-2">
+                                    {(confirmed[s.id] || '').split('\n\n').filter(Boolean).map((block, bi) => {
+                                      if (bi === 0) {
+                                        return <p key={bi} className="text-xs2 font-bold text-green-700">{block}</p>;
+                                      }
+                                      const lines = block.split('\n');
+                                      const header = lines[0];
+                                      const content = lines.slice(1).join(' ').trim();
+                                      const isFirst = bi === 1;
+                                      return (
+                                        <div key={bi} className={clsx('pl-2 border-l-2', isFirst ? 'border-purple-400' : 'border-amber-300')}>
+                                          <p className={clsx('text-xs2 font-bold mb-0.5', isFirst ? 'text-purple-700' : 'text-amber-700')}>{header}</p>
+                                          <p className="text-xs2 text-gray-600 leading-relaxed line-clamp-2">{content}</p>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
                                 ) : (
                                   <p className="text-sm2 text-gray-700 leading-relaxed">{confirmed[s.id]}</p>
                                 )}
@@ -301,22 +320,11 @@ export function SpecView() {
                   <div className="text-center py-8">
                     <Icon name="logo" size={40} className="text-blue-700 mx-auto mb-3" />
                     <h3 className="text-lg2 font-bold text-gray-800 mb-2">모든 분석이 완료되었습니다</h3>
-                    <p className="text-md2 text-gray-500 mb-4">확정된 내용을 바탕으로 특허 명세서를 AI가 생성합니다.</p>
-                    <div className="inline-flex flex-col gap-1.5 text-left mb-5 bg-gray-50 rounded-lg p-3">
-                      {(['title', 'description', 'components', 'drawings', 'claims'] as StepId[]).map(k => (
-                        <div key={k} className="flex items-center gap-2 text-sm2">
-                          <span className={clsx('w-4 h-4 rounded-full flex items-center justify-center',
-                            isConfirmed(k) ? 'bg-green-500 text-white' : 'bg-gray-300')}>
-                            {isConfirmed(k) ? <Icon name="check" size={10} /> : null}
-                          </span>
-                          <span className={isConfirmed(k) ? 'text-gray-700' : 'text-gray-400'}>{STEP_LABEL[k]} 확정</span>
-                        </div>
-                      ))}
-                    </div>
-                    <button className="btn-primary" style={{ padding: '12px 32px', fontSize: '15px' }}
-                      onClick={() => setMainView('editor')} disabled={doneCount < 5}>
-                      <Icon name="star" size={16} /> 명세서 AI 생성
-                    </button>
+                    <p className="text-md2 text-gray-500">
+                      확정된 내용을 바탕으로 특허 명세서를 AI가 생성합니다.<br/>
+                      <span className="text-blue-700 font-medium">오른쪽 패널</span>의{' '}
+                      <strong>명세서 AI 생성</strong> 버튼을 눌러 시작하세요.
+                    </p>
                   </div>
                 )}
               </>
@@ -333,9 +341,14 @@ export function SpecView() {
             confirmed={confirmed}
             onPrev={() => {
               const idx = STEPS.findIndex(s => s.id === guideStep);
-              if (idx > 1) setGuideStep(STEPS[idx - 1].id);
+              if (idx > 1) {
+                setGuideStep(STEPS[idx - 1].id);
+                if (phase === 'done') setPhase('flow');
+              }
             }}
             hasPrev={STEPS.findIndex(s => s.id === guideStep) > 1}
+            allDone={doneCount >= 5}
+            onGenerateSpec={() => setMainView('editor')}
           />
         )}
       </div>
@@ -356,7 +369,7 @@ function AiMsg({ text }: { text: React.ReactNode }) {
   );
 }
 
-function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev }: {
+function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev, allDone, onGenerateSpec }: {
   step: StepId;
   gSel: Partial<Record<StepId, string>>;
   setGSel: React.Dispatch<React.SetStateAction<Partial<Record<StepId, string>>>>;
@@ -364,6 +377,8 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
   confirmed: Partial<Record<StepId, string>>;
   onPrev: () => void;
   hasPrev: boolean;
+  allDone?: boolean;
+  onGenerateSpec?: () => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const isDone = step in confirmed;
@@ -628,9 +643,16 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
               </button>
             )
           ) : (
-            <button className="flex-1 py-1.5 bg-green-600 text-white rounded text-xs2 font-semibold cursor-default">
-              <Icon name="check" size={10} /> 확정 완료
-            </button>
+            allDone && onGenerateSpec ? (
+              <button onClick={onGenerateSpec}
+                className="flex-1 py-1.5 bg-blue-600 text-white rounded text-xs2 font-semibold hover:bg-blue-700 active:scale-[0.98] transition-all flex items-center justify-center gap-1">
+                <Icon name="star" size={10} /> 명세서 AI 생성
+              </button>
+            ) : (
+              <button className="flex-1 py-1.5 bg-green-600 text-white rounded text-xs2 font-semibold cursor-default">
+                <Icon name="check" size={10} /> 확정 완료
+              </button>
+            )
           )
         )}
       </div>
@@ -996,6 +1018,13 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
 
   // 선택된 독립항 목록
   const selectedCands = cands.filter(c => c.selected);
+
+  // 마운트 시 초기 요약을 상위로 전달 → 확정 카드에 실제 내용 표시
+  useEffect(() => {
+    const sel = INDEP_CANDS_INIT.filter((_, i) => i === 0);
+    onUpdate(`독립항 1개, 종속항 0개\n\n청구항 1.\n${sel[0].text}`);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 전체 요약을 상위로 전달 (청구항 번호 자동 부여)
   const syncUpdate = (updCands: IndepCandState[], updGroups: Record<number, DepGroupState>) => {
