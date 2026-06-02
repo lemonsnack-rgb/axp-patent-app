@@ -59,6 +59,8 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
   const [regenPrompt, setRegenPrompt] = useState('');
   const [showRegen, setShowRegen] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
   const [isRepresentative, setIsRepresentative] = useState(() =>
     drawings.find(d => d.id === initialDrawingId)?.isRepresentative ?? false
   );
@@ -188,7 +190,34 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
               <span className="text-gray-300 mx-0.5">·</span>
               <span className="text-sm2 text-gray-700 font-semibold">기호 {activeDraw.symbol}</span>
               <span className="text-gray-300">·</span>
-              <span className="text-sm2 text-gray-700 truncate max-w-[140px]">{activeDraw.name}</span>
+              {editingName ? (
+                <input
+                  autoFocus
+                  value={nameDraft}
+                  onChange={e => setNameDraft(e.target.value)}
+                  onBlur={() => {
+                    const v = nameDraft.trim();
+                    if (v && v !== activeDraw.name) onSave(activeId, { name: v });
+                    setEditingName(false);
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                    if (e.key === 'Escape') setEditingName(false);
+                  }}
+                  className="text-sm2 text-gray-700 font-semibold bg-white border border-blue-400 rounded px-1.5 py-0.5 outline-none max-w-[200px]"
+                />
+              ) : (
+                <button
+                  onClick={() => { setNameDraft(activeDraw.name); setEditingName(true); }}
+                  className="flex items-center gap-1 text-sm2 text-gray-700 hover:text-blue-700 truncate max-w-[140px] group"
+                  title="클릭하여 도면 명칭 편집"
+                >
+                  {activeDraw.name}
+                  <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="9" height="9" className="opacity-0 group-hover:opacity-60 shrink-0">
+                    <path d="M6.5 1.5l2 2L3 9H1V7z"/>
+                  </svg>
+                </button>
+              )}
               <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium shrink-0', LABEL_COLORS[activeDraw.label] || 'bg-gray-100 text-gray-600')}>
                 {activeDraw.label}
               </span>
