@@ -746,16 +746,40 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
     onComponentsChange?.(selected.map(it => ({ number: it.num || '', name: extractCompName(it.text) })));
   };
 
-  const moveUp   = (idx: number) => { if (idx === 0 || done) return; const a = [...items]; [a[idx-1],a[idx]]=[a[idx],a[idx-1]]; upd(a); };
-  const moveDown = (idx: number) => { if (idx === items.length-1 || done) return; const a=[...items]; [a[idx],a[idx+1]]=[a[idx+1],a[idx]]; upd(a); };
-  const indent   = (id: number)  => { if (!done) upd(items.map(it => it.id===id ? {...it, depth: Math.min(it.depth+1,2)} : it)); };
-  const outdent  = (id: number)  => { if (!done) upd(items.map(it => it.id===id ? {...it, depth: Math.max(it.depth-1,0)} : it)); };
+  const hasNums = (arr: CompItem[]) => arr.some(it => it.num);
+
+  const applyUpd = (next: CompItem[]) => upd(hasNums(next) ? calcAutoNums(next) : next);
+
+  const moveUp   = (idx: number) => { if (idx===0||done) return; const a=[...items]; [a[idx-1],a[idx]]=[a[idx],a[idx-1]]; applyUpd(a); };
+  const moveDown = (idx: number) => { if (idx===items.length-1||done) return; const a=[...items]; [a[idx],a[idx+1]]=[a[idx+1],a[idx]]; applyUpd(a); };
+  const indent   = (id: number)  => { if (!done) applyUpd(items.map(it => it.id===id ? {...it, depth: Math.min(it.depth+1,2)} : it)); };
+  const outdent  = (id: number)  => { if (!done) applyUpd(items.map(it => it.id===id ? {...it, depth: Math.max(it.depth-1,0)} : it)); };
   const remove   = (id: number)  => { if (!done) upd(items.filter(it => it.id!==id)); };
   const autoAssign = () => { if (!done) upd(calcAutoNums(items)); };
   const add = () => {
-    if (!newText.trim() || done) return;
+    if (!newText.trim()||done) return;
     upd([...items, { id: Date.now(), text: newText.trim(), sel: true, num: '', depth: 0 }]);
     setNewText('');
+  };
+
+  // → 활성 조건: idx>0이고 바로 위 항목이 유효한 부모(depth <= 현재 depth)
+  const canIndent = (idx: number, item: CompItem) =>
+    item.depth < 2 && idx > 0 && items[idx-1].depth >= item.depth;
+
+  // HTML5 Drag & Drop
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dropIdx, setDropIdx] = useState<number | null>(null);
+
+  const onDragStart = (idx: number) => setDragIdx(idx);
+  const onDragOver  = (e: React.DragEvent, idx: number) => { e.preventDefault(); setDropIdx(idx); };
+  const onDragEnd   = () => {
+    if (dragIdx !== null && dropIdx !== null && dragIdx !== dropIdx) {
+      const a = [...items];
+      const [moved] = a.splice(dragIdx, 1);
+      a.splice(dropIdx > dragIdx ? dropIdx - 1 : dropIdx, 0, moved);
+      applyUpd(a);
+    }
+    setDragIdx(null); setDropIdx(null);
   };
 
   const DEPTH_INDENT = 16;
@@ -781,15 +805,23 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
           {items.map((item, idx) => (
             <div key={item.id}
               style={{ paddingLeft: item.depth * DEPTH_INDENT }}
-              className={clsx(!item.sel && 'opacity-50')}>
+              draggable={!done}
+              onDragStart={() => onDragStart(idx)}
+              onDragOver={e => onDragOver(e, idx)}
+              onDragEnd={onDragEnd}
+              className={clsx(
+                !item.sel && 'opacity-50',
+                dragIdx === idx && 'opacity-30',
+                dropIdx === idx && dragIdx !== idx && 'ring-2 ring-blue-400 ring-offset-1 rounded'
+              )}>
               <div className={clsx(
                 'flex items-center gap-1 rounded px-1.5 py-1 transition-all group',
                 item.sel && !done ? 'bg-white border border-gray-200 hover:border-blue-300' : '',
                 !item.sel ? 'bg-gray-50 border border-dashed border-gray-200' : '',
                 done && item.sel ? 'bg-green-50 border border-green-200' : ''
               )}>
-                {/* 드래그 핸들 (시각 표시) */}
-                <span className="text-gray-300 cursor-grab shrink-0 select-none text-xs leading-none">⠿</span>
+                {/* 드래그 핸들 */}
+                <span className="text-gray-300 cursor-grab active:cursor-grabbing shrink-0 select-none text-xs leading-none px-0.5">⠿</span>
 
                 {/* 부호 배지 */}
                 <span className={clsx(
@@ -814,7 +846,6 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
                 {/* 액션 버튼 — hover 시 표시 */}
                 {!done && (
                   <div className="flex items-center gap-px shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {/* 순서 */}
                     <button onClick={() => moveUp(idx)} disabled={idx===0}
                       className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20" title="위로">
                       <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 7l3-4 3 4"/></svg>
@@ -823,10 +854,8 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
                       className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20" title="아래로">
                       <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 3l3 4 3-4"/></svg>
                     </button>
-                    {/* 구분선 */}
                     <span className="w-px h-3 bg-gray-200 mx-0.5" />
-                    {/* 위계 */}
-                    <button onClick={() => indent(item.id)} disabled={item.depth>=2}
+                    <button onClick={() => indent(item.id)} disabled={!canIndent(idx, item)}
                       className="p-0.5 text-gray-400 hover:text-violet-500 disabled:opacity-20" title="하위로 (→)">
                       <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 5h6M6 3l2 2-2 2"/></svg>
                     </button>
@@ -834,9 +863,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange }: {
                       className="p-0.5 text-gray-400 hover:text-violet-500 disabled:opacity-20" title="상위로 (←)">
                       <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M8 5H2M4 3L2 5l2 2"/></svg>
                     </button>
-                    {/* 구분선 */}
                     <span className="w-px h-3 bg-gray-200 mx-0.5" />
-                    {/* 삭제 */}
                     <button onClick={() => remove(item.id)}
                       className="p-0.5 text-gray-400 hover:text-red-500" title="삭제">
                       <Icon name="close" size={9} />
