@@ -5,6 +5,7 @@
  */
 import { useRef, useState } from 'react';
 import clsx from 'clsx';
+import katex from 'katex';
 import { useStore } from '../store';
 import { MOCK_DRAWINGS } from '../features/drawing-workflow/types';
 import { openEditorTab } from '../features/drawing-workflow/editorChannel';
@@ -12,6 +13,53 @@ import type { SpecAnalysisResult } from '../features/spec/types';
 import { loadSpecState, saveSpecState } from '../features/spec/specStore';
 import { PreviewModal } from '../components/PreviewModal';
 import type { PreviewSection } from '../components/PreviewModal';
+
+// ── KaTeX 유틸리티 ─────────────────────────────────────────────────────────
+function renderTeX(tex: string, displayMode = false): { html: string; error?: string } {
+  try {
+    const html = katex.renderToString(tex, { throwOnError: true, displayMode, output: 'html' });
+    return { html };
+  } catch (e: unknown) {
+    return { html: '', error: (e as Error).message?.split('\n')[0] ?? '수식 오류' };
+  }
+}
+
+function renderBlockWithTeX(text: string): string {
+  // $$...$$ 블록 수식 먼저
+  let result = text.replace(/\$\$([\s\S]+?)\$\$/g, (_, tex) => {
+    const { html, error } = renderTeX(tex.trim(), true);
+    return error
+      ? `<span class="text-red-400 text-xs">[수식 오류: ${tex.trim().slice(0, 20)}]</span>`
+      : `<span class="katex-block">${html}</span>`;
+  });
+  // $...$ 인라인 수식
+  result = result.replace(/\$([^$\n]+)\$/g, (_, tex) => {
+    const { html, error } = renderTeX(tex.trim(), false);
+    return error
+      ? `<span class="text-red-400 text-xs">[수식 오류]</span>`
+      : html;
+  });
+  return result;
+}
+
+// ── 수식 템플릿 (모듈 레벨 — 매 렌더 재생성 방지) ─────────────────────────
+const FORMULA_TEMPLATES = [
+  { label: '분수',    tex: '\\frac{a}{b}',                              title: '분수' },
+  { label: '제곱근',  tex: '\\sqrt{x}',                                 title: '제곱근' },
+  { label: 'n제곱근', tex: '\\sqrt[n]{x}',                              title: 'n제곱근' },
+  { label: '합산∑',  tex: '\\sum_{i=1}^{n} x_i',                       title: '합산 (시그마)' },
+  { label: '적분∫',  tex: '\\int_{a}^{b} f(x)\\,dx',                   title: '정적분' },
+  { label: '극한',    tex: '\\lim_{x \\to \\infty} f(x)',               title: '극한' },
+  { label: '편미분',  tex: '\\frac{\\partial f}{\\partial x}',          title: '편미분' },
+  { label: '벡터',    tex: '\\vec{v}',                                   title: '벡터' },
+  { label: '행렬',    tex: '\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}', title: '2×2 행렬' },
+  { label: '≤',      tex: '\\leq',                                      title: '이하 (≤)' },
+  { label: '≥',      tex: '\\geq',                                      title: '이상 (≥)' },
+  { label: '≠',      tex: '\\neq',                                      title: '같지 않음 (≠)' },
+  { label: '∈',      tex: '\\in',                                       title: '원소 (∈)' },
+  { label: 'αβγ',   tex: '\\alpha + \\beta + \\gamma',                 title: '그리스 문자' },
+  { label: 'E=mc²',  tex: 'E = mc^{2}',                                title: 'Einstein 공식' },
+];
 
 // ── 섹션 정의 ──────────────────────────────────────────────────────────────
 const EDITOR_SECTIONS = [
@@ -153,6 +201,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
   const [tableRows, setTableRows] = useState(3);
   const [formulaModal, setFormulaModal] = useState(false);
   const [formulaVal, setFormulaVal] = useState('');
+  const [formulaMode, setFormulaMode] = useState<'inline' | 'block'>('inline');
 
   // 저장 상태
   const [saved, setSaved] = useState(true);
@@ -244,13 +293,19 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
     setTableModal(false);
   };
 
-  // ── 수식 삽입 ───────────────────────────────────────────────────────────
+  // ── 수식 삽입 ($...$ 또는 $$...$$) ────────────────────────────────────
   const insertFormula = () => {
     if (!sel || !formulaVal.trim()) return;
+    const { error } = renderTeX(formulaVal.trim(), formulaMode === 'block');
+    if (error) return;
     const cur = blocks[sel.sid][sel.idx] || '';
-    updateBlock(sel.sid, sel.idx, cur + ` [수식: ${formulaVal.trim()}]`);
+    const marker = formulaMode === 'inline'
+      ? `$${formulaVal.trim()}$`
+      : `\n$$\n${formulaVal.trim()}\n$$\n`;
+    updateBlock(sel.sid, sel.idx, cur + marker);
     setFormulaModal(false);
     setFormulaVal('');
+    setFormulaMode('inline');
   };
 
   const selText = sel ? (blocks[sel.sid]?.[sel.idx] || '') : '';
@@ -433,6 +488,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
                             ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                             onClick={e => e.stopPropagation()}
                           />
+                        ) : blockText.includes('$') ? (
+                          <p className="text-sm leading-relaxed text-zinc-800"
+                            dangerouslySetInnerHTML={{ __html: renderBlockWithTeX(blockText) }} />
                         ) : (
                           <p className={clsx(
                             'text-sm leading-relaxed whitespace-pre-wrap',
@@ -756,35 +814,98 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
         </div>
       )}
 
-      {/* ── 수식 입력 모달 ── */}
-      {formulaModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setFormulaModal(false)}>
-          <div className="bg-white rounded-xl shadow-card-deep w-80 p-5" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base2 font-bold text-zinc-800 mb-2">수식 입력</h3>
-            <p className="text-xs2 text-zinc-500 mb-3">수식을 텍스트로 입력하세요.</p>
-            <input className="input py-2 w-full text-sm font-mono" autoFocus
-              placeholder="예: E = mc², F = ma, ∑xᵢ/n"
-              value={formulaVal}
-              onChange={e => setFormulaVal(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') insertFormula(); }}
-            />
-            {/* 특수문자 팔레트 */}
-            <div className="flex flex-wrap gap-1 mt-2">
-              {['∑', '∫', 'π', '√', '∞', '≤', '≥', '≠', '×', '÷', '°', '²', '³', '⁻¹', 'α', 'β', 'θ', 'λ', 'μ', 'σ'].map(sym => (
-                <button key={sym} onClick={() => setFormulaVal(v => v + sym)}
-                  className="px-1.5 py-1 border border-zinc-200 rounded text-sm font-serif hover:bg-zinc-50 hover:border-zinc-400 transition-colors">
-                  {sym}
+      {/* ── 수식 입력 모달 (KaTeX) ── */}
+      {formulaModal && (() => {
+        // formulaError를 상태 없이 인라인 파생 (보고서 #2 fix)
+        const preview = formulaVal.trim() ? renderTeX(formulaVal.trim(), formulaMode === 'block') : null;
+        return (
+          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setFormulaModal(false)}>
+            <div className="bg-white rounded-xl shadow-card-deep w-[560px]" onClick={e => e.stopPropagation()}>
+
+              {/* 헤더 */}
+              <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-200">
+                <h3 className="text-base2 font-bold text-zinc-800">수식 입력 (TeX / LaTeX)</h3>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs2 text-zinc-400">모드:</span>
+                  <button onClick={() => setFormulaMode('inline')}
+                    className={clsx('px-2 py-1 rounded text-xs2',
+                      formulaMode === 'inline' ? 'bg-blue-100 text-blue-700 font-semibold' : 'bg-zinc-100 text-zinc-500')}>
+                    인라인 ($...$)
+                  </button>
+                  <button onClick={() => setFormulaMode('block')}
+                    className={clsx('px-2 py-1 rounded text-xs2',
+                      formulaMode === 'block' ? 'bg-blue-100 text-blue-700 font-semibold' : 'bg-zinc-100 text-zinc-500')}>
+                    블록 ($$...$$)
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {/* TeX 입력란 */}
+                <div>
+                  <label className="block text-xs2 font-semibold text-zinc-600 mb-1">TeX 수식</label>
+                  <textarea autoFocus
+                    className="w-full input py-2 font-mono text-sm resize-none"
+                    rows={3}
+                    placeholder="예: E = mc^{2}  또는  \frac{a}{b} = \sqrt{c^2 + d^2}"
+                    value={formulaVal}
+                    onChange={e => setFormulaVal(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) insertFormula(); }}
+                  />
+                </div>
+
+                {/* 실시간 렌더링 미리보기 */}
+                <div>
+                  <label className="block text-xs2 font-semibold text-zinc-600 mb-1">미리보기</label>
+                  <div className={clsx(
+                    'min-h-[60px] rounded-lg border px-4 py-3 flex items-center',
+                    formulaMode === 'block' ? 'justify-center' : 'justify-start',
+                    preview?.error ? 'border-red-200 bg-red-50' : 'border-zinc-200 bg-zinc-50'
+                  )}>
+                    {preview ? (
+                      preview.error ? (
+                        <span className="text-xs2 text-red-500">⚠️ {preview.error}</span>
+                      ) : (
+                        <span
+                          dangerouslySetInnerHTML={{ __html: preview.html }}
+                          className={formulaMode === 'block' ? 'text-xl' : 'text-base'}
+                        />
+                      )
+                    ) : (
+                      <span className="text-zinc-400 text-xs2">수식을 입력하면 여기에 표시됩니다</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 자주 쓰는 TeX 템플릿 */}
+                <div>
+                  <label className="block text-xs2 font-semibold text-zinc-600 mb-1.5">자주 쓰는 TeX</label>
+                  <div className="flex flex-wrap gap-1">
+                    {FORMULA_TEMPLATES.map(t => (
+                      <button key={t.label}
+                        onClick={() => setFormulaVal(v => v ? v + ' ' + t.tex : t.tex)}
+                        title={t.title}
+                        className="px-2 py-1 border border-zinc-200 rounded text-xs2 font-mono hover:bg-zinc-100 hover:border-zinc-400 transition-colors">
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 px-5 pb-5 justify-end">
+                <button onClick={() => { setFormulaModal(false); setFormulaVal(''); }} className="btn-outline btn-sm">취소</button>
+                <button onClick={insertFormula}
+                  disabled={!formulaVal.trim() || !!preview?.error}
+                  className="btn-primary btn-sm disabled:opacity-40">
+                  삽입
                 </button>
-              ))}
-            </div>
-            <div className="flex gap-2 mt-4 justify-end">
-              <button onClick={() => setFormulaModal(false)} className="btn-outline btn-sm">취소</button>
-              <button onClick={insertFormula} disabled={!formulaVal.trim()} className="btn-primary btn-sm">삽입</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
     </>
   );
