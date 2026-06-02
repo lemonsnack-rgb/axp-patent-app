@@ -661,8 +661,17 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
                 className="flex-1 py-1.5 bg-blue-600 text-white rounded text-xs2 font-semibold hover:bg-blue-700 active:scale-[0.98] transition-all flex items-center justify-center gap-1">
                 <Icon name="star" size={10} /> 명세서 AI 생성
               </button>
+            ) : step === 'description' && !descSubInfo.allDone ? (
+              // description 재방문: 서브스텝이 완료 안 됐으면 서브스텝 플로우로
+              <button
+                onClick={() => descSubInfo.doConfirm?.()}
+                disabled={descMode === 'prompt' || descMode === 'diff'}
+                className="flex-1 py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                다음 →
+              </button>
             ) : (
-              // 이미 확정된 단계 재방문 시 — 다음 단계로 이동 가능하도록 "다음 →"
+              // 이미 확정된 단계 재방문 시 — 다음 단계로 이동
               <button onClick={handleConfirm}
                 className="flex-1 py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800">
                 다음 →
