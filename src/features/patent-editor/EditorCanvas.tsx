@@ -1080,22 +1080,25 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
         const p = fc.getScenePoint(opt.e);
         const cp = { x: p.x, y: p.y };
 
-        // B-1: 폴리라인 클릭 누적
+        // B-1: 폴리라인 클릭 누적 (cp를 한 번만 push)
         if (tool === "polygon") {
           polylinePointsRef.current.push(cp);
           if (polylinePreviewRef.current) fc.remove(polylinePreviewRef.current);
-          const preview = new fabric.Polyline(
-            [...polylinePointsRef.current, cp],
-            {
-              fill: 'transparent', stroke: '#000',
-              strokeWidth: state.lineWeight === 'thin' ? 1 : state.lineWeight === 'thick' ? 2.5 : 1.5,
-              strokeDashArray: LINE_DASH_PATTERNS[state.lineStyle],
-              objectCaching: false, selectable: false, evented: false,
-            }
-          );
-          polylinePreviewRef.current = preview;
-          fc.add(preview);
-          fc.requestRenderAll();
+          // 점이 1개만 있으면 아직 선을 그릴 수 없음 — 두 번째 클릭부터 preview
+          if (polylinePointsRef.current.length >= 2) {
+            const preview = new fabric.Polyline(
+              [...polylinePointsRef.current],  // cp 중복 제거
+              {
+                fill: 'transparent', stroke: '#000',
+                strokeWidth: state.lineWeight === 'thin' ? 1 : state.lineWeight === 'thick' ? 2.5 : 1.5,
+                strokeDashArray: LINE_DASH_PATTERNS[state.lineStyle],
+                objectCaching: false, selectable: false, evented: false,
+              }
+            );
+            polylinePreviewRef.current = preview;
+            fc.add(preview);
+            fc.requestRenderAll();
+          }
           return;
         }
 
@@ -1227,6 +1230,24 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
         const state = useEditorStore.getState();
         const p = fc.getScenePoint(opt.e);
         const cp = { x: p.x, y: p.y };
+
+        // 폴리라인: 마우스 이동 시 확정 점들 + 현재 마우스 위치로 라이브 프리뷰
+        if (state.tool === "polygon" && polylinePointsRef.current.length >= 1) {
+          if (polylinePreviewRef.current) fc.remove(polylinePreviewRef.current);
+          const livePreview = new fabric.Polyline(
+            [...polylinePointsRef.current, cp],
+            {
+              fill: 'transparent', stroke: '#000',
+              strokeWidth: state.lineWeight === 'thin' ? 1 : state.lineWeight === 'thick' ? 2.5 : 1.5,
+              strokeDashArray: LINE_DASH_PATTERNS[state.lineStyle],
+              objectCaching: false, selectable: false, evented: false,
+            }
+          );
+          polylinePreviewRef.current = livePreview;
+          fc.add(livePreview);
+          fc.requestRenderAll();
+          return;
+        }
 
         // 클릭-클릭 도구들: 첫 클릭 후 라이브 프리뷰 (선/참조번호/원형부호)
         if (
@@ -1511,10 +1532,20 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
         const currentTool = useEditorStore.getState().tool;
 
         // B-1: 폴리라인 더블클릭 완성
+        // 더블클릭은 두 번의 mousedown을 발생시키므로 마지막 중복점 제거
         if (currentTool === 'polygon') {
           if (polylinePreviewRef.current) {
             fc.remove(polylinePreviewRef.current);
             polylinePreviewRef.current = null;
+          }
+          // 더블클릭의 두 번째 mousedown이 같은 위치를 push했을 수 있으므로 제거
+          const pts = polylinePointsRef.current;
+          if (pts.length >= 2) {
+            const last = pts[pts.length - 1];
+            const prev = pts[pts.length - 2];
+            if (Math.abs(last.x - prev.x) < 3 && Math.abs(last.y - prev.y) < 3) {
+              pts.pop(); // 중복점 제거
+            }
           }
           if (polylinePointsRef.current.length >= 2) {
             const state2 = useEditorStore.getState();
