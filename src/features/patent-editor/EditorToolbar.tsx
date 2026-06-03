@@ -1,6 +1,7 @@
 // EditorToolbar — 특허 도면 편집기 리본 툴바 (상용 수준)
 // 그룹: 기본도구 | 지시선/부호 | 도형 | 선 스타일 | 선 굵기 | 끝단 | 연결선 | 채우기 | 지우기 | 보기 | 작업
 import { useState, useRef, useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   Brush, Circle, CircleDot, Download, Eraser,
   Frame, Grid3x3, Minus, MousePointer2,
@@ -74,29 +75,49 @@ function Group({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-// ── 더보기 드롭다운 ────────────────────────────────────────
+// ── 더보기 드롭다운 — Portal 방식 (툴바 overflow-x:auto 클리핑 우회) ───
 function MoreBtn({ label, children }: { label: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  const handleOpen = () => {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.left });
+    }
+    setOpen(p => !p);
+  };
+
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const close = (e: MouseEvent) => {
+      const target = e.target as Node;
+      // 버튼 클릭은 handleOpen이 처리
+      if (btnRef.current?.contains(target)) return;
+      setOpen(false);
+    };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
+
   return (
-    <div className="relative" ref={ref}>
-      <button type="button" onClick={() => setOpen(p => !p)}
+    <div className="relative">
+      <button type="button" ref={btnRef} onClick={handleOpen}
         className={`${BTN_BASE} ${open ? BTN_ACTIVE : BTN_INACTIVE} w-7`}
         title={label}>
         <ChevronDown size={10} />
         <span style={{ fontSize: 8 }}>더보기</span>
       </button>
-      {open && (
-        <div className="absolute left-0 top-full mt-1 bg-white border border-ck-border rounded-lg shadow-lg z-50 p-2 min-w-[140px]"
+      {open && createPortal(
+        <div
+          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
+          className="bg-white border border-ck-border rounded-lg shadow-lg p-2 min-w-[150px]"
+          onMouseDown={e => e.stopPropagation()}
           onClick={() => setOpen(false)}>
           {children}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
