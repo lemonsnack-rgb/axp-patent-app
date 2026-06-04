@@ -139,10 +139,13 @@ export function SpecView() {
     const p = { ...confirmed }; delete p[id];
     setConfirmed(p); setCurStep(id); setGuideStep(id);
   };
-  const startFlow = () => {
-    if (!diTitle.trim() || !diField.trim() || !diContent.trim()) return;
+  const startFlow = (override?: { title: string; field: string; content: string }) => {
+    const title   = override?.title   ?? diTitle.trim();
+    const field   = override?.field   ?? diField.trim();
+    const content = override?.content ?? diContent.trim();
+    if (!title || !field || !content) return;
     setAnalyzing(true);
-    const input = { title: diTitle.trim(), field: diField.trim(), content: diContent.trim(), problem: diProblem.trim(), keywords: diKeywords.trim() };
+    const input = { title, field, content, problem: diProblem.trim(), keywords: diKeywords.trim() };
     setTimeout(() => {
       const comps = generateComponentCandidates(input);
       setTitleCandidates(generateTitleCandidates(input));
@@ -345,7 +348,15 @@ export function SpecView() {
                 <h2 className="text-lg2 font-bold text-gray-800 mb-2">새 특허 명세서 작성</h2>
                 <p className="text-md2 text-gray-500 mb-6">직무발명서(PDF)를 업로드하면 AI가 자동으로 분석합니다.</p>
                 <div
-                  onClick={() => phase === 'upload' && startFlow()}
+                  onClick={() => {
+                    if (phase !== 'upload') return;
+                    // 테스트용: 기본값으로 즉시 분석 시작 (state 업데이트 대기 없이 override 전달)
+                    startFlow({
+                      title:   diTitle.trim()   || '직무발명서',
+                      field:   diField.trim()   || '기술',
+                      content: diContent.trim() || '발명 내용',
+                    });
+                  }}
                   className={`border-2 border-dashed rounded-xl p-10 mb-5 transition-all ${phase === 'upload' ? 'border-gray-300 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30' : 'border-gray-200 opacity-50'}`}>
                   <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 text-gray-400">
                     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>
@@ -396,7 +407,7 @@ export function SpecView() {
                       if ((diTitle || diContent) && !window.confirm('입력한 내용이 삭제됩니다. 계속할까요?')) return;
                       setPhase('upload');
                     }}>취소</button>
-                    <button className="btn-primary btn-sm" onClick={startFlow}
+                    <button className="btn-primary btn-sm" onClick={() => startFlow()}
                       disabled={!diTitle.trim() || !diField.trim() || !diContent.trim() || analyzing}>
                       {analyzing
                         ? <><span className="inline-block animate-spin mr-1">↻</span>AI 분석 중...</>
