@@ -308,12 +308,14 @@ export function RefListPanel({
               )}>
               <div className={clsx(
                 'flex items-center gap-1 rounded px-1.5 py-1 transition-all group',
-                'bg-white border hover:border-blue-300',
+                'border hover:border-blue-300',
                 activePlacingRef?.number === r.number && activePlacingRef?.name === r.name
-                  ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-300'
-                  : noNumGuide === `${r.number}-${r.name}`
-                    ? 'border-amber-400 bg-amber-50'
-                    : 'border-gray-200'
+                  ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-300'          // 배치 중
+                  : r.number && placedNums?.has(r.number)
+                    ? 'border-blue-300 bg-blue-50/60'                           // 배치 완료 하이라이트
+                    : noNumGuide === `${r.number}-${r.name}`
+                      ? 'border-amber-400 bg-amber-50'                         // 번호 없음 안내
+                      : 'bg-white border-gray-200'                             // 기본
               )}>
                 {/* 드래그 핸들 */}
                 <span className="text-gray-300 cursor-grab active:cursor-grabbing shrink-0 select-none text-xs leading-none px-0.5">
@@ -321,11 +323,21 @@ export function RefListPanel({
                 </span>
 
                 {/* 배치 상태 인디케이터 */}
-                {placedNums && (
-                  <span
-                    className={`w-2 h-2 rounded-full shrink-0 transition-colors ${placedNums.has(r.number) ? 'bg-blue-500' : 'bg-gray-200'}`}
-                    title={placedNums.has(r.number) ? '캔버스에 배치됨' : '미배치'}
-                  />
+                {placedNums && r.number ? (
+                  placedNums.has(r.number) ? (
+                    // 배치됨 — 파란 체크 아이콘
+                    <span title="캔버스에 배치됨" className="shrink-0 inline-flex">
+                      <svg viewBox="0 0 10 10" fill="none" stroke="#2563eb" strokeWidth="2"
+                        strokeLinecap="round" width="10" height="10">
+                        <path d="M1.5 5l2.5 3 4.5-5"/>
+                      </svg>
+                    </span>
+                  ) : (
+                    // 미배치 — 회색 원
+                    <span className="w-2 h-2 rounded-full shrink-0 bg-gray-200" title="미배치" />
+                  )
+                ) : (
+                  <span className="w-2 h-2 rounded-full shrink-0 bg-gray-100" />
                 )}
 
                 {/* 부호 번호 배지 — 클릭 시 인라인 편집 */}

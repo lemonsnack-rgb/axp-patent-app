@@ -197,6 +197,10 @@ export function PatentEditor({
     const timer = setTimeout(() => {
       canvasHandleRef.current?.placeInitialRefs(refsToPlace);
       hasAutoPlaced.current = true;
+      // 임시 부여한 번호를 구성요소 목록에도 동기화 → placedNums 연동
+      if (refsToPlace.some(r => !(availableReferences ?? []).find(a => a.number === r.number))) {
+        onReferenceBulkUpdate?.(refsToPlace);
+      }
     }, 600);
 
     return () => clearTimeout(timer);
