@@ -4,10 +4,11 @@ import { DrawingListPanel } from "./DrawingListPanel";
 import { EditorCanvas, type EditorCanvasHandle } from "./EditorCanvas";
 import { EditorToolbar } from "./EditorToolbar";
 import { RefListPanel } from "./RefListPanel";
+import { AiRefPanel } from "./AiRefPanel";
 import { useEditorStore } from "./useEditorStore";
 import { isOverlay } from "./canvas/overlay";
 import { CUSTOM_PROPS, META, FIXED_FONT_FAMILY } from "./canvas/constants";
-import type { EditorReference, PatentEditorProps, ToolMode } from "./types";
+import type { EditorReference, PatentEditorProps, ToolMode, AiRefRecommendation } from "./types";
 
 const DEFAULT_WIDTH = 1000;
 const DEFAULT_HEIGHT = 700;
@@ -61,6 +62,9 @@ export function PatentEditor({
 }: PatentEditorProps) {
   const canvasHandleRef = useRef<EditorCanvasHandle>(null);
   const [busy, setBusy] = useState(false);
+  // Task 3: AI 부호 위치 추천
+  const [aiRefRecs, setAiRefRecs] = useState<AiRefRecommendation[]>([]);
+  const [aiRefLoading, setAiRefLoading] = useState(false);
   // B-4: 트레이스 모드
   const [showUnderlayer, setShowUnderlayer] = useState(false);
   const [underlayerOpacity, setUnderlayerOpacity] = useState(30);
@@ -87,6 +91,35 @@ export function PatentEditor({
   }, []);
 
   const components = useMemo(() => inventionComponents ?? [], [inventionComponents]);
+
+  // Task 3: 편집기 진입 시 AI 부호 위치 추천 mock 생성
+  useEffect(() => {
+    if (!components.length) return;
+    setAiRefLoading(true);
+    setAiRefRecs([]);
+    const timer = setTimeout(() => {
+      const recs: AiRefRecommendation[] = components
+        .filter(c => c.number) // 번호 있는 것만
+        .slice(0, 6)
+        .map((c, i) => {
+          const col = i % 3;
+          const row = Math.floor(i / 3);
+          return {
+            id:            `ai-${c.number}-${activeDrawingId}`,
+            refNumber:     c.number,
+            componentName: c.name,
+            posXPct:       20 + col * 28,
+            posYPct:       20 + row * 45,
+            status:        'pending',
+          } as AiRefRecommendation;
+        });
+      setAiRefRecs(recs);
+      setAiRefLoading(false);
+    }, 1000);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDrawingId]);
+
   const [leftWidth, setLeftWidth] = useState(() =>
     clamp(readStoredWidth(LEFT_WIDTH_KEY, LEFT_DEFAULT), LEFT_MIN, LEFT_MAX),
   );
@@ -530,9 +563,33 @@ export function PatentEditor({
               title="패널 크기 조절"
             />
             <div
-              className="shrink-0 border-l border-ck-border"
+              className="shrink-0 border-l border-ck-border flex flex-col overflow-hidden"
               style={{ width: rightWidth }}
             >
+              {/* Task 3: AI 부호 위치 추천 패널 */}
+              {(aiRefLoading || aiRefRecs.length > 0) && (
+                <AiRefPanel
+                  recommendations={aiRefRecs}
+                  loading={aiRefLoading}
+                  components={components}
+                  onAccept={(rec) => {
+                    setAiRefRecs(prev => prev.map(r => r.id === rec.id ? { ...r, status: 'accepted' } : r));
+                    if (canvasHandleRef.current) {
+                      canvasHandleRef.current.selectRefForPlacement({ number: rec.refNumber, name: rec.componentName });
+                    }
+                  }}
+                  onReject={(recId) => {
+                    setAiRefRecs(prev => prev.map(r => r.id === recId ? { ...r, status: 'rejected' } : r));
+                  }}
+                  onNumberChange={(recId, newNumber) => {
+                    setAiRefRecs(prev => prev.map(r => r.id === recId ? { ...r, refNumber: newNumber } : r));
+                  }}
+                  onComponentChange={(recId, componentNumber) => {
+                    const comp = components.find(c => c.number === componentNumber);
+                    setAiRefRecs(prev => prev.map(r => r.id === recId ? { ...r, componentName: comp?.name ?? r.componentName } : r));
+                  }}
+                />
+              )}
               <RefListPanel
                 references={refs}
                 onAdd={handleReferenceAdd}
