@@ -32,6 +32,7 @@ export interface DrawingItem {
   stage: DrawingStage;
   originalImageUrl: string;  // 추출된 원본 이미지
   bbox: DrawingBBox;
+  adjustedBbox?: DrawingBBox; // 이용자가 조정한 bbox (없으면 bbox 사용)
   cadCandidates?: CadCandidate[];  // 변환 후 3개 후보
   selectedCandidateId?: string;
   // 편집 결과
