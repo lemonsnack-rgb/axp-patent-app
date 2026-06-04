@@ -4,11 +4,10 @@ import { DrawingListPanel } from "./DrawingListPanel";
 import { EditorCanvas, type EditorCanvasHandle } from "./EditorCanvas";
 import { EditorToolbar } from "./EditorToolbar";
 import { RefListPanel } from "./RefListPanel";
-import { AiRefPanel } from "./AiRefPanel";
 import { useEditorStore } from "./useEditorStore";
 import { isOverlay } from "./canvas/overlay";
 import { CUSTOM_PROPS, META, FIXED_FONT_FAMILY } from "./canvas/constants";
-import type { EditorReference, PatentEditorProps, ToolMode, AiRefRecommendation } from "./types";
+import type { EditorReference, PatentEditorProps, ToolMode } from "./types";
 
 const DEFAULT_WIDTH = 1000;
 const DEFAULT_HEIGHT = 700;
@@ -63,9 +62,6 @@ export function PatentEditor({
   const canvasHandleRef = useRef<EditorCanvasHandle>(null);
   const hasAutoPlaced = useRef(false);
   const [busy, setBusy] = useState(false);
-  // Task 3: AI 부호 위치 추천
-  const [aiRefRecs, setAiRefRecs] = useState<AiRefRecommendation[]>([]);
-  const [aiRefLoading, setAiRefLoading] = useState(false);
   // B-4: 트레이스 모드
   const [showUnderlayer, setShowUnderlayer] = useState(false);
   const [underlayerOpacity, setUnderlayerOpacity] = useState(30);
@@ -92,38 +88,6 @@ export function PatentEditor({
   }, []);
 
   const components = useMemo(() => inventionComponents ?? [], [inventionComponents]);
-
-  // Task 3: 편집기 진입 시 AI 부호 위치 추천 mock 생성
-  // 번호 없는 구성요소도 포함하되 AiRefPanel에서 수락 전 번호 입력 가능
-  useEffect(() => {
-    if (!components.length) return;
-    setAiRefLoading(true);
-    setAiRefRecs([]);
-    const timer = setTimeout(() => {
-      const recs: AiRefRecommendation[] = components
-        .slice(0, 6)
-        .map((c, i) => {
-          const col = i % 3;
-          const row = Math.floor(i / 3);
-          return {
-            id:            `ai-${activeDrawingId}-${i}`,
-            refNumber:     c.number || '',
-            componentName: c.name,
-            posXPct:       15 + col * 28,
-            posYPct:       20 + row * 45,
-            status:        'pending',
-          } as AiRefRecommendation;
-        });
-      setAiRefRecs(recs);
-      setAiRefLoading(false);
-      // 캔버스에 오렌지 마커 배치 (200ms 추가 대기 - 캔버스 마운트 보장)
-      setTimeout(() => {
-        canvasHandleRef.current?.placeAiPendingMarkers(recs);
-      }, 300);
-    }, 1200);
-    return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeDrawingId, components.map(c => c.number).join(',')]);
 
   const [leftWidth, setLeftWidth] = useState(() =>
     clamp(readStoredWidth(LEFT_WIDTH_KEY, LEFT_DEFAULT), LEFT_MIN, LEFT_MAX),
@@ -596,35 +560,6 @@ export function PatentEditor({
               className="shrink-0 border-l border-ck-border flex flex-col overflow-hidden"
               style={{ width: rightWidth }}
             >
-              {/* Task 3: AI 부호 위치 추천 패널 */}
-              {(aiRefLoading || aiRefRecs.length > 0) && (
-                <AiRefPanel
-                  recommendations={aiRefRecs}
-                  loading={aiRefLoading}
-                  components={components}
-                  onAccept={(rec) => {
-                    if (!rec.refNumber) {
-                      // 번호 없으면 자동 부여 후 수락
-                      alert('부호 번호를 먼저 입력하거나 "부호 자동 부여"를 클릭하세요.');
-                      return;
-                    }
-                    setAiRefRecs(prev => prev.map(r => r.id === rec.id ? { ...r, status: 'accepted' } : r));
-                    // 마커 위치에서 지시선+번호 직접 생성
-                    canvasHandleRef.current?.acceptAiMarker(rec.id, { number: rec.refNumber, name: rec.componentName });
-                  }}
-                  onReject={(recId) => {
-                    setAiRefRecs(prev => prev.map(r => r.id === recId ? { ...r, status: 'rejected' } : r));
-                    canvasHandleRef.current?.rejectAiMarker(recId);
-                  }}
-                  onNumberChange={(recId, newNumber) => {
-                    setAiRefRecs(prev => prev.map(r => r.id === recId ? { ...r, refNumber: newNumber } : r));
-                  }}
-                  onComponentChange={(recId, componentNumber) => {
-                    const comp = components.find(c => c.number === componentNumber);
-                    setAiRefRecs(prev => prev.map(r => r.id === recId ? { ...r, componentName: comp?.name ?? r.componentName } : r));
-                  }}
-                />
-              )}
               <RefListPanel
                 references={refs}
                 onAdd={handleReferenceAdd}
