@@ -344,27 +344,15 @@ export function SpecView() {
                 <Icon name="doc" size={48} className="text-blue-700 mx-auto mb-3" />
                 <h2 className="text-lg2 font-bold text-gray-800 mb-2">새 특허 명세서 작성</h2>
                 <p className="text-md2 text-gray-500 mb-6">직무발명서(PDF)를 업로드하면 AI가 자동으로 분석합니다.</p>
-                <label
-                  className={`block border-2 border-dashed rounded-xl p-10 mb-5 transition-all ${phase === 'upload' ? 'border-gray-300 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30' : 'border-gray-200 opacity-50'}`}>
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    className="hidden"
-                    onChange={e => {
-                      const file = e.target.files?.[0];
-                      if (file && phase === 'upload') {
-                        // 파일명을 diTitle에 반영 후 즉시 flow 진입 (목업)
-                        setDiTitle(file.name.replace(/\.pdf$/i, ''));
-                        startFlow();
-                      }
-                    }}
-                  />
+                <div
+                  onClick={() => phase === 'upload' && startFlow()}
+                  className={`border-2 border-dashed rounded-xl p-10 mb-5 transition-all ${phase === 'upload' ? 'border-gray-300 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30' : 'border-gray-200 opacity-50'}`}>
                   <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 text-gray-400">
                     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>
                   </svg>
                   <p className="text-md2 text-gray-600">PDF 파일을 클릭하여 업로드</p>
                   <p className="text-sm2 text-gray-400 mt-1">직무발명서 PDF</p>
-                </label>
+                </div>
               </div>
             )}
 
