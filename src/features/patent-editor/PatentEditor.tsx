@@ -61,6 +61,7 @@ export function PatentEditor({
   standalone = false,
 }: PatentEditorProps) {
   const canvasHandleRef = useRef<EditorCanvasHandle>(null);
+  const hasAutoPlaced = useRef(false);
   const [busy, setBusy] = useState(false);
   // Task 3: AI 부호 위치 추천
   const [aiRefRecs, setAiRefRecs] = useState<AiRefRecommendation[]>([]);
@@ -210,8 +211,33 @@ export function PatentEditor({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDrawing?.id]);
 
-  // 저장 데이터 없을 때의 자동 배치는 AI 마커 플로우(Task 3)로 대체
-  // placeInitialRefs는 더 이상 자동 호출하지 않음 → AI 추천 패널에서 수락으로 배치
+  // 편집기 최초 진입 시 구성요소별 지시선 자동 배치
+  useEffect(() => {
+    if (hasAutoPlaced.current) return;
+
+    // 이미 편집 내용이 있는 도면은 건너뜀
+    const drawing = drawings.find(d => d.id === activeDrawingId);
+    if (drawing?.savedEditorDataJson) return;
+
+    // 배치할 references 준비 — 번호 없으면 100, 200, ... 자동 부여
+    const refsToPlace = (availableReferences ?? [])
+      .filter(r => r.name)
+      .map((r, i) => ({
+        ...r,
+        number: r.number || String((i + 1) * 100),
+      }));
+
+    if (!refsToPlace.length) return;
+
+    // 캔버스 초기화 완료(600ms) 후 placeInitialRefs 호출
+    const timer = setTimeout(() => {
+      canvasHandleRef.current?.placeInitialRefs(refsToPlace);
+      hasAutoPlaced.current = true;
+    }, 600);
+
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDrawingId]);
 
   const commitCaption = useCallback(() => {
     if (!activeDrawing) return;
