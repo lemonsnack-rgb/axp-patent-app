@@ -175,7 +175,6 @@ export function SpecView() {
       { label: '기술분야', content: extractDesc('기술분야') },
       { label: '배경기술', content: extractDesc('배경기술') },
       { label: '해결하고자 하는 과제', content: extractDesc('해결하려는 과제') },
-      { label: '과제의 해결 수단', content: extractDesc('과제해결수단') },
       { label: '발명의 효과', content: extractDesc('발명의 효과') },
       { label: '청구범위', content: claims },
       { label: '요약서', content: abstract },
@@ -204,7 +203,7 @@ export function SpecView() {
       tech: extractDescSec('기술분야'),
       bg: extractDescSec('배경기술'),
       problem: extractDescSec('해결하려는 과제'),
-      solution: extractDescSec('과제해결수단'),
+      solution: '',
       effect: extractDescSec('발명의 효과'),
       drawDesc,
       detail,
@@ -339,34 +338,33 @@ export function SpecView() {
         <div ref={flowRef} className="flex-1 overflow-y-auto scroll-thin bg-ck-bg">
           <div className="max-w-3xl mx-auto py-8 px-4 space-y-3">
 
-            {/* 업로드 존 — 원본 동일: flow/done 이후에도 계속 표시 (스크롤 방식) */}
-            {phase !== 'flow' && phase !== 'done' && (
+            {/* 업로드 존 — PDF 파일 업로드 전용 */}
+            {phase !== 'flow' && phase !== 'done' && phase !== 'direct' && (
               <div className="text-center py-4">
                 <Icon name="doc" size={48} className="text-blue-700 mx-auto mb-3" />
                 <h2 className="text-lg2 font-bold text-gray-800 mb-2">새 특허 명세서 작성</h2>
-                <p className="text-md2 text-gray-500 mb-6">아래 두 가지 방법 중 하나로 기초자료를 제공하세요.</p>
-                <div onClick={phase === 'upload' ? startFlow : undefined}
-                  className={`border-2 border-dashed rounded-xl p-10 mb-5 transition-all ${phase === 'upload' ? 'border-gray-300 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30' : 'border-gray-200 opacity-50'}`}>
+                <p className="text-md2 text-gray-500 mb-6">직무발명서(PDF)를 업로드하면 AI가 자동으로 분석합니다.</p>
+                <label
+                  className={`block border-2 border-dashed rounded-xl p-10 mb-5 transition-all ${phase === 'upload' ? 'border-gray-300 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30' : 'border-gray-200 opacity-50'}`}>
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    className="hidden"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file && phase === 'upload') {
+                        // 파일명을 diTitle에 반영 후 즉시 flow 진입 (목업)
+                        setDiTitle(file.name.replace(/\.pdf$/i, ''));
+                        startFlow();
+                      }
+                    }}
+                  />
                   <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 text-gray-400">
                     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>
                   </svg>
-                  <p className="text-md2 text-gray-600">파일을 드래그하거나 클릭하여 업로드</p>
-                  <p className="text-sm2 text-gray-400 mt-1">PDF, DOCX, HWP, 이미지 파일 지원</p>
-                </div>
-                {phase === 'upload' && (
-                  <>
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="flex-1 h-px bg-gray-200" />
-                      <span className="text-sm2 text-gray-400 font-medium px-2">또는</span>
-                      <div className="flex-1 h-px bg-gray-200" />
-                    </div>
-                    <button onClick={() => setPhase('direct')}
-                      className="btn-outline flex items-center gap-2 mx-auto">
-                      <Icon name="edit" size={14} /> 기초 내용 직접 입력하기
-                    </button>
-                    <p className="text-xs2 text-gray-400 mt-2">파일 없이 발명 내용을 텍스트로 직접 입력할 수 있습니다.</p>
-                  </>
-                )}
+                  <p className="text-md2 text-gray-600">PDF 파일을 클릭하여 업로드</p>
+                  <p className="text-sm2 text-gray-400 mt-1">직무발명서 PDF</p>
+                </label>
               </div>
             )}
 
@@ -631,7 +629,7 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
 
   const STEP_DESCS: Partial<Record<StepId, string>> = {
     title: '업로드한 문서를 분석하여 3개의 명칭 후보를 생성했습니다. 선택하거나 직접 수정하세요.',
-    description: '기술분야→배경기술→해결과제→과제해결수단 순서로 각 항목을 확인하고 확정하세요.',
+    description: '기술분야→배경기술→해결하려는 과제→발명의 효과 순서로 각 항목을 확인하고 확정하세요.',
     abstract: '요약서를 자동 생성했습니다. 내용을 확인하고 수정하세요.',
   };
 
@@ -2043,10 +2041,6 @@ const DESC_SECTIONS: { key: string; label: string; badge2?: string; text: string
   {
     key: 'problem', label: '해결하려는 과제',
     text: '본 발명은 상기와 같은 문제점을 해결하기 위해 안출된 것으로, 라이다 포인트 클라우드 데이터를 효율적으로 전처리하여 실시간 처리 속도를 확보하면서도, 근거리·원거리 객체 모두에 대해 높은 탐지 정확도를 달성할 수 있는 3D 객체 인식 장치 및 방법을 제공하는 것을 목적으로 한다.',
-  },
-  {
-    key: 'solution', label: '과제해결수단',
-    text: '상기 과제를 해결하기 위해, 본 발명은 라이다 센서로부터 3차원 포인트 클라우드 데이터를 수신하는 데이터 수신부; 상기 포인트 클라우드 데이터에서 RANSAC 알고리즘을 이용하여 지면 포인트를 분리하고 노이즈를 제거하는 전처리부; 전처리된 포인트 클라우드를 기둥(pillar) 단위로 구성하여 2D 의사 이미지를 생성하고, PointNet++ 기반 딥러닝 모델을 이용하여 객체를 인식하는 인식부를 포함하는 라이다 기반 객체 인식 장치를 제공한다.',
   },
   {
     key: 'effect', label: '발명의 효과',

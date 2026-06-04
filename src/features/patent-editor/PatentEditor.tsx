@@ -401,6 +401,13 @@ export function PatentEditor({
     canvasHandleRef.current?.selectRefForPlacement(ref);
   }, []);
 
+  // 캔버스에 배치 완료(placedNums 변화)되면 배치 중 상태 해제
+  useEffect(() => {
+    if (activePlacingRef && placedNums.has(activePlacingRef.number)) {
+      setActivePlacingRef(null);
+    }
+  }, [placedNums, activePlacingRef]);
+
   const handleReferenceDelete = useCallback(
     (refNumber: string) => {
       const confirmed = window.confirm(
