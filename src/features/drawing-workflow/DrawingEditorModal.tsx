@@ -130,8 +130,21 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
     setWorkStageMap(m => ({ ...m, [activeId]: s }));
   }, [activeId]);
 
-  // 스타일 변환 실행 (변환 중은 스타일 변환 단계 내 인라인 상태)
+  // 스타일 변환 실행 — bbox 조정 내용 저장 후 변환 시작
   const startConvert = () => {
+    // ① adjustedBbox 저장 (퍼센트 → 픽셀 변환)
+    const activeDraw = drawings.find(d => d.id === activeId);
+    const imgW = activeDraw?.imageSize?.w ?? 800;
+    const imgH = activeDraw?.imageSize?.h ?? 600;
+    const adjustedBbox = {
+      x: Math.round(cropBox.x1 / 100 * imgW),
+      y: Math.round(cropBox.y1 / 100 * imgH),
+      w: Math.round((cropBox.x2 - cropBox.x1) / 100 * imgW),
+      h: Math.round((cropBox.y2 - cropBox.y1) / 100 * imgH),
+    };
+    onSave(activeId, { adjustedBbox, stage: 'bbox-adjusted' });
+
+    // ② 변환 시작
     goStage('converting');
     setTimeout(() => {
       const cands = MOCK_SVGS.map((svg, i) => ({
@@ -367,64 +380,56 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
             workStage === 'editing' ? 'flex-1' : 'flex-1',
           )}>
 
-            {/* ── 단계 1: 영역 확인 ── */}
+            {/* ── 단계 1: 영역 확인 (crop + reselect 통합 — bbox 편집 즉시 활성화) ── */}
             {(workStage === 'crop' || workStage === 'reselect') && activeDraw && (
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 <div className="flex-1 flex min-h-0 overflow-hidden">
-                  {/* 중앙: 이미지 크게 */}
+                  {/* 중앙: bbox 편집 UI (항상 표시) */}
                   <div className="flex-1 flex flex-col min-h-0 p-4 gap-2">
                     <p className="text-xs2 font-semibold text-gray-400 shrink-0">
-                      {workStage === 'reselect' ? '원본 이미지 — 변환 영역을 드래그하여 지정' : '추출된 도면'}
+                      수집된 도면 — 파란 박스를 드래그하여 변환 영역을 지정하세요
                     </p>
-                    {workStage === 'crop' ? (
-                      <div className="flex-1 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
-                        {/* B10: originalImageUrl → exportedImageUrl 순서로 폴백 */}
-                        {(activeDraw.originalImageUrl || activeDraw.exportedImageUrl)
-                          ? <img src={activeDraw.originalImageUrl || activeDraw.exportedImageUrl} className="max-w-full max-h-full object-contain p-3" alt="" />
-                          : (
-                            <div className="text-center text-gray-400 px-6">
-                              <Icon name="image" size={48} className="mx-auto mb-3 text-gray-200" />
-                              <p className="text-sm2 font-semibold mb-1">수집된 도면 이미지</p>
-                              <p className="text-xs2 text-gray-400 leading-relaxed">
-                                {activeDraw.description || activeDraw.name || '도면 이미지'}
-                              </p>
-                              <p className="text-xs2 text-gray-300 mt-2">
-                                실제 서비스에서는 직무발명서에서 추출된<br/>원본 도면 이미지가 표시됩니다
-                              </p>
-                            </div>
-                          )}
-                      </div>
-                    ) : (
-                      /* 대화형 B-box 크롭 */
+                    {/* bbox 편집 UI — crop/reselect 모두 동일 */}
+                    <div
+                      ref={cropContainerRef}
+                      className="flex-1 bg-gray-100 rounded-lg border border-gray-200 relative overflow-hidden select-none"
+                      style={{ cursor: 'default' }}
+                    >
+                      {/* 배경 이미지 또는 플레이스홀더 */}
+                      {(activeDraw.originalImageUrl || activeDraw.exportedImageUrl)
+                        ? <img src={activeDraw.originalImageUrl || activeDraw.exportedImageUrl} className="w-full h-full object-contain" alt="" />
+                        : (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-300 gap-2">
+                            <Icon name="image" size={48} className="text-gray-200" />
+                            <p className="text-sm2 font-semibold text-gray-400 text-center px-6">{activeDraw.description || activeDraw.name}</p>
+                            <p className="text-xs2 text-gray-300 text-center px-6">실제 서비스에서는 직무발명서에서 추출된 도면 이미지가 표시됩니다</p>
+                          </div>
+                        )}
+                      {/* 어두운 마스크 (bbox 밖) */}
+                      <div className="absolute inset-0 bg-black/25 pointer-events-none" />
+                      {/* bbox 편집 영역 */}
                       <div
-                        ref={cropContainerRef}
-                        className="flex-1 bg-gray-100 rounded-lg border border-gray-200 relative overflow-hidden select-none"
-                        style={{ cursor: 'crosshair' }}
+                        className="absolute border-2 border-blue-500 shadow-[0_0_0_9999px_rgba(0,0,0,0.3)]"
+                        style={{ left:`${cropBox.x1}%`, top:`${cropBox.y1}%`, width:`${cropBox.x2-cropBox.x1}%`, height:`${cropBox.y2-cropBox.y1}%`, cursor:'move' }}
+                        onMouseDown={e => startCropDrag('move', e)}
                       >
-                        {/* 배경 이미지 */}
-                        {(activeDraw.originalImageUrl || activeDraw.exportedImageUrl)
-                          ? <img src={activeDraw.originalImageUrl || activeDraw.exportedImageUrl} className="w-full h-full object-contain" alt="" />
-                          : <div className="absolute inset-0 flex items-center justify-center text-gray-300 text-sm2">원본 이미지</div>}
-                        {/* 어두운 마스크 */}
-                        <div className="absolute inset-0 bg-black/30 pointer-events-none" />
-                        {/* B-box 밝은 영역 + 핸들 */}
-                        <div
-                          className="absolute border-2 border-blue-500 bg-white/10"
-                          style={{ left:`${cropBox.x1}%`, top:`${cropBox.y1}%`, width:`${cropBox.x2-cropBox.x1}%`, height:`${cropBox.y2-cropBox.y1}%`, cursor:'move' }}
-                          onMouseDown={e => startCropDrag('move', e)}
-                        >
-                          <span className="absolute -top-5 left-0 text-xs2 text-white bg-blue-600 px-1.5 py-0.5 rounded font-semibold shadow">변환 영역</span>
-                          {/* 8방향 핸들 */}
-                          {(['nw','n','ne','e','se','s','sw','w'] as const).map(h => {
-                            const pos: React.CSSProperties = {};
-                            if (h.includes('n')) pos.top='-4px'; if (h.includes('s')) pos.bottom='-4px'; if (!h.includes('n')&&!h.includes('s')) pos.top='calc(50% - 4px)';
-                            if (h.includes('w')) pos.left='-4px'; if (h.includes('e')) pos.right='-4px'; if (!h.includes('w')&&!h.includes('e')) pos.left='calc(50% - 4px)';
-                            const cursors: Record<string,string> = {nw:'nw-resize',n:'n-resize',ne:'ne-resize',e:'e-resize',se:'se-resize',s:'s-resize',sw:'sw-resize',w:'w-resize'};
-                            return <div key={h} className="absolute w-2 h-2 bg-white border-2 border-blue-500 rounded-sm z-10" style={{...pos, cursor: cursors[h]}} onMouseDown={e => { e.stopPropagation(); startCropDrag(h, e); }} />;
-                          })}
-                        </div>
+                        <span className="absolute -top-6 left-0 text-xs2 text-white bg-blue-600 px-1.5 py-0.5 rounded font-semibold shadow whitespace-nowrap">
+                          변환 영역 — 드래그하여 조정
+                        </span>
+                        {/* 8방향 핸들 */}
+                        {(['nw','n','ne','e','se','s','sw','w'] as const).map(h => {
+                          const pos: React.CSSProperties = {};
+                          if (h.includes('n')) pos.top='-5px'; if (h.includes('s')) pos.bottom='-5px'; if (!h.includes('n')&&!h.includes('s')) pos.top='calc(50% - 5px)';
+                          if (h.includes('w')) pos.left='-5px'; if (h.includes('e')) pos.right='-5px'; if (!h.includes('w')&&!h.includes('e')) pos.left='calc(50% - 5px)';
+                          const cursors: Record<string,string> = {nw:'nw-resize',n:'n-resize',ne:'ne-resize',e:'e-resize',se:'se-resize',s:'s-resize',sw:'sw-resize',w:'w-resize'};
+                          return <div key={h} className="absolute w-2.5 h-2.5 bg-white border-2 border-blue-500 rounded-sm z-10 shadow-sm" style={{...pos, cursor: cursors[h]}} onMouseDown={e => { e.stopPropagation(); startCropDrag(h, e); }} />;
+                        })}
+                        {/* 영역 크기 표시 */}
+                        <span className="absolute bottom-1 right-1 text-xs2 text-white/70 font-mono">
+                          {Math.round(cropBox.x2-cropBox.x1)}% × {Math.round(cropBox.y2-cropBox.y1)}%
+                        </span>
                       </div>
-                    )}
+                    </div>
                   </div>
                   {/* 우측: 캡션 */}
                   <div className="w-48 shrink-0 border-l border-ck-border bg-ck-bg flex flex-col overflow-y-auto scroll-thin p-3 gap-3">
@@ -453,24 +458,14 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                 </div>
                 {/* 하단 버튼 */}
                 <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-t border-ck-border bg-white shrink-0">
-                  {workStage === 'crop' ? (
-                    <>
-                      <button className="btn-outline btn-sm" onClick={() => { setCropBox({ x1:15, y1:15, x2:85, y2:85 }); goStage('reselect'); }}>
-                        영역 편집
-                      </button>
-                      <button className="btn-primary btn-sm" onClick={startConvert}>스타일 변환 시작 →</button>
-                    </>
-                  ) : (
-                    <>
-                      <button className="btn-outline btn-sm" onClick={() => goStage('crop')}>← 취소</button>
-                      <div className="flex items-center gap-1.5 text-xs2 text-gray-500">
-                        <span>영역: {Math.round(cropBox.x2-cropBox.x1)}% × {Math.round(cropBox.y2-cropBox.y1)}%</span>
-                      </div>
-                      <button className="btn-primary btn-sm" onClick={startConvert}>
-                        ✓ 확인 후 변환 →
-                      </button>
-                    </>
-                  )}
+                  <button
+                    className="btn-outline btn-sm"
+                    onClick={() => setCropBox({ x1: 15, y1: 15, x2: 85, y2: 85 })}>
+                    영역 초기화
+                  </button>
+                  <button className="btn-primary btn-sm flex items-center gap-1.5" onClick={startConvert}>
+                    <Icon name="check" size={13} /> 영역 확인 완료 — 변환 시작
+                  </button>
                 </div>
               </div>
             )}
