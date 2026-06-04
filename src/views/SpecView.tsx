@@ -1209,9 +1209,18 @@ function DrawingsPanel({ done, onUpdate, inventionComponents }: {
   };
 
   const STAGE_DOT: Record<string, string> = {
-    'extracted': 'bg-gray-300', 'bbox-adjusted': 'bg-amber-400',
+    'extracted': 'bg-gray-300', 'bbox-adjusted': 'bg-blue-400',
     'converting': 'bg-amber-400', 'candidate-select': 'bg-violet-400',
-    'editing': 'bg-blue-400', 'done': 'bg-green-500',
+    'editing': 'bg-sky-400', 'done': 'bg-green-500',
+  };
+
+  const STAGE_LABEL: Record<string, { text: string; cls: string }> = {
+    'extracted':        { text: '영역 확인 필요',    cls: 'bg-amber-100 text-amber-700' },
+    'bbox-adjusted':    { text: '영역 확인 완료 ✓', cls: 'bg-blue-100 text-blue-700' },
+    'converting':       { text: '변환 중',           cls: 'bg-violet-100 text-violet-700' },
+    'candidate-select': { text: '후보 선택 필요',    cls: 'bg-orange-100 text-orange-700' },
+    'editing':          { text: '편집 중',            cls: 'bg-sky-100 text-sky-700' },
+    'done':             { text: '편집 완료',          cls: 'bg-green-100 text-green-700' },
   };
 
   const doneCount = drawings.filter(d => d.stage === 'done').length;
@@ -1250,8 +1259,20 @@ function DrawingsPanel({ done, onUpdate, inventionComponents }: {
                     </span>
                   </div>
                   <p className="text-xs2 text-gray-700 font-semibold truncate">{d.name}</p>
+                  {/* stage 배지 */}
+                  {STAGE_LABEL[d.stage] && (
+                    <span className={clsx('text-[9px] px-1 py-px rounded-full font-semibold mt-0.5 inline-block', STAGE_LABEL[d.stage].cls)}>
+                      {STAGE_LABEL[d.stage].text}
+                    </span>
+                  )}
+                  {/* adjustedBbox 크기 표시 */}
+                  {d.stage === 'bbox-adjusted' && d.adjustedBbox && (
+                    <p className="text-xs2 text-blue-500 mt-0.5">
+                      {d.adjustedBbox.w}×{d.adjustedBbox.h}px 지정됨
+                    </p>
+                  )}
                 </div>
-                {/* 완료 상태 */}
+                {/* 완료 상태 dot */}
                 <div className="shrink-0">
                   {isDone
                     ? <Icon name="check" size={11} className="text-green-500" />

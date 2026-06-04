@@ -243,7 +243,27 @@ export function RefListPanel({
             아래에서 구성요소를 추가하세요.
           </p>
         )}
+        {/* 부호 자동 부여 완료 피드백 */}
+        {assignDone && (
+          <p className="text-xs2 text-green-600 flex items-center gap-1 mt-0.5">
+            <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 5l2.5 3 3.5-5"/></svg>
+            부호 할당 완료
+          </p>
+        )}
       </div>
+
+      {/* ── 배치 모드 안내 배너 ── */}
+      {activePlacingRef && (
+        <div className="px-3 py-2 bg-blue-600 text-white shrink-0 flex items-center gap-2">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13">
+            <path d="M7 1L7 13M1 7L13 7" strokeLinecap="round"/>
+          </svg>
+          <span className="text-xs2 leading-tight">
+            <strong>{activePlacingRef.number}</strong>{activePlacingRef.name ? ` (${activePlacingRef.name})` : ''} —
+            캔버스에서 클릭하여 지시선 시작점을 지정하세요
+          </span>
+        </div>
+      )}
 
       {/* ── 검색 ── */}
       {references.length > 0 && (
@@ -289,7 +309,11 @@ export function RefListPanel({
               <div className={clsx(
                 'flex items-center gap-1 rounded px-1.5 py-1 transition-all group',
                 'bg-white border hover:border-blue-300',
-                noNumGuide === `${r.number}-${r.name}` ? 'border-amber-400 bg-amber-50' : 'border-gray-200'
+                activePlacingRef?.number === r.number && activePlacingRef?.name === r.name
+                  ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-300'
+                  : noNumGuide === `${r.number}-${r.name}`
+                    ? 'border-amber-400 bg-amber-50'
+                    : 'border-gray-200'
               )}>
                 {/* 드래그 핸들 */}
                 <span className="text-gray-300 cursor-grab active:cursor-grabbing shrink-0 select-none text-xs leading-none px-0.5">
@@ -362,12 +386,20 @@ export function RefListPanel({
                     }}
                     title={r.number ? `도면에 배치 (지시선 → ${r.number})` : '번호를 먼저 부여하세요 (위 → 버튼 클릭)'}
                     className={clsx(
-                      'shrink-0 rounded px-1.5 py-0.5 text-xs2 font-semibold border transition-colors',
-                      r.number
-                        ? 'text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-400'
-                        : 'text-gray-400 border-gray-200 cursor-not-allowed opacity-60'
+                      'shrink-0 rounded px-1.5 py-0.5 text-xs2 font-semibold border transition-all',
+                      activePlacingRef?.number === r.number && activePlacingRef?.name === r.name
+                        ? 'text-blue-700 border-blue-400 bg-blue-100 animate-pulse'
+                        : placedNums?.has(r.number)
+                          ? 'text-green-700 border-green-300 bg-green-50'
+                          : r.number
+                            ? 'text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-400'
+                            : 'text-gray-400 border-gray-200 cursor-not-allowed opacity-60'
                     )}>
-                    배치
+                    {activePlacingRef?.number === r.number && activePlacingRef?.name === r.name
+                      ? '배치 중...'
+                      : placedNums?.has(r.number)
+                        ? '✓ 배치됨'
+                        : '배치'}
                   </button>
                 )}
 
