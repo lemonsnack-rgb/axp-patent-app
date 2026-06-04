@@ -40,7 +40,7 @@ export function Sidebar() {
     list = sorted.filter(t => t.favorite);
   } else {
     const favs = sorted.filter(t => t.favorite);
-    const others = sorted.filter(t => !t.favorite).slice(0, 8);
+    const others = sorted.filter(t => !t.favorite).slice(0, 20);
     list = [...favs, ...others];
   }
 

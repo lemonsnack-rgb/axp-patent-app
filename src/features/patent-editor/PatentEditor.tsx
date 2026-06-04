@@ -354,7 +354,7 @@ export function PatentEditor({
       if (e.metaKey || e.ctrlKey) {
         if (e.key === 'c') {
           const active = fc.getActiveObject();
-          if (active) active.clone().then((cloned: fabric.Object) => { clipboardRef.current = cloned; });
+          if (active) active.clone().then((cloned: fabric.Object) => { clipboardRef.current = cloned; }).catch(() => {});
         }
         if (e.key === 'v' && clipboardRef.current) {
           clipboardRef.current.clone().then((cloned: fabric.Object) => {
@@ -363,7 +363,7 @@ export function PatentEditor({
             fc.setActiveObject(cloned);
             clipboardRef.current = cloned;
             fc.renderAll();
-          });
+          }).catch(() => {});
         }
         if (e.key === 'a') {
           e.preventDefault();
