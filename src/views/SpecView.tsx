@@ -1850,8 +1850,9 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
                   </div>
                 ) : (
                   <>
-                    {grp.items.map((dep) => {
-                      const depNum = dep.sel ? ++claimNum : null;
+                    {grp.items.map((dep, depLocalIdx) => {
+                      if (dep.sel) ++claimNum;
+                      const depLocalNum = depLocalIdx + 1; // 그룹 내 1,2,3...
                       return (
                         <div key={dep.id}
                           className={clsx('rounded-lg border transition-all',
@@ -1859,36 +1860,27 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
                             !dep.sel ? 'border-gray-200 bg-gray-50 opacity-60' : '',
                             done && dep.sel ? 'border-green-200 bg-green-50/30' : ''
                           )}>
-                          <div className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none"
-                            onClick={() => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, expanded: !d.expanded } : d) })}>
+                          {/* 헤더: 체크박스 + 종속항 N + 삭제 */}
+                          <div className="flex items-center gap-2 px-2.5 py-1.5">
                             <button
-                              onClick={e => { e.stopPropagation(); toggleDep(indep.id, dep.id); }}
+                              onClick={() => toggleDep(indep.id, dep.id)}
                               className={clsx('w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all',
                                 dep.sel ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 bg-white hover:border-blue-400')}>
                               {dep.sel && <Icon name="check" size={8} />}
                             </button>
                             <span className={clsx('text-xs2 font-bold shrink-0', dep.sel ? 'text-blue-700' : 'text-gray-400')}>
-                              청구항 {depNum ?? '—'}
+                              종속항 {depLocalNum}
                             </span>
-                            <span className="text-xs2 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 shrink-0 text-[10px]">
-                              종속(→{indepClaimNum})
-                            </span>
-                            <span className="text-xs2 text-gray-500 flex-1 truncate text-[10px] min-w-0">{dep.text.slice(0, 28)}...</span>
                             {!done && (
-                              <button onClick={e => { e.stopPropagation(); removeDep(indep.id, dep.id); }}
-                                className="shrink-0 text-gray-300 hover:text-red-400">
+                              <button onClick={() => removeDep(indep.id, dep.id)}
+                                className="shrink-0 text-gray-300 hover:text-red-400 ml-auto">
                                 <Icon name="close" size={9} />
                               </button>
                             )}
-                            {/* 펼침 화살표 */}
-                            <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"
-                              className={clsx('shrink-0 text-gray-300 transition-transform', dep.expanded && 'rotate-180')}>
-                              <path d="M2 4l3 3 3-3"/>
-                            </svg>
                           </div>
 
-                          {dep.expanded && (
-                            <div className="px-2.5 pb-2.5 border-t border-gray-100 pt-2">
+                          {/* 항상 펼침 */}
+                          <div className="px-2.5 pb-2.5 border-t border-gray-100 pt-2">
                               {/* 종속항도 DescriptionPanel 동일 3모드 패턴 */}
                               <>
                                   {/* 일반 모드: textarea + AI로 수정하기 */}
@@ -1988,7 +1980,6 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
                                   )}
                               </>
                             </div>
-                          )}
                         </div>
                       );
                     })}
