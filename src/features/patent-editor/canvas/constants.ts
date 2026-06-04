@@ -45,6 +45,9 @@ export const META = {
   lineEndY: "lineEndY",
   lastLeft: "lastLeft",
   lastTop: "lastTop",
+  // AI 부호 위치 추천 마커
+  isAiPendingMarker: "isAiPendingMarker",
+  aiRecId: "aiRecId",
 } as const;
 
 export const OVERLAY_KIND = {

@@ -115,7 +115,11 @@ export function PatentEditor({
         });
       setAiRefRecs(recs);
       setAiRefLoading(false);
-    }, 1000);
+      // 캔버스에 오렌지 마커 배치 (1.2초 후 캔버스가 마운트됨)
+      setTimeout(() => {
+        canvasHandleRef.current?.placeAiPendingMarkers(recs);
+      }, 200);
+    }, 1200);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDrawingId]);
@@ -396,12 +400,21 @@ export function PatentEditor({
     canvasHandleRef.current?.toggleHatchOnSelection();
   }, []);
 
+  // Task 4: 배치 중인 부호 상태
+  const [activePlacingRef, setActivePlacingRef] = useState<EditorReference | null>(null);
+
   const handleReferenceAdd = useCallback(
     (ref: EditorReference) => {
+      setActivePlacingRef(null); // 배치 완료 → 배치 모드 해제
       onReferenceAdd?.(ref);
     },
     [onReferenceAdd],
   );
+
+  const handlePlaceRef = useCallback((ref: EditorReference) => {
+    setActivePlacingRef(ref);
+    canvasHandleRef.current?.selectRefForPlacement(ref);
+  }, []);
 
   const handleReferenceDelete = useCallback(
     (refNumber: string) => {
@@ -574,12 +587,12 @@ export function PatentEditor({
                   components={components}
                   onAccept={(rec) => {
                     setAiRefRecs(prev => prev.map(r => r.id === rec.id ? { ...r, status: 'accepted' } : r));
-                    if (canvasHandleRef.current) {
-                      canvasHandleRef.current.selectRefForPlacement({ number: rec.refNumber, name: rec.componentName });
-                    }
+                    // 마커 위치에서 지시선+번호 직접 생성
+                    canvasHandleRef.current?.acceptAiMarker(rec.id, { number: rec.refNumber, name: rec.componentName });
                   }}
                   onReject={(recId) => {
                     setAiRefRecs(prev => prev.map(r => r.id === recId ? { ...r, status: 'rejected' } : r));
+                    canvasHandleRef.current?.rejectAiMarker(recId);
                   }}
                   onNumberChange={(recId, newNumber) => {
                     setAiRefRecs(prev => prev.map(r => r.id === recId ? { ...r, refNumber: newNumber } : r));
@@ -598,7 +611,8 @@ export function PatentEditor({
                 onDelete={handleReferenceDelete}
                 inventionComponents={components}
                 placedNums={placedNums}
-                onPlaceRef={(ref) => canvasHandleRef.current?.selectRefForPlacement(ref)}
+                activePlacingRef={activePlacingRef}
+                onPlaceRef={handlePlaceRef}
                 drawingDescription={singleDrawingMode ? (descriptionDraft || activeDrawing?.description) : undefined}
                 onDrawingDescriptionChange={singleDrawingMode ? (val) => {
                   setDescriptionDraft(val);

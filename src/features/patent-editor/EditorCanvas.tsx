@@ -51,6 +51,12 @@ export interface EditorCanvasHandle {
   getZoom: () => number;
   /** 외부에서 참조번호를 미리 선택하고 지시선 도구 활성화 */
   selectRefForPlacement: (ref: EditorReference) => void;
+  /** AI 추천 마커(오렌지 원) 캔버스에 배치 */
+  placeAiPendingMarkers: (recs: import('./types').AiRefRecommendation[]) => void;
+  /** AI 추천 마커 수락 → 해당 위치에 지시선+번호 생성 */
+  acceptAiMarker: (recId: string, ref: EditorReference) => void;
+  /** AI 추천 마커 거절 → 마커 삭제 */
+  rejectAiMarker: (recId: string) => void;
 }
 
 interface Props {
@@ -1009,6 +1015,62 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
         });
         fc.discardActiveObject();
         fc.requestRenderAll();
+      },
+      placeAiPendingMarkers: (recs) => {
+        const fc = fabricRef.current;
+        if (!fc) return;
+        // 기존 pending 마커 모두 제거
+        const existingMarkers = fc.getObjects().filter(o => getMeta(o, META.isAiPendingMarker));
+        existingMarkers.forEach(o => fc.remove(o));
+        // 새 마커 배치
+        const W = fc.getWidth();
+        const H = fc.getHeight();
+        recs.filter(r => r.status === 'pending').forEach(rec => {
+          const x = (rec.posXPct / 100) * W;
+          const y = (rec.posYPct / 100) * H;
+          const circle = new fabric.Circle({
+            radius: 18, fill: '#f97316', stroke: 'white', strokeWidth: 2.5,
+            originX: 'center', originY: 'center', objectCaching: false,
+          });
+          const numText = new fabric.IText(rec.refNumber || '?', {
+            fontSize: 12, fontFamily: FIXED_FONT_FAMILY, fill: 'white', fontWeight: 'bold',
+            originX: 'center', originY: 'center', objectCaching: false,
+          });
+          const labelText = new fabric.IText(rec.componentName || '', {
+            fontSize: 10, fontFamily: FIXED_FONT_FAMILY, fill: '#1a1a1a',
+            left: 22, top: -6, objectCaching: false,
+            backgroundColor: 'rgba(255,255,255,0.85)',
+          });
+          const group = new fabric.Group([circle, numText, labelText], {
+            left: x, top: y, originX: 'center', originY: 'center',
+            hasControls: false, hasBorders: false, objectCaching: false,
+            hoverCursor: 'move',
+          });
+          setMeta(group, META.isAiPendingMarker, true);
+          setMeta(group, META.aiRecId, rec.id);
+          fc.add(group);
+        });
+        fc.requestRenderAll();
+      },
+      acceptAiMarker: (recId, ref) => {
+        const fc = fabricRef.current;
+        if (!fc) return;
+        const marker = fc.getObjects().find(o => getMeta(o, META.aiRecId) === recId);
+        if (!marker) return;
+        // 마커 위치에서 지시선+번호 생성
+        const anchor = { x: marker.left ?? 0, y: marker.top ?? 0 };
+        const textPos = { x: anchor.x + 70, y: anchor.y - 35 };
+        const state = useEditorStore.getState();
+        spawnLeaderPair(fc, anchor, textPos, state.lineStyle, state.leaderCurve, ref);
+        // 마커 제거
+        fc.remove(marker);
+        fc.requestRenderAll();
+      },
+      rejectAiMarker: (recId) => {
+        const fc = fabricRef.current;
+        if (!fc) return;
+        const marker = fc.getObjects().find(o => getMeta(o, META.aiRecId) === recId);
+        if (marker) { fc.remove(marker); fc.requestRenderAll(); }
       },
       removeAllUsesOfRef: (refNumber: string) => {
         const fc = fabricRef.current;

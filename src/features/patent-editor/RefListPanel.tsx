@@ -12,6 +12,8 @@ interface Props {
   /** 전체 목록을 한번에 교체 — autoAssign처럼 번호가 바뀔 때 사용 */
   onBulkUpdate?: (refs: EditorReference[]) => void;
   onDelete: (refNumber: string) => void;
+  /** 현재 배치 중인 부호 (배너 + 하이라이트용) */
+  activePlacingRef?: EditorReference | null;
   inventionComponents?: InventionComponent[];
   placedNums?: Set<string>;
   onPlaceRef?: (ref: EditorReference) => void;
@@ -79,6 +81,7 @@ export function RefListPanel({
   references, onAdd, onUpdate, onBulkUpdate, onDelete,
   inventionComponents, placedNums, onPlaceRef,
   drawingDescription = '', onDrawingDescriptionChange,
+  activePlacingRef,
 }: Props) {
   const [newName, setNewName] = useState('');
   const [dragNum, setDragNum] = useState<string | null>(null);
@@ -109,15 +112,18 @@ export function RefListPanel({
 
   const hasNums = references.some(r => r.number && r.number !== '');
 
+  const [assignDone, setAssignDone] = useState(false);
+
   // ── 부호 자동 부여 ─────────────────────────────────────
   const autoAssign = () => {
     const updated = autoAssignNumbers(references);
     if (onBulkUpdate) {
-      // 번호가 바뀌므로 전체 교체 방식 사용
       onBulkUpdate(updated);
     } else if (onUpdate) {
       updated.forEach(r => onUpdate(r));
     }
+    setAssignDone(true);
+    setTimeout(() => setAssignDone(false), 2000);
   };
 
   // ── 새 항목 추가 ──────────────────────────────────────
