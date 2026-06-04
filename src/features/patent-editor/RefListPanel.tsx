@@ -82,6 +82,15 @@ export function RefListPanel({
   const [dragNum, setDragNum] = useState<string | null>(null);
   const [dropNum, setDropNum] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  // 번호 없는 항목 배치 시도 시 가이드 표시
+  const [noNumGuide, setNoNumGuide] = useState<string | null>(null); // ref key
+  const [pulseAutoAssign, setPulseAutoAssign] = useState(false);
+
+  const showNoNumGuide = (key: string) => {
+    setNoNumGuide(key);
+    setPulseAutoAssign(true);
+    setTimeout(() => { setNoNumGuide(null); setPulseAutoAssign(false); }, 3000);
+  };
 
   const flat = useMemo(() => buildFlat(references), [references]);
 
@@ -196,24 +205,18 @@ export function RefListPanel({
           <span className="text-xs2 font-semibold text-gray-600">
             도면 부호 <span className="font-normal text-gray-400">({references.length})</span>
           </span>
-          {!hasNums && references.length > 0 && (
-            <button onClick={autoAssign}
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs2 font-semibold bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition-colors">
-              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="10" height="10">
-                <path d="M2 6h8M8 4l2 2-2 2"/>
-              </svg>
-              부호 자동 부여
-            </button>
-          )}
-          {hasNums && (
-            <button onClick={autoAssign}
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs2 font-semibold bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition-colors">
-              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="10" height="10">
-                <path d="M2 6h8M8 4l2 2-2 2"/>
-              </svg>
-              부호 재부여
-            </button>
-          )}
+          <button onClick={autoAssign}
+            className={clsx(
+              'flex items-center gap-1 px-2 py-1 rounded text-xs2 font-semibold border transition-colors',
+              pulseAutoAssign
+                ? 'bg-blue-600 border-blue-600 text-white animate-pulse ring-2 ring-blue-400 ring-offset-1'
+                : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
+            )}>
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="10" height="10">
+              <path d="M2 6h8M8 4l2 2-2 2"/>
+            </svg>
+            {hasNums ? '부호 재부여' : '부호 자동 부여'}
+          </button>
         </div>
         {!hasNums && references.length > 0 && (
           <p className="text-xs2 text-gray-400 leading-tight">
@@ -270,7 +273,8 @@ export function RefListPanel({
               )}>
               <div className={clsx(
                 'flex items-center gap-1 rounded px-1.5 py-1 transition-all group',
-                'bg-white border border-gray-200 hover:border-blue-300'
+                'bg-white border hover:border-blue-300',
+                noNumGuide === `${r.number}-${r.name}` ? 'border-amber-400 bg-amber-50' : 'border-gray-200'
               )}>
                 {/* 드래그 핸들 */}
                 <span className="text-gray-300 cursor-grab active:cursor-grabbing shrink-0 select-none text-xs leading-none px-0.5">
@@ -301,7 +305,30 @@ export function RefListPanel({
                   onChange={e => onUpdate?.({ ...r, name: e.target.value || undefined })}
                 />
 
-                {/* 액션 버튼 — hover 시 표시 (ComponentsPanel과 동일) */}
+                {/* 캔버스 배치 버튼 — 항상 표시 (번호 없으면 안내 유도) */}
+                {onPlaceRef && (
+                  <button
+                    onClick={() => {
+                      const key = `${r.number}-${r.name}`;
+                      if (!r.number) {
+                        // 번호 없음 → 부호 자동 부여 유도
+                        showNoNumGuide(key);
+                      } else {
+                        onPlaceRef(r);
+                      }
+                    }}
+                    title={r.number ? `도면에 배치 (지시선 → ${r.number})` : '부호 번호 먼저 부여 필요'}
+                    className={clsx(
+                      'shrink-0 rounded px-1.5 py-0.5 text-xs2 font-semibold border transition-colors',
+                      r.number
+                        ? 'text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-400'
+                        : 'text-amber-600 border-amber-200 hover:bg-amber-50 hover:border-amber-400'
+                    )}>
+                    {r.number ? '배치' : '배치?'}
+                  </button>
+                )}
+
+                {/* 편집 버튼 — hover 시 표시 */}
                 <div className="flex items-center gap-px shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                   {/* ↑ 위로 */}
                   <button onClick={() => moveUp(r)} disabled={!canMoveUp(r)}
@@ -325,14 +352,6 @@ export function RefListPanel({
                     <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M8 5H2M4 3L2 5l2 2"/></svg>
                   </button>
                   <span className="w-px h-3 bg-gray-200 mx-0.5" />
-                  {/* 캔버스 배치 */}
-                  {onPlaceRef && (
-                    <button onClick={() => onPlaceRef(r)}
-                      title="도면에 배치"
-                      className="rounded px-1 py-0.5 text-blue-600 hover:bg-blue-50 text-xs2 font-semibold border border-blue-200 hover:border-blue-400 transition-colors">
-                      배치
-                    </button>
-                  )}
                   {/* 삭제 */}
                   <button
                     onClick={() => { if (window.confirm(`"${r.name || r.number}" 부호를 삭제하시겠습니까?`)) onDelete(r.number); }}
@@ -341,6 +360,15 @@ export function RefListPanel({
                   </button>
                 </div>
               </div>
+            {/* 번호 없는 항목 배치 시도 시 안내 메시지 */}
+            {noNumGuide === `${r.number}-${r.name}` && (
+              <div className="mx-1 mb-1 px-2 py-1.5 bg-amber-50 border border-amber-200 rounded text-xs2 text-amber-700 flex items-center gap-1.5">
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" width="11" height="11">
+                  <circle cx="6" cy="6" r="5"/><line x1="6" y1="4" x2="6" y2="6.5"/><circle cx="6" cy="8.5" r="0.5" fill="currentColor"/>
+                </svg>
+                <span>부호 번호가 없습니다. 먼저 <strong>부호 자동 부여 →</strong>를 클릭하세요.</span>
+              </div>
+            )}
             </div>
           );
         })}
