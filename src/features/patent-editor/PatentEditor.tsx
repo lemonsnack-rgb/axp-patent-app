@@ -52,6 +52,7 @@ export function PatentEditor({
   onDrawingDescriptionChange,
   onReferenceAdd,
   onReferenceUpdate,
+  onReferenceBulkUpdate,
   onReferenceDelete,
   onSaveProject,
   onExportComplete,
@@ -536,6 +537,7 @@ export function PatentEditor({
                 references={refs}
                 onAdd={handleReferenceAdd}
                 onUpdate={onReferenceUpdate}
+                onBulkUpdate={onReferenceBulkUpdate}
                 onDelete={handleReferenceDelete}
                 inventionComponents={components}
                 placedNums={placedNums}

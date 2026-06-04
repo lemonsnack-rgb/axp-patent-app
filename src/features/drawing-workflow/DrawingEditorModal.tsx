@@ -625,8 +625,13 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                     singleDrawingMode={true}
                     onActiveDrawingChange={() => {}}
                     onReferenceAdd={ref => setLocalRefs(p => [...p, ref])}
-                    onReferenceUpdate={ref => setLocalRefs(p => p.map(r => r.number === ref.number ? ref : r))}
-                    onReferenceDelete={num => setLocalRefs(p => p.filter(r => r.number !== num))}
+                    onReferenceUpdate={ref => setLocalRefs(p => p.map(r => {
+                      // 번호가 없으면 이름으로 매칭
+                      const match = r.number ? r.number === ref.number : r.name === ref.name;
+                      return match ? ref : r;
+                    }))}
+                    onReferenceBulkUpdate={refs => setLocalRefs(refs)}
+                    onReferenceDelete={num => setLocalRefs(p => p.filter(r => r.number !== num && r.name !== num))}
                     onSaveProject={(id, json) => {
                       onSave(id, { savedEditorJson: json, stage: 'editing' });
                       if (standalone) writeEditorResult({ drawingId: id, editorJson: json, stage: 'editing', references: [], timestamp: Date.now() });

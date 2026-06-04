@@ -100,6 +100,8 @@ export interface PatentEditorProps {
   onReferenceAdd?: (ref: EditorReference) => void;
   /** 부호 이름·parent 변경 시 호출. 이 모듈 밖에서는 다른 명세서와도 동기화 가능 */
   onReferenceUpdate?: (ref: EditorReference) => void;
+  /** 부호 자동 부여 등 전체 목록을 한번에 교체할 때 사용 */
+  onReferenceBulkUpdate?: (refs: EditorReference[]) => void;
   onReferenceDelete?: (refNumber: string) => void;
   onSaveProject: (drawingId: string, editorDataJson: string) => void;
   onExportComplete: (drawingId: string, finalBlob: Blob) => void;

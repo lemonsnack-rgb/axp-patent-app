@@ -9,6 +9,8 @@ interface Props {
   references: EditorReference[];
   onAdd: (ref: EditorReference) => void;
   onUpdate?: (ref: EditorReference) => void;
+  /** 전체 목록을 한번에 교체 — autoAssign처럼 번호가 바뀔 때 사용 */
+  onBulkUpdate?: (refs: EditorReference[]) => void;
   onDelete: (refNumber: string) => void;
   inventionComponents?: InventionComponent[];
   placedNums?: Set<string>;
@@ -74,13 +76,16 @@ function autoAssignNumbers(refs: EditorReference[]): EditorReference[] {
 const DEPTH_INDENT = 16;
 
 export function RefListPanel({
-  references, onAdd, onUpdate, onDelete,
+  references, onAdd, onUpdate, onBulkUpdate, onDelete,
   inventionComponents, placedNums, onPlaceRef,
   drawingDescription = '', onDrawingDescriptionChange,
 }: Props) {
   const [newName, setNewName] = useState('');
   const [dragNum, setDragNum] = useState<string | null>(null);
   const [dropNum, setDropNum] = useState<string | null>(null);
+  // 번호 인라인 편집 상태
+  const [editingNumKey, setEditingNumKey] = useState<string | null>(null);
+  const [editingNumVal, setEditingNumVal] = useState('');
   const [search, setSearch] = useState('');
   // 번호 없는 항목 배치 시도 시 가이드 표시
   const [noNumGuide, setNoNumGuide] = useState<string | null>(null); // ref key
@@ -106,9 +111,13 @@ export function RefListPanel({
 
   // ── 부호 자동 부여 ─────────────────────────────────────
   const autoAssign = () => {
-    if (!onUpdate) return;
     const updated = autoAssignNumbers(references);
-    updated.forEach(r => onUpdate(r));
+    if (onBulkUpdate) {
+      // 번호가 바뀌므로 전체 교체 방식 사용
+      onBulkUpdate(updated);
+    } else if (onUpdate) {
+      updated.forEach(r => onUpdate(r));
+    }
   };
 
   // ── 새 항목 추가 ──────────────────────────────────────
@@ -289,13 +298,41 @@ export function RefListPanel({
                   />
                 )}
 
-                {/* 부호 번호 배지 (ComponentsPanel과 동일) */}
-                <span className={clsx(
-                  'w-8 text-xs2 font-bold rounded px-1 py-0.5 shrink-0 text-center',
-                  r.number ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'
-                )}>
-                  {r.number || '—'}
-                </span>
+                {/* 부호 번호 배지 — 클릭 시 인라인 편집 */}
+                {editingNumKey === `num-${r.name}` ? (
+                  <input
+                    type="text"
+                    className="w-10 text-xs2 font-bold rounded px-1 py-0.5 shrink-0 text-center border border-blue-400 bg-white outline-none"
+                    value={editingNumVal}
+                    placeholder="100"
+                    autoFocus
+                    onChange={e => setEditingNumVal(e.target.value)}
+                    onBlur={() => {
+                      const num = editingNumVal.trim();
+                      if (num) onUpdate?.({ ...r, number: num });
+                      setEditingNumKey(null);
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        const num = editingNumVal.trim();
+                        if (num) onUpdate?.({ ...r, number: num });
+                        setEditingNumKey(null);
+                      }
+                      if (e.key === 'Escape') setEditingNumKey(null);
+                    }}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    title="클릭하여 번호 편집"
+                    onClick={() => { setEditingNumKey(`num-${r.name}`); setEditingNumVal(r.number || ''); }}
+                    className={clsx(
+                      'w-8 text-xs2 font-bold rounded px-1 py-0.5 shrink-0 text-center transition-colors hover:ring-1 hover:ring-blue-400',
+                      r.number ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                    )}>
+                    {r.number || '—'}
+                  </button>
+                )}
 
                 {/* 이름 편집 (인라인 텍스트 입력) */}
                 <input
@@ -317,14 +354,14 @@ export function RefListPanel({
                         onPlaceRef(r);
                       }
                     }}
-                    title={r.number ? `도면에 배치 (지시선 → ${r.number})` : '부호 번호 먼저 부여 필요'}
+                    title={r.number ? `도면에 배치 (지시선 → ${r.number})` : '번호를 먼저 부여하세요 (위 → 버튼 클릭)'}
                     className={clsx(
                       'shrink-0 rounded px-1.5 py-0.5 text-xs2 font-semibold border transition-colors',
                       r.number
                         ? 'text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-400'
-                        : 'text-amber-600 border-amber-200 hover:bg-amber-50 hover:border-amber-400'
+                        : 'text-gray-400 border-gray-200 cursor-not-allowed opacity-60'
                     )}>
-                    {r.number ? '배치' : '배치?'}
+                    배치
                   </button>
                 )}
 
