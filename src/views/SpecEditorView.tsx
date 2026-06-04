@@ -295,11 +295,27 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
     setChatMessages(prev => [...prev, userMsg]);
     // mock AI 응답
     const cur = sel ? (blocks[sel.sid]?.[sel.idx] || '') : '';
+    const secLabel = sel ? (EDITOR_SECTIONS.find(s => s.id === sel.sid)?.label ?? '') : '';
     setTimeout(() => {
-      const aiText = cur
-        ? `${cur.replace(/이다\.$/, `이다. ${msg.slice(0, 20)} 관점에서 보완했습니다.`)}`
-        : `${msg}에 대한 답변입니다. 단락을 선택하면 해당 내용을 기반으로 수정안을 제안합니다.`;
+      let aiText: string;
+      if (cur) {
+        // 단락 선택 시: 수정안 제안
+        aiText = `${cur.replace(/이다\.$/, `이다. ${msg.slice(0, 20)} 관점에서 보완했습니다.`)}`;
+      } else {
+        // 미선택 시: 일반 Q&A (특허 어시스턴트 맥락)
+        const replies: Record<string, string> = {
+          '청구항': '청구항은 특허 보호 범위를 정의합니다. 독립항은 핵심 구성요소를 포함하고, 종속항은 추가 특징을 기재합니다.',
+          '명세서': '특허 명세서는 발명의 기술분야, 배경기술, 해결과제, 발명의 효과, 도면 설명, 청구범위, 요약서로 구성됩니다.',
+          '효과': '발명의 효과는 기존 기술 대비 개선점을 구체적인 수치나 표현으로 기재하는 것이 좋습니다.',
+          '도면': '도면은 발명의 구성요소를 시각적으로 표현하며, 각 구성요소에 도면 부호(100, 200...)를 부여합니다.',
+        };
+        const matchKey = Object.keys(replies).find(k => msg.includes(k));
+        aiText = matchKey
+          ? replies[matchKey]
+          : `"${msg.slice(0, 30)}"에 대해 답변드립니다. 특허 명세서 작성 시 이 부분은 발명의 기술적 특징을 명확히 표현하는 것이 중요합니다. 특정 단락을 선택하면 해당 내용을 직접 수정해드릴 수 있습니다.`;
+      }
       const aiMsg: ChatMsg = { role: 'ai', text: aiText, proposed: cur ? aiText : undefined };
+      void secLabel; // suppress unused warning
       setChatMessages(prev => [...prev, aiMsg]);
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     }, 600);
@@ -584,21 +600,26 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
 
               {/* 채팅 메시지 영역 */}
               <div className="flex-1 overflow-y-auto scroll-thin px-3 py-2 space-y-3">
-                {chatMessages.length === 0 && !sel && (
-                  <div className="text-center py-8">
-                    <div className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center mx-auto mb-2">
+                {chatMessages.length === 0 && (
+                  <div className="py-6 px-1">
+                    <div className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center mx-auto mb-3">
                       <AiIcon />
                     </div>
-                    <p className="text-xs2 text-zinc-500 font-medium mb-1">AI 어시스턴트</p>
-                    <p className="text-xs2 text-zinc-400 leading-relaxed">
-                      단락을 클릭하여 선택하거나<br />아래 채팅창에 질문하세요
-                    </p>
+                    <p className="text-xs2 text-zinc-500 font-medium mb-2 text-center">AI 어시스턴트</p>
+                    {/* 빠른 질문 예시 */}
+                    <div className="space-y-1.5">
+                      {[
+                        sel ? '이 단락을 더 간결하게 수정해줘' : '청구항 작성 팁을 알려줘',
+                        sel ? '특허 문체로 바꿔줘' : '발명의 효과를 어떻게 써야 하나요?',
+                        sel ? '구체적인 수치를 추가해줘' : '독립항과 종속항 차이는?',
+                      ].map((q, i) => (
+                        <button key={i} onClick={() => { setChatInput(q); }}
+                          className="w-full text-left text-xs2 text-zinc-500 px-2.5 py-1.5 rounded-lg border border-zinc-200 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50/50 transition-colors">
+                          {q}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                )}
-                {chatMessages.length === 0 && sel && (
-                  <p className="text-xs2 text-zinc-400 text-center py-4">
-                    선택된 단락에 대해 질문하거나 수정 지시를 입력하세요
-                  </p>
                 )}
                 {chatMessages.map((m, i) => (
                   <div key={i} className={clsx('flex gap-2', m.role === 'user' ? 'justify-end' : 'justify-start')}>
