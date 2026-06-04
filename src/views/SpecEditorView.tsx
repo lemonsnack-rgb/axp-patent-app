@@ -196,6 +196,12 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
   const [proposed, setProposed] = useState('');
   const [diffSel, setDiffSel] = useState<'current' | 'proposed'>('proposed');
 
+  // 채팅 UI
+  type ChatMsg = { role: 'user' | 'ai'; text: string; proposed?: string };
+  const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
   // 도구 모달
   const [tableModal, setTableModal] = useState(false);
   const [tableRows, setTableRows] = useState(3);
@@ -278,6 +284,25 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
     updateBlock(sel.sid, sel.idx, finalText);
     setAiMode('view');
     setProposed('');
+  };
+
+  // ── 채팅 전송 ──────────────────────────────────────────────────────────
+  const sendChat = () => {
+    const msg = chatInput.trim();
+    if (!msg) return;
+    setChatInput('');
+    const userMsg: ChatMsg = { role: 'user', text: msg };
+    setChatMessages(prev => [...prev, userMsg]);
+    // mock AI 응답
+    const cur = sel ? (blocks[sel.sid]?.[sel.idx] || '') : '';
+    setTimeout(() => {
+      const aiText = cur
+        ? `${cur.replace(/이다\.$/, `이다. ${msg.slice(0, 20)} 관점에서 보완했습니다.`)}`
+        : `${msg}에 대한 답변입니다. 단락을 선택하면 해당 내용을 기반으로 수정안을 제안합니다.`;
+      const aiMsg: ChatMsg = { role: 'ai', text: aiText, proposed: cur ? aiText : undefined };
+      setChatMessages(prev => [...prev, aiMsg]);
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    }, 600);
   };
 
   // ── 표 삽입 ─────────────────────────────────────────────────────────────
@@ -536,10 +561,106 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
             ))}
           </div>
 
-          {/* 탭 본문 */}
-          <div className="flex-1 overflow-y-auto scroll-thin">
+          {/* ── AI 어시스턴트 탭 — 채팅 레이아웃 (탭 본문과 분리) ── */}
+          {panelTab === 'ai' && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* 선택된 블록 컨텍스트 */}
+              {sel && (
+                <div className="px-3 pt-2 pb-1.5 border-b border-zinc-100 shrink-0 bg-zinc-50">
+                  <p className="text-xs2 text-zinc-400 mb-1">
+                    {EDITOR_SECTIONS.find(s => s.id === sel.sid)?.label} · 블록 {sel.idx + 1}
+                  </p>
+                  <div className="rounded border border-zinc-200 bg-white focus-within:border-blue-400 transition-all">
+                    <textarea
+                      className="w-full text-xs2 text-zinc-800 bg-transparent px-2.5 py-2 outline-none resize-none leading-relaxed max-h-28 overflow-y-auto"
+                      value={selText}
+                      rows={Math.min(4, Math.max(2, Math.ceil(selText.length / 50)))}
+                      placeholder="단락 내용을 직접 수정하세요..."
+                      onChange={e => updateBlock(sel.sid, sel.idx, e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
 
-            {/* ── AI 어시스턴트 탭 ── */}
+              {/* 채팅 메시지 영역 */}
+              <div className="flex-1 overflow-y-auto scroll-thin px-3 py-2 space-y-3">
+                {chatMessages.length === 0 && !sel && (
+                  <div className="text-center py-8">
+                    <div className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center mx-auto mb-2">
+                      <AiIcon />
+                    </div>
+                    <p className="text-xs2 text-zinc-500 font-medium mb-1">AI 어시스턴트</p>
+                    <p className="text-xs2 text-zinc-400 leading-relaxed">
+                      단락을 클릭하여 선택하거나<br />아래 채팅창에 질문하세요
+                    </p>
+                  </div>
+                )}
+                {chatMessages.length === 0 && sel && (
+                  <p className="text-xs2 text-zinc-400 text-center py-4">
+                    선택된 단락에 대해 질문하거나 수정 지시를 입력하세요
+                  </p>
+                )}
+                {chatMessages.map((m, i) => (
+                  <div key={i} className={clsx('flex gap-2', m.role === 'user' ? 'justify-end' : 'justify-start')}>
+                    {m.role === 'ai' && (
+                      <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                        <span className="text-[9px] font-bold text-white">AI</span>
+                      </div>
+                    )}
+                    <div className={clsx(
+                      'rounded-xl px-3 py-2 text-xs2 leading-relaxed max-w-[85%]',
+                      m.role === 'user'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-zinc-100 text-zinc-800'
+                    )}>
+                      {m.text}
+                      {m.proposed && sel && (
+                        <button
+                          onClick={() => { updateBlock(sel.sid, sel.idx, m.proposed!); }}
+                          className="mt-2 block w-full py-1 text-xs2 font-semibold bg-white/20 hover:bg-white/30 rounded text-center transition-colors">
+                          ✓ 이 내용으로 적용
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* 하단 채팅 입력창 — 항상 표시 */}
+              <div className="border-t border-zinc-200 px-3 py-2.5 shrink-0 bg-white">
+                <div className="flex gap-2 items-end">
+                  <textarea
+                    className="flex-1 text-xs2 border border-zinc-300 rounded-xl px-3 py-2 outline-none resize-none focus:border-blue-400 transition-colors leading-relaxed"
+                    placeholder={sel ? "수정 지시를 입력하세요... (Enter 전송)" : "질문을 입력하세요... (Enter 전송)"}
+                    value={chatInput}
+                    rows={1}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendChat();
+                      }
+                    }}
+                    style={{ maxHeight: '96px', overflowY: 'auto' }}
+                  />
+                  <button
+                    onClick={sendChat}
+                    disabled={!chatInput.trim()}
+                    className="shrink-0 w-8 h-8 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center transition-colors">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" width="13" height="13">
+                      <path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z" fill="white" stroke="none"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 탭 본문 (도면/참고문헌) */}
+          <div className={clsx('flex-1 overflow-y-auto scroll-thin', panelTab === 'ai' && 'hidden')}>
+
+            {/* ── AI 어시스턴트 탭 (placeholder) ── */}
             {panelTab === 'ai' && (
               <div className="p-3">
                 {!sel ? (
