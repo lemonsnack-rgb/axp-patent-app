@@ -93,36 +93,36 @@ export function PatentEditor({
   const components = useMemo(() => inventionComponents ?? [], [inventionComponents]);
 
   // Task 3: 편집기 진입 시 AI 부호 위치 추천 mock 생성
+  // 번호 없는 구성요소도 포함하되 AiRefPanel에서 수락 전 번호 입력 가능
   useEffect(() => {
     if (!components.length) return;
     setAiRefLoading(true);
     setAiRefRecs([]);
     const timer = setTimeout(() => {
       const recs: AiRefRecommendation[] = components
-        .filter(c => c.number) // 번호 있는 것만
         .slice(0, 6)
         .map((c, i) => {
           const col = i % 3;
           const row = Math.floor(i / 3);
           return {
-            id:            `ai-${c.number}-${activeDrawingId}`,
-            refNumber:     c.number,
+            id:            `ai-${activeDrawingId}-${i}`,
+            refNumber:     c.number || '',
             componentName: c.name,
-            posXPct:       20 + col * 28,
+            posXPct:       15 + col * 28,
             posYPct:       20 + row * 45,
             status:        'pending',
           } as AiRefRecommendation;
         });
       setAiRefRecs(recs);
       setAiRefLoading(false);
-      // 캔버스에 오렌지 마커 배치 (1.2초 후 캔버스가 마운트됨)
+      // 캔버스에 오렌지 마커 배치 (200ms 추가 대기 - 캔버스 마운트 보장)
       setTimeout(() => {
         canvasHandleRef.current?.placeAiPendingMarkers(recs);
-      }, 200);
+      }, 300);
     }, 1200);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeDrawingId]);
+  }, [activeDrawingId, components.map(c => c.number).join(',')]);
 
   const [leftWidth, setLeftWidth] = useState(() =>
     clamp(readStoredWidth(LEFT_WIDTH_KEY, LEFT_DEFAULT), LEFT_MIN, LEFT_MAX),
@@ -210,17 +210,8 @@ export function PatentEditor({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDrawing?.id]);
 
-  // 저장 데이터 없을 때 구성요소를 캔버스에 자동 배치 (AI 추천 위치)
-  useEffect(() => {
-    if (!activeDrawing?.savedEditorDataJson && refs.length > 0) {
-      // EditorCanvas가 마운트된 후 약간의 지연 후 배치
-      const t = setTimeout(() => {
-        canvasHandleRef.current?.placeInitialRefs(refs);
-      }, 300);
-      return () => clearTimeout(t);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeDrawing?.id]);
+  // 저장 데이터 없을 때의 자동 배치는 AI 마커 플로우(Task 3)로 대체
+  // placeInitialRefs는 더 이상 자동 호출하지 않음 → AI 추천 패널에서 수락으로 배치
 
   const commitCaption = useCallback(() => {
     if (!activeDrawing) return;
@@ -586,6 +577,11 @@ export function PatentEditor({
                   loading={aiRefLoading}
                   components={components}
                   onAccept={(rec) => {
+                    if (!rec.refNumber) {
+                      // 번호 없으면 자동 부여 후 수락
+                      alert('부호 번호를 먼저 입력하거나 "부호 자동 부여"를 클릭하세요.');
+                      return;
+                    }
                     setAiRefRecs(prev => prev.map(r => r.id === rec.id ? { ...r, status: 'accepted' } : r));
                     // 마커 위치에서 지시선+번호 직접 생성
                     canvasHandleRef.current?.acceptAiMarker(rec.id, { number: rec.refNumber, name: rec.componentName });

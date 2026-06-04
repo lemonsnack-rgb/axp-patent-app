@@ -616,7 +616,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                     drawings={patentDrawings}
                     activeDrawingId={activeId}
                     availableReferences={localRefs}
-                    inventionComponents={refsToComponents(availableReferences ?? [])}
+                    inventionComponents={refsToComponents(localRefs)}
                     singleDrawingMode={true}
                     onActiveDrawingChange={() => {}}
                     onReferenceAdd={ref => setLocalRefs(p => [...p, ref])}
