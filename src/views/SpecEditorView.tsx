@@ -13,6 +13,7 @@ import type { SpecAnalysisResult } from '../features/spec/types';
 import { loadSpecState, saveSpecState } from '../features/spec/specStore';
 import { PreviewModal } from '../components/PreviewModal';
 import type { PreviewSection } from '../components/PreviewModal';
+import { analyzePromptClarity, generateIntentOptions, generateMockModification } from '../features/ai/clarityAnalyzer';
 
 // ── KaTeX 유틸리티 ─────────────────────────────────────────────────────────
 function renderTeX(tex: string, displayMode = false): { html: string; error?: string } {
@@ -191,7 +192,16 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
   const [panelTab, setPanelTab] = useState<'ai' | 'drawings' | 'refs'>('ai');
 
   // 채팅 UI
-  type ChatMsg = { id: number; role: 'user' | 'ai'; text: string; proposed?: string; blockRef?: { sid: SectionId; idx: number } };
+  type ChatMsg = {
+    id: number;
+    role: 'user' | 'ai';
+    text: string;
+    proposed?: string;
+    blockRef?: { sid: SectionId; idx: number };
+    intentOptions?: string[];       // 패턴 B: 방향 선택지
+    selectedIntent?: string;        // 패턴 B: 선택된 방향
+    sourceMsg?: string;             // 재생성용 원본 메시지
+  };
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
   const [chatInput, setChatInput] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -260,7 +270,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
     setActiveSec(sid);
   };
 
-  // ── 채팅 전송 ──────────────────────────────────────────────────────────
+  // ── Q&A 응답 (블록 미선택 시) ─────────────────────────────────────────
   const CHAT_REPLIES: Record<string, string> = {
     '청구항': '청구항은 특허 보호 범위를 정의합니다. 독립항은 핵심 구성요소를 포함하고, 종속항은 추가 특징을 기재합니다.',
     '명세서': '특허 명세서는 발명의 기술분야, 배경기술, 해결과제, 발명의 효과, 도면 설명, 청구범위, 요약서로 구성됩니다.',
@@ -268,25 +278,22 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
     '도면': '도면은 발명의 구성요소를 시각적으로 표현하며, 각 구성요소에 도면 부호(100, 200...)를 부여합니다.',
   };
 
-  const runAI = (msg: string, curText: string, blockRef: { sid: SectionId; idx: number } | undefined) => {
-    setTimeout(() => {
-      let aiText: string;
-      let proposed: string | undefined;
-      if (curText) {
-        proposed = curText.replace(/이다\.$/, `이다. ${msg.slice(0, 20)} 관점에서 보완했습니다.`);
-        const secLabel = blockRef ? (EDITOR_SECTIONS.find(s => s.id === blockRef.sid)?.label ?? '') : '';
-        aiText = `${secLabel} 단락의 수정안을 생성했습니다.`;
-      } else {
-        const matchKey = Object.keys(CHAT_REPLIES).find(k => msg.includes(k));
-        aiText = matchKey
-          ? CHAT_REPLIES[matchKey]
-          : `"${msg.slice(0, 30)}"에 대해 답변드립니다. 특정 단락을 선택하면 해당 내용을 직접 수정해드릴 수 있습니다.`;
-      }
-      setChatMessages(prev => [...prev, { id: ++msgIdRef.current, role: 'ai', text: aiText, proposed, blockRef }]);
-      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-    }, 600);
+  // ── AI 수정 실행 (방향 확정 후) ────────────────────────────────────────
+  const runModification = (
+    instruction: string,
+    curText: string,
+    blockRef: { sid: SectionId; idx: number } | undefined,
+    sourceMsg: string,
+    selectedIntent?: string,
+  ) => {
+    const secLabel = blockRef ? (EDITOR_SECTIONS.find(s => s.id === blockRef.sid)?.label ?? '') : '';
+    const proposed = generateMockModification(curText, instruction);
+    const label = selectedIntent ? `[${selectedIntent}] 방향으로 수정했습니다.` : `${secLabel} 단락의 수정안입니다.`;
+    setChatMessages(prev => [...prev, { id: ++msgIdRef.current, role: 'ai', text: label, proposed, blockRef, sourceMsg, selectedIntent }]);
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
   };
 
+  // ── 채팅 전송 ──────────────────────────────────────────────────────────
   const sendChat = (override?: string) => {
     const msg = (override ?? chatInput).trim();
     if (!msg) return;
@@ -294,19 +301,53 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
     const cur = sel ? (blocks[sel.sid]?.[sel.idx] || '') : '';
     const blockRef = sel ? { sid: sel.sid, idx: sel.idx } : undefined;
     setChatMessages(prev => [...prev, { id: ++msgIdRef.current, role: 'user', text: msg }]);
-    runAI(msg, cur, blockRef);
+
+    setTimeout(() => {
+      if (!cur) {
+        // Q&A 모드
+        const matchKey = Object.keys(CHAT_REPLIES).find(k => msg.includes(k));
+        const aiText = matchKey
+          ? CHAT_REPLIES[matchKey]
+          : `"${msg.slice(0, 30)}"에 대해 답변드립니다. 특정 단락을 선택하면 해당 내용을 직접 수정해드릴 수 있습니다.`;
+        setChatMessages(prev => [...prev, { id: ++msgIdRef.current, role: 'ai', text: aiText }]);
+        setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+        return;
+      }
+      // 명확도 판단 (TODO: API 교체)
+      const clarity = analyzePromptClarity(msg);
+      if (clarity === 'direct') {
+        runModification(msg, cur, blockRef, msg);
+      } else {
+        const options = generateIntentOptions(msg);
+        setChatMessages(prev => [...prev, {
+          id: ++msgIdRef.current, role: 'ai',
+          text: '어떤 방향으로 수정할까요?',
+          intentOptions: options, blockRef, sourceMsg: msg,
+        }]);
+        setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+      }
+    }, 600);
+  };
+
+  // ── 방향 선택 (패턴 B) ─────────────────────────────────────────────────
+  const selectIntent = (msgId: number, intent: string) => {
+    const msg = chatMessages.find(m => m.id === msgId);
+    if (!msg?.blockRef) return;
+    const cur = blocks[msg.blockRef.sid]?.[msg.blockRef.idx] || '';
+    // 선택지 메시지를 선택 완료 상태로 변경
+    setChatMessages(prev => prev.map(m =>
+      m.id === msgId ? { ...m, intentOptions: undefined, selectedIntent: intent, text: `[${intent}] 방향 선택됨` } : m
+    ));
+    setTimeout(() => runModification(intent, cur, msg.blockRef, msg.sourceMsg || intent, intent), 400);
   };
 
   // ── 다시 생성 ──────────────────────────────────────────────────────────
   const regenerate = (msg: ChatMsg) => {
-    const idx = chatMessages.findIndex(m => m.id === msg.id);
-    let userQuery = '';
-    for (let i = idx - 1; i >= 0; i--) {
-      if (chatMessages[i].role === 'user') { userQuery = chatMessages[i].text; break; }
-    }
+    if (!msg.blockRef) return;
+    const cur = blocks[msg.blockRef.sid]?.[msg.blockRef.idx] || '';
+    const instruction = msg.selectedIntent || msg.sourceMsg || '다시 생성';
     setChatMessages(prev => prev.filter(m => m.id !== msg.id));
-    const cur = msg.blockRef ? (blocks[msg.blockRef.sid]?.[msg.blockRef.idx] || '') : '';
-    runAI(userQuery || '다시 생성', cur, msg.blockRef);
+    setTimeout(() => runModification(instruction, cur, msg.blockRef, instruction, msg.selectedIntent), 400);
   };
 
   // ── 표 삽입 ─────────────────────────────────────────────────────────────
@@ -626,6 +667,19 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
                     ) : (
                       <div className="rounded-xl text-xs2 leading-relaxed max-w-[85%] bg-zinc-100 text-zinc-800 overflow-hidden">
                         <p className="px-3 pt-2.5 pb-1.5">{m.text}</p>
+                        {/* 패턴 B: 방향 선택지 */}
+                        {m.intentOptions && (
+                          <div className="flex flex-wrap gap-1.5 px-2.5 pb-2.5">
+                            {m.intentOptions.map((opt, i) => (
+                              <button key={i}
+                                onClick={() => selectIntent(m.id, opt)}
+                                className="px-2.5 py-1 text-xs2 border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-colors">
+                                {opt}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {/* 패턴 A / 패턴 B 결과: 수정안 */}
                         {m.proposed && (
                           <>
                             <div className="mx-2.5 mb-2 rounded-lg bg-white border border-zinc-200 p-2.5">

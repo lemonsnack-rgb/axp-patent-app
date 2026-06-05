@@ -17,6 +17,7 @@ import {
   generateComponentCandidates,
 } from '../features/spec/mockAiService';
 import type { SpecAnalysisResult } from '../features/spec/types';
+import { analyzePromptClarity, generateIntentOptions, generateMockModification } from '../features/ai/clarityAnalyzer';
 
 type StepId = 'upload' | 'title' | 'description' | 'components' | 'drawings' | 'claims' | 'abstract';
 const STEPS: { id: StepId; num: number; short: string }[] = [
@@ -606,31 +607,102 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
   const [editVals, setEditVals] = useState<Record<number, string>>({});
 
   // 채팅 상태
-  type GuideChatMsg = { id: number; role: 'user' | 'ai'; text: string };
+  type GuideChatMsg = {
+    id: number;
+    role: 'user' | 'ai';
+    text: string;
+    proposed?: string;
+    applyFn?: () => void;
+    intentOptions?: string[];
+    selectedIntent?: string;
+    sourceMsg?: string;
+    sourceFocusCtx?: FocusCtx;
+  };
+  type FocusCtx = { text: string; label: string; apply: (newText: string) => void };
   const [guideChatMsgs, setGuideChatMsgs] = useState<GuideChatMsg[]>([]);
   const [guideChatInput, setGuideChatInput] = useState('');
+  const [focusCtx, setFocusCtx] = useState<FocusCtx | null>(null);
   const guideChatIdRef = useRef(0);
   const guideChatEndRef = useRef<HTMLDivElement>(null);
 
-  const sendGuideChat = () => {
-    const msg = guideChatInput.trim();
+  const QA_REPLIES: Record<string, string> = {
+    '청구항': '청구항은 특허 보호 범위를 정의합니다. 독립항과 종속항으로 구성됩니다.',
+    '명칭': '발명의 명칭은 발명의 핵심 기술을 간결하게 표현해야 합니다.',
+    '구성요소': '구성요소는 발명의 각 기술 요소를 분리하여 도면 부호와 함께 기재합니다.',
+    '도면': '도면은 발명의 구성요소를 시각화하며, 각 부호(100, 200...)로 연결됩니다.',
+  };
+
+  const runGuideModification = (
+    instruction: string,
+    ctx: FocusCtx,
+    sourceMsg: string,
+    selectedIntent?: string,
+  ) => {
+    const proposed = generateMockModification(ctx.text, instruction);
+    const label = selectedIntent ? `[${selectedIntent}] 방향으로 수정했습니다.` : `${ctx.label} 수정안입니다.`;
+    setGuideChatMsgs(prev => [...prev, {
+      id: ++guideChatIdRef.current,
+      role: 'ai',
+      text: label,
+      proposed,
+      applyFn: () => ctx.apply(proposed),
+      sourceMsg,
+      selectedIntent,
+      sourceFocusCtx: ctx,
+    }]);
+    setTimeout(() => guideChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+  };
+
+  const sendGuideChat = (override?: string) => {
+    const msg = (override ?? guideChatInput).trim();
     if (!msg) return;
-    setGuideChatInput('');
+    if (!override) setGuideChatInput('');
+    const capturedCtx = focusCtx;
     setGuideChatMsgs(prev => [...prev, { id: ++guideChatIdRef.current, role: 'user', text: msg }]);
-    const REPLIES: Record<string, string> = {
-      '청구항': '청구항은 특허 보호 범위를 정의합니다. 독립항과 종속항으로 구성됩니다.',
-      '명칭': '발명의 명칭은 발명의 핵심 기술을 간결하게 표현해야 합니다.',
-      '구성요소': '구성요소는 발명의 각 기술 요소를 분리하여 도면 부호와 함께 기재합니다.',
-      '도면': '도면은 발명의 구성요소를 시각화하며, 각 부호(100, 200...)로 연결됩니다.',
-    };
-    const matchKey = Object.keys(REPLIES).find(k => msg.includes(k));
-    const aiText = matchKey
-      ? REPLIES[matchKey]
-      : `"${msg.slice(0, 20)}"에 대해 답변드립니다. 더 구체적인 내용은 각 단계 확정 후 명세서 편집기에서 수정할 수 있습니다.`;
+
     setTimeout(() => {
-      setGuideChatMsgs(prev => [...prev, { id: ++guideChatIdRef.current, role: 'ai', text: aiText }]);
-      setTimeout(() => guideChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+      if (!capturedCtx) {
+        const matchKey = Object.keys(QA_REPLIES).find(k => msg.includes(k));
+        const aiText = matchKey
+          ? QA_REPLIES[matchKey]
+          : `"${msg.slice(0, 20)}"에 대해 답변드립니다. 텍스트 영역을 클릭하면 AI가 해당 내용을 수정해드릴 수 있습니다.`;
+        setGuideChatMsgs(prev => [...prev, { id: ++guideChatIdRef.current, role: 'ai', text: aiText }]);
+        setTimeout(() => guideChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+        return;
+      }
+      // 명확도 판단 (TODO: API 교체)
+      const clarity = analyzePromptClarity(msg);
+      if (clarity === 'direct') {
+        runGuideModification(msg, capturedCtx, msg);
+      } else {
+        const options = generateIntentOptions(msg);
+        setGuideChatMsgs(prev => [...prev, {
+          id: ++guideChatIdRef.current,
+          role: 'ai',
+          text: '어떤 방향으로 수정할까요?',
+          intentOptions: options,
+          sourceMsg: msg,
+          sourceFocusCtx: capturedCtx,
+        }]);
+        setTimeout(() => guideChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+      }
     }, 500);
+  };
+
+  const selectGuideIntent = (msgId: number, intent: string) => {
+    const msg = guideChatMsgs.find(m => m.id === msgId);
+    if (!msg?.sourceFocusCtx) return;
+    setGuideChatMsgs(prev => prev.map(m =>
+      m.id === msgId ? { ...m, intentOptions: undefined, selectedIntent: intent, text: `[${intent}] 방향 선택됨` } : m
+    ));
+    setTimeout(() => runGuideModification(intent, msg.sourceFocusCtx!, msg.sourceMsg || intent, intent), 400);
+  };
+
+  const regenerateGuideChat = (msg: GuideChatMsg) => {
+    if (!msg.sourceFocusCtx) return;
+    const instruction = msg.selectedIntent || msg.sourceMsg || '다시 생성';
+    setGuideChatMsgs(prev => prev.filter(m => m.id !== msg.id));
+    setTimeout(() => runGuideModification(instruction, msg.sourceFocusCtx!, instruction, msg.selectedIntent), 400);
   };
   const [regenCounts, setRegenCounts] = useState<Record<number, number>>({}); // #9: 재생성 카운트
   // description 패널 내부 모드 추적 (view/edit/prompt/diff)
@@ -740,11 +812,11 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
       </div>
 
       {/* 단계별 특수 패널 */}
-      {step === 'description' && <DescriptionPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} onModeChange={setDescMode} promptTrigger={descPromptTrigger} onSubInfoChange={setDescSubInfo} />}
+      {step === 'description' && <DescriptionPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} onModeChange={setDescMode} promptTrigger={descPromptTrigger} onSubInfoChange={setDescSubInfo} onFocusContext={setFocusCtx} />}
       {step === 'components' && <ComponentsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} onComponentsChange={setConfirmedComponents} initialItems={aiComponents} />}
       {step === 'drawings' && <DrawingsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} inventionComponents={confirmedComponents} />}
-      {step === 'claims' && <ClaimsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} />}
-      {step === 'abstract' && <AbstractPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} />}
+      {step === 'claims' && <ClaimsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} onFocusContext={setFocusCtx} />}
+      {step === 'abstract' && <AbstractPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} onFocusContext={setFocusCtx} />}
 
       {/* 일반 단계 A/B/C/D 카드 */}
       {!isSpecial && (
@@ -758,7 +830,20 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
             return (
               <div
                 key={i}
-                onClick={() => { if (!isDone && !isEditing) { setGSel(p => ({ ...p, [step]: cardVal })); setEditingIdx(null); } }}
+                onClick={() => {
+          if (!isDone && !isEditing) {
+            setGSel(p => ({ ...p, [step]: cardVal }));
+            setEditingIdx(null);
+            setFocusCtx({
+              text: cardVal,
+              label: STEP_LABEL[step] || step,
+              apply: (newText) => {
+                setGSel(p => ({ ...p, [step]: newText }));
+                setEditVals(prev => ({ ...prev, [i]: newText }));
+              },
+            });
+          }
+        }}
                 className={clsx(
                   'rounded-lg border-2 p-3 cursor-pointer transition-all',
                   isSelected && !isEditing && 'border-blue-700 bg-blue-50',
@@ -867,22 +952,67 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
       <div className="border-t border-ck-border shrink-0 ml-1.5 bg-white">
         {/* 메시지 이력 (있을 때만 표시) */}
         {guideChatMsgs.length > 0 && (
-          <div className="max-h-28 overflow-y-auto scroll-thin px-3 py-2 space-y-2 bg-zinc-50">
+          <div className="max-h-48 overflow-y-auto scroll-thin px-3 py-2 space-y-2 bg-zinc-50">
             {guideChatMsgs.map(m => (
               <div key={m.id} className={clsx('flex gap-1.5', m.role === 'user' ? 'justify-end' : 'justify-start')}>
                 {m.role === 'ai' && (
-                  <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[8px] font-bold text-white"
+                  <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[8px] font-bold text-white shrink-0"
                     style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
                 )}
-                <div className={clsx(
-                  'rounded-xl px-2.5 py-1.5 text-xs2 leading-relaxed max-w-[85%]',
-                  m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-zinc-200 text-zinc-800'
-                )}>{m.text}</div>
+                {m.role === 'user' ? (
+                  <div className="rounded-xl px-2.5 py-1.5 text-xs2 leading-relaxed max-w-[85%] bg-blue-600 text-white">
+                    {m.text}
+                  </div>
+                ) : (
+                  <div className="rounded-xl text-xs2 leading-relaxed max-w-[85%] bg-zinc-200 text-zinc-800 overflow-hidden">
+                    <p className="px-2.5 pt-1.5 pb-1">{m.text}</p>
+                    {/* 패턴 B: 방향 선택지 */}
+                    {m.intentOptions && (
+                      <div className="flex flex-wrap gap-1 px-2.5 pb-2">
+                        {m.intentOptions.map((opt, i) => (
+                          <button key={i}
+                            onClick={() => selectGuideIntent(m.id, opt)}
+                            className="px-2 py-0.5 text-xs2 border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors">
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {/* 수정안 + 적용/다시생성 */}
+                    {m.proposed && (
+                      <>
+                        <div className="mx-2 mb-1.5 rounded-lg bg-white border border-zinc-300 p-2">
+                          <p className="text-xs2 font-semibold text-zinc-400 mb-0.5">수정안</p>
+                          <p className="text-xs2 text-zinc-800 leading-relaxed whitespace-pre-wrap">{m.proposed}</p>
+                        </div>
+                        <div className="flex gap-1 px-2 pb-2">
+                          <button
+                            onClick={() => { m.applyFn?.(); setFocusCtx(prev => prev ? { ...prev, text: m.proposed! } : null); }}
+                            className="flex-1 py-1 text-xs2 font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                            ✓ 적용
+                          </button>
+                          <button
+                            onClick={() => regenerateGuideChat(m)}
+                            className="px-2.5 py-1 text-xs2 text-zinc-500 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors">
+                            ↺ 다시 생성
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
             <div ref={guideChatEndRef} />
           </div>
         )}
+        {/* 포커스 컨텍스트 표시 */}
+        <div className="px-3 pt-1 pb-0 text-xs2">
+          {focusCtx
+            ? <span className="text-zinc-400">편집 중: <span className="text-blue-600 font-semibold">{focusCtx.label}</span></span>
+            : <span className="text-zinc-300">텍스트를 클릭하면 AI가 수정을 도와드립니다</span>
+          }
+        </div>
         {/* 입력창 — 항상 표시 */}
         <div className="flex gap-2 items-center px-3 py-2">
           <input
@@ -894,7 +1024,7 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); sendGuideChat(); } }}
           />
           <button
-            onClick={sendGuideChat}
+            onClick={() => sendGuideChat()}
             disabled={!guideChatInput.trim()}
             className="shrink-0 w-7 h-7 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center transition-colors">
             <svg viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" width="12" height="12">
@@ -1429,7 +1559,7 @@ const MOCK_DEPS_BY_INDEP: Record<number, Pick<DepItemState,'text'|'sel'>[]> = {
 interface DepGroupState { generated: boolean; items: DepItemState[]; newText: string }
 
 
-function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void }) {
+function ClaimsPanel({ done, onUpdate, onFocusContext }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void; onFocusContext?: (ctx: { text: string; label: string; apply: (t: string) => void }) => void }) {
   const [claimsPhase, setClaimsPhase] = useState<'indep' | 'dep'>('indep');
 
   // 독립항 후보 상태 (n개 다중 선택)
@@ -1624,6 +1754,11 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
                       rows={Math.max(4, Math.ceil(cand.text.length / 40))}
                       placeholder="독립항 내용을 입력하거나 수정하세요..."
                       onClick={e => e.stopPropagation()}
+                      onFocus={() => onFocusContext?.({
+                        text: cand.text,
+                        label: `독립항 ${cand.label}`,
+                        apply: (newText) => setCands(p => p.map(c => c.id === cand.id ? { ...c, text: newText, editVal: newText } : c)),
+                      })}
                       onChange={e => setCands(p => p.map(c => c.id === cand.id ? { ...c, text: e.target.value } : c))}
                       ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                     />
@@ -1694,6 +1829,11 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
                       value={indep.text}
                       rows={Math.max(3, Math.ceil(indep.text.length / 45))}
                       onClick={e => e.stopPropagation()}
+                      onFocus={() => onFocusContext?.({
+                        text: indep.text,
+                        label: `독립항 ${indep.label}`,
+                        apply: (newText) => setCands(p => p.map(c => c.id === indep.id ? { ...c, text: newText, editVal: newText } : c)),
+                      })}
                       onChange={e => setCands(p => p.map(c => c.id === indep.id ? { ...c, text: e.target.value } : c))}
                       ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                     />
@@ -1761,6 +1901,15 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
                                     className="w-full text-xs2 text-gray-800 bg-transparent px-2.5 py-2 outline-none resize-none leading-relaxed"
                                     value={dep.text}
                                     rows={Math.max(6, Math.ceil(dep.text.length / 40))}
+                                    onFocus={() => onFocusContext?.({
+                                      text: dep.text,
+                                      label: `종속항 ${dep.id}`,
+                                      apply: (newText) => {
+                                        const next = { ...depGroups, [indep.id]: { ...grp, items: grp.items.map(d => d.id === dep.id ? { ...d, text: newText, editVal: newText } : d) } };
+                                        setDepGroups(next);
+                                        syncUpdate(cands, next);
+                                      },
+                                    })}
                                     onChange={e => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, text: e.target.value } : d) })}
                                   />
                                 </div>
@@ -1825,11 +1974,12 @@ const DESC_SECTIONS: { key: string; label: string; badge2?: string; text: string
 ];
 
 // 발명의 설명 패널 — 1개 생성 + view/edit/prompt/diff 모드
-function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChange }: {
+function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChange, onFocusContext }: {
   done: boolean; onConfirm: () => void; onUpdate: (v: string) => void;
   onModeChange?: (mode: string) => void;
   promptTrigger?: number;
   onSubInfoChange?: (info: { subStep: number; currentLabel: string; allDone: boolean; doConfirm: (() => void) | null }) => void;
+  onFocusContext?: (ctx: { text: string; label: string; apply: (t: string) => void }) => void;
 }) {
   const [subStep, setSubStep] = useState(0);
   const [confirmed, setConfirmed] = useState<Record<string, string>>({});
@@ -1945,6 +2095,11 @@ function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChan
                 value={curText}
                 rows={Math.max(4, Math.ceil(curText.length / 40))}
                 placeholder="텍스트를 직접 입력하거나 수정하세요..."
+                onFocus={() => onFocusContext?.({
+                  text: texts[sec.key] || '',
+                  label: sec.label,
+                  apply: (newText) => setTexts(p => ({ ...p, [sec.key]: newText })),
+                })}
                 onChange={e => {
                   setTexts(p => ({ ...p, [sec.key]: e.target.value }));
                   e.target.style.height = 'auto';
@@ -1992,7 +2147,7 @@ const ABSTRACT_CANDS = [
   },
 ];
 
-function AbstractPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void }) {
+function AbstractPanel({ done, onUpdate, onFocusContext }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void; onFocusContext?: (ctx: { text: string; label: string; apply: (t: string) => void }) => void }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [editVals, setEditVals] = useState<Record<number, string>>({});
 
@@ -2044,6 +2199,7 @@ function AbstractPanel({ done, onUpdate }: { done: boolean; onConfirm: () => voi
                   value={getVal(i)}
                   rows={4}
                   onClick={e => e.stopPropagation()}
+                  onFocus={() => onFocusContext?.({ text: getVal(i), label: '요약서', apply: (newText) => { setEditVals(prev => ({ ...prev, [i]: newText })); onUpdate(newText); } })}
                   onChange={e => {
                     setEditVals(prev => ({ ...prev, [i]: e.target.value }));
                     onUpdate(e.target.value);
