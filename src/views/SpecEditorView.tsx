@@ -675,7 +675,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
                     style={{ maxHeight: '96px', overflowY: 'auto' }}
                   />
                   <button
-                    onClick={sendChat}
+                    onClick={() => sendChat()}
                     disabled={!chatInput.trim()}
                     className="shrink-0 w-8 h-8 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center transition-colors">
                     <svg viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" width="13" height="13">
