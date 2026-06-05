@@ -1277,18 +1277,13 @@ function DrawingsPanel({ done, onUpdate, inventionComponents }: {
                 </div>
               </div>
 
-              {/* 편집 버튼 — 항상 표시, 클릭 가능함을 명확히 인지 */}
+              {/* 도면 편집 버튼 — 완료 여부는 stage 배지로 표시, 버튼 라벨 통일 */}
               {isEditable && (
                 <button
                   onClick={() => openEditor(d.id)}
-                  className={clsx(
-                    'w-full flex items-center justify-center gap-1 py-1 text-xs2 font-semibold transition-colors border-t',
-                    isDone
-                      ? 'border-green-100 text-green-600 hover:bg-green-50'
-                      : 'border-gray-100 text-blue-600 hover:bg-blue-50',
-                  )}>
+                  className="w-full flex items-center justify-center gap-1 py-1 text-xs2 font-semibold transition-colors border-t border-gray-100 text-blue-600 hover:bg-blue-50">
                   <Icon name="edit" size={10} />
-                  {isDone ? '편집 내용 보기 →' : '도면 편집 →'}
+                  도면 편집 →
                 </button>
               )}
             </div>
