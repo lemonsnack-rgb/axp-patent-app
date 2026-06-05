@@ -565,39 +565,41 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
             ))}
           </div>
 
-          {/* ── AI 어시스턴트 탭 — 채팅 레이아웃 (탭 본문과 분리) ── */}
+          {/* 선택된 블록 컨텍스트 (AI 탭일 때만) */}
           {panelTab === 'ai' && (
-            <div className="flex-1 flex flex-col overflow-hidden">
-              {/* 선택된 블록 컨텍스트 (읽기 전용) */}
-              <div className="px-3 pt-2 pb-2 border-b border-zinc-100 shrink-0 bg-zinc-50">
-                {sel ? (
-                  <>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="text-xs2 font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
-                        {EDITOR_SECTIONS.find(s => s.id === sel.sid)?.short}
-                      </span>
-                      <span className="text-xs2 text-zinc-400">블록 {sel.idx + 1}</span>
-                    </div>
-                    <p className="text-xs2 text-zinc-600 leading-relaxed line-clamp-3 bg-white rounded border border-zinc-200 px-2.5 py-1.5">
-                      {selText || <span className="text-zinc-400 italic">빈 단락</span>}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-xs2 text-zinc-400 text-center py-0.5">
-                    본문에서 단락을 선택하면 AI가 수정을 도와드립니다
+            <div className="px-3 pt-2 pb-2 border-b border-zinc-100 shrink-0 bg-zinc-50">
+              {sel ? (
+                <>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-xs2 font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                      {EDITOR_SECTIONS.find(s => s.id === sel.sid)?.short}
+                    </span>
+                    <span className="text-xs2 text-zinc-400">블록 {sel.idx + 1}</span>
+                  </div>
+                  <p className="text-xs2 text-zinc-600 leading-relaxed line-clamp-3 bg-white rounded border border-zinc-200 px-2.5 py-1.5">
+                    {selText || <span className="text-zinc-400 italic">빈 단락</span>}
                   </p>
-                )}
-              </div>
+                </>
+              ) : (
+                <p className="text-xs2 text-zinc-400 text-center py-0.5">
+                  본문에서 단락을 선택하면 AI가 수정을 도와드립니다
+                </p>
+              )}
+            </div>
+          )}
 
-              {/* 채팅 메시지 영역 */}
-              <div className="flex-1 overflow-y-auto scroll-thin px-3 py-2 space-y-3">
+          {/* 탭 본문 (스크롤 영역) */}
+          <div className="flex-1 overflow-y-auto scroll-thin">
+
+            {/* ── AI 탭: 채팅 메시지 ── */}
+            {panelTab === 'ai' && (
+              <div className="px-3 py-2 space-y-3">
                 {chatMessages.length === 0 && (
                   <div className="py-6 px-1">
                     <div className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center mx-auto mb-3">
                       <AiIcon />
                     </div>
                     <p className="text-xs2 text-zinc-500 font-medium mb-2 text-center">AI 어시스턴트</p>
-                    {/* 빠른 질문 예시 */}
                     <div className="space-y-1.5">
                       {[
                         sel ? '이 단락을 더 간결하게 수정해줘' : '청구항 작성 팁을 알려줘',
@@ -656,39 +658,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
                 ))}
                 <div ref={chatEndRef} />
               </div>
-
-              {/* 하단 채팅 입력창 — 항상 표시 */}
-              <div className="border-t border-zinc-200 px-3 py-2.5 shrink-0 bg-white">
-                <div className="flex gap-2 items-end">
-                  <textarea
-                    className="flex-1 text-xs2 border border-zinc-300 rounded-xl px-3 py-2 outline-none resize-none focus:border-blue-400 transition-colors leading-relaxed"
-                    placeholder={sel ? "수정 지시를 입력하세요... (Enter 전송)" : "질문을 입력하세요... (Enter 전송)"}
-                    value={chatInput}
-                    rows={1}
-                    onChange={e => setChatInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        sendChat();
-                      }
-                    }}
-                    style={{ maxHeight: '96px', overflowY: 'auto' }}
-                  />
-                  <button
-                    onClick={() => sendChat()}
-                    disabled={!chatInput.trim()}
-                    className="shrink-0 w-8 h-8 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center transition-colors">
-                    <svg viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" width="13" height="13">
-                      <path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z" fill="white" stroke="none"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 탭 본문 (도면/참고문헌) */}
-          <div className={clsx('flex-1 overflow-y-auto scroll-thin', panelTab === 'ai' && 'hidden')}>
+            )}
 
             {/* ── 도면 탭 ── */}
             {panelTab === 'drawings' && (
@@ -828,6 +798,34 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
                 )}
               </div>
             )}
+          </div>
+
+          {/* 하단 채팅 입력창 — 탭 관계없이 항상 표시 */}
+          <div className="border-t border-zinc-200 px-3 py-2.5 shrink-0 bg-white">
+            <div className="flex gap-2 items-end">
+              <textarea
+                className="flex-1 text-xs2 border border-zinc-300 rounded-xl px-3 py-2 outline-none resize-none focus:border-blue-400 transition-colors leading-relaxed"
+                placeholder={sel ? "수정 지시를 입력하세요... (Enter 전송)" : "질문을 입력하세요... (Enter 전송)"}
+                value={chatInput}
+                rows={1}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChat();
+                  }
+                }}
+                style={{ maxHeight: '96px', overflowY: 'auto' }}
+              />
+              <button
+                onClick={() => sendChat()}
+                disabled={!chatInput.trim()}
+                className="shrink-0 w-8 h-8 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center transition-colors">
+                <svg viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" width="13" height="13">
+                  <path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z" fill="white" stroke="none"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </aside>
       </div>
