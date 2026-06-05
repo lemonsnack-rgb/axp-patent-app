@@ -604,6 +604,34 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
   const letters = ['A', 'B', 'C', 'D', 'E'];
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editVals, setEditVals] = useState<Record<number, string>>({});
+
+  // 채팅 상태
+  type GuideChatMsg = { id: number; role: 'user' | 'ai'; text: string };
+  const [guideChatMsgs, setGuideChatMsgs] = useState<GuideChatMsg[]>([]);
+  const [guideChatInput, setGuideChatInput] = useState('');
+  const guideChatIdRef = useRef(0);
+  const guideChatEndRef = useRef<HTMLDivElement>(null);
+
+  const sendGuideChat = () => {
+    const msg = guideChatInput.trim();
+    if (!msg) return;
+    setGuideChatInput('');
+    setGuideChatMsgs(prev => [...prev, { id: ++guideChatIdRef.current, role: 'user', text: msg }]);
+    const REPLIES: Record<string, string> = {
+      '청구항': '청구항은 특허 보호 범위를 정의합니다. 독립항과 종속항으로 구성됩니다.',
+      '명칭': '발명의 명칭은 발명의 핵심 기술을 간결하게 표현해야 합니다.',
+      '구성요소': '구성요소는 발명의 각 기술 요소를 분리하여 도면 부호와 함께 기재합니다.',
+      '도면': '도면은 발명의 구성요소를 시각화하며, 각 부호(100, 200...)로 연결됩니다.',
+    };
+    const matchKey = Object.keys(REPLIES).find(k => msg.includes(k));
+    const aiText = matchKey
+      ? REPLIES[matchKey]
+      : `"${msg.slice(0, 20)}"에 대해 답변드립니다. 더 구체적인 내용은 각 단계 확정 후 명세서 편집기에서 수정할 수 있습니다.`;
+    setTimeout(() => {
+      setGuideChatMsgs(prev => [...prev, { id: ++guideChatIdRef.current, role: 'ai', text: aiText }]);
+      setTimeout(() => guideChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    }, 500);
+  };
   const [regenCounts, setRegenCounts] = useState<Record<number, number>>({}); // #9: 재생성 카운트
   // description 패널 내부 모드 추적 (view/edit/prompt/diff)
   const [descMode, setDescMode] = useState<string>('view');
@@ -834,6 +862,47 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
           )}
         </div>
       )}
+
+      {/* 채팅 영역 — 항상 표시 */}
+      <div className="border-t border-ck-border shrink-0 ml-1.5 bg-white">
+        {/* 메시지 이력 (있을 때만 표시) */}
+        {guideChatMsgs.length > 0 && (
+          <div className="max-h-28 overflow-y-auto scroll-thin px-3 py-2 space-y-2 bg-zinc-50">
+            {guideChatMsgs.map(m => (
+              <div key={m.id} className={clsx('flex gap-1.5', m.role === 'user' ? 'justify-end' : 'justify-start')}>
+                {m.role === 'ai' && (
+                  <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[8px] font-bold text-white"
+                    style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
+                )}
+                <div className={clsx(
+                  'rounded-xl px-2.5 py-1.5 text-xs2 leading-relaxed max-w-[85%]',
+                  m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-zinc-200 text-zinc-800'
+                )}>{m.text}</div>
+              </div>
+            ))}
+            <div ref={guideChatEndRef} />
+          </div>
+        )}
+        {/* 입력창 — 항상 표시 */}
+        <div className="flex gap-2 items-center px-3 py-2">
+          <input
+            type="text"
+            className="flex-1 text-xs2 border border-zinc-300 rounded-xl px-3 py-1.5 outline-none focus:border-blue-400 transition-colors"
+            placeholder="AI에게 질문하세요..."
+            value={guideChatInput}
+            onChange={e => setGuideChatInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); sendGuideChat(); } }}
+          />
+          <button
+            onClick={sendGuideChat}
+            disabled={!guideChatInput.trim()}
+            className="shrink-0 w-7 h-7 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center transition-colors">
+            <svg viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" width="12" height="12">
+              <path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z" fill="white" stroke="none"/>
+            </svg>
+          </button>
+        </div>
+      </div>
 
       {/* 하단 버튼 바 */}
       <div className="flex gap-2 px-3 py-2.5 border-t border-ck-border bg-ck-bg shrink-0 ml-1.5">
