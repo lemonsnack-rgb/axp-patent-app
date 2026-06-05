@@ -1834,11 +1834,11 @@ function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChan
   const [texts, setTexts] = useState<Record<string, string>>(
     Object.fromEntries(DESC_SECTIONS.map(s => [s.key, s.text]))
   );
-  const [mode, _setMode] = useState<'view' | 'edit' | 'prompt' | 'diff'>('view');
+  const [_mode, _setMode] = useState<'view' | 'edit' | 'prompt' | 'diff'>('view');
   const setMode = (m: 'view' | 'edit' | 'prompt' | 'diff') => { _setMode(m); onModeChange?.(m); };
   const [promptVal, setPromptVal] = useState('');
   const [proposed, setProposed] = useState('');
-  const [diffSel, setDiffSel] = useState<'current' | 'proposed'>('proposed');
+  const [_diffSel, setDiffSel] = useState<'current' | 'proposed'>('proposed');
   // 프롬프트 수정의 기준 텍스트: 'current'(원본) | 'proposed'(변경 버전)
   const [promptBase, setPromptBase] = useState<'current' | 'proposed'>('current');
 
@@ -1876,16 +1876,16 @@ function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChan
     });
   }, [safeSubStep, allDone, isDone, curText]);
 
-  const submitPrompt = () => {
+  const _submitPrompt = () => {
     if (!promptVal.trim()) return;
-    // 수정 기준: 'proposed'면 변경 버전 기반, 'current'면 현재 텍스트 기반
     const baseText = promptBase === 'proposed' && proposed ? proposed : curText;
     const mock = baseText.replace(/이다\.$/, `이다 (${promptVal.slice(0, 20)} 반영).`);
     setProposed(mock);
-    setDiffSel('proposed'); // 기본으로 변경 버전 선택
+    setDiffSel('proposed');
     setMode('diff');
     setPromptVal('');
   };
+  void _submitPrompt;
 
   if (!sec) return null;
 
