@@ -693,6 +693,7 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
     selectedIntent?: string;
     sourceMsg?: string;
     sourceFocusCtx?: FocusCtx;
+    applied?: boolean;
   };
   type FocusCtx = { text: string; label: string; apply: (newText: string) => void };
   const [guideChatMsgs, setGuideChatMsgs] = useState<GuideChatMsg[]>([]);
@@ -781,6 +782,7 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
     setTimeout(() => runGuideModification(instruction, msg.sourceFocusCtx!, instruction, msg.selectedIntent), 400);
   };
   const [regenCounts, setRegenCounts] = useState<Record<number, number>>({}); // #9: 재생성 카운트
+  const [appliedIdx, setAppliedIdx] = useState<number | null>(null); // 적용 flash 인덱스
   // description 패널 내부 모드 추적 (view/edit/prompt/diff)
   const [descMode, setDescMode] = useState<string>('view');
   // description 패널의 prompt 재입력 요청 콜백
@@ -939,20 +941,23 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
           }
         }}
                 className={clsx(
-                  'rounded-lg border-2 p-3 cursor-pointer transition-all',
-                  isSelected && !isEditing && 'border-blue-700 bg-blue-50',
+                  'rounded-lg border-2 p-3 cursor-pointer transition-all relative',
+                  appliedIdx === i && 'ring-2 ring-green-400 ring-offset-1',
+                  isSelected && !isEditing && 'border-blue-600 bg-blue-50 shadow-sm',
                   isEditing && 'border-blue-500 bg-blue-50',
                   isConfirmedCard && 'border-green-500 bg-green-50',
-                  !isSelected && !isConfirmedCard && !isDone && !isEditing && 'border-ck-border bg-ck-bg hover:border-blue-300',
+                  !isSelected && !isConfirmedCard && !isDone && !isEditing && 'border-ck-border bg-white hover:border-blue-400 hover:bg-blue-50/40',
                   isDone && !isConfirmedCard && 'border-gray-200 bg-white opacity-60',
                 )}
               >
                 <div className="flex items-center gap-2 mb-2">
                   <span className={clsx(
                     'w-5 h-5 rounded-full text-xs2 font-bold flex items-center justify-center shrink-0',
-                    isSelected || isConfirmedCard || isEditing ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-600',
+                    isSelected || isConfirmedCard || isEditing ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600',
                   )}>{letter}</span>
-                  {/* AI배지 제거 요청으로 미표시 */}
+                  {isSelected && !isEditing && (
+                    <span className="text-xs2 text-blue-600 font-semibold">✓ 선택됨</span>
+                  )}
                   <div className="ml-auto flex gap-1">
                     {!isDone && (
                       <>
@@ -977,11 +982,14 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
                         </button>
                         <button
                           onClick={e => { e.stopPropagation(); setEditingIdx(isEditing ? null : i); setGSel(p => ({ ...p, [step]: cardVal })); }}
-                          className={clsx('w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-gray-700',
-                            isEditing ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-200')}
+                          className={clsx(
+                            'flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs2 transition-colors',
+                            isEditing ? 'bg-blue-100 text-blue-700' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-700',
+                          )}
                           title="직접 수정"
                         >
-                          <Icon name="edit" size={11} />
+                          <Icon name="edit" size={10} />
+                          <span>수정</span>
                         </button>
                       </>
                     )}
@@ -989,17 +997,45 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
                 </div>
                 {/* 카드 텍스트 — 편집 모드 시 contenteditable textarea */}
                 {isEditing ? (
-                  <textarea
-                    autoFocus
-                    className="w-full text-sm2 font-semibold text-gray-800 bg-white border border-blue-300 rounded px-2 py-1 outline-none resize-none"
-                    value={editVals[i] ?? c}
-                    rows={2}
-                    onClick={e => e.stopPropagation()}
-                    onChange={e => {
-                      setEditVals(prev => ({ ...prev, [i]: e.target.value }));
-                      setGSel(p => ({ ...p, [step]: e.target.value }));
-                    }}
-                  />
+                  <>
+                    <textarea
+                      autoFocus
+                      className="w-full text-sm2 font-semibold text-gray-800 bg-white border border-blue-300 rounded px-2 py-1 outline-none resize-none"
+                      value={editVals[i] ?? c}
+                      rows={2}
+                      onClick={e => e.stopPropagation()}
+                      onChange={e => {
+                        setEditVals(prev => ({ ...prev, [i]: e.target.value }));
+                        setGSel(p => ({ ...p, [step]: e.target.value }));
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          setGSel(p => ({ ...p, [step]: editVals[i] ?? c }));
+                          setEditingIdx(null);
+                        }
+                        if (e.key === 'Escape') {
+                          e.preventDefault();
+                          setEditVals(prev => { const n = { ...prev }; delete n[i]; return n; });
+                          setEditingIdx(null);
+                        }
+                      }}
+                    />
+                    <div className="flex gap-1.5 mt-1.5" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => { setGSel(p => ({ ...p, [step]: editVals[i] ?? c })); setEditingIdx(null); }}
+                        className="flex-1 py-1 text-xs2 font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        ✓ 확정
+                      </button>
+                      <button
+                        onClick={() => { setEditVals(prev => { const n = { ...prev }; delete n[i]; return n; }); setEditingIdx(null); }}
+                        className="px-2.5 py-1 text-xs2 text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        취소
+                      </button>
+                    </div>
+                  </>
                 ) : (
                   <p className="text-sm2 font-semibold text-gray-800 leading-snug">{cardVal}</p>
                 )}
@@ -1081,9 +1117,23 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
                         </div>
                         <div className="flex gap-1 px-2 pb-2">
                           <button
-                            onClick={() => { m.applyFn?.(); setFocusCtx(prev => prev ? { ...prev, text: m.proposed! } : null); }}
-                            className="flex-1 py-1 text-xs2 font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                            ✓ 적용
+                            disabled={m.applied}
+                            onClick={() => {
+                              m.applyFn?.();
+                              setFocusCtx(prev => prev ? { ...prev, text: m.proposed! } : null);
+                              const appliedCardIdx = cands.findIndex((c, ci) => (editVals[ci] ?? c) === gSel[step]);
+                              if (appliedCardIdx >= 0) {
+                                setAppliedIdx(appliedCardIdx);
+                                setTimeout(() => setAppliedIdx(null), 1500);
+                              }
+                              setGuideChatMsgs(prev => prev.map(msg => msg.id === m.id ? { ...msg, applied: true } : msg));
+                            }}
+                            className={clsx(
+                              'flex-1 py-1 text-xs2 font-semibold rounded-lg transition-colors',
+                              m.applied ? 'bg-green-100 text-green-700 cursor-default' : 'bg-blue-600 text-white hover:bg-blue-700',
+                            )}
+                          >
+                            {m.applied ? '✓ 적용됨' : '✓ 적용'}
                           </button>
                           <button
                             onClick={() => regenerateGuideChat(m)}
@@ -1100,10 +1150,18 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
             <div ref={guideChatEndRef} />
           </div>
         )}
-        {/* 포커스 컨텍스트 표시 — 활성 필드가 있을 때만 */}
+        {/* 컨텍스트 표시 */}
+        {!focusCtx && (
+          <div className="shrink-0 px-3 pt-1.5 pb-0">
+            <p className="text-xs2 text-zinc-400">카드를 클릭하여 선택하면 AI에게 수정을 요청할 수 있습니다.</p>
+          </div>
+        )}
         {focusCtx && (
-          <div className="shrink-0 px-3 pt-1 pb-0 text-xs2">
-            <span className="text-zinc-400">편집 중: <span className="text-blue-600 font-semibold">{focusCtx.label}</span></span>
+          <div className="shrink-0 px-3 pt-1.5 pb-0">
+            <div className="flex items-center gap-1 text-xs2">
+              <span className="text-blue-600 font-semibold shrink-0">선택됨</span>
+              <span className="text-zinc-400 truncate">· {focusCtx.text.slice(0, 22)}{focusCtx.text.length > 22 ? '…' : ''}</span>
+            </div>
           </div>
         )}
         {/* 입력창 — 항상 표시 */}
@@ -1111,7 +1169,7 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
           <input
             type="text"
             className="flex-1 text-xs2 border border-zinc-300 rounded-xl px-3 py-1.5 outline-none focus:border-blue-400 transition-colors"
-            placeholder="AI에게 질문하세요..."
+            placeholder={focusCtx ? `"${focusCtx.text.slice(0, 12)}…" 수정 요청...` : 'AI에게 질문하세요...'}
             value={guideChatInput}
             onChange={e => setGuideChatInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); sendGuideChat(); } }}
