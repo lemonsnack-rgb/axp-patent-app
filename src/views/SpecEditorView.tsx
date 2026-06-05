@@ -190,17 +190,12 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
   // 우측 패널 탭
   const [panelTab, setPanelTab] = useState<'ai' | 'drawings' | 'refs'>('ai');
 
-  // AI 수정 모드
-  const [aiMode, setAiMode] = useState<'view' | 'prompt' | 'diff'>('view');
-  const [promptVal, setPromptVal] = useState('');
-  const [proposed, setProposed] = useState('');
-  const [diffSel, setDiffSel] = useState<'current' | 'proposed'>('proposed');
-
   // 채팅 UI
-  type ChatMsg = { role: 'user' | 'ai'; text: string; proposed?: string };
+  type ChatMsg = { id: number; role: 'user' | 'ai'; text: string; proposed?: string; blockRef?: { sid: SectionId; idx: number } };
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
   const [chatInput, setChatInput] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const msgIdRef = useRef(0);
 
   // 도구 모달
   const [tableModal, setTableModal] = useState(false);
@@ -262,63 +257,56 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
   const selectBlock = (sid: SectionId, idx: number) => {
     setSel({ sid, idx });
     setPanelTab('ai');
-    setAiMode('view');
-    setProposed('');
     setActiveSec(sid);
   };
 
-  // ── AI 수정 제출 ────────────────────────────────────────────────────────
-  const submitPrompt = () => {
-    if (!sel) return;
-    const cur = blocks[sel.sid][sel.idx] || '';
-    const mock = `${promptVal.trim() ? `[${promptVal.slice(0, 20)} 반영] ` : ''}${cur.replace(/이다\.$/, '이다. 이를 통해 특허 청구범위가 더욱 명확해진다.')}`;
-    setProposed(mock);
-    setDiffSel('proposed');
-    setAiMode('diff');
-    setPromptVal('');
-  };
-
-  const applyDiff = () => {
-    if (!sel) return;
-    const finalText = diffSel === 'proposed' ? proposed : blocks[sel.sid][sel.idx];
-    updateBlock(sel.sid, sel.idx, finalText);
-    setAiMode('view');
-    setProposed('');
-  };
-
   // ── 채팅 전송 ──────────────────────────────────────────────────────────
-  const sendChat = () => {
-    const msg = chatInput.trim();
-    if (!msg) return;
-    setChatInput('');
-    const userMsg: ChatMsg = { role: 'user', text: msg };
-    setChatMessages(prev => [...prev, userMsg]);
-    // mock AI 응답
-    const cur = sel ? (blocks[sel.sid]?.[sel.idx] || '') : '';
-    const secLabel = sel ? (EDITOR_SECTIONS.find(s => s.id === sel.sid)?.label ?? '') : '';
+  const CHAT_REPLIES: Record<string, string> = {
+    '청구항': '청구항은 특허 보호 범위를 정의합니다. 독립항은 핵심 구성요소를 포함하고, 종속항은 추가 특징을 기재합니다.',
+    '명세서': '특허 명세서는 발명의 기술분야, 배경기술, 해결과제, 발명의 효과, 도면 설명, 청구범위, 요약서로 구성됩니다.',
+    '효과': '발명의 효과는 기존 기술 대비 개선점을 구체적인 수치나 표현으로 기재하는 것이 좋습니다.',
+    '도면': '도면은 발명의 구성요소를 시각적으로 표현하며, 각 구성요소에 도면 부호(100, 200...)를 부여합니다.',
+  };
+
+  const runAI = (msg: string, curText: string, blockRef: { sid: SectionId; idx: number } | undefined) => {
     setTimeout(() => {
       let aiText: string;
-      if (cur) {
-        // 단락 선택 시: 수정안 제안
-        aiText = `${cur.replace(/이다\.$/, `이다. ${msg.slice(0, 20)} 관점에서 보완했습니다.`)}`;
+      let proposed: string | undefined;
+      if (curText) {
+        proposed = curText.replace(/이다\.$/, `이다. ${msg.slice(0, 20)} 관점에서 보완했습니다.`);
+        const secLabel = blockRef ? (EDITOR_SECTIONS.find(s => s.id === blockRef.sid)?.label ?? '') : '';
+        aiText = `${secLabel} 단락의 수정안을 생성했습니다.`;
       } else {
-        // 미선택 시: 일반 Q&A (특허 어시스턴트 맥락)
-        const replies: Record<string, string> = {
-          '청구항': '청구항은 특허 보호 범위를 정의합니다. 독립항은 핵심 구성요소를 포함하고, 종속항은 추가 특징을 기재합니다.',
-          '명세서': '특허 명세서는 발명의 기술분야, 배경기술, 해결과제, 발명의 효과, 도면 설명, 청구범위, 요약서로 구성됩니다.',
-          '효과': '발명의 효과는 기존 기술 대비 개선점을 구체적인 수치나 표현으로 기재하는 것이 좋습니다.',
-          '도면': '도면은 발명의 구성요소를 시각적으로 표현하며, 각 구성요소에 도면 부호(100, 200...)를 부여합니다.',
-        };
-        const matchKey = Object.keys(replies).find(k => msg.includes(k));
+        const matchKey = Object.keys(CHAT_REPLIES).find(k => msg.includes(k));
         aiText = matchKey
-          ? replies[matchKey]
-          : `"${msg.slice(0, 30)}"에 대해 답변드립니다. 특허 명세서 작성 시 이 부분은 발명의 기술적 특징을 명확히 표현하는 것이 중요합니다. 특정 단락을 선택하면 해당 내용을 직접 수정해드릴 수 있습니다.`;
+          ? CHAT_REPLIES[matchKey]
+          : `"${msg.slice(0, 30)}"에 대해 답변드립니다. 특정 단락을 선택하면 해당 내용을 직접 수정해드릴 수 있습니다.`;
       }
-      const aiMsg: ChatMsg = { role: 'ai', text: aiText, proposed: cur ? aiText : undefined };
-      void secLabel; // suppress unused warning
-      setChatMessages(prev => [...prev, aiMsg]);
+      setChatMessages(prev => [...prev, { id: ++msgIdRef.current, role: 'ai', text: aiText, proposed, blockRef }]);
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     }, 600);
+  };
+
+  const sendChat = (override?: string) => {
+    const msg = (override ?? chatInput).trim();
+    if (!msg) return;
+    if (!override) setChatInput('');
+    const cur = sel ? (blocks[sel.sid]?.[sel.idx] || '') : '';
+    const blockRef = sel ? { sid: sel.sid, idx: sel.idx } : undefined;
+    setChatMessages(prev => [...prev, { id: ++msgIdRef.current, role: 'user', text: msg }]);
+    runAI(msg, cur, blockRef);
+  };
+
+  // ── 다시 생성 ──────────────────────────────────────────────────────────
+  const regenerate = (msg: ChatMsg) => {
+    const idx = chatMessages.findIndex(m => m.id === msg.id);
+    let userQuery = '';
+    for (let i = idx - 1; i >= 0; i--) {
+      if (chatMessages[i].role === 'user') { userQuery = chatMessages[i].text; break; }
+    }
+    setChatMessages(prev => prev.filter(m => m.id !== msg.id));
+    const cur = msg.blockRef ? (blocks[msg.blockRef.sid]?.[msg.blockRef.idx] || '') : '';
+    runAI(userQuery || '다시 생성', cur, msg.blockRef);
   };
 
   // ── 표 삽입 ─────────────────────────────────────────────────────────────
@@ -580,23 +568,26 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
           {/* ── AI 어시스턴트 탭 — 채팅 레이아웃 (탭 본문과 분리) ── */}
           {panelTab === 'ai' && (
             <div className="flex-1 flex flex-col overflow-hidden">
-              {/* 선택된 블록 컨텍스트 */}
-              {sel && (
-                <div className="px-3 pt-2 pb-1.5 border-b border-zinc-100 shrink-0 bg-zinc-50">
-                  <p className="text-xs2 text-zinc-400 mb-1">
-                    {EDITOR_SECTIONS.find(s => s.id === sel.sid)?.label} · 블록 {sel.idx + 1}
+              {/* 선택된 블록 컨텍스트 (읽기 전용) */}
+              <div className="px-3 pt-2 pb-2 border-b border-zinc-100 shrink-0 bg-zinc-50">
+                {sel ? (
+                  <>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-xs2 font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                        {EDITOR_SECTIONS.find(s => s.id === sel.sid)?.short}
+                      </span>
+                      <span className="text-xs2 text-zinc-400">블록 {sel.idx + 1}</span>
+                    </div>
+                    <p className="text-xs2 text-zinc-600 leading-relaxed line-clamp-3 bg-white rounded border border-zinc-200 px-2.5 py-1.5">
+                      {selText || <span className="text-zinc-400 italic">빈 단락</span>}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xs2 text-zinc-400 text-center py-0.5">
+                    본문에서 단락을 선택하면 AI가 수정을 도와드립니다
                   </p>
-                  <div className="rounded border border-zinc-200 bg-white focus-within:border-blue-400 transition-all">
-                    <textarea
-                      className="w-full text-xs2 text-zinc-800 bg-transparent px-2.5 py-2 outline-none resize-none leading-relaxed max-h-28 overflow-y-auto"
-                      value={selText}
-                      rows={Math.min(4, Math.max(2, Math.ceil(selText.length / 50)))}
-                      placeholder="단락 내용을 직접 수정하세요..."
-                      onChange={e => updateBlock(sel.sid, sel.idx, e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* 채팅 메시지 영역 */}
               <div className="flex-1 overflow-y-auto scroll-thin px-3 py-2 space-y-3">
@@ -613,7 +604,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
                         sel ? '특허 문체로 바꿔줘' : '발명의 효과를 어떻게 써야 하나요?',
                         sel ? '구체적인 수치를 추가해줘' : '독립항과 종속항 차이는?',
                       ].map((q, i) => (
-                        <button key={i} onClick={() => { setChatInput(q); }}
+                        <button key={i} onClick={() => sendChat(q)}
                           className="w-full text-left text-xs2 text-zinc-500 px-2.5 py-1.5 rounded-lg border border-zinc-200 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50/50 transition-colors">
                           {q}
                         </button>
@@ -621,28 +612,46 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
                     </div>
                   </div>
                 )}
-                {chatMessages.map((m, i) => (
-                  <div key={i} className={clsx('flex gap-2', m.role === 'user' ? 'justify-end' : 'justify-start')}>
+                {chatMessages.map((m) => (
+                  <div key={m.id} className={clsx('flex gap-2', m.role === 'user' ? 'justify-end' : 'justify-start')}>
                     {m.role === 'ai' && (
                       <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center shrink-0 mt-0.5">
                         <span className="text-[9px] font-bold text-white">AI</span>
                       </div>
                     )}
-                    <div className={clsx(
-                      'rounded-xl px-3 py-2 text-xs2 leading-relaxed max-w-[85%]',
-                      m.role === 'user'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-zinc-100 text-zinc-800'
-                    )}>
-                      {m.text}
-                      {m.proposed && sel && (
-                        <button
-                          onClick={() => { updateBlock(sel.sid, sel.idx, m.proposed!); }}
-                          className="mt-2 block w-full py-1 text-xs2 font-semibold bg-white/20 hover:bg-white/30 rounded text-center transition-colors">
-                          ✓ 이 내용으로 적용
-                        </button>
-                      )}
-                    </div>
+                    {m.role === 'user' ? (
+                      <div className="rounded-xl px-3 py-2 text-xs2 leading-relaxed max-w-[85%] bg-blue-600 text-white">
+                        {m.text}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl text-xs2 leading-relaxed max-w-[85%] bg-zinc-100 text-zinc-800 overflow-hidden">
+                        <p className="px-3 pt-2.5 pb-1.5">{m.text}</p>
+                        {m.proposed && (
+                          <>
+                            <div className="mx-2.5 mb-2 rounded-lg bg-white border border-zinc-200 p-2.5">
+                              <p className="text-xs2 font-semibold text-zinc-400 mb-1">수정안</p>
+                              <p className="text-xs2 text-zinc-800 leading-relaxed whitespace-pre-wrap">{m.proposed}</p>
+                            </div>
+                            <div className="flex gap-1.5 px-2.5 pb-2.5">
+                              <button
+                                onClick={() => {
+                                  const ref = m.blockRef;
+                                  if (ref) updateBlock(ref.sid, ref.idx, m.proposed!);
+                                  else if (sel) updateBlock(sel.sid, sel.idx, m.proposed!);
+                                }}
+                                className="flex-1 py-1.5 text-xs2 font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                ✓ 적용
+                              </button>
+                              <button
+                                onClick={() => regenerate(m)}
+                                className="px-3 py-1.5 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors">
+                                ↺ 다시 생성
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
                 <div ref={chatEndRef} />
@@ -680,118 +689,6 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
 
           {/* 탭 본문 (도면/참고문헌) */}
           <div className={clsx('flex-1 overflow-y-auto scroll-thin', panelTab === 'ai' && 'hidden')}>
-
-            {/* ── AI 어시스턴트 탭 (placeholder) ── */}
-            {panelTab === 'ai' && (
-              <div className="p-3">
-                {!sel ? (
-                  /* 미선택 */
-                  <div className="text-center py-10">
-                    <div className="w-12 h-12 rounded-xl bg-zinc-100 flex items-center justify-center mx-auto mb-3">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="24" height="24" className="text-zinc-400">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                      </svg>
-                    </div>
-                    <p className="text-sm2 text-zinc-600 font-medium mb-1">단락을 선택하세요</p>
-                    <p className="text-xs2 text-zinc-400 leading-relaxed">
-                      본문의 단락을 클릭하면<br />AI로 해당 내용을 수정할 수 있습니다
-                    </p>
-                  </div>
-                ) : aiMode === 'view' ? (
-                  /* view 모드: 현재 내용 + AI로 수정하기 */
-                  <>
-                    <p className="text-xs2 font-semibold text-zinc-500 mb-2">
-                      {EDITOR_SECTIONS.find(s => s.id === sel.sid)?.label} · 블록 {sel.idx + 1}
-                    </p>
-                    <div className="rounded-lg border-2 border-ck-border bg-ck-bg focus-within:border-blue-400 transition-all">
-                      <textarea
-                        className="w-full text-xs2 text-zinc-800 bg-transparent px-3 py-3 outline-none resize-none leading-relaxed rounded-t-lg overflow-hidden"
-                        value={selText}
-                        rows={Math.max(4, Math.ceil(selText.length / 40))}
-                        placeholder="단락 내용을 직접 수정하세요..."
-                        onChange={e => { updateBlock(sel.sid, sel.idx, e.target.value); }}
-                        ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
-                      />
-                      <div className="flex justify-end px-3 pb-2 pt-1 border-t border-zinc-100">
-                        <button onClick={() => setAiMode('prompt')}
-                          className="flex items-center gap-1 px-2 py-1 rounded text-xs2 text-violet-600 hover:bg-violet-50 transition-colors">
-                          <AiIcon /> AI로 수정하기
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                ) : aiMode === 'prompt' ? (
-                  /* prompt 모드 */
-                  <>
-                    <div className="rounded-lg border p-3 bg-zinc-50 mb-2">
-                      <p className="text-xs2 font-medium text-zinc-400 mb-1">현재 내용</p>
-                      <p className="text-xs2 text-zinc-700 leading-relaxed line-clamp-4">{selText}</p>
-                    </div>
-                    <div className="rounded-lg border border-violet-300 bg-violet-50 p-3">
-                      <p className="text-xs2 text-violet-700 font-semibold mb-2 flex items-center gap-1.5">
-                        <AiIcon /> 어떻게 수정할까요?
-                      </p>
-                      <textarea autoFocus
-                        className="w-full text-xs2 bg-white border border-violet-200 rounded px-2 py-1.5 outline-none resize-none"
-                        placeholder="예: 더 구체적으로 / 특허 문체로 / 간결하게"
-                        value={promptVal} rows={3}
-                        onChange={e => setPromptVal(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitPrompt(); } }}
-                      />
-                      <div className="flex gap-1.5 mt-2 justify-end">
-                        <button onClick={() => setAiMode('view')}
-                          className="btn-outline btn-xs text-xs2">취소</button>
-                        <button onClick={submitPrompt} disabled={!promptVal.trim()}
-                          className="px-3 py-1 bg-violet-600 text-white rounded text-xs2 font-semibold hover:bg-violet-700 disabled:opacity-40">
-                          수정 생성
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  /* diff 모드 */
-                  <div className="space-y-2">
-                    <p className="text-xs2 font-semibold text-zinc-500">버전을 선택하세요</p>
-                    {/* 현재 버전 */}
-                    <div onClick={() => setDiffSel('current')}
-                      className={clsx('rounded-lg border-2 p-2.5 cursor-pointer transition-all',
-                        diffSel === 'current' ? 'border-zinc-400 bg-zinc-50' : 'border-zinc-200 opacity-60 hover:opacity-80')}>
-                      <p className="text-xs2 font-medium text-zinc-400 mb-1">현재 버전 유지</p>
-                      <p className="text-xs2 text-zinc-600 leading-relaxed line-clamp-3">{selText}</p>
-                    </div>
-                    {/* 변경 버전 */}
-                    <div
-                      onClick={() => setDiffSel('proposed')}
-                      className={clsx('rounded-lg border-2 transition-all',
-                        diffSel === 'proposed' ? 'border-blue-600 bg-blue-50 shadow-sm' : 'border-blue-200 hover:border-blue-400')}>
-                      <div className="flex items-center gap-1.5 px-3 pt-2.5 mb-1">
-                        <p className="text-xs2 font-bold text-blue-700">변경 버전 채택</p>
-                        <span className="ml-auto text-xs2 px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 font-semibold">수정됨</span>
-                      </div>
-                      <textarea
-                        className={clsx('w-full text-xs2 bg-transparent px-3 pb-2 outline-none resize-none leading-relaxed',
-                          diffSel === 'proposed' ? 'text-zinc-800' : 'text-zinc-600')}
-                        rows={Math.max(3, Math.ceil(proposed.length / 45))}
-                        value={proposed}
-                        onClick={e => { e.stopPropagation(); setDiffSel('proposed'); }}
-                        onChange={e => setProposed(e.target.value)}
-                      />
-                      <div className="px-3 pb-2 pt-1 border-t border-blue-100">
-                        <button onClick={() => setAiMode('prompt')}
-                          className="flex items-center gap-1 text-xs2 text-violet-600 hover:text-violet-800">
-                          <AiIcon /> AI로 추가 수정
-                        </button>
-                      </div>
-                    </div>
-                    <button onClick={applyDiff}
-                      className="w-full py-2 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800">
-                      선택 완료 →
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* ── 도면 탭 ── */}
             {panelTab === 'drawings' && (
