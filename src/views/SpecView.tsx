@@ -78,6 +78,18 @@ export function SpecView() {
   const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
   const [specFocusCtx, setSpecFocusCtx] = useState<FocusCtx | null>(null);
   const guidePanelInputRef = useRef<HTMLInputElement>(null);
+  const [descMode, setDescMode] = useState<string>('view');
+  const [descSubInfo, setDescSubInfo] = useState<{
+    subStep: number; currentLabel: string; allDone: boolean; doConfirm: (() => void) | null;
+  }>({ subStep: 0, currentLabel: '기술분야', allDone: false, doConfirm: null });
+  const [confirmedComponents, setConfirmedComponents] = useState<InventionComponent[]>([
+    { number: '100', name: '데이터 수집부' },
+    { number: '200', name: '전처리부' },
+    { number: '300', name: '특징 추출부' },
+    { number: '400', name: '인식부' },
+    { number: '500', name: '출력부' },
+  ]);
+  const descPromptTrigger = 0;
   const [previewOpen, setPreviewOpen] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Set<StepId>>(new Set());
   const [phase, setPhase] = useState<'upload' | 'direct' | 'flow' | 'done'>(savedSpec?.phase ?? 'upload');
@@ -394,6 +406,7 @@ export function SpecView() {
 
       {/* Body */}
       <div className="flex-1 flex overflow-hidden min-h-0 relative">
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         <div ref={flowRef} className="flex-1 overflow-y-auto scroll-thin bg-ck-bg">
           <div className="max-w-3xl mx-auto py-8 px-4 space-y-3">
 
@@ -484,8 +497,7 @@ export function SpecView() {
                       <AiMsg text={
                         isSpecialStep(s.id) ? (
                           <><strong>{STEP_LABEL[s.id]}</strong><br />
-                          업로드 내용을 기반으로 {STEP_LABEL[s.id]} 후보를 생성했습니다.{' '}
-                          <span className="text-blue-700 font-semibold">오른쪽 패널</span>에서 확인하세요.</>
+                          업로드 내용을 기반으로 {STEP_LABEL[s.id]} 항목을 준비했습니다. 아래에서 확인하고 항목을 채우세요.</>
                         ) : (
                           <><strong>{STEP_LABEL[s.id]}</strong><br />
                           업로드 내용을 기반으로 {STEP_LABEL[s.id]} 후보를 생성했습니다. 아래에서 선택하거나 직접 입력하세요.</>
@@ -498,10 +510,58 @@ export function SpecView() {
                           cands={(s.id === 'title' ? (titleCandidates.length > 0 ? titleCandidates : undefined) : undefined) || GUIDE_CANDS[s.id] || []}
                           gSel={gSel}
                           setGSel={setGSel}
-                          onConfirm={confirm}
                           setFocusCtx={setSpecFocusCtx}
                           guidePanelInputRef={guidePanelInputRef}
                         />
+                      )}
+                      {/* 현재 단계 특수 패널 인라인 */}
+                      {s.id === guideStep && !isDone && isSpecialStep(s.id) && (
+                        <div className="mt-3">
+                          {s.id === 'description' && (
+                            <DescriptionPanel
+                              done={false}
+                              onConfirm={() => confirm('description')}
+                              onUpdate={v => setGSel(p => ({ ...p, description: v }))}
+                              onModeChange={setDescMode}
+                              promptTrigger={descPromptTrigger}
+                              onSubInfoChange={setDescSubInfo}
+                              onFocusContext={setSpecFocusCtx}
+                            />
+                          )}
+                          {s.id === 'components' && (
+                            <ComponentsPanel
+                              done={false}
+                              onConfirm={() => confirm('components')}
+                              onUpdate={v => setGSel(p => ({ ...p, components: v }))}
+                              onComponentsChange={setConfirmedComponents}
+                              initialItems={aiComponents}
+                            />
+                          )}
+                          {s.id === 'drawings' && (
+                            <DrawingsPanel
+                              done={false}
+                              onConfirm={() => confirm('drawings')}
+                              onUpdate={v => setGSel(p => ({ ...p, drawings: v }))}
+                              inventionComponents={confirmedComponents}
+                            />
+                          )}
+                          {s.id === 'claims' && (
+                            <ClaimsPanel
+                              done={false}
+                              onConfirm={() => confirm('claims')}
+                              onUpdate={v => setGSel(p => ({ ...p, claims: v }))}
+                              onFocusContext={setSpecFocusCtx}
+                            />
+                          )}
+                          {s.id === 'abstract' && (
+                            <AbstractPanel
+                              done={false}
+                              onConfirm={() => confirm('abstract')}
+                              onUpdate={v => setGSel(p => ({ ...p, abstract: v }))}
+                              onFocusContext={setSpecFocusCtx}
+                            />
+                          )}
+                        </div>
                       )}
                       {isDone && (() => {
                         const isExpanded = expandedCards.has(s.id);
@@ -613,6 +673,40 @@ export function SpecView() {
             )}
           </div>
         </div>
+        {/* 네비게이션 바 — 본문 하단 */}
+        {(phase === 'flow' || phase === 'done') && (
+          <div className="shrink-0 border-t border-ck-border bg-white w-full">
+            <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between">
+              <button
+                onClick={() => {
+                  const idx = STEPS.findIndex(s => s.id === guideStep);
+                  if (idx > 1) { setGuideStep(STEPS[idx - 1].id); if (phase === 'done') setPhase('flow'); }
+                }}
+                disabled={STEPS.findIndex(s => s.id === guideStep) <= 1}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 disabled:opacity-40 transition-colors"
+              >← 이전</button>
+              <div className="flex items-center gap-2">
+                {guideStep === 'drawings' && !confirmed['drawings'] && (
+                  <button onClick={() => confirm('drawings')} className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors">건너뛰기</button>
+                )}
+                {doneCount >= 5 ? (
+                  <button onClick={() => handleSetMainView('editor')} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-blue-700 rounded-xl hover:bg-blue-800 transition-colors">명세서 AI 생성</button>
+                ) : guideStep === 'description' ? (
+                  descSubInfo.allDone ? (
+                    <button onClick={() => confirm('description')} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-blue-700 rounded-xl hover:bg-blue-800 transition-colors">다음 →</button>
+                  ) : (
+                    <button onClick={() => descSubInfo.doConfirm?.()} disabled={descMode === 'prompt' || descMode === 'diff'} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-blue-700 rounded-xl hover:bg-blue-800 disabled:opacity-40 transition-colors">다음 →</button>
+                  )
+                ) : !isSpecialStep(guideStep) ? (
+                  <button onClick={() => { const cur = gSel[guideStep]; if (cur?.trim()) confirm(guideStep); }} disabled={!gSel[guideStep]?.trim()} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-blue-700 rounded-xl hover:bg-blue-800 disabled:opacity-40 transition-colors">다음 →</button>
+                ) : (
+                  <button onClick={() => confirm(guideStep)} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-blue-700 rounded-xl hover:bg-blue-800 transition-colors">다음 →</button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        </div>
 
         {/* 모바일 배경 오버레이 */}
         {mobileGuideOpen && (
@@ -626,25 +720,7 @@ export function SpecView() {
           <GuidePanel
             key={`guide-panel-${guideStep}`}
             step={guideStep}
-            gSel={gSel}
-            setGSel={setGSel}
-            onConfirm={confirm}
             confirmed={confirmed}
-            onPrev={() => {
-              const idx = STEPS.findIndex(s => s.id === guideStep);
-              if (idx > 1) {
-                setGuideStep(STEPS[idx - 1].id);
-                if (phase === 'done') setPhase('flow');
-              }
-            }}
-            hasPrev={STEPS.findIndex(s => s.id === guideStep) > 1}
-            allDone={doneCount >= 5}
-            onGenerateSpec={() => handleSetMainView('editor')}
-            customCandidates={{
-              title:    titleCandidates.length > 0 ? titleCandidates : undefined,
-              abstract: abstractCandidates.length > 0 ? abstractCandidates : undefined,
-            }}
-            aiComponents={aiComponents.length > 0 ? aiComponents : undefined}
             mobileOpen={mobileGuideOpen}
             onMobileClose={() => setMobileGuideOpen(false)}
             focusCtx={specFocusCtx}
@@ -698,13 +774,12 @@ type GuideChatMsg = {
 
 // ── 본문 인라인 후보 카드 ─────────────────────────────────────────
 function InlineCandidateCards({
-  stepId, cands, gSel, setGSel, onConfirm, setFocusCtx, guidePanelInputRef,
+  stepId, cands, gSel, setGSel, setFocusCtx, guidePanelInputRef,
 }: {
   stepId: StepId;
   cands: string[];
   gSel: Partial<Record<StepId, string>>;
   setGSel: React.Dispatch<React.SetStateAction<Partial<Record<StepId, string>>>>;
-  onConfirm: (id: StepId) => void;
   setFocusCtx: (ctx: FocusCtx | null) => void;
   guidePanelInputRef: React.RefObject<HTMLInputElement | null>;
 }) {
@@ -812,30 +887,13 @@ function InlineCandidateCards({
         />
       </div>
 
-      {/* 확정 버튼 */}
-      <button
-        onClick={() => { if (curSel.trim()) { setGSel(p => ({ ...p, [stepId]: curSel })); onConfirm(stepId); } }}
-        disabled={!curSel.trim()}
-        className="w-full py-2.5 bg-blue-700 text-white rounded-xl text-sm font-semibold hover:bg-blue-800 disabled:opacity-40 transition-colors"
-      >
-        다음 →
-      </button>
     </div>
   );
 }
 
-function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev, allDone, onGenerateSpec, customCandidates, aiComponents, mobileOpen, onMobileClose, focusCtx, setFocusCtx, chatInputRef }: {
+function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setFocusCtx, chatInputRef }: {
   step: StepId;
-  gSel: Partial<Record<StepId, string>>;
-  setGSel: React.Dispatch<React.SetStateAction<Partial<Record<StepId, string>>>>;
-  onConfirm: (id: StepId) => void;
   confirmed: Partial<Record<StepId, string>>;
-  onPrev: () => void;
-  hasPrev: boolean;
-  allDone?: boolean;
-  onGenerateSpec?: () => void;
-  customCandidates?: Partial<Record<StepId, string[]>>;
-  aiComponents?: { id: number; text: string; sel: boolean; num: string; depth: number }[];
   mobileOpen?: boolean;
   onMobileClose?: () => void;
   focusCtx: FocusCtx | null;
@@ -844,9 +902,6 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const isDone = step in confirmed;
-  const isSpecial = step === 'description' || step === 'components' || step === 'drawings' || step === 'claims' || step === 'abstract';
-  const cands = customCandidates?.[step] || GUIDE_CANDS[step] || [];
-  const curSel = gSel[step] || cands[0] || '';
   // 채팅 상태
   const [guideChatMsgs, setGuideChatMsgs] = useState<GuideChatMsg[]>([]);
   const [guideChatInput, setGuideChatInput] = useState('');
@@ -932,30 +987,6 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
     setGuideChatMsgs(prev => prev.filter(m => m.id !== msg.id));
     setTimeout(() => runGuideModification(instruction, msg.sourceFocusCtx!, instruction, msg.selectedIntent), 400);
   };
-  // description 패널 내부 모드 추적 (view/edit/prompt/diff)
-  const [descMode, setDescMode] = useState<string>('view');
-  // description 패널의 prompt 재입력 요청 콜백
-  const [descPromptTrigger] = useState(0);
-  // description 패널의 현재 섹션 상태 (GuidePanel 하단 버튼 제어용)
-  const [descSubInfo, setDescSubInfo] = useState<{
-    subStep: number; currentLabel: string; allDone: boolean; doConfirm: (() => void) | null;
-  }>({ subStep: 0, currentLabel: '기술분야', allDone: false, doConfirm: null });
-
-  // 구성요소 → 도면 부호 공유 (ComponentsPanel → DrawingsPanel)
-  const [confirmedComponents, setConfirmedComponents] = useState<InventionComponent[]>([
-    { number: '100', name: '데이터 수집부' },
-    { number: '200', name: '전처리부' },
-    { number: '300', name: '특징 추출부' },
-    { number: '400', name: '인식부' },
-    { number: '500', name: '출력부' },
-  ]);
-
-
-  const STEP_DESCS: Partial<Record<StepId, string>> = {
-    title: '업로드한 문서를 분석하여 3개의 명칭 후보를 생성했습니다. 선택하거나 직접 수정하세요.',
-    description: '기술분야→배경기술→해결하려는 과제→발명의 효과 순서로 각 항목을 확인하고 확정하세요.',
-    abstract: '요약서를 자동 생성했습니다. 내용을 확인하고 수정하세요.',
-  };
 
   // 리사이즈 핸들 — 원본 artifact-resize-handle 동일
   const startResize = (e: React.MouseEvent) => {
@@ -982,33 +1013,12 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
     document.addEventListener('mouseup', onUp);
   };
 
-  const handleConfirm = () => {
-    // 특수 단계: gSel에 이미 onUpdate로 세팅된 실제 내용이 있으면 그것을 사용
-    if (isSpecial) {
-      // gSel[step]이 있으면 그 값을 사용, 없으면 단계별 기본 요약 문자열 사용
-      const fallbacks: Partial<Record<StepId, string>> = {
-        components: '구성요소 확정',
-        drawings: '도면 확정',
-        claims: '청구항 확정',
-        abstract: '요약서 확정',
-      };
-      const specialVal = gSel[step] || fallbacks[step] || '확정';
-      setGSel(p => ({ ...p, [step]: specialVal }));
-      onConfirm(step);
-      return;
-    }
-    if (curSel.trim()) {
-      setGSel(p => ({ ...p, [step]: curSel }));
-      onConfirm(step);
-    }
-  };
-
   return (
     <aside ref={panelRef} className={clsx(
       'bg-white flex-col overflow-hidden',
       // 데스크탑: 인라인 우측 사이드 패널
       'md:flex md:relative md:shrink-0 md:border-l md:border-ck-border',
-      isSpecial ? 'md:w-[380px] md:min-w-[320px] md:max-w-[700px]' : 'md:w-[300px] md:min-w-[260px] md:max-w-[500px]',
+      'md:w-[320px] md:min-w-[260px] md:max-w-[480px]',
       // 모바일: 하단 고정 시트
       'max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-50',
       'max-md:h-[72vh] max-md:rounded-t-2xl max-md:shadow-2xl',
@@ -1039,9 +1049,7 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
           <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs2 font-bold shrink-0"
             style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
           <span className="text-base2 font-bold text-gray-800">
-            {step === 'description' && descSubInfo?.currentLabel
-              ? descSubInfo.currentLabel
-              : STEP_LABEL[step] || step}
+            {STEP_LABEL[step] || step}
           </span>
           {isDone && (
             <span className="ml-auto inline-flex items-center gap-1 text-xs2 px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
@@ -1049,26 +1057,16 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
             </span>
           )}
         </div>
-        <p className="text-sm2 text-gray-500 leading-snug">
-          {STEP_DESCS[step] || `${STEP_LABEL[step]} 후보를 생성했습니다. 선택하거나 직접 수정하세요.`}
-        </p>
+        <p className="text-sm2 text-gray-500 leading-snug">카드를 선택하고 AI에게 수정을 요청하거나 질문하세요.</p>
       </div>
 
-      {/* 단계별 특수 패널 */}
-      {step === 'description' && <DescriptionPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} onModeChange={setDescMode} promptTrigger={descPromptTrigger} onSubInfoChange={setDescSubInfo} onFocusContext={setFocusCtx} />}
-      {step === 'components' && <ComponentsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} onComponentsChange={setConfirmedComponents} initialItems={aiComponents} />}
-      {step === 'drawings' && <DrawingsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} inventionComponents={confirmedComponents} />}
-      {step === 'claims' && <ClaimsPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} onFocusContext={setFocusCtx} />}
-      {step === 'abstract' && <AbstractPanel done={isDone} onConfirm={handleConfirm} onUpdate={v => setGSel(p => ({ ...p, [step]: v }))} onFocusContext={setFocusCtx} />}
-
       {/* 선택된 카드 미러 */}
-      {focusCtx && !isSpecial && (
+      {focusCtx ? (
         <div className="shrink-0 mx-3 mt-2 mb-1 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-xs2 text-blue-500 font-semibold mb-0.5">선택됨</p>
           <p className="text-sm2 text-gray-800 font-semibold leading-snug line-clamp-2">{focusCtx.text}</p>
         </div>
-      )}
-      {!isSpecial && !focusCtx && (
+      ) : (
         <div className="shrink-0 mx-3 mt-2 mb-1 px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg">
           <p className="text-xs2 text-zinc-400">왼쪽 본문에서 카드를 선택하면 AI에게 수정을 요청할 수 있습니다.</p>
         </div>
@@ -1076,7 +1074,7 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
 
 
       {/* 채팅 영역 — flex-1로 남은 공간 차지 */}
-      <div className={clsx('border-t border-ck-border ml-1.5 bg-white flex flex-col overflow-hidden', isSpecial ? 'shrink-0' : 'flex-1')}>
+      <div className="flex-1 border-t border-ck-border ml-1.5 bg-white flex flex-col overflow-hidden">
         {/* 메시지 이력 */}
         {guideChatMsgs.length > 0 && (
           <div className="flex-1 overflow-y-auto scroll-thin px-3 py-2 space-y-2 bg-zinc-50">
@@ -1179,77 +1177,6 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
         </div>
       </div>
 
-      {/* 하단 버튼 바 */}
-      <div className="flex gap-2 px-3 py-2.5 border-t border-ck-border bg-ck-bg shrink-0 ml-1.5">
-        <button
-          onClick={onPrev}
-          disabled={!hasPrev}
-          className="px-3 py-1.5 border border-gray-300 rounded text-xs2 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
-        >
-          ← 이전
-        </button>
-        {/* 5단계 도면: 도면 없이 진행 버튼 */}
-        {step === 'drawings' && !isDone && (
-          <button onClick={handleConfirm}
-            className="px-2.5 py-1.5 border border-gray-300 rounded text-xs2 text-gray-500 hover:bg-gray-50 whitespace-nowrap"
-            title="도면 없이 다음 단계로 진행">
-            건너뛰기
-          </button>
-        )}
-
-        {/* 비특수 단계: 다음 버튼은 InlineCandidateCards 내부에 있으므로 GuidePanel에서 숨김 */}
-        {/* description diff 모드에서 확인 버튼 숨김 */}
-        {!isSpecial && !isDone ? null : !(step === 'description' && descMode === 'diff') && (
-          !isDone ? (
-            step === 'description' ? (
-              descSubInfo.allDone ? (
-                <button onClick={handleConfirm}
-                  className="flex-1 py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800">
-                  다음 →
-                </button>
-              ) : (
-                <button
-                  onClick={() => descSubInfo.doConfirm?.()}
-                  disabled={descMode === 'prompt' || descMode === 'diff'}
-                  className="flex-1 py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  다음 →
-                </button>
-              )
-            ) : (
-              <button
-                onClick={handleConfirm}
-                disabled={!isSpecial && !curSel.trim()}
-                className="flex-1 py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                다음 →
-              </button>
-            )
-          ) : (
-            allDone && onGenerateSpec ? (
-              <button onClick={onGenerateSpec}
-                className="flex-1 py-1.5 bg-blue-600 text-white rounded text-xs2 font-semibold hover:bg-blue-700 active:scale-[0.98] transition-all flex items-center justify-center gap-1">
-                <Icon name="star" size={10} /> 명세서 AI 생성
-              </button>
-            ) : step === 'description' && !descSubInfo.allDone ? (
-              // description 재방문: 서브스텝이 완료 안 됐으면 서브스텝 플로우로
-              <button
-                onClick={() => descSubInfo.doConfirm?.()}
-                disabled={descMode === 'prompt' || descMode === 'diff'}
-                className="flex-1 py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                다음 →
-              </button>
-            ) : (
-              // 이미 확정된 단계 재방문 시 — 다음 단계로 이동
-              <button onClick={handleConfirm}
-                className="flex-1 py-1.5 bg-blue-700 text-white rounded text-xs2 font-semibold hover:bg-blue-800">
-                다음 →
-              </button>
-            )
-          )
-        )}
-      </div>
     </aside>
   );
 }
