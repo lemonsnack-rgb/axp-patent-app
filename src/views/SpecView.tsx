@@ -361,8 +361,7 @@ export function SpecView() {
                   <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 text-gray-400">
                     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>
                   </svg>
-                  <p className="text-md2 text-gray-600">PDF 파일을 클릭하여 업로드</p>
-                  <p className="text-sm2 text-gray-400 mt-1">직무발명서 PDF</p>
+                  <p className="text-md2 text-gray-600">직무발명서 PDF를 업로드 하세요.</p>
                 </div>
               </div>
             )}
