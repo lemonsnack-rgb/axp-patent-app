@@ -116,7 +116,7 @@ export function NewTaskView() {
                     <span className={`text-xs2 px-1.5 py-0.5 rounded-full font-medium bg-${meta.color}-50 text-${meta.color}-700`}>{meta.label}</span>
                   </div>
                   <p className="text-sm2 font-semibold text-zinc-800 truncate">{t.name}</p>
-                  <p className="text-xs2 text-zinc-400 mt-0.5">{new Date(t.updatedAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} 수정</p>
+                  <p className="text-xs2 text-zinc-400 mt-0.5">{t.updatedAt && isFinite(t.updatedAt) ? new Date(t.updatedAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }) + ' 수정' : '날짜 없음'}</p>
                 </button>
               );
             })}

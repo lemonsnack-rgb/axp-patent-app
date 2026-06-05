@@ -345,7 +345,9 @@ function TaskRow({ t, active, onSelect, onToggleFav, menuOpen, onMenuToggle, onR
 }
 
 function relTime(ts: number): string {
+  if (!ts || !isFinite(ts)) return '날짜 없음';
   const diff = Date.now() - ts;
+  if (diff < 0) return '방금';
   const m = Math.floor(diff / 60000);
   if (m < 1) return '방금';
   if (m < 60) return `${m}분 전`;

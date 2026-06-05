@@ -1100,15 +1100,14 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
             <div ref={guideChatEndRef} />
           </div>
         )}
-        {/* 포커스 컨텍스트 표시 */}
-        <div className="px-3 pt-1 pb-0 text-xs2">
-          {focusCtx
-            ? <span className="text-zinc-400">편집 중: <span className="text-blue-600 font-semibold">{focusCtx.label}</span></span>
-            : <span className="text-zinc-300">텍스트를 클릭하면 AI가 수정을 도와드립니다</span>
-          }
-        </div>
+        {/* 포커스 컨텍스트 표시 — 활성 필드가 있을 때만 */}
+        {focusCtx && (
+          <div className="shrink-0 px-3 pt-1 pb-0 text-xs2">
+            <span className="text-zinc-400">편집 중: <span className="text-blue-600 font-semibold">{focusCtx.label}</span></span>
+          </div>
+        )}
         {/* 입력창 — 항상 표시 */}
-        <div className="flex gap-2 items-center px-3 py-2">
+        <div className="shrink-0 flex gap-2 items-center px-3 py-2">
           <input
             type="text"
             className="flex-1 text-xs2 border border-zinc-300 rounded-xl px-3 py-1.5 outline-none focus:border-blue-400 transition-colors"
@@ -1452,11 +1451,9 @@ function DrawingsPanel({ done, onUpdate, inventionComponents }: {
   const [newTabNotice, setNewTabNotice] = useState(false);
 
   const handleSave = (drawingId: string, updates: Partial<typeof drawings[0]>) => {
-    setDrawings(prev => {
-      const next = prev.map(d => d.id === drawingId ? { ...d, ...updates } : d);
-      onUpdate(next.filter(d => d.stage === 'done').map(d => `기호${d.symbol} ${d.name}: ${d.description}`).join('\n\n'));
-      return next;
-    });
+    const next = drawings.map(d => d.id === drawingId ? { ...d, ...updates } : d);
+    setDrawings(next);
+    onUpdate(next.filter(d => d.stage === 'done').map(d => `기호${d.symbol} ${d.name}: ${d.description}`).join('\n\n'));
   };
 
   // 편집기 탭 결과 수신 (데스크탑 새 탭 편집 후 반영)
@@ -2236,7 +2233,7 @@ function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChan
       {allDone && (
         <div className="px-3 py-2 border-t border-ck-border bg-green-50 shrink-0 ml-1.5">
           <div className="flex items-center gap-1.5 text-xs2 text-green-700 font-medium">
-            <Icon name="check" size={11} /> 4개 섹션 모두 확정됨 — 하단 버튼으로 다음 단계 진행
+            <Icon name="check" size={11} /> 5개 섹션 모두 확정됨 — 하단 버튼으로 다음 단계 진행
           </div>
         </div>
       )}
