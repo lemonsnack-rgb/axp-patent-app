@@ -23,11 +23,17 @@
 
 @layer utilities {
   /* 스크롤바 폭 통일 */
-  .scroll-thin { scrollbar-width: thin; scrollbar-color: #d1d5db transparent; }
+  .scroll-thin { scrollbar-width: thin; scrollbar-color: #d1d5db transparent; -webkit-overflow-scrolling: touch; }
   .scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
   .scroll-thin::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
   .scroll-thin::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
   .scroll-thin::-webkit-scrollbar-track { background: transparent; }
+
+  /* 터치 디바이스 최소 터치 타깃 크기 (44×44px 권장) */
+  @media (pointer: coarse) {
+    .btn-sm, .btn-xs { min-height: 36px; }
+    .btn-primary, .btn-outline, .btn-ghost { min-height: 40px; }
+  }
 }
 
 @layer components {

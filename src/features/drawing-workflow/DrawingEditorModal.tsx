@@ -458,11 +458,14 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                 </div>
                 {/* 하단 버튼 */}
                 <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-t border-ck-border bg-white shrink-0">
-                  <button
-                    className="btn-outline btn-sm"
-                    onClick={() => setCropBox({ x1: 15, y1: 15, x2: 85, y2: 85 })}>
-                    영역 초기화
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button className="btn-outline btn-sm" onClick={onClose}>취소</button>
+                    <button
+                      className="btn-outline btn-sm"
+                      onClick={() => setCropBox({ x1: 15, y1: 15, x2: 85, y2: 85 })}>
+                      영역 초기화
+                    </button>
+                  </div>
                   <button className="btn-primary btn-sm flex items-center gap-1.5" onClick={startConvert}>
                     <Icon name="check" size={13} /> 영역 확인 완료 — 변환 시작
                   </button>

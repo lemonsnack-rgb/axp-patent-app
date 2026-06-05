@@ -59,14 +59,14 @@ export function TopBar() {
           href={HELP_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="btn-ghost"
+          className="btn-ghost hidden md:inline-flex"
           title="도움말 (새 탭에서 열기)"
         ><Icon name="help" /></a>
         <button className="btn-ghost relative" title="알림" aria-label="알림">
           <Icon name="bell" />
           <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full" aria-hidden="true" />
         </button>
-        <button className="btn-ghost text-sm2 px-2" title="언어 선택" aria-label="언어 선택 (현재: 한국어)">KR</button>
+        <button className="btn-ghost text-sm2 px-2 hidden md:inline-flex" title="언어 선택" aria-label="언어 선택 (현재: 한국어)">KR</button>
       </div>
     </header>
   );

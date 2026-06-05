@@ -30,11 +30,12 @@ export function isMobile(): boolean {
   return window.innerWidth < 768 || 'ontouchstart' in window;
 }
 
-/** 편집기 탭을 새 탭으로 열고 세션 데이터를 저장 */
-export function openEditorTab(session: EditorSession): void {
+/** 편집기 탭을 새 탭으로 열고 세션 데이터를 저장. 팝업 차단 시 false 반환 */
+export function openEditorTab(session: EditorSession): boolean {
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
   const base = window.location.href.split('#')[0];
-  window.open(`${base}#drawing-editor`, '_blank');
+  const newWin = window.open(`${base}#drawing-editor`, '_blank');
+  return newWin !== null;
 }
 
 /** 현재 탭이 편집기 탭인지 확인 */

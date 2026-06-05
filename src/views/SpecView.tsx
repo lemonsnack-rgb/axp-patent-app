@@ -16,7 +16,8 @@ import {
   generateTitleCandidates, generateAbstractCandidates,
   generateComponentCandidates,
 } from '../features/spec/mockAiService';
-import type { SpecAnalysisResult } from '../features/spec/types';
+import type { SpecAnalysisResult, SpecAnalysisState } from '../features/spec/types';
+import { loadSpecState, saveSpecState } from '../features/spec/specStore';
 import { analyzePromptClarity, generateIntentOptions, generateMockModification } from '../features/ai/clarityAnalyzer';
 
 type StepId = 'upload' | 'title' | 'description' | 'components' | 'drawings' | 'claims' | 'abstract';
@@ -67,45 +68,61 @@ const GUIDE_CANDS: Record<string, string[]> = {
 };
 
 export function SpecView() {
-  const { tasks, activeTaskId } = useStore();
+  const { tasks, activeTaskId, taskUpdate } = useStore();
   const task = activeTaskId ? tasks.find(t => t.id === activeTaskId) : null;
+  const savedSpec = task?.id ? loadSpecState(task.id) : null;
 
-  // mainView를 sessionStorage에 persist — 사이드바 재클릭 시 에디터 상태 유지
-  const [mainView, setMainView] = useState<'analysis' | 'editor'>(() => {
-    if (task?.id) {
-      const saved = sessionStorage.getItem(`axp_mainview_${task.id}`);
-      if (saved === 'editor') return 'editor';
-    }
-    return 'analysis';
-  });
-  const handleSetMainView = (v: 'analysis' | 'editor') => {
-    setMainView(v);
-    if (task?.id) sessionStorage.setItem(`axp_mainview_${task.id}`, v);
-  };
+  const [mainView, setMainView] = useState<'analysis' | 'editor'>(savedSpec?.mainView ?? 'analysis');
+  const handleSetMainView = (v: 'analysis' | 'editor') => setMainView(v);
   const [guideOpen, setGuideOpen] = useState(true);
+  const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [expandedCards, setExpandedCards] = useState<Set<StepId>>(new Set()); // U5: 확정 카드 접힘
-  const [phase, setPhase] = useState<'upload' | 'direct' | 'flow' | 'done'>('upload');
-  const [curStep, setCurStep] = useState<StepId>('upload');
-  const [confirmed, setConfirmed] = useState<Partial<Record<StepId, string>>>({});
-  const [guideStep, setGuideStep] = useState<StepId>('title');
-  const [gSel, setGSel] = useState<Partial<Record<StepId, string>>>({});
+  const [expandedCards, setExpandedCards] = useState<Set<StepId>>(new Set());
+  const [phase, setPhase] = useState<'upload' | 'direct' | 'flow' | 'done'>(savedSpec?.phase ?? 'upload');
+  const [curStep, setCurStep] = useState<StepId>((savedSpec?.curStep as StepId) ?? 'upload');
+  const [confirmed, setConfirmed] = useState<Partial<Record<StepId, string>>>((savedSpec?.confirmed as Partial<Record<StepId, string>>) ?? {});
+  const [guideStep, setGuideStep] = useState<StepId>((savedSpec?.curStep as StepId) ?? 'title');
+  const [gSel, setGSel] = useState<Partial<Record<StepId, string>>>((savedSpec?.gSel as Partial<Record<StepId, string>>) ?? {});
 
-  const [diTitle, setDiTitle] = useState('');
-  const [diField, setDiField] = useState('');
-  const [diContent, setDiContent] = useState('');
-  const [diProblem, setDiProblem] = useState('');
-  const [diKeywords, setDiKeywords] = useState('');
+  const [diTitle, setDiTitle] = useState(savedSpec?.diTitle ?? '');
+  const [diField, setDiField] = useState(savedSpec?.diField ?? '');
+  const [diContent, setDiContent] = useState(savedSpec?.diContent ?? '');
+  const [diProblem, setDiProblem] = useState(savedSpec?.diProblem ?? '');
+  const [diKeywords, setDiKeywords] = useState(savedSpec?.diKeywords ?? '');
   // 기초자료 보기 패널
   const [sourceDataOpen, setSourceDataOpen] = useState(false);
 
   // AI 분석 생성 후보 (mockAiService 연결)
-  const [titleCandidates, setTitleCandidates] = useState<string[]>([]);
-  const [abstractCandidates, setAbstractCandidates] = useState<string[]>([]);
-  const [aiComponents, setAiComponents] = useState<{ id: number; text: string; sel: boolean; num: string; depth: number }[]>([]);
+  const [titleCandidates, setTitleCandidates] = useState<string[]>(savedSpec?.titleCandidates ?? []);
+  const [abstractCandidates, setAbstractCandidates] = useState<string[]>(savedSpec?.abstractCandidates ?? []);
+  const [aiComponents, setAiComponents] = useState<{ id: number; text: string; sel: boolean; num: string; depth: number }[]>(
+    (savedSpec?.componentItems as { id: number; text: string; sel: boolean; num: string; depth: number }[]) ?? []
+  );
   const [analyzing, setAnalyzing] = useState(false);
 
   const flowRef = useRef<HTMLDivElement>(null);
+  const flowSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 자동 저장 — 400ms 디바운스
+  useEffect(() => {
+    if (!task?.id) return;
+    if (flowSaveTimerRef.current) clearTimeout(flowSaveTimerRef.current);
+    flowSaveTimerRef.current = setTimeout(() => {
+      saveSpecState(task.id, {
+        phase,
+        curStep,
+        confirmed: confirmed as SpecAnalysisState['confirmed'],
+        gSel: gSel as SpecAnalysisState['gSel'],
+        diTitle, diField, diContent, diProblem, diKeywords,
+        titleCandidates,
+        abstractCandidates,
+        componentItems: aiComponents as SpecAnalysisState['componentItems'],
+        mainView,
+      });
+    }, 400);
+    return () => { if (flowSaveTimerRef.current) clearTimeout(flowSaveTimerRef.current); };
+  }, [phase, curStep, confirmed, gSel, diTitle, diField, diContent,
+      diProblem, diKeywords, titleCandidates, abstractCandidates, aiComponents, mainView, task?.id]);
 
   // U7: 분석 진행 중 이탈 확인
   useEffect(() => {
@@ -124,6 +141,25 @@ export function SpecView() {
     if (id === 'upload') return true;
     if (phase === 'upload' || phase === 'direct') return false;
     return si(id) <= si(curStep);
+  };
+
+  const resetAnalysis = () => {
+    if (!window.confirm('처음부터 다시 시작하면 모든 분석 내용이 삭제됩니다. 계속하시겠습니까?')) return;
+    setPhase('upload');
+    setCurStep('upload');
+    setConfirmed({});
+    setGSel({});
+    setTitleCandidates([]);
+    setAbstractCandidates([]);
+    setAiComponents([]);
+    if (task?.id) {
+      saveSpecState(task.id, {
+        phase: 'upload', curStep: 'upload',
+        confirmed: {}, gSel: {},
+        titleCandidates: [], abstractCandidates: [], componentItems: [],
+        mainView: 'analysis',
+      });
+    }
   };
 
   const confirm = (id: StepId) => {
@@ -159,6 +195,11 @@ export function SpecView() {
       setCurStep('title');
       setGuideStep('title');
       setAnalyzing(false);
+      // 발명 제목으로 작업명 자동 업데이트 (기본값일 때만)
+      if (task?.id && title && (!task.name || task.name === '새 명세서' || task.name === '새 작업')) {
+        const taskName = title.length > 40 ? title.slice(0, 40) + '…' : title;
+        taskUpdate(task.id, { name: taskName });
+      }
       setTimeout(() => flowRef.current?.scrollTo({ top: 99999, behavior: 'smooth' }), 50);
     }, 1500);
   };
@@ -179,6 +220,7 @@ export function SpecView() {
       { label: '기술분야', content: extractDesc('기술분야') },
       { label: '배경기술', content: extractDesc('배경기술') },
       { label: '해결하고자 하는 과제', content: extractDesc('해결하려는 과제') },
+      { label: '과제의 해결 수단', content: extractDesc('과제의 해결 수단') },
       { label: '발명의 효과', content: extractDesc('발명의 효과') },
       { label: '청구범위', content: claims },
       { label: '요약서', content: abstract },
@@ -207,7 +249,7 @@ export function SpecView() {
       tech: extractDescSec('기술분야'),
       bg: extractDescSec('배경기술'),
       problem: extractDescSec('해결하려는 과제'),
-      solution: '',
+      solution: extractDescSec('과제의 해결 수단'),
       effect: extractDescSec('발명의 효과'),
       drawDesc,
       detail,
@@ -259,6 +301,15 @@ export function SpecView() {
 
       {/* Stepper — 원본 stepper-bar / step-pill / step-connector 구조 */}
       <div className="flex items-center px-4 border-b border-ck-border overflow-x-auto scroll-thin shrink-0" style={{ height: 48 }}>
+        {(phase === 'flow' || phase === 'done') && (
+          <button
+            onClick={resetAnalysis}
+            className="text-xs text-zinc-400 hover:text-red-500 transition-colors flex-shrink-0 mr-3 flex items-center gap-1"
+            title="처음부터 다시 시작"
+          >
+            ↺ 다시 시작
+          </button>
+        )}
         {STEPS.map((s, i) => {
           const isDone = isConfirmed(s.id);
           const active = s.id === curStep && (phase === 'flow' || phase === 'done');
@@ -543,8 +594,17 @@ export function SpecView() {
           </div>
         </div>
 
-        {guideOpen && (phase === 'flow' || phase === 'done') && (
+        {/* 모바일 배경 오버레이 */}
+        {mobileGuideOpen && (
+          <div
+            className="md:hidden fixed inset-0 bg-black/40 z-40"
+            onClick={() => setMobileGuideOpen(false)}
+          />
+        )}
+
+        {(guideOpen || mobileGuideOpen) && (phase === 'flow' || phase === 'done') && (
           <GuidePanel
+            key={`guide-panel-${guideStep}`}
             step={guideStep}
             gSel={gSel}
             setGSel={setGSel}
@@ -565,7 +625,21 @@ export function SpecView() {
               abstract: abstractCandidates.length > 0 ? abstractCandidates : undefined,
             }}
             aiComponents={aiComponents.length > 0 ? aiComponents : undefined}
+            mobileOpen={mobileGuideOpen}
+            onMobileClose={() => setMobileGuideOpen(false)}
           />
+        )}
+
+        {/* 모바일 전용: AI 가이드 FAB */}
+        {(phase === 'flow' || phase === 'done') && (
+          <button
+            className="md:hidden fixed bottom-5 right-4 z-30 bg-blue-600 text-white rounded-full px-4 py-2.5 text-sm font-medium shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform"
+            onClick={() => setMobileGuideOpen(true)}
+            aria-label="AI 가이드 열기"
+          >
+            <Icon name="star" size={14} />
+            AI 가이드
+          </button>
         )}
       </div>
       {previewOpen && <PreviewModal taskName={task?.name} sections={makePreviewSections()} onClose={() => setPreviewOpen(false)} />}
@@ -584,7 +658,7 @@ function AiMsg({ text }: { text: React.ReactNode }) {
   );
 }
 
-function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev, allDone, onGenerateSpec, customCandidates, aiComponents }: {
+function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev, allDone, onGenerateSpec, customCandidates, aiComponents, mobileOpen, onMobileClose }: {
   step: StepId;
   gSel: Partial<Record<StepId, string>>;
   setGSel: React.Dispatch<React.SetStateAction<Partial<Record<StepId, string>>>>;
@@ -596,6 +670,8 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
   onGenerateSpec?: () => void;
   customCandidates?: Partial<Record<StepId, string[]>>;
   aiComponents?: { id: number; text: string; sel: boolean; num: string; depth: number }[];
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const isDone = step in confirmed;
@@ -779,10 +855,28 @@ function GuidePanel({ step, gSel, setGSel, onConfirm, confirmed, onPrev, hasPrev
   };
 
   return (
-    <aside ref={panelRef} className="border-l border-ck-border bg-white flex flex-col overflow-hidden shrink-0"
-      style={{ width: '380px', minWidth: '320px', maxWidth: '700px', position: 'relative' }}>
+    <aside ref={panelRef} className={clsx(
+      'bg-white flex-col overflow-hidden',
+      // 데스크탑: 인라인 우측 사이드 패널
+      'md:flex md:relative md:shrink-0 md:border-l md:border-ck-border',
+      'md:w-[380px] md:min-w-[320px] md:max-w-[700px]',
+      // 모바일: 하단 고정 시트
+      'max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-50',
+      'max-md:h-[72vh] max-md:rounded-t-2xl max-md:shadow-2xl',
+      'max-md:border-t max-md:border-ck-border',
+      'max-md:transition-transform max-md:duration-300 max-md:ease-out',
+      mobileOpen ? 'flex max-md:translate-y-0' : 'max-md:hidden md:flex',
+    )}>
+      {/* 모바일 전용: 시트 핸들바 + 닫기 */}
+      <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-ck-border shrink-0 relative">
+        <div className="w-8 h-1 bg-zinc-300 rounded-full absolute top-2 left-1/2 -translate-x-1/2" />
+        <span className="font-semibold text-sm">AI 가이드</span>
+        <button onClick={onMobileClose} className="btn-ghost p-1" aria-label="가이드 닫기">
+          <Icon name="close" size={16} />
+        </button>
+      </div>
 
-      {/* 리사이즈 핸들 — 원본 artifact-resize-handle */}
+      {/* 리사이즈 핸들 — 원본 artifact-resize-handle (데스크탑에서만) */}
       <div
         onMouseDown={startResize}
         className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400 z-10 transition-colors"
@@ -1355,6 +1449,7 @@ function DrawingsPanel({ done, onUpdate, inventionComponents }: {
   // 모바일 전용 모달 상태
   const [modalOpen, setModalOpen] = useState(false);
   const [modalStartId, setModalStartId] = useState('');
+  const [newTabNotice, setNewTabNotice] = useState(false);
 
   const handleSave = (drawingId: string, updates: Partial<typeof drawings[0]>) => {
     setDrawings(prev => {
@@ -1379,21 +1474,26 @@ function DrawingsPanel({ done, onUpdate, inventionComponents }: {
 
   const openEditor = (id: string) => {
     if (isMobile()) {
-      // 모바일: 모달로
       setModalStartId(id);
       setModalOpen(true);
     } else {
-      // 데스크탑: 새 탭으로 전체 워크플로 오픈
       const draw = drawings.find(d => d.id === id);
-      openEditorTab({
+      const opened = openEditorTab({
         drawingId: id,
         drawings,
         components: inventionComponents ?? [],
-        // 구성요소 목록을 도면 부호 초기값으로 변환하여 전달
         references: (inventionComponents ?? []).map(c => ({ number: c.number, name: c.name })),
         drawingName: draw?.name ?? id,
         timestamp: Date.now(),
       });
+      if (opened) {
+        setNewTabNotice(true);
+        setTimeout(() => setNewTabNotice(false), 4000);
+      } else {
+        // 팝업 차단 시 모달로 폴백
+        setModalStartId(id);
+        setModalOpen(true);
+      }
     }
   };
 
@@ -1422,8 +1522,14 @@ function DrawingsPanel({ done, onUpdate, inventionComponents }: {
 
   return (
     <>
+      {newTabNotice && (
+        <div className="mx-3 mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs2 text-blue-700 flex items-center gap-1.5 shrink-0">
+          <span>↗</span>
+          도면 편집기가 새 탭에서 열렸습니다. 편집 완료 후 이 탭으로 돌아오세요.
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto scroll-thin px-3 py-3 ml-1.5 space-y-1.5">
-        {/* 헤더 — 전체 "편집기 열기" 버튼 제거 (개별 카드에서 편집 진입) */}
+        {/* 헤더 */}
         <p className="text-xs2 font-semibold text-gray-500 mb-2">
           추출된 도면 <span className="font-normal text-gray-400">({drawings.length}개 · 완료 {doneCount}개)</span>
         </p>
@@ -1966,6 +2072,10 @@ const DESC_SECTIONS: { key: string; label: string; badge2?: string; text: string
   {
     key: 'problem', label: '해결하려는 과제',
     text: '본 발명은 상기와 같은 문제점을 해결하기 위해 안출된 것으로, 라이다 포인트 클라우드 데이터를 효율적으로 전처리하여 실시간 처리 속도를 확보하면서도, 근거리·원거리 객체 모두에 대해 높은 탐지 정확도를 달성할 수 있는 3D 객체 인식 장치 및 방법을 제공하는 것을 목적으로 한다.',
+  },
+  {
+    key: 'solution', label: '과제의 해결 수단',
+    text: '본 발명의 과제를 해결하기 위한 수단으로, 라이다 포인트 클라우드 데이터를 입력받는 데이터 수집부(100)와, 입력된 데이터를 정규화·필터링하는 전처리부(200)와, 딥러닝 기반 특징을 추출하는 특징 추출부(300)와, 최종 객체를 분류하는 인식부(400)와, 인식 결과를 자율주행 제어부에 전달하는 출력부(500)를 포함한다.',
   },
   {
     key: 'effect', label: '발명의 효과',

@@ -7,6 +7,7 @@ import { useRef, useState } from 'react';
 import clsx from 'clsx';
 import katex from 'katex';
 import { useStore } from '../store';
+import { Icon } from '../components/Icon';
 import { MOCK_DRAWINGS } from '../features/drawing-workflow/types';
 import { openEditorTab } from '../features/drawing-workflow/editorChannel';
 import type { SpecAnalysisResult } from '../features/spec/types';
@@ -190,6 +191,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
 
   // 우측 패널 탭
   const [panelTab, setPanelTab] = useState<'ai' | 'drawings' | 'refs'>('ai');
+
+  // 모바일 AI 패널 오픈 상태
+  const [mobileAiOpen, setMobileAiOpen] = useState(false);
 
   // 채팅 UI
   type ChatMsg = {
@@ -592,7 +596,32 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
         </div>
 
         {/* 우측 AI 어시스턴트 패널 */}
-        <aside className="w-[380px] shrink-0 border-l border-zinc-200 bg-white flex flex-col overflow-hidden">
+        {mobileAiOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/40 md:hidden"
+            onClick={() => setMobileAiOpen(false)}
+          />
+        )}
+        <aside className={clsx(
+          'bg-white flex-col overflow-hidden',
+          'md:flex md:relative md:shrink-0 md:border-l md:border-zinc-200',
+          'md:w-[380px] md:min-w-[320px]',
+          'max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-50',
+          'max-md:h-[72vh] max-md:rounded-t-2xl max-md:shadow-2xl',
+          'max-md:border-t max-md:border-zinc-200',
+          'max-md:transition-transform max-md:duration-300 max-md:ease-out',
+          mobileAiOpen ? 'flex max-md:translate-y-0' : 'max-md:hidden md:flex',
+        )}>
+          {/* 모바일 핸들 */}
+          <div className="md:hidden shrink-0 pt-2 pb-1 px-4 flex items-center justify-between relative">
+            <div className="absolute left-1/2 -translate-x-1/2 top-2 w-9 h-1 bg-zinc-300 rounded-full" />
+            <button
+              onClick={() => setMobileAiOpen(false)}
+              className="ml-auto w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-zinc-600"
+            >
+              <Icon name="close" size={14} />
+            </button>
+          </div>
           {/* 탭 헤더 */}
           <div className="flex border-b border-zinc-200 shrink-0">
             {([['ai', 'AI 어시스턴트'], ['drawings', '도면'], ['refs', '참고문헌']] as const).map(([id, label]) => (
@@ -881,6 +910,23 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
           </div>
         </aside>
       </div>
+
+      {/* 모바일 AI 패널 FAB */}
+      <button
+        onClick={() => setMobileAiOpen(true)}
+        className={clsx(
+          'md:hidden fixed bottom-5 right-4 z-30',
+          'w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-700 active:scale-95',
+          'shadow-lg flex items-center justify-center transition-all',
+          mobileAiOpen && 'hidden',
+        )}
+        title="AI 어시스턴트 열기"
+        aria-label="AI 어시스턴트 열기"
+      >
+        <svg viewBox="0 0 20 20" fill="white" width="22" height="22">
+          <path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v7a2 2 0 01-2 2H6l-4 4V5z"/>
+        </svg>
+      </button>
 
       {/* ── 표 삽입 모달 ── */}
       {tableModal && (
