@@ -78,7 +78,7 @@ export function SpecView() {
   const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
   const [specFocusCtx, setSpecFocusCtx] = useState<FocusCtx | null>(null);
   const guidePanelInputRef = useRef<HTMLInputElement>(null);
-  const [descMode, setDescMode] = useState<string>('view');
+  const [descMode] = useState<string>('view');
   const [descSubInfo, setDescSubInfo] = useState<{
     subStep: number; currentLabel: string; allDone: boolean; doConfirm: (() => void) | null;
   }>({ subStep: 0, currentLabel: '기술분야', allDone: false, doConfirm: null });
@@ -89,7 +89,6 @@ export function SpecView() {
     { number: '400', name: '인식부' },
     { number: '500', name: '출력부' },
   ]);
-  const descPromptTrigger = 0;
   const [previewOpen, setPreviewOpen] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Set<StepId>>(new Set());
   const [phase, setPhase] = useState<'upload' | 'direct' | 'flow' | 'done'>(savedSpec?.phase ?? 'upload');
@@ -519,13 +518,10 @@ export function SpecView() {
                         <div className="mt-3">
                           {s.id === 'description' && (
                             <DescriptionPanel
-                              done={false}
-                              onConfirm={() => confirm('description')}
                               onUpdate={v => setGSel(p => ({ ...p, description: v }))}
-                              onModeChange={setDescMode}
-                              promptTrigger={descPromptTrigger}
                               onSubInfoChange={setDescSubInfo}
                               onFocusContext={setSpecFocusCtx}
+                              guidePanelInputRef={guidePanelInputRef}
                             />
                           )}
                           {s.id === 'components' && (
@@ -2060,182 +2056,141 @@ const DESC_SECTIONS: { key: string; label: string; badge2?: string; text: string
   },
 ];
 
-// 발명의 설명 패널 — 1개 생성 + view/edit/prompt/diff 모드
-function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChange, onFocusContext }: {
-  done: boolean; onConfirm: () => void; onUpdate: (v: string) => void;
-  onModeChange?: (mode: string) => void;
-  promptTrigger?: number;
+// 발명의 설명 패널 — 5개 섹션 동시 표시, 섹션 클릭으로 AI 패널 연결
+function DescriptionPanel({ onUpdate, onSubInfoChange, onFocusContext, guidePanelInputRef }: {
+  onUpdate: (v: string) => void;
   onSubInfoChange?: (info: { subStep: number; currentLabel: string; allDone: boolean; doConfirm: (() => void) | null }) => void;
   onFocusContext?: (ctx: { text: string; label: string; apply: (t: string) => void }) => void;
+  guidePanelInputRef?: React.RefObject<HTMLInputElement | null>;
 }) {
-  const [subStep, setSubStep] = useState(0);
-  const [confirmed, setConfirmed] = useState<Record<string, string>>({});
   const [texts, setTexts] = useState<Record<string, string>>(
     Object.fromEntries(DESC_SECTIONS.map(s => [s.key, s.text]))
   );
-  const [_mode, _setMode] = useState<'view' | 'edit' | 'prompt' | 'diff'>('view');
-  const setMode = (m: 'view' | 'edit' | 'prompt' | 'diff') => { _setMode(m); onModeChange?.(m); };
-  const [promptVal, setPromptVal] = useState('');
-  const [proposed, setProposed] = useState('');
-  const [_diffSel, setDiffSel] = useState<'current' | 'proposed'>('proposed');
-  // 프롬프트 수정의 기준 텍스트: 'current'(원본) | 'proposed'(변경 버전)
-  const [promptBase, setPromptBase] = useState<'current' | 'proposed'>('current');
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editVals, setEditVals] = useState<Record<string, string>>({});
 
-  // 하단 바의 "다시 수정 요청" → 변경 버전 기반으로 프롬프트 모드 진입
-  const prevTrigger = useRef(0);
+  // 항상 확정 준비 완료 상태 — 하단 바에서 바로 다음 단계 진행 가능
   useEffect(() => {
-    if (promptTrigger && promptTrigger !== prevTrigger.current) {
-      prevTrigger.current = promptTrigger;
-      // 이미 proposed가 있으면(diff 모드에서 온 경우) 변경 버전 기반으로 수정
-      setPromptBase(proposed ? 'proposed' : 'current');
-      setMode('prompt');
-    }
-  }, [promptTrigger]);
+    onSubInfoChange?.({ subStep: 0, currentLabel: '발명의 설명', allDone: true, doConfirm: null });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // subStep이 범위를 벗어나지 않도록 클램핑
-  const safeSubStep = Math.min(subStep, DESC_SECTIONS.length - 1);
-  const sec = DESC_SECTIONS[safeSubStep];
-  const curText = texts[sec?.key] || sec?.text || '';
-  const isDone = !!confirmed[sec?.key];
-  const allDone = DESC_SECTIONS.every(s => confirmed[s.key]);
-
-  // 부모에 현재 상태 전달
+  // texts 변경 시 상위에 동기화
   useEffect(() => {
-    onSubInfoChange?.({
-      subStep: safeSubStep,
-      currentLabel: sec?.label || '',
-      allDone,
-      doConfirm: isDone ? null : () => {
-        const next = { ...confirmed, [sec.key]: curText };
-        setConfirmed(next);
-        onUpdate(DESC_SECTIONS.map(s => `【${s.label}】\n${next[s.key] || s.text}`).join('\n\n'));
-        setMode('view');
-        if (safeSubStep < DESC_SECTIONS.length - 1) setSubStep(p => Math.min(p + 1, DESC_SECTIONS.length - 1));
-      },
-    });
-  }, [safeSubStep, allDone, isDone, curText]);
+    onUpdate(DESC_SECTIONS.map(s => `【${s.label}】\n${texts[s.key] || s.text}`).join('\n\n'));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [texts]);
 
-  // 섹션 전환 시 AI 어시스턴트 컨텍스트 갱신
-  useEffect(() => {
+  const selectSection = (key: string) => {
+    setActiveKey(key);
+    const sec = DESC_SECTIONS.find(s => s.key === key);
     if (!sec) return;
     onFocusContext?.({
-      text: texts[sec.key] || '',
+      text: texts[key] || sec.text,
       label: sec.label,
-      apply: (newText) => setTexts(p => ({ ...p, [sec.key]: newText })),
+      apply: (newText) => setTexts(p => ({ ...p, [key]: newText })),
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [safeSubStep]);
-
-  const _submitPrompt = () => {
-    if (!promptVal.trim()) return;
-    const baseText = promptBase === 'proposed' && proposed ? proposed : curText;
-    const mock = baseText.replace(/이다\.$/, `이다 (${promptVal.slice(0, 20)} 반영).`);
-    setProposed(mock);
-    setDiffSel('proposed');
-    setMode('diff');
-    setPromptVal('');
   };
-  void _submitPrompt;
 
-  if (!sec) return null;
+  const requestAI = (key: string) => {
+    selectSection(key);
+    setTimeout(() => guidePanelInputRef?.current?.focus(), 50);
+  };
 
   return (
-    <>
-      {/* 현재 섹션 표시 (스텝바 없이 섹션명만) */}
-      {/* 섹션 탭 네비게이션 — 확정 섹션 클릭으로 재방문 가능 */}
-      <div className="mx-3 mt-2 mb-1 shrink-0">
-        <div className="flex gap-1 overflow-x-auto scroll-thin pb-1">
-          {DESC_SECTIONS.map((s, i) => {
-            const isConfirmed = !!confirmed[s.key];
-            const isActive = i === safeSubStep;
-            return (
-              <button
-                key={s.key}
-                onClick={() => {
-                  setSubStep(i);
-                  onFocusContext?.({
-                    text: texts[s.key] || '',
-                    label: s.label,
-                    apply: (newText) => setTexts(p => ({ ...p, [s.key]: newText })),
-                  });
-                }}
-                className={clsx(
-                  'shrink-0 px-2 py-1 rounded text-xs2 transition-colors border',
-                  isActive ? 'bg-blue-700 text-white border-blue-700' :
-                  isConfirmed ? 'bg-green-50 text-green-700 border-green-300 hover:bg-green-100' :
-                  'bg-white text-gray-400 border-gray-200',
-                )}
-              >
-                {isConfirmed && !isActive && <Icon name="check" size={8} className="inline mr-0.5" />}
-                {s.label}
-              </button>
-            );
-          })}
-        </div>
-        {isDone && <p className="text-xs2 text-green-600 mt-1 flex items-center gap-1"><Icon name="check" size={9} /> 확정됨</p>}
-      </div>
-
-      <div className="flex-1 overflow-y-auto scroll-thin px-3 pb-2 ml-1.5 space-y-2">
-
-        {/* 이전 섹션 히스토리 — 확정된 섹션들을 현재 섹션 위에 표시 */}
-        {DESC_SECTIONS.slice(0, safeSubStep).filter(s => confirmed[s.key]).map(s => (
-          <div key={s.key} className="rounded-lg border border-green-200 bg-green-50/60 p-2.5">
-            <div className="flex items-center gap-1.5 mb-1">
-              <Icon name="check" size={10} className="text-green-600 shrink-0" />
-              <span className="text-xs2 font-bold text-green-700">{s.label}</span>
+    <div className="space-y-2">
+      {DESC_SECTIONS.map(sec => {
+        const isActive = activeKey === sec.key;
+        const isEditing = editingKey === sec.key;
+        const cardText = editVals[sec.key] ?? texts[sec.key] ?? sec.text;
+        return (
+          <div
+            key={sec.key}
+            onClick={() => { if (!isEditing) selectSection(sec.key); }}
+            className={clsx(
+              'rounded-xl border-2 p-3 cursor-pointer transition-all bg-white',
+              isEditing && 'border-blue-500 bg-blue-50',
+              isActive && !isEditing && 'border-blue-600 bg-blue-50 shadow-sm',
+              !isActive && !isEditing && 'border-zinc-200 hover:border-blue-300 hover:bg-blue-50/30',
+            )}
+          >
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className={clsx(
+                'text-xs2 font-bold px-2 py-0.5 rounded-full shrink-0',
+                isActive || isEditing ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600',
+              )}>{sec.label}</span>
+              {isActive && !isEditing && <span className="text-xs2 text-blue-600 font-semibold">✓ 선택됨</span>}
+              <div className="ml-auto flex gap-1">
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    if (isEditing) {
+                      setEditVals(p => { const n = { ...p }; delete n[sec.key]; return n; });
+                      setEditingKey(null);
+                    } else {
+                      setEditingKey(sec.key);
+                      setActiveKey(sec.key);
+                      setEditVals(p => ({ ...p, [sec.key]: texts[sec.key] ?? sec.text }));
+                    }
+                  }}
+                  className={clsx(
+                    'flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs2 transition-colors',
+                    isEditing ? 'bg-blue-100 text-blue-700' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-700',
+                  )}
+                ><Icon name="edit" size={10} /><span>수정</span></button>
+                <button
+                  onClick={e => { e.stopPropagation(); requestAI(sec.key); }}
+                  className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
+                >
+                  <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
+                  AI 수정
+                </button>
+              </div>
             </div>
-            <p className="text-xs2 text-gray-600 leading-relaxed line-clamp-2">{texts[s.key] || s.text}</p>
-          </div>
-        ))}
-
-        {/* 텍스트 편집 영역 (항상 표시) */}
-        {(
-          <div className={clsx('rounded-lg border-2 transition-all',
-            isDone ? 'border-green-300 bg-green-50' : 'border-ck-border bg-ck-bg focus-within:border-blue-400')}>
-
-            {/* 텍스트 직접 편집 영역 */}
-            {!isDone ? (
-              <textarea
-                className="w-full text-xs2 text-gray-800 bg-transparent px-3 py-3 outline-none resize-none leading-relaxed rounded-lg overflow-hidden"
-                value={curText}
-                rows={Math.max(4, Math.ceil(curText.length / 40))}
-                placeholder="텍스트를 직접 입력하거나 수정하세요..."
-                onFocus={() => onFocusContext?.({
-                  text: texts[sec.key] || '',
-                  label: sec.label,
-                  apply: (newText) => setTexts(p => ({ ...p, [sec.key]: newText })),
-                })}
-                onChange={e => {
-                  setTexts(p => ({ ...p, [sec.key]: e.target.value }));
-                  e.target.style.height = 'auto';
-                  e.target.style.height = e.target.scrollHeight + 'px';
-                }}
-                ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
-              />
-            ) : (
+            {isEditing ? (
               <>
-                <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1">
-                  <Icon name="check" size={10} className="text-green-600 shrink-0" />
-                  <span className="text-xs2 font-bold text-green-700">{sec.label}</span>
+                <textarea
+                  autoFocus
+                  className="w-full text-sm2 text-gray-800 bg-white border border-blue-300 rounded px-2 py-1.5 outline-none resize-none leading-relaxed"
+                  value={editVals[sec.key] ?? texts[sec.key] ?? sec.text}
+                  rows={Math.max(3, Math.ceil((editVals[sec.key] ?? texts[sec.key] ?? sec.text).length / 50))}
+                  onClick={e => e.stopPropagation()}
+                  onChange={e => setEditVals(p => ({ ...p, [sec.key]: e.target.value }))}
+                  onKeyDown={e => {
+                    if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setEditVals(p => { const n = { ...p }; delete n[sec.key]; return n; });
+                      setEditingKey(null);
+                    }
+                  }}
+                />
+                <div className="flex gap-1.5 mt-1.5" onClick={e => e.stopPropagation()}>
+                  <button
+                    onClick={() => {
+                      const newVal = editVals[sec.key] ?? texts[sec.key] ?? sec.text;
+                      setTexts(p => ({ ...p, [sec.key]: newVal }));
+                      setEditVals(p => { const n = { ...p }; delete n[sec.key]; return n; });
+                      setEditingKey(null);
+                    }}
+                    className="flex-1 py-1 text-xs2 font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >✓ 확정</button>
+                  <button
+                    onClick={() => {
+                      setEditVals(p => { const n = { ...p }; delete n[sec.key]; return n; });
+                      setEditingKey(null);
+                    }}
+                    className="px-2.5 py-1 text-xs2 text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >취소</button>
                 </div>
-                <p className="text-xs2 text-green-800 leading-relaxed px-3 pb-3">{curText}</p>
               </>
+            ) : (
+              <p className="text-sm2 text-gray-700 leading-relaxed">{cardText}</p>
             )}
           </div>
-        )}
-
-
-      </div>
-
-      {/* 내부 확정 버튼 제거 — 하단 바(GuidePanel)에서 통합 처리 */}
-      {allDone && (
-        <div className="px-3 py-2 border-t border-ck-border bg-green-50 shrink-0 ml-1.5">
-          <div className="flex items-center gap-1.5 text-xs2 text-green-700 font-medium">
-            <Icon name="check" size={11} /> 5개 섹션 모두 확정됨 — 하단 버튼으로 다음 단계 진행
-          </div>
-        </div>
-      )}
-    </>
+        );
+      })}
+    </div>
   );
 }
 
