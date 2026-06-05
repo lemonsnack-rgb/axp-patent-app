@@ -1569,7 +1569,7 @@ function ClaimsPanel({ done, onUpdate }: { done: boolean; onConfirm: () => void;
     syncUpdate(cands, next);
   };
 
-  void applyIndepDiff; void regenDep; void applyDepDiff;
+  void applyIndepDiff; void regenIndep; void regenDep; void applyDepDiff;
 
   const updateDepGroup = (indepId: number, patch: Partial<DepGroupState>) => {
     setDepGroups(p => ({ ...p, [indepId]: { ...p[indepId], ...patch } }));
