@@ -565,28 +565,26 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
             ))}
           </div>
 
-          {/* 선택된 블록 컨텍스트 (AI 탭일 때만) */}
-          {panelTab === 'ai' && (
-            <div className="px-3 pt-2 pb-2 border-b border-zinc-100 shrink-0 bg-zinc-50">
-              {sel ? (
-                <>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className="text-xs2 font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
-                      {EDITOR_SECTIONS.find(s => s.id === sel.sid)?.short}
-                    </span>
-                    <span className="text-xs2 text-zinc-400">블록 {sel.idx + 1}</span>
-                  </div>
-                  <p className="text-xs2 text-zinc-600 leading-relaxed line-clamp-3 bg-white rounded border border-zinc-200 px-2.5 py-1.5">
-                    {selText || <span className="text-zinc-400 italic">빈 단락</span>}
-                  </p>
-                </>
-              ) : (
-                <p className="text-xs2 text-zinc-400 text-center py-0.5">
-                  본문에서 단락을 선택하면 AI가 수정을 도와드립니다
+          {/* 선택된 블록 컨텍스트 — 탭 무관하게 항상 표시 */}
+          <div className="px-3 pt-2 pb-2 border-b border-zinc-100 shrink-0 bg-zinc-50">
+            {sel ? (
+              <>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-xs2 font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                    {EDITOR_SECTIONS.find(s => s.id === sel.sid)?.short}
+                  </span>
+                  <span className="text-xs2 text-zinc-400">블록 {sel.idx + 1}</span>
+                </div>
+                <p className="text-xs2 text-zinc-600 leading-relaxed line-clamp-3 bg-white rounded border border-zinc-200 px-2.5 py-1.5">
+                  {selText || <span className="text-zinc-400 italic">빈 단락</span>}
                 </p>
-              )}
-            </div>
-          )}
+              </>
+            ) : (
+              <p className="text-xs2 text-zinc-400 text-center py-0.5">
+                본문에서 단락을 선택하면 AI가 수정을 도와드립니다
+              </p>
+            )}
+          </div>
 
           {/* 탭 본문 (스크롤 영역) */}
           <div className="flex-1 overflow-y-auto scroll-thin">
