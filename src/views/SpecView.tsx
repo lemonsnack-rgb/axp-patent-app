@@ -2099,7 +2099,7 @@ function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChan
   const isDone = !!confirmed[sec?.key];
   const allDone = DESC_SECTIONS.every(s => confirmed[s.key]);
 
-  // 부모(GuidePanel)에 현재 상태 전달
+  // 부모에 현재 상태 전달
   useEffect(() => {
     onSubInfoChange?.({
       subStep: safeSubStep,
@@ -2114,6 +2114,17 @@ function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChan
       },
     });
   }, [safeSubStep, allDone, isDone, curText]);
+
+  // 섹션 전환 시 AI 어시스턴트 컨텍스트 갱신
+  useEffect(() => {
+    if (!sec) return;
+    onFocusContext?.({
+      text: texts[sec.key] || '',
+      label: sec.label,
+      apply: (newText) => setTexts(p => ({ ...p, [sec.key]: newText })),
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [safeSubStep]);
 
   const _submitPrompt = () => {
     if (!promptVal.trim()) return;
@@ -2140,7 +2151,14 @@ function DescriptionPanel({ onUpdate, onModeChange, promptTrigger, onSubInfoChan
             return (
               <button
                 key={s.key}
-                onClick={() => setSubStep(i)}
+                onClick={() => {
+                  setSubStep(i);
+                  onFocusContext?.({
+                    text: texts[s.key] || '',
+                    label: s.label,
+                    apply: (newText) => setTexts(p => ({ ...p, [s.key]: newText })),
+                  });
+                }}
                 className={clsx(
                   'shrink-0 px-2 py-1 rounded text-xs2 transition-colors border',
                   isActive ? 'bg-blue-700 text-white border-blue-700' :
