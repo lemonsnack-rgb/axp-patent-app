@@ -27,8 +27,8 @@ export function TopBar() {
     <header className="h-topbar bg-white border-b border-zinc-200 flex items-center justify-between px-3 shrink-0">
       <div className="flex items-center gap-2">
         <div
-          className="flex items-center justify-between"
-          style={{ width: `calc(${sidebarCollapsed ? '72px' : '260px'} - 22px)` }}
+          className={sidebarCollapsed ? 'flex items-center justify-center' : 'flex items-center justify-between'}
+          style={{ width: `calc(${sidebarCollapsed ? '72px' : '260px'} - 24px)` }}
         >
           <button
             onClick={() => sidebarCollapsed ? setSidebarCollapsed(false) : setMode('home')}
