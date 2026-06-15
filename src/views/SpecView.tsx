@@ -90,6 +90,8 @@ export function SpecView() {
     { number: '500', name: '출력부' },
   ]);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [compModalOpen, setCompModalOpen] = useState(false);
+  const [compModalMounted, setCompModalMounted] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Set<StepId>>(new Set());
   const [phase, setPhase] = useState<'upload' | 'direct' | 'flow' | 'done'>(savedSpec?.phase ?? 'upload');
   const [curStep, setCurStep] = useState<StepId>((savedSpec?.curStep as StepId) ?? 'upload');
@@ -525,13 +527,31 @@ export function SpecView() {
                             />
                           )}
                           {s.id === 'components' && (
-                            <ComponentsPanel
-                              done={false}
-                              onConfirm={() => confirm('components')}
-                              onUpdate={v => setGSel(p => ({ ...p, components: v }))}
-                              onComponentsChange={setConfirmedComponents}
-                              initialItems={aiComponents}
-                            />
+                            <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2 ml-1.5">
+                              <div className="rounded-xl border-2 border-zinc-200 bg-white p-3">
+                                <div className="flex items-center justify-between mb-2.5">
+                                  <span className="text-xs2 font-semibold text-gray-600">AI 추출 구성요소 ({confirmedComponents.length}개)</span>
+                                  <button
+                                    onClick={() => { setCompModalOpen(true); setCompModalMounted(true); }}
+                                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs2 font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                                  >
+                                    <Icon name="edit" size={10} />
+                                    구성요소 편집 →
+                                  </button>
+                                </div>
+                                <div className="space-y-1">
+                                  {confirmedComponents.slice(0, 6).map(c => (
+                                    <div key={c.number || c.name} className="flex items-center gap-2 py-0.5">
+                                      <span className="text-xs2 font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded w-10 text-center shrink-0">{c.number || '—'}</span>
+                                      <span className="text-sm2 text-gray-700">{c.name}</span>
+                                    </div>
+                                  ))}
+                                  {confirmedComponents.length > 6 && (
+                                    <p className="text-xs2 text-gray-400 pl-12">+{confirmedComponents.length - 6}개 더</p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
                           )}
                           {s.id === 'drawings' && (
                             <DrawingsPanel
@@ -555,6 +575,7 @@ export function SpecView() {
                               onConfirm={() => confirm('abstract')}
                               onUpdate={v => setGSel(p => ({ ...p, abstract: v }))}
                               onFocusContext={setSpecFocusCtx}
+                              guidePanelInputRef={guidePanelInputRef}
                             />
                           )}
                         </div>
@@ -738,6 +759,31 @@ export function SpecView() {
         )}
       </div>
       {previewOpen && <PreviewModal taskName={task?.name} sections={makePreviewSections()} onClose={() => setPreviewOpen(false)} />}
+      {compModalMounted && (
+        <div
+          style={{ display: compModalOpen ? undefined : 'none' }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={e => { if (e.target === e.currentTarget) setCompModalOpen(false); }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden" style={{ width: 560, maxWidth: '90vw', maxHeight: '82vh' }}>
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-200 shrink-0">
+              <span className="text-base2 font-bold text-gray-800">구성요소 편집</span>
+              <button onClick={() => setCompModalOpen(false)} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+                <Icon name="close" size={14} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <ComponentsPanel
+                done={false}
+                onConfirm={() => setCompModalOpen(false)}
+                onUpdate={v => setGSel(p => ({ ...p, components: v }))}
+                onComponentsChange={setConfirmedComponents}
+                initialItems={aiComponents}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1828,7 +1874,7 @@ function ClaimsPanel({ done, onUpdate, onFocusContext }: { done: boolean; onConf
 
             {/* 헤더 — 체크박스 + 뱃지만 */}
             <div className="flex items-center gap-2 px-3 pt-3 pb-2 cursor-pointer"
-              onClick={() => { if (!done) toggleIndep(cand.id); }}>
+              onClick={() => { if (!done) { toggleIndep(cand.id); onFocusContext?.({ text: cand.text, label: `독립항 ${cand.label}`, apply: (newText) => setCands(p => p.map(c => c.id === cand.id ? { ...c, text: newText, editVal: newText } : c)) }); } }}>
               <button
                 onClick={e => { e.stopPropagation(); if (!done) toggleIndep(cand.id); }}
                 className={clsx('w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all',
@@ -1918,7 +1964,10 @@ function ClaimsPanel({ done, onUpdate, onFocusContext }: { done: boolean; onConf
               {/* 독립항 헤더 */}
               <div className="border-b px-3 py-2.5 bg-blue-50 border-blue-200">
                 {/* 타이틀 (항상 표시) */}
-                <div className="flex items-center gap-2 mb-2">
+                <div
+                  className="flex items-center gap-2 mb-2 cursor-pointer"
+                  onClick={() => !done && onFocusContext?.({ text: indep.text, label: `독립항 ${indep.label}`, apply: (newText) => setCands(p => p.map(c => c.id === indep.id ? { ...c, text: newText, editVal: newText } : c)) })}
+                >
                   <Icon name="check" size={11} className="text-blue-600" />
                   <span className="text-xs2 font-bold text-blue-700">청구항 {indepClaimNum} · 독립항 {indep.label}</span>
                 </div>
@@ -1976,9 +2025,12 @@ function ClaimsPanel({ done, onUpdate, onFocusContext }: { done: boolean; onConf
                             done && dep.sel ? 'border-green-200 bg-green-50/30' : ''
                           )}>
                           {/* 헤더: 체크박스 + 종속항 N + 삭제 */}
-                          <div className="flex items-center gap-2 px-2.5 py-1.5">
+                          <div
+                            className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer"
+                            onClick={() => !done && onFocusContext?.({ text: dep.text, label: `종속항 ${dep.id}`, apply: (newText) => { const next = { ...depGroups, [indep.id]: { ...grp, items: grp.items.map(d => d.id === dep.id ? { ...d, text: newText, editVal: newText } : d) } }; setDepGroups(next); syncUpdate(cands, next); } })}
+                          >
                             <button
-                              onClick={() => toggleDep(indep.id, dep.id)}
+                              onClick={e => { e.stopPropagation(); toggleDep(indep.id, dep.id); }}
                               className={clsx('w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all',
                                 dep.sel ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 bg-white hover:border-blue-400')}>
                               {dep.sel && <Icon name="check" size={8} />}
@@ -2171,15 +2223,34 @@ const ABSTRACT_CANDS = [
   },
 ];
 
-function AbstractPanel({ done, onUpdate, onFocusContext }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void; onFocusContext?: (ctx: { text: string; label: string; apply: (t: string) => void }) => void }) {
+function AbstractPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
+  done: boolean;
+  onConfirm: () => void;
+  onUpdate: (v: string) => void;
+  onFocusContext?: (ctx: { text: string; label: string; apply: (t: string) => void }) => void;
+  guidePanelInputRef?: React.RefObject<HTMLInputElement | null>;
+}) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [editVals, setEditVals] = useState<Record<number, string>>({});
 
   const getVal = (i: number) => editVals[i] ?? ABSTRACT_CANDS[i].text;
 
+  const selectCand = (i: number) => {
+    setSelectedIdx(i);
+    onFocusContext?.({
+      text: getVal(i),
+      label: '요약서',
+      apply: (newText) => { setEditVals(prev => ({ ...prev, [i]: newText })); onUpdate(newText); },
+    });
+  };
+
+  const requestAI = (i: number) => {
+    selectCand(i);
+    setTimeout(() => guidePanelInputRef?.current?.focus(), 50);
+  };
+
   return (
     <>
-      {/* 안내 배너 */}
       <div className="mx-3 mt-3 mb-2 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 shrink-0">
         <p className="text-xs2 text-blue-700">명세서 전체 내용을 기반으로 <strong>요약서 2개 후보</strong>를 생성했습니다. 선택하거나 수정하세요.</p>
       </div>
@@ -2191,47 +2262,36 @@ function AbstractPanel({ done, onUpdate, onFocusContext }: { done: boolean; onCo
           return (
             <div
               key={cand.letter}
-              onClick={() => !done && setSelectedIdx(i)}
+              onClick={() => !done && selectCand(i)}
               className={clsx(
-                'rounded-lg border-2 p-3 cursor-pointer transition-all',
-                isSelected && 'border-blue-700 bg-blue-50',
+                'rounded-xl border-2 p-3 cursor-pointer transition-all bg-white',
+                isSelected && 'border-blue-600 bg-blue-50 shadow-sm',
                 isConfirmed && 'border-green-500 bg-green-50',
-                !isSelected && !isConfirmed && !done && 'border-ck-border bg-ck-bg hover:border-blue-300',
+                !isSelected && !isConfirmed && !done && 'border-zinc-200 hover:border-blue-300 hover:bg-blue-50/30',
                 done && !isConfirmed && 'border-gray-200 opacity-60',
               )}
             >
-              <div className="flex items-center gap-2 mb-2">
-                <span className={clsx('w-5 h-5 rounded-full text-xs2 font-bold flex items-center justify-center shrink-0 border-2',
-                  isSelected || isConfirmed ? 'border-blue-700 bg-blue-700 text-white' : 'border-gray-300 text-gray-500')}>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className={clsx('w-5 h-5 rounded-full text-xs2 font-bold flex items-center justify-center shrink-0',
+                  isSelected || isConfirmed ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500')}>
                   {cand.letter}
                 </span>
-                {cand.badge2 && (
-                  <span className="text-xs2 text-gray-500 font-medium">{cand.badge2}</span>
-                )}
-                <span className="text-xs2 text-gray-400">{cand.charCount}자</span>
+                {cand.badge2 && <span className="text-xs2 text-gray-500 font-medium">{cand.badge2}</span>}
+                <span className="text-xs2 text-gray-400">{getVal(i).length}자</span>
+                {isSelected && <span className="text-xs2 text-blue-600 font-semibold">✓ 선택됨</span>}
                 {!done && (
-                  <div className="ml-auto flex gap-1">
-                    <button onClick={e => { e.stopPropagation(); setSelectedIdx(i); }} title="직접 수정" className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400">
-                      <Icon name="edit" size={11} />
+                  <div className="ml-auto">
+                    <button
+                      onClick={e => { e.stopPropagation(); requestAI(i); }}
+                      className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
+                    >
+                      <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
+                      AI 수정
                     </button>
                   </div>
                 )}
               </div>
-              {isSelected ? (
-                <textarea
-                  className="w-full text-xs2 text-gray-700 bg-white border border-blue-200 rounded px-2 py-1.5 outline-none resize-none leading-relaxed"
-                  value={getVal(i)}
-                  rows={4}
-                  onClick={e => e.stopPropagation()}
-                  onFocus={() => onFocusContext?.({ text: getVal(i), label: '요약서', apply: (newText) => { setEditVals(prev => ({ ...prev, [i]: newText })); onUpdate(newText); } })}
-                  onChange={e => {
-                    setEditVals(prev => ({ ...prev, [i]: e.target.value }));
-                    onUpdate(e.target.value);
-                  }}
-                />
-              ) : (
-                <p className="text-xs2 text-gray-700 leading-relaxed line-clamp-4">{getVal(i)}</p>
-              )}
+              <p className="text-sm2 text-gray-700 leading-relaxed">{getVal(i)}</p>
             </div>
           );
         })}
