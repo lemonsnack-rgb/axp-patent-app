@@ -34,6 +34,14 @@ const LABEL_COLORS: Record<string, string> = {
   'AI생성':   'bg-violet-100 text-violet-700',
 };
 
+const WORK_STAGE_BADGE: Record<string, { text: string; cls: string }> = {
+  'crop':       { text: '영역 확인',  cls: 'bg-amber-100 text-amber-700' },
+  'reselect':   { text: '영역 확인',  cls: 'bg-amber-100 text-amber-700' },
+  'converting': { text: '변환 중',    cls: 'bg-violet-100 text-violet-700' },
+  'decide':     { text: '후보 선택',  cls: 'bg-orange-100 text-orange-700' },
+  'editing':    { text: '편집 중',    cls: 'bg-sky-100 text-sky-700' },
+};
+
 const MOCK_SVGS = [
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150"><rect x="10" y="10" width="180" height="130" fill="none" stroke="#333" stroke-width="1.5"/><line x1="100" y1="10" x2="100" y2="140" stroke="#999" stroke-width="0.5" stroke-dasharray="4,3"/><rect x="30" y="30" width="60" height="90" fill="none" stroke="#333" stroke-width="1"/><rect x="110" y="30" width="60" height="90" fill="none" stroke="#333" stroke-width="1"/></svg>`,
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150"><rect x="10" y="10" width="180" height="130" fill="none" stroke="#333" stroke-width="2"/><circle cx="100" cy="75" r="40" fill="none" stroke="#333" stroke-width="1.2"/><line x1="10" y1="75" x2="190" y2="75" stroke="#aaa" stroke-width="0.5" stroke-dasharray="4,3"/></svg>`,
@@ -41,7 +49,7 @@ const MOCK_SVGS = [
 ];
 
 export function DrawingEditorModal({ drawings, initialDrawingId, availableReferences, onSave, onClose, standalone = false }: Props) {
-  const [activeId] = useState(initialDrawingId);
+  const [activeId, setActiveId] = useState(initialDrawingId);
   const [workStageMap, setWorkStageMap] = useState<Record<string, WorkStage>>(() => {
     const m: Record<string, WorkStage> = {};
     drawings.forEach(d => {
@@ -61,8 +69,13 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
-  // B-box 상태 (퍼센트, 0~100)
-  const [cropBox, setCropBox] = useState({ x1: 15, y1: 15, x2: 85, y2: 85 });
+  // B-box 상태 — 도면별 독립 관리 (퍼센트, 0~100)
+  const [cropBoxMap, setCropBoxMap] = useState<Record<string, {x1:number; y1:number; x2:number; y2:number}>>(() => {
+    const m: Record<string, {x1:number; y1:number; x2:number; y2:number}> = {};
+    drawings.forEach(d => { m[d.id] = { x1: 15, y1: 15, x2: 85, y2: 85 }; });
+    return m;
+  });
+  const cropBox = cropBoxMap[activeId] ?? { x1: 15, y1: 15, x2: 85, y2: 85 };
   const cropContainerRef = React.useRef<HTMLDivElement>(null);
   type CropHandle = 'move'|'nw'|'n'|'ne'|'e'|'se'|'s'|'sw'|'w';
   const cropDragRef = React.useRef<{ type: CropHandle; startX: number; startY: number; startBox: { x1:number; y1:number; x2:number; y2:number }; } | null>(null);
@@ -92,7 +105,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
       }
       x1=Math.max(0,Math.min(x1,100)); y1=Math.max(0,Math.min(y1,100));
       x2=Math.max(0,Math.min(x2,100)); y2=Math.max(0,Math.min(y2,100));
-      setCropBox({ x1, y1, x2, y2 });
+      setCropBoxMap(m => ({ ...m, [activeId]: { x1, y1, x2, y2 } }));
     };
     const onUp = () => {
       cropDragRef.current = null;
@@ -105,6 +118,17 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
   const [isRepresentative, setIsRepresentative] = useState(() =>
     drawings.find(d => d.id === initialDrawingId)?.isRepresentative ?? false
   );
+
+  // 도면 전환 시 UI 상태 초기화
+  useEffect(() => {
+    setEditingName(false);
+    setNameDraft('');
+    setZoomedCandId(null);
+    setShowRegen(false);
+    setRegenPrompt('');
+    setIsRepresentative(drawings.find(d => d.id === activeId)?.isRepresentative ?? false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId]);
 
   // 메인 탭: 편집기 탭 결과 수신
   useEffect(() => {
@@ -226,7 +250,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
 
   const innerStyle = standalone
     ? undefined
-    : { width: '100%', maxWidth: 900, height: 'min(620px, calc(100vh - 32px))' };
+    : { width: '100%', maxWidth: 1020, height: 'min(640px, calc(100vh - 32px))' };
 
   return (
     <Wrapper>
@@ -335,8 +359,8 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
           // 도면 편집 단계에서는 좌측 패널 없이 전체 너비 사용
           workStage !== 'editing' && 'flex',
         )}>
-          {/* 좌: 도면 목록 패널 (편집 단계 + standalone에서는 숨김) */}
-          {workStage !== 'editing' && !standalone && (
+          {/* 좌: 도면 목록 패널 (standalone에서는 숨김, 모든 단계에서 상시 표시) */}
+          {!standalone && (
             <aside className="w-36 border-r border-ck-border bg-ck-bg shrink-0 flex flex-col overflow-hidden">
               <div className="px-2.5 pt-2.5 pb-1.5 border-b border-ck-border shrink-0">
                 <p className="text-xs2 font-semibold text-gray-500 uppercase tracking-wide">
@@ -347,12 +371,17 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                 {drawings.map(d => {
                   const isActive = d.id === activeId;
                   const ws = workStageMap[d.id] || 'crop';
-                  const isDone = ws === 'editing' || d.stage === 'done';
+                  const statusBadge = d.stage === 'done'
+                    ? { text: '편집 완료', cls: 'bg-green-100 text-green-700' }
+                    : WORK_STAGE_BADGE[ws] ?? { text: '대기', cls: 'bg-gray-100 text-gray-500' };
                   return (
-                    <div key={d.id} className={clsx(
-                      'rounded-lg border p-1.5 transition-all',
-                      isActive ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-ck-border bg-white',
-                    )}>
+                    <div
+                      key={d.id}
+                      onClick={() => setActiveId(d.id)}
+                      className={clsx(
+                        'rounded-lg border p-1.5 transition-all cursor-pointer',
+                        isActive ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-ck-border bg-white hover:border-blue-300 hover:bg-blue-50/40',
+                      )}>
                       <div className="aspect-[4/3] bg-gray-100 rounded border border-gray-200 flex items-center justify-center overflow-hidden mb-1">
                         {d.exportedImageUrl
                           ? <img src={d.exportedImageUrl} className="w-full h-full object-contain" alt="" />
@@ -360,12 +389,11 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                       </div>
                       <p className="text-xs2 font-semibold text-gray-700 truncate">기호 {d.symbol}</p>
                       <p className="text-xs2 text-gray-500 truncate">{d.name}</p>
-                      <div className="mt-0.5">
-                        {isDone
-                          ? <span className="text-xs2 text-green-600 flex items-center gap-0.5"><Icon name="check" size={9} />완료</span>
-                          : isActive
-                            ? <span className="text-xs2 text-blue-600 font-semibold">작업 중</span>
-                            : <span className="text-xs2 text-gray-400">대기</span>}
+                      <div className="mt-1">
+                        {isActive
+                          ? <span className="text-[9px] px-1.5 py-px rounded-full bg-blue-600 text-white font-semibold">▶ 진행 중</span>
+                          : <span className={clsx('text-[9px] px-1.5 py-px rounded-full font-semibold', statusBadge.cls)}>{statusBadge.text}</span>
+                        }
                       </div>
                     </div>
                   );
@@ -462,7 +490,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                     <button className="btn-outline btn-sm" onClick={onClose}>취소</button>
                     <button
                       className="btn-outline btn-sm"
-                      onClick={() => setCropBox({ x1: 15, y1: 15, x2: 85, y2: 85 })}>
+                      onClick={() => setCropBoxMap(m => ({ ...m, [activeId]: { x1: 15, y1: 15, x2: 85, y2: 85 } }))}>
                       영역 초기화
                     </button>
                   </div>
