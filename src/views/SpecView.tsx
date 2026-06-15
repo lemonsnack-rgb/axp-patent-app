@@ -567,6 +567,7 @@ export function SpecView() {
                               onConfirm={() => confirm('claims')}
                               onUpdate={v => setGSel(p => ({ ...p, claims: v }))}
                               onFocusContext={setSpecFocusCtx}
+                              guidePanelInputRef={guidePanelInputRef}
                             />
                           )}
                           {s.id === 'abstract' && (
@@ -827,82 +828,53 @@ function InlineCandidateCards({
 }) {
   const letters = ['A', 'B', 'C', 'D', 'E'];
   const curSel = gSel[stepId] || cands[0] || '';
-  const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editVals, setEditVals] = useState<Record<number, string>>({});
 
-  const selectCard = (text: string) => {
-    setGSel(p => ({ ...p, [stepId]: text }));
-    setFocusCtx({ text, label: STEP_LABEL[stepId] || stepId, apply: (newText) => setGSel(p => ({ ...p, [stepId]: newText })) });
+  const getCardVal = (i: number) => editVals[i] ?? cands[i];
+
+  const selectCard = (i: number) => {
+    const cardVal = getCardVal(i);
+    setGSel(p => ({ ...p, [stepId]: cardVal }));
+    setFocusCtx({ text: cardVal, label: STEP_LABEL[stepId] || stepId, apply: (newText) => { setEditVals(prev => ({ ...prev, [i]: newText })); setGSel(p => ({ ...p, [stepId]: newText })); } });
   };
-  const requestAI = (text: string) => {
-    selectCard(text);
+  const requestAI = (i: number) => {
+    selectCard(i);
     setTimeout(() => guidePanelInputRef.current?.focus(), 50);
   };
 
   return (
     <div className="space-y-2 mt-3">
       {cands.map((c, i) => {
-        const cardVal = editVals[i] ?? c;
+        const cardVal = getCardVal(i);
         const letter = letters[i] || String(i + 1);
         const isSelected = curSel === cardVal || curSel === c;
-        const isEditing = editingIdx === i;
         return (
           <div
             key={i}
-            onClick={() => { if (!isEditing) selectCard(cardVal); }}
+            onClick={() => selectCard(i)}
             className={clsx(
               'rounded-xl border-2 p-3 cursor-pointer transition-all bg-white',
-              isEditing && 'border-blue-500 bg-blue-50',
-              isSelected && !isEditing && 'border-blue-600 bg-blue-50 shadow-sm',
-              !isSelected && !isEditing && 'border-zinc-200 hover:border-blue-300 hover:bg-blue-50/30',
+              isSelected && 'border-blue-600 bg-blue-50 shadow-sm',
+              !isSelected && 'border-zinc-200 hover:border-blue-300 hover:bg-blue-50/30',
             )}
           >
             <div className="flex items-center gap-2 mb-1.5">
               <span className={clsx(
                 'w-5 h-5 rounded-full text-xs2 font-bold flex items-center justify-center shrink-0',
-                isSelected || isEditing ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500',
+                isSelected ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500',
               )}>{letter}</span>
-              {isSelected && !isEditing && <span className="text-xs2 text-blue-600 font-semibold">✓ 선택됨</span>}
-              <div className="ml-auto flex gap-1">
+              {isSelected && <span className="text-xs2 text-blue-600 font-semibold">✓ 선택됨</span>}
+              <div className="ml-auto">
                 <button
-                  onClick={e => { e.stopPropagation(); setEditingIdx(isEditing ? null : i); setGSel(p => ({ ...p, [stepId]: cardVal })); }}
-                  className={clsx('flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs2 transition-colors', isEditing ? 'bg-blue-100 text-blue-700' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-700')}
-                  title="직접 수정"
-                ><Icon name="edit" size={10} /><span>수정</span></button>
-                <button
-                  onClick={e => { e.stopPropagation(); requestAI(cardVal); }}
+                  onClick={e => { e.stopPropagation(); requestAI(i); }}
                   className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
-                  title="AI에게 수정 요청"
                 >
                   <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
                   AI 수정
                 </button>
               </div>
             </div>
-            {isEditing ? (
-              <>
-                <textarea
-                  autoFocus
-                  className="w-full text-sm2 font-semibold text-gray-800 bg-white border border-blue-300 rounded px-2 py-1 outline-none resize-none"
-                  value={editVals[i] ?? c}
-                  rows={2}
-                  onClick={e => e.stopPropagation()}
-                  onChange={e => { setEditVals(prev => ({ ...prev, [i]: e.target.value })); setGSel(p => ({ ...p, [stepId]: e.target.value })); }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); setGSel(p => ({ ...p, [stepId]: editVals[i] ?? c })); setEditingIdx(null); }
-                    if (e.key === 'Escape') { e.preventDefault(); setEditVals(prev => { const n = { ...prev }; delete n[i]; return n; }); setEditingIdx(null); }
-                  }}
-                />
-                <div className="flex gap-1.5 mt-1.5" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => { setGSel(p => ({ ...p, [stepId]: editVals[i] ?? c })); setEditingIdx(null); }}
-                    className="flex-1 py-1 text-xs2 font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">✓ 확정</button>
-                  <button onClick={() => { setEditVals(prev => { const n = { ...prev }; delete n[i]; return n; }); setEditingIdx(null); }}
-                    className="px-2.5 py-1 text-xs2 text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">취소</button>
-                </div>
-              </>
-            ) : (
-              <p className="text-sm2 font-semibold text-gray-800 leading-snug">{cardVal}</p>
-            )}
+            <p className="text-sm2 font-semibold text-gray-800 leading-snug">{cardVal}</p>
           </div>
         );
       })}
@@ -1707,7 +1679,7 @@ const MOCK_DEPS_BY_INDEP: Record<number, Pick<DepItemState,'text'|'sel'>[]> = {
 interface DepGroupState { generated: boolean; items: DepItemState[]; newText: string }
 
 
-function ClaimsPanel({ done, onUpdate, onFocusContext }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void; onFocusContext?: (ctx: { text: string; label: string; apply: (t: string) => void }) => void }) {
+function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void; onFocusContext?: (ctx: { text: string; label: string; apply: (t: string) => void }) => void; guidePanelInputRef?: React.RefObject<HTMLInputElement | null> }) {
   const [claimsPhase, setClaimsPhase] = useState<'indep' | 'dep'>('indep');
 
   // 독립항 후보 상태 (n개 다중 선택)
@@ -1749,6 +1721,11 @@ function ClaimsPanel({ done, onUpdate, onFocusContext }: { done: boolean; onConf
       return acc + (grp?.items.filter(d => d.sel).length ?? 0);
     }, 0);
     onUpdate(`독립항 ${indepCount}개, 종속항 ${depCount}개\n\n${lines.join('\n\n')}`);
+  };
+
+  const requestAIClaim = (text: string, label: string, applyFn: (t: string) => void) => {
+    onFocusContext?.({ text, label, apply: applyFn });
+    setTimeout(() => guidePanelInputRef?.current?.focus(), 50);
   };
 
   // 독립항 선택 토글
@@ -1886,6 +1863,17 @@ function ClaimsPanel({ done, onUpdate, onFocusContext }: { done: boolean; onConf
                 {cand.label}
               </span>
               <span className="text-xs2 px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">독립항</span>
+              {!done && (
+                <div className="ml-auto">
+                  <button
+                    onClick={e => { e.stopPropagation(); requestAIClaim(cand.text, `독립항 ${cand.label}`, (newText) => setCands(p => p.map(c => c.id === cand.id ? { ...c, text: newText, editVal: newText } : c))); }}
+                    className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
+                  >
+                    <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
+                    AI 수정
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* 본문 — 3가지 모드 전환 (DescriptionPanel과 동일 패턴) */}
@@ -1970,6 +1958,17 @@ function ClaimsPanel({ done, onUpdate, onFocusContext }: { done: boolean; onConf
                 >
                   <Icon name="check" size={11} className="text-blue-600" />
                   <span className="text-xs2 font-bold text-blue-700">청구항 {indepClaimNum} · 독립항 {indep.label}</span>
+                  {!done && (
+                    <div className="ml-auto">
+                      <button
+                        onClick={e => { e.stopPropagation(); requestAIClaim(indep.text, `독립항 ${indep.label}`, (newText) => setCands(p => p.map(c => c.id === indep.id ? { ...c, text: newText, editVal: newText } : c))); }}
+                        className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
+                      >
+                        <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
+                        AI 수정
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* 일반 모드: textarea */}
