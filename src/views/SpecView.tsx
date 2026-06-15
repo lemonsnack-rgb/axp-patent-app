@@ -903,6 +903,12 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
   const [guideChatInput, setGuideChatInput] = useState('');
   const guideChatIdRef = useRef(0);
   const guideChatEndRef = useRef<HTMLDivElement>(null);
+  const [localText, setLocalText] = useState('');
+
+  // focusCtx 변경(섹션 선택, AI 적용) 시 편집 텍스트 동기화
+  useEffect(() => {
+    setLocalText(focusCtx?.text ?? '');
+  }, [focusCtx]);
 
   const QA_REPLIES: Record<string, string> = {
     '청구항': '청구항은 특허 보호 범위를 정의합니다. 독립항과 종속항으로 구성됩니다.',
@@ -936,7 +942,8 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
     const msg = (override ?? guideChatInput).trim();
     if (!msg) return;
     if (!override) setGuideChatInput('');
-    const capturedCtx = focusCtx;
+    // 사용자가 textarea에서 직접 편집한 내용을 AI 컨텍스트로 사용
+    const capturedCtx = focusCtx ? { ...focusCtx, text: localText } : null;
     setGuideChatMsgs(prev => [...prev, { id: ++guideChatIdRef.current, role: 'user', text: msg }]);
 
     setTimeout(() => {
@@ -1056,11 +1063,27 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
         <p className="text-sm2 text-gray-500 leading-snug">카드를 선택하고 AI에게 수정을 요청하거나 질문하세요.</p>
       </div>
 
-      {/* 선택된 카드 미러 */}
+      {/* 선택된 콘텐츠 — 전체 내용 표시 + 직접 편집 가능 */}
       {focusCtx ? (
-        <div className="shrink-0 mx-3 mt-2 mb-1 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-xs2 text-blue-500 font-semibold mb-0.5">선택됨</p>
-          <p className="text-sm2 text-gray-800 font-semibold leading-snug line-clamp-2">{focusCtx.text}</p>
+        <div className="shrink-0 mx-3 mt-2 mb-1">
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="text-xs2 text-blue-600 font-semibold">✎ 선택됨</span>
+            <span className="text-xs2 text-zinc-400">· {focusCtx.label}</span>
+          </div>
+          <textarea
+            className="w-full text-sm2 text-gray-800 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 outline-none resize-none leading-relaxed focus:border-blue-400 transition-colors overflow-y-auto scroll-thin"
+            value={localText}
+            rows={3}
+            onChange={e => {
+              setLocalText(e.target.value);
+              focusCtx.apply(e.target.value);
+              e.target.style.height = 'auto';
+              e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+            }}
+            ref={el => {
+              if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 160) + 'px'; }
+            }}
+          />
         </div>
       ) : (
         <div className="shrink-0 mx-3 mt-2 mb-1 px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg">
@@ -1147,7 +1170,7 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
           <div className="shrink-0 px-3 pt-1.5 pb-0">
             <div className="flex items-center gap-1 text-xs2">
               <span className="text-blue-600 font-semibold shrink-0">수정 요청 중</span>
-              <span className="text-zinc-400 truncate">· {focusCtx.text.slice(0, 22)}{focusCtx.text.length > 22 ? '…' : ''}</span>
+              <span className="text-zinc-400">· {focusCtx.label}</span>
             </div>
           </div>
         )}
@@ -1157,7 +1180,7 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
             ref={chatInputRef}
             type="text"
             className="flex-1 text-xs2 border border-zinc-300 rounded-xl px-3 py-1.5 outline-none focus:border-blue-400 transition-colors"
-            placeholder={focusCtx ? `"${focusCtx.text.slice(0, 12)}…" 수정 요청...` : 'AI에게 질문하세요...'}
+            placeholder={focusCtx ? `"${focusCtx.label}" 수정 요청...` : 'AI에게 질문하세요...'}
             value={guideChatInput}
             onChange={e => setGuideChatInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); sendGuideChat(); } }}
