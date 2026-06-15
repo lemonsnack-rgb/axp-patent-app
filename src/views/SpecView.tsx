@@ -1517,12 +1517,6 @@ function DrawingsPanel({ done, onUpdate, inventionComponents }: {
     'AI생성':   'bg-violet-100 text-violet-700',
   };
 
-  const STAGE_DOT: Record<string, string> = {
-    'extracted': 'bg-gray-300', 'bbox-adjusted': 'bg-blue-400',
-    'converting': 'bg-amber-400', 'candidate-select': 'bg-violet-400',
-    'editing': 'bg-sky-400', 'done': 'bg-green-500',
-  };
-
   const STAGE_LABEL: Record<string, { text: string; cls: string }> = {
     'extracted':        { text: '영역 확인 필요',    cls: 'bg-amber-100 text-amber-700' },
     'bbox-adjusted':    { text: '영역 확인 완료 ✓', cls: 'bg-blue-100 text-blue-700' },
@@ -1542,64 +1536,56 @@ function DrawingsPanel({ done, onUpdate, inventionComponents }: {
           도면 편집기가 새 탭에서 열렸습니다. 편집 완료 후 이 탭으로 돌아오세요.
         </div>
       )}
-      <div className="flex-1 overflow-y-auto scroll-thin px-3 py-3 ml-1.5 space-y-1.5">
+      <div className="flex-1 overflow-y-auto scroll-thin px-3 py-3 ml-1.5">
         {/* 헤더 */}
-        <p className="text-xs2 font-semibold text-gray-500 mb-2">
+        <p className="text-xs2 font-semibold text-gray-500 mb-2.5">
           추출된 도면 <span className="font-normal text-gray-400">({drawings.length}개 · 완료 {doneCount}개)</span>
         </p>
 
+        <div className="grid grid-cols-2 gap-2">
         {drawings.map(d => {
           const isEditable = !done;
-          const stageDot = STAGE_DOT[d.stage] || 'bg-gray-300';
           const isDone = d.stage === 'done';
+          const stageBadge = STAGE_LABEL[d.stage];
           return (
             <div key={d.id}
               className={clsx(
-                'rounded-lg border transition-all overflow-hidden',
-                isDone ? 'border-green-200 bg-green-50/30' : 'border-gray-200 bg-white',
+                'rounded-xl border-2 overflow-hidden transition-all flex flex-col bg-white',
+                isDone ? 'border-green-200' : 'border-zinc-200',
                 done && 'opacity-60',
               )}>
-              {/* 썸네일 + 메타 */}
-              <div className="flex items-center gap-2.5 px-2.5 pt-2 pb-1.5">
-                <div className="w-10 shrink-0 aspect-[4/3] bg-gray-100 rounded border border-gray-200 flex items-center justify-center overflow-hidden">
-                  {d.exportedImageUrl
-                    ? <img src={d.exportedImageUrl} className="w-full h-full object-contain" alt="" />
-                    : <Icon name="image" size={12} className="text-gray-300" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1 mb-0.5">
-                    <span className="text-xs2 font-bold text-gray-700">기호 {d.symbol}</span>
-                    <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', LABEL_STYLES[d.label])}>
-                      {d.label}
-                    </span>
-                  </div>
-                  <p className="text-xs2 text-gray-700 font-semibold truncate">{d.name}</p>
-                  {/* stage 배지 */}
-                  {STAGE_LABEL[d.stage] && (
-                    <span className={clsx('text-[9px] px-1 py-px rounded-full font-semibold mt-0.5 inline-block', STAGE_LABEL[d.stage].cls)}>
-                      {STAGE_LABEL[d.stage].text}
-                    </span>
-                  )}
-                  {/* adjustedBbox 크기 표시 */}
-                  {d.stage === 'bbox-adjusted' && d.adjustedBbox && (
-                    <p className="text-xs2 text-blue-500 mt-0.5">
-                      {d.adjustedBbox.w}×{d.adjustedBbox.h}px 지정됨
-                    </p>
-                  )}
-                </div>
-                {/* 완료 상태 dot */}
-                <div className="shrink-0">
-                  {isDone
-                    ? <Icon name="check" size={11} className="text-green-500" />
-                    : <span className={clsx('w-2 h-2 rounded-full block', stageDot)} />}
-                </div>
+              {/* 썸네일 (상단, 큰 영역) */}
+              <div className="w-full aspect-[4/3] bg-gray-100 flex items-center justify-center overflow-hidden relative">
+                {d.exportedImageUrl
+                  ? <img src={d.exportedImageUrl} className="w-full h-full object-contain" alt="" />
+                  : <Icon name="image" size={28} className="text-gray-200" />}
+                {/* 상태 배지 오버레이 */}
+                {stageBadge && (
+                  <span className={clsx(
+                    'absolute bottom-1.5 left-1.5 text-xs2 px-2 py-0.5 rounded-full font-semibold shadow-sm',
+                    stageBadge.cls,
+                  )}>
+                    {stageBadge.text}
+                  </span>
+                )}
               </div>
 
-              {/* 도면 편집 버튼 — 완료 여부는 stage 배지로 표시, 버튼 라벨 통일 */}
+              {/* 메타 */}
+              <div className="px-2.5 pt-2 pb-1.5 flex-1">
+                <div className="flex items-center gap-1 mb-0.5 flex-wrap">
+                  <span className="text-xs2 font-bold text-gray-700">기호 {d.symbol}</span>
+                  <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium shrink-0', LABEL_STYLES[d.label])}>
+                    {d.label}
+                  </span>
+                </div>
+                <p className="text-xs2 text-gray-700 font-semibold leading-snug line-clamp-2">{d.name}</p>
+              </div>
+
+              {/* 편집 버튼 */}
               {isEditable && (
                 <button
                   onClick={() => openEditor(d.id)}
-                  className="w-full flex items-center justify-center gap-1 py-1 text-xs2 font-semibold transition-colors border-t border-gray-100 text-blue-600 hover:bg-blue-50">
+                  className="w-full flex items-center justify-center gap-1 py-1.5 text-xs2 font-semibold transition-colors border-t border-gray-100 text-blue-600 hover:bg-blue-50 shrink-0">
                   <Icon name="edit" size={10} />
                   도면 편집 →
                 </button>
@@ -1607,6 +1593,7 @@ function DrawingsPanel({ done, onUpdate, inventionComponents }: {
             </div>
           );
         })}
+        </div>
       </div>
 
       {done && (
