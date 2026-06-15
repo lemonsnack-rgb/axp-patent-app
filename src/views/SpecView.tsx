@@ -2090,8 +2090,6 @@ function DescriptionPanel({ onUpdate, onSubInfoChange, onFocusContext, guidePane
     Object.fromEntries(DESC_SECTIONS.map(s => [s.key, s.text]))
   );
   const [activeKey, setActiveKey] = useState<string | null>(null);
-  const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [editVals, setEditVals] = useState<Record<string, string>>({});
 
   // 항상 확정 준비 완료 상태 — 하단 바에서 바로 다음 단계 진행 가능
   useEffect(() => {
@@ -2125,43 +2123,24 @@ function DescriptionPanel({ onUpdate, onSubInfoChange, onFocusContext, guidePane
     <div className="space-y-2">
       {DESC_SECTIONS.map(sec => {
         const isActive = activeKey === sec.key;
-        const isEditing = editingKey === sec.key;
-        const cardText = editVals[sec.key] ?? texts[sec.key] ?? sec.text;
+        const cardText = texts[sec.key] ?? sec.text;
         return (
           <div
             key={sec.key}
-            onClick={() => { if (!isEditing) selectSection(sec.key); }}
+            onClick={() => selectSection(sec.key)}
             className={clsx(
               'rounded-xl border-2 p-3 cursor-pointer transition-all bg-white',
-              isEditing && 'border-blue-500 bg-blue-50',
-              isActive && !isEditing && 'border-blue-600 bg-blue-50 shadow-sm',
-              !isActive && !isEditing && 'border-zinc-200 hover:border-blue-300 hover:bg-blue-50/30',
+              isActive && 'border-blue-600 bg-blue-50 shadow-sm',
+              !isActive && 'border-zinc-200 hover:border-blue-300 hover:bg-blue-50/30',
             )}
           >
             <div className="flex items-center gap-2 mb-1.5">
               <span className={clsx(
                 'text-xs2 font-bold px-2 py-0.5 rounded-full shrink-0',
-                isActive || isEditing ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600',
+                isActive ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600',
               )}>{sec.label}</span>
-              {isActive && !isEditing && <span className="text-xs2 text-blue-600 font-semibold">✓ 선택됨</span>}
-              <div className="ml-auto flex gap-1">
-                <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    if (isEditing) {
-                      setEditVals(p => { const n = { ...p }; delete n[sec.key]; return n; });
-                      setEditingKey(null);
-                    } else {
-                      setEditingKey(sec.key);
-                      setActiveKey(sec.key);
-                      setEditVals(p => ({ ...p, [sec.key]: texts[sec.key] ?? sec.text }));
-                    }
-                  }}
-                  className={clsx(
-                    'flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs2 transition-colors',
-                    isEditing ? 'bg-blue-100 text-blue-700' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-700',
-                  )}
-                ><Icon name="edit" size={10} /><span>수정</span></button>
+              {isActive && <span className="text-xs2 text-blue-600 font-semibold">✓ 선택됨</span>}
+              <div className="ml-auto">
                 <button
                   onClick={e => { e.stopPropagation(); requestAI(sec.key); }}
                   className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
@@ -2171,45 +2150,7 @@ function DescriptionPanel({ onUpdate, onSubInfoChange, onFocusContext, guidePane
                 </button>
               </div>
             </div>
-            {isEditing ? (
-              <>
-                <textarea
-                  autoFocus
-                  className="w-full text-sm2 text-gray-800 bg-white border border-blue-300 rounded px-2 py-1.5 outline-none resize-none leading-relaxed"
-                  value={editVals[sec.key] ?? texts[sec.key] ?? sec.text}
-                  rows={Math.max(3, Math.ceil((editVals[sec.key] ?? texts[sec.key] ?? sec.text).length / 50))}
-                  onClick={e => e.stopPropagation()}
-                  onChange={e => setEditVals(p => ({ ...p, [sec.key]: e.target.value }))}
-                  onKeyDown={e => {
-                    if (e.key === 'Escape') {
-                      e.preventDefault();
-                      setEditVals(p => { const n = { ...p }; delete n[sec.key]; return n; });
-                      setEditingKey(null);
-                    }
-                  }}
-                />
-                <div className="flex gap-1.5 mt-1.5" onClick={e => e.stopPropagation()}>
-                  <button
-                    onClick={() => {
-                      const newVal = editVals[sec.key] ?? texts[sec.key] ?? sec.text;
-                      setTexts(p => ({ ...p, [sec.key]: newVal }));
-                      setEditVals(p => { const n = { ...p }; delete n[sec.key]; return n; });
-                      setEditingKey(null);
-                    }}
-                    className="flex-1 py-1 text-xs2 font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >✓ 확정</button>
-                  <button
-                    onClick={() => {
-                      setEditVals(p => { const n = { ...p }; delete n[sec.key]; return n; });
-                      setEditingKey(null);
-                    }}
-                    className="px-2.5 py-1 text-xs2 text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                  >취소</button>
-                </div>
-              </>
-            ) : (
-              <p className="text-sm2 text-gray-700 leading-relaxed">{cardText}</p>
-            )}
+            <p className="text-sm2 text-gray-700 leading-relaxed">{cardText}</p>
           </div>
         );
       })}
