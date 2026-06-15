@@ -359,9 +359,8 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
           // 도면 편집 단계에서는 좌측 패널 없이 전체 너비 사용
           workStage !== 'editing' && 'flex',
         )}>
-          {/* 좌: 도면 목록 패널 (standalone에서는 숨김, 모든 단계에서 상시 표시) */}
-          {!standalone && (
-            <aside className="w-36 border-r border-ck-border bg-ck-bg shrink-0 flex flex-col overflow-hidden">
+          {/* 좌: 도면 목록 패널 (모달/standalone 모든 모드에서 상시 표시) */}
+          <aside className="w-36 border-r border-ck-border bg-ck-bg shrink-0 flex flex-col overflow-hidden">
               <div className="px-2.5 pt-2.5 pb-1.5 border-b border-ck-border shrink-0">
                 <p className="text-xs2 font-semibold text-gray-500 uppercase tracking-wide">
                   도면 목록 <span className="font-normal text-gray-400">({drawings.length})</span>
@@ -400,7 +399,6 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                 })}
               </div>
             </aside>
-          )}
 
           {/* 우: 단계별 콘텐츠 */}
           <div className={clsx(
