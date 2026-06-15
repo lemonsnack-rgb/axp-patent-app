@@ -1722,11 +1722,22 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: { d
     syncUpdate(next, depGroups);
   };
 
-  // 독립항 Phase B로 이동
+  // 독립항 Phase B로 이동 — 선택된 독립항의 종속항 자동 생성
   const confirmIndep = () => {
     if (selectedCands.length === 0) return;
+    const autoGroups = { ...depGroups };
+    cands.filter(c => c.selected).forEach(c => {
+      if (!autoGroups[c.id]?.generated) {
+        const items = (MOCK_DEPS_BY_INDEP[c.id] ?? MOCK_DEPS_BY_INDEP[1]).map((d, i) => ({
+          id: i + 1, ...d, expanded: false, editing: false, editVal: d.text,
+          aiOpen: false, aiPromptVal: '', aiProposed: '', aiDiffOpen: false, aiDiffSel: 'proposed' as const,
+        }));
+        autoGroups[c.id] = { generated: true, items, newText: '' };
+      }
+    });
+    setDepGroups(autoGroups);
     setClaimsPhase('dep');
-    syncUpdate(cands, depGroups);
+    syncUpdate(cands, autoGroups);
   };
 
   // 독립항 AI 재생성 — prompt → diff 모드로 전환 (mock 생성)
@@ -1983,22 +1994,20 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: { d
               <div className="p-2.5 space-y-1.5">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs2 font-semibold text-gray-500">
-                    종속항 {grp.generated ? `(${grp.items.filter(d => d.sel).length}개 선택)` : ''}
+                    종속항 ({grp.items.filter(d => d.sel).length}개 선택)
                   </span>
-                  {!done && !grp.generated && (
+                  {!done && (
                     <button onClick={() => generateDeps(indep.id)}
-                      className="flex items-center gap-1.5 px-2.5 py-1 bg-violet-600 text-white rounded-md text-xs2 font-semibold hover:bg-violet-700 active:scale-[0.98] transition-all">
-                      <span className="font-bold text-xs2">AI</span> 종속항 생성
+                      className="text-xs2 text-gray-400 hover:text-violet-600 flex items-center gap-1 transition-colors">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="10" height="10">
+                        <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10"/><path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6"/>
+                      </svg>
+                      재생성
                     </button>
                   )}
                 </div>
 
-                {!grp.generated ? (
-                  <div className="rounded-lg border border-dashed border-gray-200 py-3 text-center">
-                    <p className="text-xs2 text-gray-400">독립항을 기반으로 종속항을 자동 생성합니다</p>
-                    <p className="text-xs2 text-gray-300 mt-1">위 버튼을 눌러 생성하세요</p>
-                  </div>
-                ) : (
+                {(
                   <>
                     {grp.items.map((dep, depLocalIdx) => {
                       if (dep.sel) ++claimNum;
