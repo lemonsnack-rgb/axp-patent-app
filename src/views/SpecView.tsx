@@ -411,45 +411,26 @@ export function SpecView() {
         <div ref={flowRef} className="flex-1 overflow-y-auto scroll-thin bg-ck-bg">
           <div className="max-w-3xl mx-auto py-8 px-4 space-y-3">
 
-            {/* 시작화면 — 3가지 기초자료 입력 방식 */}
+            {/* 업로드 존 — PDF 파일 업로드 */}
             {phase !== 'flow' && phase !== 'done' && phase !== 'direct' && (
-              <div className="py-4">
-                <div className="text-center mb-7">
-                  <Icon name="doc" size={40} className="text-blue-700 mx-auto mb-3" />
-                  <h2 className="text-lg2 font-bold text-gray-800 mb-1">새 특허 명세서 작성</h2>
-                  <p className="text-md2 text-gray-500">기초자료를 선택해 AI 분석을 시작하세요.</p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
-                  {/* 1. PDF 업로드 — 추천 (활성) */}
-                  <div
-                    onClick={() => startFlow({ title: diTitle.trim() || '직무발명서', field: diField.trim() || '기술', content: diContent.trim() || '발명 내용' })}
-                    className="relative flex flex-col items-center text-center p-5 rounded-xl border-2 border-blue-500 bg-blue-50 cursor-pointer hover:bg-blue-100 transition-all shadow-sm"
-                  >
-                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs2 font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap">추천</span>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="36" height="36" className="text-blue-600 mb-3 mt-1">
-                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                    </svg>
-                    <p className="text-sm2 font-semibold text-blue-800 mb-1">직무발명서 PDF 업로드</p>
-                    <p className="text-xs2 text-blue-600/80 leading-relaxed">AI가 자동 분석해 명세서 항목을 추출합니다</p>
-                  </div>
-                  {/* 2. 직접 입력 — 준비 중 (비활성) */}
-                  <div className="relative flex flex-col items-center text-center p-5 rounded-xl border-2 border-gray-200 bg-gray-50 cursor-not-allowed select-none opacity-60">
-                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-gray-400 text-white text-xs2 font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap">준비 중</span>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="36" height="36" className="text-gray-400 mb-3 mt-1">
-                      <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
-                    </svg>
-                    <p className="text-sm2 font-semibold text-gray-500 mb-1">발명 내용 직접 입력</p>
-                    <p className="text-xs2 text-gray-400 leading-relaxed">명칭·기술분야·발명 내용을 직접 기술합니다</p>
-                  </div>
-                  {/* 3. 기존 자료에서 시작 — 준비 중 (비활성) */}
-                  <div className="relative flex flex-col items-center text-center p-5 rounded-xl border-2 border-gray-200 bg-gray-50 cursor-not-allowed select-none opacity-60">
-                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-gray-400 text-white text-xs2 font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap">준비 중</span>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="36" height="36" className="text-gray-400 mb-3 mt-1">
-                      <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
-                    </svg>
-                    <p className="text-sm2 font-semibold text-gray-500 mb-1">기존 자료에서 시작</p>
-                    <p className="text-xs2 text-gray-400 leading-relaxed">프로젝트 자료·라이브러리·선행기술 검색 결과 활용</p>
-                  </div>
+              <div className="text-center py-4">
+                <Icon name="doc" size={48} className="text-blue-700 mx-auto mb-3" />
+                <h2 className="text-lg2 font-bold text-gray-800 mb-2">새 특허 명세서 작성</h2>
+                <p className="text-md2 text-gray-500 mb-6">직무발명서(PDF)를 업로드하면 AI가 자동으로 분석합니다.</p>
+                <div
+                  onClick={() => {
+                    if (phase !== 'upload') return;
+                    startFlow({
+                      title:   diTitle.trim()   || '직무발명서',
+                      field:   diField.trim()   || '기술',
+                      content: diContent.trim() || '발명 내용',
+                    });
+                  }}
+                  className={`border-2 border-dashed rounded-xl p-10 mb-5 transition-all ${phase === 'upload' ? 'border-gray-300 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30' : 'border-gray-200 opacity-50'}`}>
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 text-gray-400">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                  <p className="text-md2 text-gray-600">직무발명서 PDF를 업로드 하세요.</p>
                 </div>
               </div>
             )}
@@ -1421,7 +1402,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                     <span className="text-xs2 text-gray-800 font-medium flex-1 min-w-0 truncate">{item.text}</span>
                   )}
                   {!done && (
-                    <div className="flex items-center gap-px shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-px shrink-0">
                       <button onClick={() => moveUp(idx)} disabled={idx===0}
                         className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20" title="위로">
                         <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 7l3-4 3 4"/></svg>
@@ -1463,11 +1444,6 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                   ) : (
                     <span className="inline-flex items-center gap-1 text-xs2 px-1.5 py-0.5 rounded bg-gray-50 text-gray-400 border border-gray-200">
                       부호 미배정
-                    </span>
-                  )}
-                  {item.sel && (
-                    <span className="inline-flex items-center gap-1 text-xs2 px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200">
-                      청구항 후보
                     </span>
                   )}
                 </div>
