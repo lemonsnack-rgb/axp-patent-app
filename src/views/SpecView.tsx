@@ -778,7 +778,7 @@ function AiMsg({ text }: { text: React.ReactNode }) {
     <div className="flex items-start gap-3">
       <div className="w-8 h-8 rounded-full bg-blue-700 text-white text-xs2 font-bold flex items-center justify-center shrink-0">AI</div>
       <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-md2 text-gray-700 shadow-xs max-w-2xl">
-        {text}<span className="text-xs2 text-gray-400 ml-2">방금</span>
+        {text}
       </div>
     </div>
   );
