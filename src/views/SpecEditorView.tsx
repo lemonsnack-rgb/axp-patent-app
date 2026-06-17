@@ -108,8 +108,8 @@ const TableIcon = () => (
 );
 
 // ── 메인 컴포넌트 ──────────────────────────────────────────────────────────
-export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }: {
-  task: any; onBack: () => void; confirmedTitle?: string; analysisResult?: SpecAnalysisResult;
+export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult, projectName }: {
+  task: any; onBack: () => void; confirmedTitle?: string; analysisResult?: SpecAnalysisResult; projectName?: string;
 }) {
   const taskName: string = task?.name || '새 명세서';
   // 위저드에서 확정된 발명 명칭이 있으면 title 섹션에 사용
@@ -418,7 +418,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
       <div className="flex items-center border-b border-zinc-200 bg-white shrink-0 h-10">
         <button onClick={onBack}
           className="flex items-center gap-1 text-xs2 text-blue-600 hover:text-blue-800 px-3 h-full hover:bg-zinc-50 transition-colors shrink-0">
-          ← 분석결과
+          ← 분석 후보 보기
         </button>
         <div className="w-px h-5 bg-zinc-200 mx-1 self-center shrink-0" />
         <div className="flex items-center gap-0.5">
@@ -457,6 +457,26 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
         ))}
       </div>
 
+
+      {/* 초안 기반 정보 배너 */}
+      {analysisResult && (
+        <div className="shrink-0 px-4 py-1.5 bg-zinc-50 border-b border-zinc-200 flex items-center gap-3 flex-wrap">
+          {projectName && (
+            <span className="text-xs2 text-zinc-400">{projectName}</span>
+          )}
+          {projectName && <span className="text-xs2 text-zinc-300">›</span>}
+          <span className="text-xs2 text-zinc-500 font-medium">초안 근거:</span>
+          <span className="text-xs2 text-zinc-500">
+            PDF 업로드 기반
+            {analysisResult.componentItems?.length > 0 && ` · 구성요소 ${analysisResult.componentItems.length}개`}
+            {analysisResult.drawings?.length > 0 && ` · 도면 ${analysisResult.drawings.length}개`}
+            {analysisResult.claims?.trim() && ' · 청구항 포함'}
+          </span>
+          <button onClick={onBack} className="ml-auto text-xs2 text-blue-500 hover:text-blue-700 transition-colors">
+            분석 후보 다시 보기 →
+          </button>
+        </div>
+      )}
 
       {/* 본문 — 전체 명세서 스크롤 */}
       <div
@@ -584,7 +604,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
 
       </div>{/* 좌측 에디터 컬럼 끝 */}
 
-      {/* 우측 AI 어시스턴트 패널 */}
+      {/* 우측 AI 보조 패널 */}
       {mobileAiOpen && (
           <div
             className="fixed inset-0 z-40 bg-black/40 md:hidden"
@@ -618,7 +638,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
               <>
                 <div className="w-5 h-5 rounded flex items-center justify-center text-white text-xs font-bold shrink-0"
                   style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
-                <span className="text-sm font-bold text-gray-800">AI 어시스턴트</span>
+                <span className="text-sm font-bold text-gray-800">AI 보조</span>
               </>
             )}
             {activePanel === 'drawings' && (
@@ -831,7 +851,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
         <div className="hidden md:flex flex-col items-center border-l border-zinc-200 bg-white py-2 gap-1 shrink-0" style={{ width: 40 }}>
           <button
             onClick={() => setActivePanel(p => p === 'ai' ? 'drawings' : 'ai')}
-            title="AI 어시스턴트"
+            title="AI 보조"
             className={clsx('w-8 h-8 rounded-lg flex items-center justify-center transition-colors',
               activePanel === 'ai' ? 'bg-violet-100 text-violet-700' : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100')}>
             <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
@@ -858,8 +878,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
           'shadow-lg flex items-center justify-center transition-all',
           mobileAiOpen && 'hidden',
         )}
-        title="AI 어시스턴트 열기"
-        aria-label="AI 어시스턴트 열기"
+        title="AI 보조 열기"
+        aria-label="AI 보조 열기"
       >
         <svg viewBox="0 0 20 20" fill="white" width="22" height="22">
           <path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v7a2 2 0 01-2 2H6l-4 4V5z"/>

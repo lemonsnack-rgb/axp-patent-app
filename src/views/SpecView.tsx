@@ -68,8 +68,9 @@ const GUIDE_CANDS: Record<string, string[]> = {
 };
 
 export function SpecView() {
-  const { tasks, activeTaskId, taskUpdate } = useStore();
+  const { tasks, activeTaskId, taskUpdate, projects } = useStore();
   const task = activeTaskId ? tasks.find(t => t.id === activeTaskId) : null;
+  const projectName = task?.folderId ? (projects.find(p => p.id === task.folderId)?.name ?? '') : '';
   const savedSpec = task?.id ? loadSpecState(task.id) : null;
 
   const [mainView, setMainView] = useState<'analysis' | 'editor'>(savedSpec?.mainView ?? 'analysis');
@@ -113,6 +114,7 @@ export function SpecView() {
     (savedSpec?.componentItems as { id: number; text: string; sel: boolean; num: string; depth: number }[]) ?? []
   );
   const [analyzing, setAnalyzing] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
 
   const flowRef = useRef<HTMLDivElement>(null);
   const flowSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -120,6 +122,7 @@ export function SpecView() {
   // 자동 저장 — 400ms 디바운스
   useEffect(() => {
     if (!task?.id) return;
+    setSaveStatus('saving');
     if (flowSaveTimerRef.current) clearTimeout(flowSaveTimerRef.current);
     flowSaveTimerRef.current = setTimeout(() => {
       saveSpecState(task.id, {
@@ -133,6 +136,7 @@ export function SpecView() {
         componentItems: aiComponents as SpecAnalysisState['componentItems'],
         mainView,
       });
+      setSaveStatus('saved');
     }, 400);
     return () => { if (flowSaveTimerRef.current) clearTimeout(flowSaveTimerRef.current); };
   }, [phase, curStep, confirmed, gSel, diTitle, diField, diContent,
@@ -150,7 +154,6 @@ export function SpecView() {
   }, [phase]);
 
   const si = (id: StepId) => STEPS.findIndex(s => s.id === id);
-  const isConfirmed = (id: StepId) => id in confirmed;
   const isSpecialStep = (id: StepId) =>
     id === 'description' || id === 'components' || id === 'drawings' || id === 'claims' || id === 'abstract';
   const isVisible = (id: StepId) => {
@@ -284,6 +287,7 @@ export function SpecView() {
           onBack={() => handleSetMainView('analysis')}
           confirmedTitle={gSel['title'] || confirmed['title'] || diTitle}
           analysisResult={makeAnalysisResult()}
+          projectName={projectName}
         />
         {previewOpen && <PreviewModal taskName={task?.name} sections={makePreviewSections()} onClose={() => setPreviewOpen(false)} />}
       </>
@@ -330,6 +334,18 @@ export function SpecView() {
       {/* Body */}
       <div className="flex-1 flex overflow-hidden min-h-0 relative">
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+
+          {/* 작업 컨텍스트 + 저장 상태 */}
+          {task && (
+            <div className="shrink-0 px-4 py-1 bg-white border-b border-gray-100 flex items-center gap-2 min-h-[26px]">
+              {projectName && <span className="text-xs2 text-gray-400 truncate max-w-[120px]">{projectName}</span>}
+              {projectName && <span className="text-xs2 text-gray-300">›</span>}
+              <span className="text-xs2 text-gray-600 font-medium truncate flex-1">{task.name}</span>
+              <span className={clsx('text-xs2 shrink-0', saveStatus === 'saving' ? 'text-blue-400' : 'text-gray-300')}>
+                {saveStatus === 'saving' ? '저장 중...' : '저장됨'}
+              </span>
+            </div>
+          )}
 
           {/* Stepper — 에디터 컬럼 내부: 에디터 너비 기준으로 중앙 정렬 */}
           <div className="relative flex items-center border-b border-ck-border shrink-0" style={{ height: 48 }}>
@@ -395,27 +411,45 @@ export function SpecView() {
         <div ref={flowRef} className="flex-1 overflow-y-auto scroll-thin bg-ck-bg">
           <div className="max-w-3xl mx-auto py-8 px-4 space-y-3">
 
-            {/* 업로드 존 — PDF 파일 업로드 전용 */}
+            {/* 시작화면 — 3가지 기초자료 입력 방식 */}
             {phase !== 'flow' && phase !== 'done' && phase !== 'direct' && (
-              <div className="text-center py-4">
-                <Icon name="doc" size={48} className="text-blue-700 mx-auto mb-3" />
-                <h2 className="text-lg2 font-bold text-gray-800 mb-2">새 특허 명세서 작성</h2>
-                <p className="text-md2 text-gray-500 mb-6">직무발명서(PDF)를 업로드하면 AI가 자동으로 분석합니다.</p>
-                <div
-                  onClick={() => {
-                    if (phase !== 'upload') return;
-                    // 테스트용: 기본값으로 즉시 분석 시작 (state 업데이트 대기 없이 override 전달)
-                    startFlow({
-                      title:   diTitle.trim()   || '직무발명서',
-                      field:   diField.trim()   || '기술',
-                      content: diContent.trim() || '발명 내용',
-                    });
-                  }}
-                  className={`border-2 border-dashed rounded-xl p-10 mb-5 transition-all ${phase === 'upload' ? 'border-gray-300 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30' : 'border-gray-200 opacity-50'}`}>
-                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 text-gray-400">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                  </svg>
-                  <p className="text-md2 text-gray-600">직무발명서 PDF를 업로드 하세요.</p>
+              <div className="py-4">
+                <div className="text-center mb-7">
+                  <Icon name="doc" size={40} className="text-blue-700 mx-auto mb-3" />
+                  <h2 className="text-lg2 font-bold text-gray-800 mb-1">새 특허 명세서 작성</h2>
+                  <p className="text-md2 text-gray-500">기초자료를 선택해 AI 분석을 시작하세요.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
+                  {/* 1. PDF 업로드 — 추천 (활성) */}
+                  <div
+                    onClick={() => startFlow({ title: diTitle.trim() || '직무발명서', field: diField.trim() || '기술', content: diContent.trim() || '발명 내용' })}
+                    className="relative flex flex-col items-center text-center p-5 rounded-xl border-2 border-blue-500 bg-blue-50 cursor-pointer hover:bg-blue-100 transition-all shadow-sm"
+                  >
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs2 font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap">추천</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="36" height="36" className="text-blue-600 mb-3 mt-1">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    <p className="text-sm2 font-semibold text-blue-800 mb-1">직무발명서 PDF 업로드</p>
+                    <p className="text-xs2 text-blue-600/80 leading-relaxed">AI가 자동 분석해 명세서 항목을 추출합니다</p>
+                  </div>
+                  {/* 2. 직접 입력 — 준비 중 (비활성) */}
+                  <div className="relative flex flex-col items-center text-center p-5 rounded-xl border-2 border-gray-200 bg-gray-50 cursor-not-allowed select-none opacity-60">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-gray-400 text-white text-xs2 font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap">준비 중</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="36" height="36" className="text-gray-400 mb-3 mt-1">
+                      <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                    </svg>
+                    <p className="text-sm2 font-semibold text-gray-500 mb-1">발명 내용 직접 입력</p>
+                    <p className="text-xs2 text-gray-400 leading-relaxed">명칭·기술분야·발명 내용을 직접 기술합니다</p>
+                  </div>
+                  {/* 3. 기존 자료에서 시작 — 준비 중 (비활성) */}
+                  <div className="relative flex flex-col items-center text-center p-5 rounded-xl border-2 border-gray-200 bg-gray-50 cursor-not-allowed select-none opacity-60">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-gray-400 text-white text-xs2 font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap">준비 중</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="36" height="36" className="text-gray-400 mb-3 mt-1">
+                      <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+                    </svg>
+                    <p className="text-sm2 font-semibold text-gray-500 mb-1">기존 자료에서 시작</p>
+                    <p className="text-xs2 text-gray-400 leading-relaxed">프로젝트 자료·라이브러리·선행기술 검색 결과 활용</p>
+                  </div>
                 </div>
               </div>
             )}
@@ -654,22 +688,15 @@ export function SpecView() {
                 {phase === 'done' && (
                   <div className="text-center py-8">
                     <Icon name="logo" size={40} className="text-blue-700 mx-auto mb-3" />
-                    <h3 className="text-lg2 font-bold text-gray-800 mb-2">모든 분석이 완료되었습니다</h3>
-                    {task?.id && sessionStorage.getItem(`axp_mainview_${task.id}`) === 'editor' ? (
-                      <>
-                        <p className="text-md2 text-gray-500 mb-4">이미 생성된 명세서 에디터로 돌아갈 수 있습니다.</p>
-                        <button
-                          onClick={() => handleSetMainView('editor')}
-                          className="btn-primary btn-sm mx-auto flex items-center gap-1.5">
-                          <Icon name="doc" size={13} /> 명세서 에디터 열기 →
-                        </button>
-                      </>
-                    ) : (
-                      <p className="text-md2 text-gray-500">
-                        확정된 내용을 바탕으로 특허 명세서를 AI가 생성합니다.<br/>
-                        <span className="text-blue-700 font-medium">오른쪽 패널</span>의{' '}
-                        <strong>명세서 AI 생성</strong> 버튼을 눌러 시작하세요.
-                      </p>
+                    <h3 className="text-lg2 font-bold text-gray-800 mb-2">모든 분석 항목이 확정되었습니다</h3>
+                    <p className="text-md2 text-gray-500 mb-5">확정된 내용을 바탕으로 명세서 초안을 편집하세요.</p>
+                    <button
+                      onClick={() => handleSetMainView('editor')}
+                      className="btn-primary btn-sm mx-auto flex items-center gap-1.5">
+                      <Icon name="doc" size={13} /> 명세서 초안 편집으로 이동 →
+                    </button>
+                    {task?.id && sessionStorage.getItem(`axp_mainview_${task.id}`) === 'editor' && (
+                      <p className="text-xs2 text-gray-400 mt-3">이미 진행 중인 편집 내용이 있습니다 — 이어서 편집할 수 있습니다.</p>
                     )}
                   </div>
                 )}
@@ -696,7 +723,7 @@ export function SpecView() {
                   <button onClick={() => confirm('drawings')} className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors">건너뛰기</button>
                 )}
                 {doneCount >= 5 ? (
-                  <button onClick={() => handleSetMainView('editor')} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-blue-700 rounded-xl hover:bg-blue-800 transition-colors">명세서 AI 생성</button>
+                  <button onClick={() => handleSetMainView('editor')} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-blue-700 rounded-xl hover:bg-blue-800 transition-colors">명세서 초안 편집 →</button>
                 ) : guideStep === 'description' ? (
                   descSubInfo.allDone ? (
                     <button onClick={() => confirm('description')} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-blue-700 rounded-xl hover:bg-blue-800 transition-colors">다음 →</button>
@@ -735,15 +762,15 @@ export function SpecView() {
           />
         )}
 
-        {/* 모바일 전용: AI 가이드 FAB */}
+        {/* 모바일 전용: AI 보조 FAB */}
         {(phase === 'flow' || phase === 'done') && (
           <button
             className="md:hidden fixed bottom-5 right-4 z-30 bg-blue-600 text-white rounded-full px-4 py-2.5 text-sm font-medium shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform"
             onClick={() => setMobileGuideOpen(true)}
-            aria-label="AI 가이드 열기"
+            aria-label="AI 보조 열기"
           >
             <Icon name="star" size={14} />
-            AI 가이드
+            AI 보조
           </button>
         )}
       </div>
@@ -1044,7 +1071,7 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
       {/* 모바일 전용: 시트 핸들바 + 닫기 */}
       <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-ck-border shrink-0 relative">
         <div className="w-8 h-1 bg-zinc-300 rounded-full absolute top-2 left-1/2 -translate-x-1/2" />
-        <span className="font-semibold text-sm">AI 가이드</span>
+        <span className="font-semibold text-sm">AI 보조</span>
         <button onClick={onMobileClose} className="btn-ghost p-1" aria-label="가이드 닫기">
           <Icon name="close" size={16} />
         </button>
@@ -1062,7 +1089,7 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
       <div className="hidden md:flex shrink-0 items-center gap-2 px-4 border-b border-ck-border bg-gray-50 ml-1.5" style={{ height: 48 }}>
         <div className="w-5 h-5 rounded flex items-center justify-center text-white text-xs font-bold shrink-0"
           style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
-        <span className="text-sm font-bold text-gray-800">AI 어시스턴트</span>
+        <span className="text-sm font-bold text-gray-800">AI 보조</span>
         {isDone && (
           <span className="ml-auto inline-flex items-center gap-1 text-xs2 px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
             <Icon name="check" size={10} /> 확정됨
@@ -1074,7 +1101,7 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
         <div className="flex items-center gap-2 mb-1.5">
           <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs2 font-bold shrink-0"
             style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
-          <span className="text-base2 font-bold text-gray-800">AI 어시스턴트</span>
+          <span className="text-base2 font-bold text-gray-800">AI 보조</span>
           {isDone && (
             <span className="ml-auto inline-flex items-center gap-1 text-xs2 px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
               <Icon name="check" size={10} /> 확정됨
@@ -1418,6 +1445,30 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                         <Icon name="close" size={9} />
                       </button>
                     </div>
+                  )}
+                </div>
+
+                {/* 연결 상태 배지
+                  TODO: 현재는 부호 배정·선택 여부를 기반으로 한 mock 표시.
+                  실제 구현 시 SpecComponentItem에 linkedDrawingNums(number[])와
+                  linkedClaimIds(number[]) 필드를 추가하고, 도면·청구항 확정 시
+                  해당 부호가 참조되는지 역추적해 여기에 렌더링할 것.
+                */}
+                <div className="pl-9 flex items-center gap-1.5 flex-wrap">
+                  {item.num ? (
+                    <span className="inline-flex items-center gap-1 text-xs2 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-200">
+                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" width="8" height="8"><rect x="1" y="1" width="8" height="8" rx="1"/><path d="M3 5h4M5 3v4"/></svg>
+                      도면 부호 배정
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-xs2 px-1.5 py-0.5 rounded bg-gray-50 text-gray-400 border border-gray-200">
+                      부호 미배정
+                    </span>
+                  )}
+                  {item.sel && (
+                    <span className="inline-flex items-center gap-1 text-xs2 px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200">
+                      청구항 후보
+                    </span>
                   )}
                 </div>
 
