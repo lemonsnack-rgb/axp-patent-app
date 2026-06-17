@@ -21,7 +21,7 @@ interface Props {
 }
 
 export function LibrarySaveModal({ open, context, onClose }: Props) {
-  const { collections, collectionAdd, ensureUncategorized, libraryAdd } = useStore();
+  const { collections, collectionAdd, ensureUncategorized, libraryAdd, activeTaskId, tasks } = useStore();
   const toast = useToast();
   const [collectionId, setCollectionId] = useState('');
   const [tags, setTags] = useState('');
@@ -51,6 +51,7 @@ export function LibrarySaveModal({ open, context, onClose }: Props) {
     let folderId = collectionId;
     if (!folderId) folderId = ensureUncategorized();
     const tagList = tags.split(',').map(s => s.trim()).filter(Boolean);
+    const activeTask = tasks.find(t => t.id === activeTaskId);
     const li: Omit<LibraryItem, 'id' | 'savedAt'> = {
       type: context.type,
       refNumber: context.refNumber,
@@ -63,6 +64,7 @@ export function LibrarySaveModal({ open, context, onClose }: Props) {
       note: note.trim() || undefined,
       favorite,
       data: context.data,
+      fromFolderId: activeTask?.folderId,
     };
     libraryAdd(li);
     const colName = collections.find(c => c.id === folderId)?.name || '미분류';
