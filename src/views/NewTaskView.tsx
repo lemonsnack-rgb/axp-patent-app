@@ -78,23 +78,25 @@ export function NewTaskView() {
         <p className="text-lg2 text-zinc-500">작업 유형을 선택하세요. 작업 이름·프로젝트·고객사는 아래에서 지정할 수 있습니다.</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 max-w-3xl w-full mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 max-w-3xl w-full mb-6">
         {TYPES.map(t => (
           <button
             key={t.type}
             onClick={() => setType(t.type)}
             className={clsx(
-              'flex flex-col gap-2 p-5 bg-white rounded-xl text-left border transition-all duration-200 min-h-[140px] active:scale-[0.98] shadow-card',
+              'flex flex-row items-center sm:flex-col sm:items-start gap-3 p-4 sm:p-5 bg-white rounded-xl text-left border transition-all duration-200 sm:min-h-[140px] active:scale-[0.98] shadow-card',
               type === t.type
                 ? 'border-brand-400 bg-brand-50 shadow-[0_0_0_2px_rgba(59,142,245,0.2)]'
                 : 'border-neutral-150 hover:border-brand-200 hover:-translate-y-px hover:shadow-card-hover',
             )}
           >
-            <span className={`w-12 h-12 rounded-lg flex items-center justify-center bg-${t.color}-50 text-${t.color}-700`}>
-              <Icon name={t.icon} size={28} />
+            <span className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg shrink-0 flex items-center justify-center bg-${t.color}-50 text-${t.color}-700`}>
+              <Icon name={t.icon} size={24} />
             </span>
-            <div className="text-lg2 font-bold text-neutral-700">{t.title}</div>
-            <div className="text-sm2 text-neutral-400 leading-snug">{t.desc}</div>
+            <div className="flex-1 min-w-0">
+              <div className="text-base2 sm:text-lg2 font-bold text-neutral-700">{t.title}</div>
+              <div className="text-xs2 sm:text-sm2 text-neutral-400 leading-snug line-clamp-2">{t.desc}</div>
+            </div>
           </button>
         ))}
       </div>
@@ -103,7 +105,7 @@ export function NewTaskView() {
       {!type && tasks.length > 0 && (
         <div className="max-w-3xl w-full mt-6">
           <p className="text-sm2 font-semibold text-zinc-500 mb-3">최근 작업</p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {tasks.slice(0, 3).map(t => {
               const meta = taskTypeMeta(t.type);
               return (
