@@ -238,9 +238,10 @@ export function Sidebar() {
 
       <div className={clsx('mt-auto border-t border-zinc-100', sidebarCollapsed ? 'p-2' : 'p-3')}>
         <button className={clsx('flex items-center gap-2 w-full px-2 py-1.5 rounded-md hover:bg-zinc-100 active:scale-[0.98] transition-all text-md2 text-zinc-700', sidebarCollapsed && 'justify-center')}
+          title="고객사"
           onClick={() => setMode('clients')}>
-          <Icon name="settings" size={16} />
-          {!sidebarCollapsed && <span>설정</span>}
+          <Icon name="user" size={16} />
+          {!sidebarCollapsed && <span>고객사</span>}
         </button>
         {!sidebarCollapsed && (
           <div className="flex items-center gap-2 px-2 py-1.5 mt-1">
