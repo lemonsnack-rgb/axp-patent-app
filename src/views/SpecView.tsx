@@ -1180,7 +1180,6 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
         {/* 컨텍스트 표시 */}
         {!focusCtx && (
           <div className="shrink-0 px-3 pt-1.5 pb-0">
-            <p className="text-xs2 text-zinc-400">카드를 선택하고 [AI 수정] 버튼을 눌러 수정을 요청하세요.</p>
           </div>
         )}
         {focusCtx && (
