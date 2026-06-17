@@ -679,14 +679,16 @@ export function SpecView() {
         {(phase === 'flow' || phase === 'done') && (
           <div className="shrink-0 border-t border-ck-border bg-white w-full">
             <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between">
-              <button
-                onClick={() => {
-                  const idx = STEPS.findIndex(s => s.id === guideStep);
-                  if (idx > 1) { setGuideStep(STEPS[idx - 1].id); if (phase === 'done') setPhase('flow'); }
-                }}
-                disabled={STEPS.findIndex(s => s.id === guideStep) <= 1}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 disabled:opacity-40 transition-colors"
-              >← 이전</button>
+              {STEPS.findIndex(s => s.id === guideStep) > 1 && (
+                <button
+                  onClick={() => {
+                    const idx = STEPS.findIndex(s => s.id === guideStep);
+                    setGuideStep(STEPS[idx - 1].id);
+                    if (phase === 'done') setPhase('flow');
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+                >← 이전</button>
+              )}
               <div className="flex items-center gap-2">
                 {guideStep === 'drawings' && !confirmed['drawings'] && (
                   <button onClick={() => confirm('drawings')} className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors">건너뛰기</button>
