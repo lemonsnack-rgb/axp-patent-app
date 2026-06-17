@@ -19,8 +19,8 @@ export default {
       },
       fontSize: {
         // 구 px → 표준 Tailwind 비례로 상향 조정 (class명 유지)
-        'xs2':   ['11px', { lineHeight: '1.5' }],   // 구 10px → text-xs 근접
-        'sm2':   ['12px', { lineHeight: '1.5' }],   // 구 11px → text-xs
+        'xs2':   ['12px', { lineHeight: '1.5' }],   // 구 10px → text-xs 근접
+        'sm2':   ['13px', { lineHeight: '1.5' }],   // 구 11px → text-xs
         'md2':   ['13px', { lineHeight: '1.55' }],  // 구 12px → text-sm 근접
         'base2': ['14px', { lineHeight: '1.6' }],   // 구 13px → text-sm
         'lg2':   ['16px', { lineHeight: '1.5' }],   // 구 15px → text-base
