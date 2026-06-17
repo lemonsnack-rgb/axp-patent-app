@@ -281,7 +281,16 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery }: P
             next.has(i) ? next.delete(i) : next.add(i);
             return next;
           })}
-          onToggleAll={(all) => setChecked(all ? new Set(data.map((_, i) => i)) : new Set())}
+          onToggleAll={(all) => {
+            const start = (page - 1) * perPage;
+            const pageIndices = data.slice(start, start + perPage).map((_, i) => start + i);
+            setChecked(prev => {
+              const next = new Set(prev);
+              if (all) pageIndices.forEach(idx => next.add(idx));
+              else pageIndices.forEach(idx => next.delete(idx));
+              return next;
+            });
+          }}
           sortCol={sortCol}
           sortDir={sortDir}
           onSort={(col) => {
@@ -414,6 +423,8 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
   onSort: (col: 'applicationDate' | 'title') => void;
 }) {
   const totalPages = Math.ceil(totalCount / perPage);
+  const startIdx = (page - 1) * perPage;
+  const pageData = data.slice(startIdx, startIdx + perPage);
 
   return (
     <div className="flex-1 flex min-h-0 overflow-hidden">
@@ -443,7 +454,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                   <input
                     type="checkbox"
                     className="form-checkbox text-blue-700 rounded w-3 h-3"
-                    checked={data.length > 0 && checked.size === data.length}
+                    checked={pageData.length > 0 && pageData.every((_, i) => checked.has(startIdx + i))}
                     onChange={e => onToggleAll(e.target.checked)}
                   />
                 </th>
@@ -468,17 +479,18 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
               </tr>
             </thead>
             <tbody>
-              {data.map((d, i) => {
-                const rowNo = (page - 1) * perPage + i + 1;
-                const isSelected = selectedCard === i;
+              {pageData.map((d, i) => {
+                const absIdx = startIdx + i;
+                const rowNo = absIdx + 1;
+                const isSelected = selectedCard === absIdx;
                 const statusClass =
                   d.status === '등록' ? 'badge-green' :
                   d.status === '심사중' || d.status === '출원' ? 'badge-amber' :
                   'badge-gray';
                 return (
                   <tr
-                    key={i}
-                    onClick={() => onSelectCard(i)}
+                    key={absIdx}
+                    onClick={() => onSelectCard(absIdx)}
                     className={clsx(
                       'border-b border-gray-100 cursor-pointer transition-colors',
                       isSelected
@@ -490,8 +502,8 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                       <input
                         type="checkbox"
                         className="form-checkbox text-blue-700 rounded w-3 h-3"
-                        checked={checked.has(i)}
-                        onChange={() => onToggleCheck(i)}
+                        checked={checked.has(absIdx)}
+                        onChange={() => onToggleCheck(absIdx)}
                       />
                     </td>
                     <td className="px-3 py-2 text-center text-xs2 text-gray-400">{rowNo}</td>
@@ -505,7 +517,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                     <td className="px-2 py-2 text-xs2 text-gray-600 font-mono">{d.applicationDate}</td>
                     <td className="px-2 py-2">
                       <button
-                        onClick={e => { e.stopPropagation(); onOpenDetail(i); }}
+                        onClick={e => { e.stopPropagation(); onOpenDetail(absIdx); }}
                         className="text-left text-sm2 text-gray-800 hover:text-blue-700 line-clamp-2 leading-snug font-medium w-full"
                         title={d.title}
                       >
@@ -517,7 +529,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                       <div className="flex items-center gap-1">
                         <span className="text-xs2 text-gray-600 font-mono">{d.expirationDate || '—'}</span>
                         <button
-                          onClick={e => { e.stopPropagation(); onSave(i); }}
+                          onClick={e => { e.stopPropagation(); onSave(absIdx); }}
                           className="ml-1 text-gray-400 hover:text-yellow-500 shrink-0"
                           title="라이브러리 저장"
                         >
