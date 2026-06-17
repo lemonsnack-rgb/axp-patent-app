@@ -356,7 +356,7 @@ export function SpecView() {
                     )}
                     <button
                       disabled={locked}
-                      onClick={() => { if (!locked && (phase === 'flow' || phase === 'done')) { setCurStep(s.id); if (s.id !== 'upload') setGuideStep(s.id); } }}
+                      onClick={() => { if (!locked && (phase === 'flow' || phase === 'done')) { setCurStep(s.id); if (s.id !== 'upload') { setGuideStep(s.id); setExpandedCards(prev => new Set([...prev, s.id])); } } }}
                       className={clsx(
                         'flex items-center gap-1.5 px-3 py-1 rounded-full border transition-colors',
                         active && 'border-blue-200 bg-blue-50',
@@ -479,91 +479,95 @@ export function SpecView() {
                   const isDone = si(s.id) < si(curStep) && (phase === 'flow' || phase === 'done');
                   return (
                     <div key={s.id} className="space-y-3">
-                      <AiMsg text={
-                        isSpecialStep(s.id) ? (
-                          <><strong>{STEP_LABEL[s.id]}</strong><br />
-                          업로드 내용을 기반으로 {STEP_LABEL[s.id]} 항목을 준비했습니다. 아래에서 확인하고 항목을 채우세요.</>
-                        ) : (
-                          <><strong>{STEP_LABEL[s.id]}</strong><br />
-                          업로드 내용을 기반으로 {STEP_LABEL[s.id]} 후보를 생성했습니다. 아래에서 선택하거나 직접 입력하세요.</>
-                        )
-                      } />
-                      {/* 현재 단계 후보 카드 인라인 — 비특수 단계만 */}
-                      {s.id === guideStep && !isDone && !isSpecialStep(s.id) && (
-                        <InlineCandidateCards
-                          stepId={s.id}
-                          cands={(s.id === 'title' ? (titleCandidates.length > 0 ? titleCandidates : undefined) : undefined) || GUIDE_CANDS[s.id] || []}
-                          gSel={gSel}
-                          setGSel={setGSel}
-                          setFocusCtx={setSpecFocusCtx}
-                          guidePanelInputRef={guidePanelInputRef}
-                        />
-                      )}
-                      {/* 현재 단계 특수 패널 인라인 */}
-                      {s.id === guideStep && !isDone && isSpecialStep(s.id) && (
-                        <div className="mt-3">
-                          {s.id === 'description' && (
-                            <DescriptionPanel
-                              onUpdate={v => setGSel(p => ({ ...p, description: v }))}
-                              onSubInfoChange={setDescSubInfo}
-                              onFocusContext={setSpecFocusCtx}
+                      {(!isDone || expandedCards.has(s.id)) && (
+                        <>
+                          <AiMsg text={
+                            isSpecialStep(s.id) ? (
+                              <><strong>{STEP_LABEL[s.id]}</strong><br />
+                              업로드 내용을 기반으로 {STEP_LABEL[s.id]} 항목을 준비했습니다. 아래에서 확인하고 항목을 채우세요.</>
+                            ) : (
+                              <><strong>{STEP_LABEL[s.id]}</strong><br />
+                              업로드 내용을 기반으로 {STEP_LABEL[s.id]} 후보를 생성했습니다. 아래에서 선택하거나 직접 입력하세요.</>
+                            )
+                          } />
+                          {/* 현재 단계 후보 카드 인라인 — 비특수 단계만 */}
+                          {s.id === guideStep && !isDone && !isSpecialStep(s.id) && (
+                            <InlineCandidateCards
+                              stepId={s.id}
+                              cands={(s.id === 'title' ? (titleCandidates.length > 0 ? titleCandidates : undefined) : undefined) || GUIDE_CANDS[s.id] || []}
+                              gSel={gSel}
+                              setGSel={setGSel}
+                              setFocusCtx={setSpecFocusCtx}
                               guidePanelInputRef={guidePanelInputRef}
                             />
                           )}
-                          {s.id === 'components' && (
-                            <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2 ml-1.5">
-                              <div className="rounded-xl border-2 border-zinc-200 bg-white p-3">
-                                <div className="flex items-center justify-between mb-2.5">
-                                  <span className="text-xs2 font-semibold text-gray-600">AI 추출 구성요소 ({confirmedComponents.length}개)</span>
-                                  <button
-                                    onClick={() => { setCompModalOpen(true); setCompModalMounted(true); }}
-                                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs2 font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-                                  >
-                                    <Icon name="edit" size={10} />
-                                    구성요소 편집 →
-                                  </button>
-                                </div>
-                                <div className="space-y-1">
-                                  {confirmedComponents.slice(0, 6).map(c => (
-                                    <div key={c.number || c.name} className="flex items-center gap-2 py-0.5">
-                                      <span className="text-xs2 font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded w-10 text-center shrink-0">{c.number || '—'}</span>
-                                      <span className="text-sm2 text-gray-700">{c.name}</span>
+                          {/* 현재 단계 특수 패널 인라인 */}
+                          {s.id === guideStep && !isDone && isSpecialStep(s.id) && (
+                            <div className="mt-3">
+                              {s.id === 'description' && (
+                                <DescriptionPanel
+                                  onUpdate={v => setGSel(p => ({ ...p, description: v }))}
+                                  onSubInfoChange={setDescSubInfo}
+                                  onFocusContext={setSpecFocusCtx}
+                                  guidePanelInputRef={guidePanelInputRef}
+                                />
+                              )}
+                              {s.id === 'components' && (
+                                <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2 ml-1.5">
+                                  <div className="rounded-xl border-2 border-zinc-200 bg-white p-3">
+                                    <div className="flex items-center justify-between mb-2.5">
+                                      <span className="text-xs2 font-semibold text-gray-600">AI 추출 구성요소 ({confirmedComponents.length}개)</span>
+                                      <button
+                                        onClick={() => { setCompModalOpen(true); setCompModalMounted(true); }}
+                                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs2 font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                                      >
+                                        <Icon name="edit" size={10} />
+                                        구성요소 편집 →
+                                      </button>
                                     </div>
-                                  ))}
-                                  {confirmedComponents.length > 6 && (
-                                    <p className="text-xs2 text-gray-400 pl-12">+{confirmedComponents.length - 6}개 더</p>
-                                  )}
+                                    <div className="space-y-1">
+                                      {confirmedComponents.slice(0, 6).map(c => (
+                                        <div key={c.number || c.name} className="flex items-center gap-2 py-0.5">
+                                          <span className="text-xs2 font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded w-10 text-center shrink-0">{c.number || '—'}</span>
+                                          <span className="text-sm2 text-gray-700">{c.name}</span>
+                                        </div>
+                                      ))}
+                                      {confirmedComponents.length > 6 && (
+                                        <p className="text-xs2 text-gray-400 pl-12">+{confirmedComponents.length - 6}개 더</p>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
+                              )}
+                              {s.id === 'drawings' && (
+                                <DrawingsPanel
+                                  done={false}
+                                  onConfirm={() => confirm('drawings')}
+                                  onUpdate={v => setGSel(p => ({ ...p, drawings: v }))}
+                                  inventionComponents={confirmedComponents}
+                                />
+                              )}
+                              {s.id === 'claims' && (
+                                <ClaimsPanel
+                                  done={false}
+                                  onConfirm={() => confirm('claims')}
+                                  onUpdate={v => setGSel(p => ({ ...p, claims: v }))}
+                                  onFocusContext={setSpecFocusCtx}
+                                  guidePanelInputRef={guidePanelInputRef}
+                                />
+                              )}
+                              {s.id === 'abstract' && (
+                                <AbstractPanel
+                                  done={false}
+                                  onConfirm={() => confirm('abstract')}
+                                  onUpdate={v => setGSel(p => ({ ...p, abstract: v }))}
+                                  onFocusContext={setSpecFocusCtx}
+                                  guidePanelInputRef={guidePanelInputRef}
+                                />
+                              )}
                             </div>
                           )}
-                          {s.id === 'drawings' && (
-                            <DrawingsPanel
-                              done={false}
-                              onConfirm={() => confirm('drawings')}
-                              onUpdate={v => setGSel(p => ({ ...p, drawings: v }))}
-                              inventionComponents={confirmedComponents}
-                            />
-                          )}
-                          {s.id === 'claims' && (
-                            <ClaimsPanel
-                              done={false}
-                              onConfirm={() => confirm('claims')}
-                              onUpdate={v => setGSel(p => ({ ...p, claims: v }))}
-                              onFocusContext={setSpecFocusCtx}
-                              guidePanelInputRef={guidePanelInputRef}
-                            />
-                          )}
-                          {s.id === 'abstract' && (
-                            <AbstractPanel
-                              done={false}
-                              onConfirm={() => confirm('abstract')}
-                              onUpdate={v => setGSel(p => ({ ...p, abstract: v }))}
-                              onFocusContext={setSpecFocusCtx}
-                              guidePanelInputRef={guidePanelInputRef}
-                            />
-                          )}
-                        </div>
+                        </>
                       )}
                       {isDone && (() => {
                         const isExpanded = expandedCards.has(s.id);
