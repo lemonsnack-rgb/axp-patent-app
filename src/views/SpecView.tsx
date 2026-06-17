@@ -73,7 +73,7 @@ export function SpecView() {
   const handleSetMainView = (v: 'analysis' | 'editor') => setMainView(v);
   const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
   const [specFocusCtx, setSpecFocusCtx] = useState<FocusCtx | null>(null);
-  const guidePanelInputRef = useRef<HTMLInputElement>(null);
+  const guidePanelInputRef = useRef<HTMLTextAreaElement>(null);
   const [descMode] = useState<string>('view');
   const [descSubInfo, setDescSubInfo] = useState<{
     subStep: number; currentLabel: string; allDone: boolean; doConfirm: (() => void) | null;
@@ -109,6 +109,7 @@ export function SpecView() {
     (savedSpec?.componentItems as { id: number; text: string; sel: boolean; num: string; depth: number }[]) ?? []
   );
   const [analyzing, setAnalyzing] = useState(false);
+  const [loadingStage, setLoadingStage] = useState(0);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
 
   const flowRef = useRef<HTMLDivElement>(null);
@@ -196,21 +197,23 @@ export function SpecView() {
     const title   = override?.title   ?? diTitle.trim();
     const field   = override?.field   ?? diField.trim();
     const content = override?.content ?? diContent.trim();
-    if (!title || !field || !content) return;
+    if (!title || !content) return;
     setAnalyzing(true);
+    setLoadingStage(1);
     const input = { title, field, content, problem: diProblem.trim(), keywords: diKeywords.trim() };
+    setTimeout(() => setLoadingStage(2), 500);
+    setTimeout(() => setLoadingStage(3), 1000);
     setTimeout(() => {
       const comps = generateComponentCandidates(input);
       setTitleCandidates(generateTitleCandidates(input));
       setAiComponents(comps);
-      // 이전 확정 상태 초기화 (새 분석 시작)
       setConfirmed({});
       setGSel({});
       setPhase('flow');
       setCurStep('title');
       setGuideStep('title');
       setAnalyzing(false);
-      // 발명 제목으로 작업명 자동 업데이트 (기본값일 때만)
+      setLoadingStage(0);
       if (task?.id && title && (!task.name || task.name === '새 명세서' || task.name === '새 작업')) {
         const taskName = title.length > 40 ? title.slice(0, 40) + '…' : title;
         taskUpdate(task.id, { name: taskName });
@@ -278,7 +281,6 @@ export function SpecView() {
           onBack={() => handleSetMainView('analysis')}
           confirmedTitle={gSel['title'] || confirmed['title'] || diTitle}
           analysisResult={makeAnalysisResult()}
-          projectName={projectName}
         />
         {previewOpen && <PreviewModal taskName={task?.name} sections={makePreviewSections()} onClose={() => setPreviewOpen(false)} />}
       </>
@@ -361,14 +363,12 @@ export function SpecView() {
                       <div className={clsx('h-0.5 shrink-0 mx-1', prevDone ? 'bg-green-500' : 'bg-gray-200')}
                         style={{ width: 20 }} />
                     )}
-                    <button
-                      disabled={locked}
-                      onClick={() => { if (!locked && (phase === 'flow' || phase === 'done')) { setCurStep(s.id); if (s.id !== 'upload') { setGuideStep(s.id); setExpandedCards(prev => new Set([...prev, s.id])); } } }}
+                    <div
                       className={clsx(
-                        'flex items-center gap-1.5 px-3 py-1 rounded-full border transition-colors',
+                        'flex items-center gap-1.5 px-3 py-1 rounded-full border cursor-default select-none',
                         active && 'border-blue-200 bg-blue-50',
                         !active && 'border-transparent',
-                        locked && 'cursor-default opacity-60',
+                        locked && 'opacity-60',
                       )}>
                       <span className={clsx(
                         'w-5 h-5 rounded-full text-xs2 font-bold flex items-center justify-center shrink-0 border-2',
@@ -386,7 +386,7 @@ export function SpecView() {
                         locked && 'text-gray-400',
                         !active && !isDone && !locked && 'text-gray-500',
                       )}>{s.short}</span>
-                    </button>
+                    </div>
                   </div>
                 );
               })}
@@ -403,7 +403,7 @@ export function SpecView() {
           <div className="max-w-3xl mx-auto py-8 px-4 space-y-3">
 
             {/* 업로드 존 — PDF 파일 업로드 */}
-            {phase !== 'flow' && phase !== 'done' && phase !== 'direct' && (
+            {phase !== 'flow' && phase !== 'done' && !analyzing && (
               <div className="text-center py-4">
                 <Icon name="doc" size={48} className="text-brand-400 mx-auto mb-3" />
                 <h2 className="text-lg2 font-bold text-gray-800 mb-2">새 특허 명세서 작성</h2>
@@ -411,42 +411,76 @@ export function SpecView() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".pdf,.docx,.txt"
+                  accept=".pdf"
                   className="hidden"
                   onChange={e => {
                     const file = e.target.files?.[0];
                     if (!file) return;
                     const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+                    const content = `[${file.name}] 파일이 업로드되었습니다.`;
                     setDiTitle(nameWithoutExt);
-                    const reader = new FileReader();
-                    reader.onload = ev => {
-                      const text = ev.target?.result as string;
-                      setDiContent(text?.slice(0, 2000) || '(파일 내용)');
-                      setPhase('direct');
-                    };
-                    if (file.type === 'text/plain') {
-                      reader.readAsText(file);
-                    } else {
-                      setDiContent(`[${file.name}] 파일이 업로드되었습니다. 아래 내용을 확인 후 AI 분석을 시작하세요.`);
-                      setPhase('direct');
-                    }
+                    setDiContent(content);
+                    startFlow({ title: nameWithoutExt, field: '', content });
                     e.target.value = '';
                   }}
                 />
                 <div
-                  onClick={() => { if (phase === 'upload') fileInputRef.current?.click(); }}
-                  className={`border-2 border-dashed rounded-xl p-10 mb-5 transition-all ${phase === 'upload' ? 'border-gray-300 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30' : 'border-gray-200 opacity-50'}`}>
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-gray-300 rounded-xl p-10 mb-5 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all">
                   <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 text-gray-400">
                     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>
                   </svg>
                   <p className="text-md2 text-gray-600">직무발명서 PDF를 업로드 하세요.</p>
-                  <p className="text-xs2 text-gray-400 mt-1">.pdf · .docx · .txt 지원</p>
+                  <p className="text-xs2 text-gray-400 mt-1">.pdf 지원</p>
+                </div>
+              </div>
+            )}
+
+            {/* 분석 로딩 화면 */}
+            {analyzing && (
+              <div className="flex flex-col items-center py-16 gap-8">
+                <div className="w-full max-w-xs space-y-3">
+                  {[
+                    { stage: 1, label: 'PDF 텍스트 추출 중...' },
+                    { stage: 2, label: '발명 구성요소 파악 중...' },
+                    { stage: 3, label: '명세서 항목 분석 중...' },
+                  ].map(s => (
+                    <div key={s.stage} className={clsx(
+                      'flex items-center gap-3 p-3 rounded-lg transition-all duration-300',
+                      loadingStage === s.stage && 'bg-blue-50',
+                    )}>
+                      <div className={clsx(
+                        'w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-colors duration-300',
+                        loadingStage > s.stage ? 'bg-green-100' :
+                        loadingStage === s.stage ? 'bg-blue-100' : 'bg-gray-100',
+                      )}>
+                        {loadingStage > s.stage ? (
+                          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="text-green-600"><polyline points="3,8 7,12 13,4" /></svg>
+                        ) : loadingStage === s.stage ? (
+                          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-blue-500 animate-spin" style={{ transformOrigin: 'center' }}><circle cx="8" cy="8" r="5" strokeDasharray="20 12" /></svg>
+                        ) : (
+                          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-300"><circle cx="8" cy="8" r="5" /></svg>
+                        )}
+                      </div>
+                      <span className={clsx(
+                        'text-sm2 transition-colors duration-300',
+                        loadingStage > s.stage ? 'text-green-700' :
+                        loadingStage === s.stage ? 'text-brand-400 font-semibold' : 'text-gray-400',
+                      )}>{s.label}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="w-56 h-1 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-brand-400 rounded-full transition-all duration-700 ease-out"
+                    style={{ width: `${Math.max(5, (loadingStage / 3) * 100)}%` }}
+                  />
                 </div>
               </div>
             )}
 
             {/* 직접입력 폼 — 원본: AI 분석 시작 후에도 계속 표시 (필드 잠금) */}
-            {(phase === 'direct' || ((phase === 'flow' || phase === 'done') && diTitle.trim())) && (
+            {phase === 'direct' && (
               <div className="card overflow-hidden">
                 <div className="flex items-center gap-3 p-4 border-b border-gray-100 bg-gray-50">
                   <Icon name="edit" size={20} className="text-brand-400" />
@@ -831,7 +865,7 @@ function InlineCandidateCards({
   gSel: Partial<Record<StepId, string>>;
   setGSel: React.Dispatch<React.SetStateAction<Partial<Record<StepId, string>>>>;
   setFocusCtx: (ctx: FocusCtx | null) => void;
-  guidePanelInputRef: React.RefObject<HTMLInputElement | null>;
+  guidePanelInputRef: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const letters = ['A', 'B', 'C', 'D', 'E'];
   const curSel = gSel[stepId] || cands[0] || '';
@@ -925,17 +959,25 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
   onMobileClose?: () => void;
   focusCtx: FocusCtx | null;
   setFocusCtx: (ctx: FocusCtx | null) => void;
-  chatInputRef?: React.RefObject<HTMLInputElement | null>;
+  chatInputRef?: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const isDone = step in confirmed;
   // 채팅 상태
   const [guideChatMsgs, setGuideChatMsgs] = useState<GuideChatMsg[]>([]);
   const [guideChatInput, setGuideChatInput] = useState('');
+  const localTextareaRef = useRef<HTMLTextAreaElement>(null);
   const guideChatIdRef = useRef(0);
   const guideChatEndRef = useRef<HTMLDivElement>(null);
   const [localText, setLocalText] = useState('');
   const [isEditingCtx, setIsEditingCtx] = useState(false);
+
+  useEffect(() => {
+    const el = (chatInputRef?.current ?? localTextareaRef.current);
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }, [guideChatInput, chatInputRef]);
 
   // focusCtx 변경(섹션 선택, AI 적용) 시 편집 텍스트 동기화 + 편집 모드 리셋
   useEffect(() => {
@@ -1237,15 +1279,16 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
           </div>
         )}
         {/* 입력창 — 항상 표시 */}
-        <div className="shrink-0 flex gap-2 items-center px-3 py-2">
-          <input
-            ref={chatInputRef}
-            type="text"
-            className="flex-1 text-xs2 border border-zinc-300 rounded-xl px-3 py-1.5 outline-none focus:border-blue-400 transition-colors"
+        <div className="shrink-0 flex gap-2 items-end px-3 py-2">
+          <textarea
+            ref={chatInputRef ?? localTextareaRef}
+            rows={2}
+            className="flex-1 text-xs2 border border-zinc-300 rounded-xl px-3 py-2 outline-none resize-none focus:border-blue-400 transition-colors leading-relaxed overflow-y-auto"
             placeholder={focusCtx ? `"${focusCtx.label}" 수정 요청...` : 'AI에게 질문하세요...'}
             value={guideChatInput}
             onChange={e => setGuideChatInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); sendGuideChat(); } }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendGuideChat(); } }}
+            style={{ maxHeight: '120px' }}
           />
           <button
             onClick={() => sendGuideChat()}
@@ -1761,7 +1804,7 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
   onConfirm: () => void;
   onUpdate: (v: string) => void;
   onFocusContext?: (ctx: { text: string; label: string; apply: (t: string) => void }) => void;
-  guidePanelInputRef?: React.RefObject<HTMLInputElement | null>;
+  guidePanelInputRef?: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const [claimsPhase, setClaimsPhase] = useState<'indep' | 'dep'>('indep');
   const [claimSets] = useState<import('../features/spec/types').IndependentClaimSet[]>(() =>
@@ -2162,7 +2205,7 @@ function DescriptionPanel({ onUpdate, onSubInfoChange, onFocusContext, guidePane
   onUpdate: (v: string) => void;
   onSubInfoChange?: (info: { subStep: number; currentLabel: string; allDone: boolean; doConfirm: (() => void) | null }) => void;
   onFocusContext?: (ctx: { text: string; label: string; apply: (t: string) => void }) => void;
-  guidePanelInputRef?: React.RefObject<HTMLInputElement | null>;
+  guidePanelInputRef?: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const [texts, setTexts] = useState<Record<string, string>>(
     Object.fromEntries(DESC_SECTIONS.map(s => [s.key, s.text]))
