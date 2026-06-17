@@ -1723,6 +1723,7 @@ function DrawingsPanel({ done, onUpdate, inventionComponents }: {
               {isEditable && (
                 <button
                   onClick={() => openEditor(d.id)}
+                  title="새 탭에서 열립니다"
                   className="w-full flex items-center justify-center gap-1 py-1.5 text-xs2 font-semibold transition-colors border-t border-gray-100 text-blue-600 hover:bg-blue-50 shrink-0">
                   <Icon name="edit" size={10} />
                   도면 편집 →

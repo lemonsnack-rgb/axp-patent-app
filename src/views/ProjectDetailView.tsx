@@ -4,6 +4,7 @@ import { useStore, taskTypeMeta } from '../store';
 import { useToast } from '../components/Toast';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
+import { EmptyState } from '../components/EmptyState';
 import { PROJECT_COLORS } from './HomeView';
 import type { TaskType } from '../types';
 
@@ -56,6 +57,7 @@ export function ProjectDetailView() {
   };
   const setColor = (c: string) => {
     projectUpdate(p.id, { color: c });
+    toast.show('색상 변경됨');
     setMenuOpen(false);
   };
   const remove = () => {
@@ -138,10 +140,10 @@ export function ProjectDetailView() {
       <div className="flex-1 overflow-y-auto scroll-thin p-6">
         {tab === 'tasks' && (
           projectTasks.length === 0 ? (
-            <div className="card p-12 text-center text-gray-400 text-md2">
-              이 프로젝트에 작업이 없습니다.<br/>
-              우측 상단 [+ 이 프로젝트에 새 작업]으로 추가하세요.
-            </div>
+            <EmptyState
+              title="이 프로젝트에 작업이 없습니다."
+              description="우측 상단 [+ 이 프로젝트에 새 작업]으로 추가하세요."
+            />
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3">
               {projectTasks.map(t => {
@@ -194,10 +196,10 @@ export function ProjectDetailView() {
 
             {/* 라이브러리 표 */}
             {libFiltered.length === 0 ? (
-              <div className="card p-12 text-center text-gray-400 text-md2">
-                이 프로젝트에 저장된 라이브러리 자료가 없습니다.<br/>
-                검색에서 [저장]을 누르면 여기 표시됩니다.
-              </div>
+              <EmptyState
+                title="이 프로젝트에 저장된 라이브러리 자료가 없습니다."
+                description="검색에서 [저장]을 누르면 여기 표시됩니다."
+              />
             ) : (
               <div className="card overflow-hidden">
                 <table className="w-full text-md2">

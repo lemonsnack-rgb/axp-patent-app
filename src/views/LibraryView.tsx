@@ -7,6 +7,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { LibrarySaveModal } from '../components/LibrarySaveModal';
 import { LibraryDetailModal } from '../components/LibraryDetailModal';
 import clsx from 'clsx';
+import { EmptyState } from '../components/EmptyState';
 import type { LibraryItem } from '../types';
 
 type DrillFilter = null | { kind: 'all' } | { kind: 'collection'; id: string } | { kind: 'tag'; tag: string };
@@ -15,6 +16,7 @@ const COLLECTION_COLORS = ['#1e5fa6', '#10b981', '#f59e0b', '#6d28d9', '#dc2626'
 
 export function LibraryView() {
   const { library, collections, collectionAdd, collectionToggleFavorite, collectionRemove } = useStore();
+  const toast = useToast();
   const [search, setSearch] = useState('');
   const [drill, setDrill] = useState<DrillFilter>(null);
   const [newOpen, setNewOpen] = useState(false);
@@ -54,11 +56,11 @@ export function LibraryView() {
 
       {/* 빈 상태 안내 */}
       {collections.length === 0 && (
-        <div className="text-center py-12 text-gray-400">
-          <Icon name="library" size={40} className="mx-auto mb-3 text-gray-200" />
-          <p className="text-md2 font-medium text-gray-600 mb-1">라이브러리가 비어 있습니다</p>
-          <p className="text-sm2 text-gray-400">특허·논문 검색에서 저장한 자료가 여기에 표시됩니다.<br/>폴더를 만들어 자료를 분류해 보세요.</p>
-        </div>
+        <EmptyState
+          icon="library"
+          title="라이브러리가 비어 있습니다"
+          description={"특허·논문 검색에서 저장한 자료가 여기에 표시됩니다.\n폴더를 만들어 자료를 분류해 보세요."}
+        />
       )}
 
       {/* 폴더 그리드 */}
@@ -123,7 +125,7 @@ export function LibraryView() {
                   <button
                     onClick={e => {
                       e.stopPropagation();
-                      showConfirm(`"${c.name}" 폴더를 삭제할까요?\n자료는 미분류로 이동됩니다.`, () => collectionRemove(c.id));
+                      showConfirm(`"${c.name}" 폴더를 삭제할까요?\n자료는 미분류로 이동됩니다.`, () => { collectionRemove(c.id); toast.show(`폴더 삭제: ${c.name}`); });
                     }}
                     className="opacity-0 hover:opacity-100 absolute bottom-1 right-1.5 text-xs2 text-red-500 hover:bg-red-50 px-1.5 py-0.5 rounded"
                   >삭제</button>
@@ -134,8 +136,8 @@ export function LibraryView() {
         })}
       </div>
 
-      {/* 태그 행 (드릴다운 모드일 때만) */}
-      {drill && allTags.length > 0 && (
+      {/* 태그 행 */}
+      {allTags.length > 0 && (
         <section className="mt-6">
           <div className="text-sm2 font-semibold text-zinc-500 mb-2">태그 {allTags.length}개</div>
           <div className="flex flex-wrap gap-1.5">
@@ -223,7 +225,7 @@ function DrillDownItems({ filter, search, sort, onSortChange, onOpenDetail }: {
         </select>
       </div>
       {items.length === 0 ? (
-        <div className="card p-8 text-center text-zinc-400">자료가 없습니다.</div>
+        <EmptyState compact title="자료가 없습니다." />
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3">
           {items.map(it => {

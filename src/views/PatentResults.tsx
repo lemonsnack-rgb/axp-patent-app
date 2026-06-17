@@ -6,6 +6,7 @@ import { PATENT_FACET_GROUPS_BASE, PATENT_FACET_GROUPS_EXT } from '../data/facet
 import { Icon } from '../components/Icon';
 import { useStore } from '../store';
 import { useToast } from '../components/Toast';
+import { getPatentStatusBadgeClass } from '../utils/badgeUtils';
 import type { PatentResult } from '../types';
 
 type SortKey = 'recent' | 'cited' | 'grade' | 'relevance';
@@ -515,10 +516,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                 const absIdx = startIdx + i;
                 const rowNo = absIdx + 1;
                 const isSelected = selectedCard === absIdx;
-                const statusClass =
-                  d.status === '등록' ? 'badge-green' :
-                  d.status === '심사중' || d.status === '출원' ? 'badge-amber' :
-                  'badge-gray';
+                const statusClass = getPatentStatusBadgeClass(d.status);
                 return (
                   <tr
                     key={absIdx}
@@ -606,7 +604,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
 
 function InlineDetail({ d, onOpenDetail, onSave }: { d: PatentResult; onOpenDetail: () => void; onSave: () => void }) {
   if (!d) return null;
-  const statusClass = d.status === '등록' ? 'badge-green' : d.status === '심사중' ? 'badge-amber' : 'badge-gray';
+  const statusClass = getPatentStatusBadgeClass(d.status);
   return (
     <div className="space-y-3">
       <div className="font-bold text-base2 text-gray-800 leading-snug">{d.title}</div>
@@ -684,7 +682,7 @@ function SlidingView({ data, onOpenDetail, onSave, onBgPatent }: { data: PatentR
           >
             <div className="flex items-center gap-2 mb-2">
               <span className="font-mono text-md2 text-brand-400">{d.number}</span>
-              <span className={clsx('badge text-xs2', d.status === '등록' ? 'badge-green' : 'badge-amber')}>{d.status}</span>
+              <span className={clsx('badge text-xs2', getPatentStatusBadgeClass(d.status))}>{d.status}</span>
               {d.grade && <span className="badge badge-blue text-xs2">평가 {d.grade}</span>}
               <div className="ml-auto flex gap-1.5">
                 <button onClick={() => onOpenDetail(i)} className="btn-outline btn-xs">전체 보기</button>
@@ -793,7 +791,7 @@ function GalleryView({ data, onSave, onBgPatent }: { data: PatentResult[]; onSav
             </div>
             <div className="flex items-center gap-1.5 mb-1">
               <span className="font-mono text-sm2 text-brand-400">{d.number}</span>
-              <span className={clsx('badge text-xs2', d.status === '등록' ? 'badge-green' : 'badge-amber')}>{d.status}</span>
+              <span className={clsx('badge text-xs2', getPatentStatusBadgeClass(d.status))}>{d.status}</span>
             </div>
             <div className="text-md2 font-semibold text-gray-800 line-clamp-2 mb-1">{d.title}</div>
             <div className="text-sm2 text-gray-500 truncate">{d.applicant}</div>

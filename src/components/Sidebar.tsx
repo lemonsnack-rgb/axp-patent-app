@@ -4,6 +4,9 @@ import { useStore, taskTypeMeta } from '../store';
 import { TaskItemSkeleton } from './ui/Skeleton';
 import { useToast } from './Toast';
 import { Icon } from './Icon';
+import { ConfirmModal } from './ConfirmModal';
+import { QuickNameModal } from './QuickNameModal';
+import { EmptyState } from './EmptyState';
 import type { Task } from '../types';
 
 export function Sidebar() {
@@ -19,6 +22,8 @@ export function Sidebar() {
   const [taskSearchOpen, setTaskSearchOpen] = useState(false);
   const [taskSearchQuery, setTaskSearchQuery] = useState('');
   const [taskSearchType, setTaskSearchType] = useState('all');
+  const [renameState, setRenameState] = useState<{ open: boolean; taskId: string; current: string }>({ open: false, taskId: '', current: '' });
+  const [deleteState, setDeleteState] = useState<{ open: boolean; taskId: string; taskName: string }>({ open: false, taskId: '', taskName: '' });
 
   // 단축키: Cmd/Ctrl+B 사이드바 토글
   useEffect(() => {
@@ -117,17 +122,13 @@ export function Sidebar() {
               });
               if (filtered.length === 0) {
                 return (
-                  <div className="text-center text-zinc-400 py-8">
-                    <p className="text-xs">검색 결과 없음</p>
-                    {(taskSearchQuery || taskSearchType !== 'all') && (
-                      <button
-                        onClick={() => { setTaskSearchQuery(''); setTaskSearchType('all'); }}
-                        className="text-xs text-blue-500 mt-1 hover:underline"
-                      >
-                        필터 초기화
-                      </button>
-                    )}
-                  </div>
+                  <EmptyState
+                    compact
+                    title="검색 결과 없음"
+                    action={(taskSearchQuery || taskSearchType !== 'all') ? (
+                      <button onClick={() => { setTaskSearchQuery(''); setTaskSearchType('all'); }} className="text-xs text-blue-500 hover:underline">필터 초기화</button>
+                    ) : undefined}
+                  />
                 );
               }
               return filtered.map(t => (
@@ -196,10 +197,10 @@ export function Sidebar() {
           <div className="flex-1 overflow-y-auto scroll-thin px-2 py-1.5">
             {list.length === 0 ? (
               search
-                ? <div className="text-center text-xs2 text-neutral-400 px-3 py-6">검색 결과 없음</div>
+                ? <EmptyState compact title="검색 결과 없음" />
                 : tasks.length === 0
                   ? <div className="space-y-1 px-1 py-2">{[0,1,2].map(i => <TaskItemSkeleton key={i} />)}</div>
-                  : <div className="text-center text-xs2 text-neutral-400 px-3 py-6">작업이 없습니다.<br/><span className="mt-1 block">새 작업을 클릭하세요.</span></div>
+                  : <EmptyState compact title="작업이 없습니다." description="새 작업을 클릭하세요." />
             ) : list.map(t => (
               <TaskRow
                 key={t.id}
@@ -212,24 +213,13 @@ export function Sidebar() {
                 onToggleFav={() => taskToggleFavorite(t.id)}
                 menuOpen={menuFor === t.id}
                 onMenuToggle={() => setMenuFor(menuFor === t.id ? null : t.id)}
-                onRename={() => {
-                  const n = prompt('새 이름:', t.name);
-                  if (n?.trim()) { taskUpdate(t.id, { name: n.trim() }); toast.show('이름 변경 완료'); }
-                  setMenuFor(null);
-                }}
+                onRename={() => { setRenameState({ open: true, taskId: t.id, current: t.name }); setMenuFor(null); }}
                 onDuplicate={() => {
                   taskAdd({ type: t.type, name: t.name + ' 사본', folderId: t.folderId, clientId: t.clientId, contactId: t.contactId, techField: t.techField });
                   toast.show('작업 복제됨');
                   setMenuFor(null);
                 }}
-                onDelete={() => {
-                  if (confirm(`"${t.name}" 작업을 삭제할까요?`)) {
-                    taskRemove(t.id);
-                    if (activeTaskId === t.id) setActiveTaskId(null);
-                    toast.show('작업 삭제됨');
-                  }
-                  setMenuFor(null);
-                }}
+                onDelete={() => { setDeleteState({ open: true, taskId: t.id, taskName: t.name }); setMenuFor(null); }}
               />
             ))}
           </div>
@@ -253,6 +243,21 @@ export function Sidebar() {
           </div>
         )}
       </div>
+      <QuickNameModal
+        open={renameState.open}
+        title="작업 이름 변경"
+        placeholder={renameState.current}
+        onSubmit={name => { taskUpdate(renameState.taskId, { name }); toast.show('이름 변경 완료'); setRenameState(s => ({ ...s, open: false })); }}
+        onClose={() => setRenameState(s => ({ ...s, open: false }))}
+      />
+      <ConfirmModal
+        open={deleteState.open}
+        message={`"${deleteState.taskName}" 작업을 삭제할까요?`}
+        confirmLabel="삭제"
+        danger
+        onConfirm={() => { taskRemove(deleteState.taskId); if (activeTaskId === deleteState.taskId) setActiveTaskId(null); toast.show('작업 삭제됨'); setDeleteState(s => ({ ...s, open: false })); }}
+        onCancel={() => setDeleteState(s => ({ ...s, open: false }))}
+      />
     </aside>
   );
 }

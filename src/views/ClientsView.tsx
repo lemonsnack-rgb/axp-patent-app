@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { useToast } from '../components/Toast';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
+import { EmptyState } from '../components/EmptyState';
 import type { Client, Contact } from '../types';
 
 interface ClientForm { name: string; industry: string; address: string }
@@ -111,9 +112,10 @@ export function ClientsView() {
 
       <div className="space-y-3">
         {list.length === 0 ? (
-          <div className="card p-12 text-center text-gray-400">
-            {search ? `"${search}" 검색 결과가 없습니다` : <>등록된 고객사가 없습니다.<br/>[+ 새 고객사] 버튼으로 추가하세요.</>}
-          </div>
+          <EmptyState
+            title={search ? `"${search}" 검색 결과가 없습니다` : '등록된 고객사가 없습니다.'}
+            description={search ? undefined : '[+ 새 고객사] 버튼으로 추가하세요.'}
+          />
         ) : list.map(c => {
           const cContacts = contactByClient(c.id);
           const cProjects = projects.filter(p => p.clientId === c.id).length;
