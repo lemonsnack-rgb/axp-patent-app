@@ -1911,7 +1911,7 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: { d
           <button
             onClick={confirmIndep}
             disabled={selectedCands.length === 0}
-            className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm2 font-semibold hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed mt-1">
+            className="w-full py-2.5 border border-blue-400 text-blue-600 bg-blue-50 rounded-lg text-sm2 font-medium hover:bg-blue-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
             선택한 독립항 {selectedCands.length > 0 ? `${selectedCands.length}개` : ''} 으로 종속항 구성 →
           </button>
         )}
