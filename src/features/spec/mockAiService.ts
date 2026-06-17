@@ -28,16 +28,17 @@ export function generateDescriptionSection(
 export function generateComponentCandidates(input: InventionInput): SpecComponentItem[] {
   const { title, field, content } = input;
   const base = [
-    { text: `입력부: ${field} 환경에서 외부 데이터를 수신하여 처리 파이프라인에 전달` },
-    { text: `전처리부: 수신된 데이터에 대한 전처리 및 정규화를 수행` },
-    { text: `처리부: ${title} 핵심 알고리즘을 적용하여 데이터를 분석·처리` },
-    { text: `출력부: 처리 결과를 외부 시스템에 출력` },
+    { text: `입력부: ${field} 환경에서 외부 데이터를 수신하여 처리 파이프라인에 전달`, englishName: 'input unit', definition: `${field} 환경에서 외부 신호 또는 데이터를 수신하여 내부 처리 파이프라인에 전달하는 구성요소`, parent: `데이터 처리 시스템 / data processing system` },
+    { text: `전처리부: 수신된 데이터에 대한 전처리 및 정규화를 수행`, englishName: 'preprocessing unit', definition: '수신된 원시 데이터의 노이즈 제거, 정규화, 변환 등의 전처리 과정을 수행하는 구성요소', parent: `데이터 처리 시스템 / data processing system` },
+    { text: `처리부: ${title} 핵심 알고리즘을 적용하여 데이터를 분석·처리`, englishName: 'processing unit', definition: `${title}의 핵심 알고리즘을 적용하여 입력 데이터를 분석하고 처리 결과를 산출하는 구성요소`, parent: `데이터 처리 시스템 / data processing system` },
+    { text: `출력부: 처리 결과를 외부 시스템에 출력`, englishName: 'output unit', definition: '처리 결과를 사용자 인터페이스 또는 외부 시스템에 전달하는 구성요소', parent: `데이터 처리 시스템 / data processing system` },
   ];
   if (content.length > 50) {
-    base.push({ text: `제어부: ${content.slice(0, 30)}... 전반을 제어·관리` });
+    base.push({ text: `제어부: ${content.slice(0, 30)}... 전반을 제어·관리`, englishName: 'control unit', definition: '시스템 각 구성요소의 동작을 조율하고 전반적인 처리 흐름을 제어·관리하는 구성요소', parent: `데이터 처리 시스템 / data processing system` });
   }
   return base.map((c, i) => ({
     id: i + 1, text: c.text, sel: true, num: '', depth: 0,
+    englishName: c.englishName, definition: c.definition, parent: c.parent,
   }));
 }
 

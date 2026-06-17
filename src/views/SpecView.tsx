@@ -616,6 +616,25 @@ export function SpecView() {
                                         );
                                       })}
                                     </div>
+                                  ) : s.id === 'components' ? (
+                                    <ul className="space-y-1">
+                                      {confirmedVal.split('\n').filter(Boolean).map((line, li) => {
+                                        const parenIdx = line.lastIndexOf(' (');
+                                        const hasEng = parenIdx > 0 && line.endsWith(')');
+                                        const base = hasEng ? line.slice(0, parenIdx) : line;
+                                        const eng = hasEng ? line.slice(parenIdx + 2, -1) : '';
+                                        const spaceIdx = base.indexOf(' ');
+                                        const num = spaceIdx > 0 ? base.slice(0, spaceIdx) : '';
+                                        const name = spaceIdx > 0 ? base.slice(spaceIdx + 1) : base;
+                                        return (
+                                          <li key={li} className="flex items-baseline gap-1.5">
+                                            <span className="text-xs2 font-bold text-blue-600 shrink-0 w-7 text-right">{num}</span>
+                                            <span className="text-xs2 text-gray-800">{name}</span>
+                                            {eng && <span className="text-xs2 text-gray-400">({eng})</span>}
+                                          </li>
+                                        );
+                                      })}
+                                    </ul>
                                   ) : (
                                     <p className="text-sm2 text-gray-700 leading-relaxed">{confirmedVal}</p>
                                   )}
@@ -1202,7 +1221,7 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
 }
 
 // 구성요소 패널 (#20)
-interface CompItem { id: number; text: string; sel: boolean; num: string; depth: number }
+interface CompItem { id: number; text: string; sel: boolean; num: string; depth: number; englishName?: string; definition?: string; parent?: string }
 const INIT_COMPS: CompItem[] = [
   { id: 1, text: '데이터 수집부: 라이다 센서로부터 3D 포인트 클라우드 데이터를 수집', sel: true, num: '', depth: 0 },
   { id: 2, text: '전처리부: 노이즈 제거 및 다운샘플링을 통해 데이터 전처리 수행', sel: true, num: '', depth: 0 },
@@ -1245,7 +1264,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
   onConfirm: () => void;
   onUpdate: (v: string) => void;
   onComponentsChange?: (comps: InventionComponent[]) => void;
-  initialItems?: { id: number; text: string; sel: boolean; num: string; depth: number }[];
+  initialItems?: { id: number; text: string; sel: boolean; num: string; depth: number; englishName?: string; definition?: string; parent?: string }[];
 }) {
   const initData = (initialItems && initialItems.length > 0) ? initialItems : INIT_COMPS;
   const [items, setItems] = useState<CompItem[]>(initData as CompItem[]);
@@ -1262,7 +1281,11 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
   const upd = (next: CompItem[]) => {
     setItems(next);
     const selected = next.filter(it => it.sel);
-    onUpdate(selected.map(it => `${it.num || '—'} ${it.text}`).join('\n'));
+    onUpdate(selected.map(it => {
+      let line = `${it.num || '—'} ${extractCompName(it.text)}`;
+      if (it.englishName) line += ` (${it.englishName})`;
+      return line;
+    }).join('\n'));
     onComponentsChange?.(selected.map(it => ({ number: it.num || '', name: extractCompName(it.text) })));
   };
 
@@ -1284,7 +1307,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
   const autoAssign = () => { if (!done) upd(calcAutoNums(items)); };
   const add = () => {
     if (!newText.trim()||done) return;
-    upd([...items, { id: Date.now(), text: newText.trim(), sel: true, num: '', depth: 0 }]);
+    upd([...items, { id: Date.now(), text: newText.trim(), sel: true, num: '', depth: 0, englishName: '', definition: '', parent: '' }]);
     setNewText('');
   };
 
@@ -1332,7 +1355,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
           </p>
         )}
 
-        <div className="space-y-0.5">
+        <div className="space-y-2">
           {items.map((item, idx) => (
             <div key={item.id}
               style={{ paddingLeft: item.depth * DEPTH_INDENT }}
@@ -1343,64 +1366,104 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
               className={clsx(
                 !item.sel && 'opacity-50',
                 dragIdx === idx && 'opacity-30',
-                dropIdx === idx && dragIdx !== idx && 'ring-2 ring-blue-400 ring-offset-1 rounded'
+                dropIdx === idx && dragIdx !== idx && 'ring-2 ring-blue-400 ring-offset-1 rounded-lg'
               )}>
               <div className={clsx(
-                'flex items-center gap-1 rounded px-1.5 py-1 transition-all group',
-                item.sel && !done ? 'bg-white border border-gray-200 hover:border-blue-300' : '',
-                !item.sel ? 'bg-gray-50 border border-dashed border-gray-200' : '',
-                done && item.sel ? 'bg-green-50 border border-green-200' : ''
+                'rounded-lg border p-2 space-y-1.5 transition-all group',
+                item.sel && !done ? 'bg-white border-gray-200 hover:border-blue-300' : '',
+                !item.sel ? 'bg-gray-50 border-dashed border-gray-200' : '',
+                done && item.sel ? 'bg-green-50 border-green-200' : ''
               )}>
-                {/* 드래그 핸들 */}
-                <span className="text-gray-300 cursor-grab active:cursor-grabbing shrink-0 select-none text-xs leading-none px-0.5">⠿</span>
+                {/* 명칭 row */}
+                <div className="flex items-center gap-1">
+                  <span className="text-gray-300 cursor-grab active:cursor-grabbing shrink-0 select-none text-xs leading-none px-0.5">⠿</span>
+                  <span className={clsx(
+                    'w-8 text-xs2 font-bold rounded px-1 py-0.5 shrink-0 text-center',
+                    item.num ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'
+                  )}>
+                    {item.num || '—'}
+                  </span>
+                  {!done ? (
+                    <input
+                      className="text-xs2 text-gray-800 font-medium flex-1 bg-transparent outline-none min-w-0 py-0.5"
+                      value={item.text}
+                      placeholder="구성요소 명칭..."
+                      onChange={e => upd(items.map(it => it.id===item.id ? {...it, text: e.target.value} : it))}
+                    />
+                  ) : (
+                    <span className="text-xs2 text-gray-800 font-medium flex-1 min-w-0 truncate">{item.text}</span>
+                  )}
+                  {!done && (
+                    <div className="flex items-center gap-px shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => moveUp(idx)} disabled={idx===0}
+                        className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20" title="위로">
+                        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 7l3-4 3 4"/></svg>
+                      </button>
+                      <button onClick={() => moveDown(idx)} disabled={idx===items.length-1}
+                        className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20" title="아래로">
+                        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 3l3 4 3-4"/></svg>
+                      </button>
+                      <span className="w-px h-3 bg-gray-200 mx-0.5" />
+                      <button onClick={() => indent(item.id)} disabled={!canIndent(idx, item)}
+                        className="p-0.5 text-gray-400 hover:text-violet-500 disabled:opacity-20" title="하위로 (→)">
+                        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 5h6M6 3l2 2-2 2"/></svg>
+                      </button>
+                      <button onClick={() => outdent(item.id)} disabled={item.depth<=0}
+                        className="p-0.5 text-gray-400 hover:text-violet-500 disabled:opacity-20" title="상위로 (←)">
+                        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M8 5H2M4 3L2 5l2 2"/></svg>
+                      </button>
+                      <span className="w-px h-3 bg-gray-200 mx-0.5" />
+                      <button onClick={() => remove(item.id)}
+                        className="p-0.5 text-gray-400 hover:text-red-500" title="삭제">
+                        <Icon name="close" size={9} />
+                      </button>
+                    </div>
+                  )}
+                </div>
 
-                {/* 부호 배지 */}
-                <span className={clsx(
-                  'w-8 text-xs2 font-bold rounded px-1 py-0.5 shrink-0 text-center',
-                  item.num ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'
-                )}>
-                  {item.num || '—'}
-                </span>
-
-                {/* 텍스트 */}
-                {!done ? (
-                  <input
-                    className="text-xs2 text-gray-700 flex-1 bg-transparent outline-none min-w-0 py-0.5"
-                    value={item.text}
-                    placeholder="구성요소 이름..."
-                    onChange={e => upd(items.map(it => it.id===item.id ? {...it, text: e.target.value} : it))}
-                  />
-                ) : (
-                  <span className="text-xs2 text-gray-700 flex-1 min-w-0 truncate">{item.text}</span>
-                )}
-
-                {/* 액션 버튼 — hover 시 표시 */}
-                {!done && (
-                  <div className="flex items-center gap-px shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => moveUp(idx)} disabled={idx===0}
-                      className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20" title="위로">
-                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 7l3-4 3 4"/></svg>
-                    </button>
-                    <button onClick={() => moveDown(idx)} disabled={idx===items.length-1}
-                      className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20" title="아래로">
-                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 3l3 4 3-4"/></svg>
-                    </button>
-                    <span className="w-px h-3 bg-gray-200 mx-0.5" />
-                    <button onClick={() => indent(item.id)} disabled={!canIndent(idx, item)}
-                      className="p-0.5 text-gray-400 hover:text-violet-500 disabled:opacity-20" title="하위로 (→)">
-                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 5h6M6 3l2 2-2 2"/></svg>
-                    </button>
-                    <button onClick={() => outdent(item.id)} disabled={item.depth<=0}
-                      className="p-0.5 text-gray-400 hover:text-violet-500 disabled:opacity-20" title="상위로 (←)">
-                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M8 5H2M4 3L2 5l2 2"/></svg>
-                    </button>
-                    <span className="w-px h-3 bg-gray-200 mx-0.5" />
-                    <button onClick={() => remove(item.id)}
-                      className="p-0.5 text-gray-400 hover:text-red-500" title="삭제">
-                      <Icon name="close" size={9} />
-                    </button>
+                {/* 추가 필드 (영문명, 정의, 상위어) */}
+                <div className="pl-9 space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs2 text-gray-400 w-11 shrink-0">영문명</span>
+                    {!done ? (
+                      <input
+                        className="flex-1 text-xs2 text-gray-600 bg-gray-50 border border-gray-200 rounded px-2 py-0.5 outline-none focus:border-blue-300 focus:bg-white transition-colors"
+                        value={item.englishName || ''}
+                        placeholder="English name"
+                        onChange={e => upd(items.map(it => it.id===item.id ? {...it, englishName: e.target.value} : it))}
+                      />
+                    ) : (
+                      <span className="text-xs2 text-gray-500">{item.englishName || <span className="text-gray-300">—</span>}</span>
+                    )}
                   </div>
-                )}
+                  <div className="flex items-start gap-1.5">
+                    <span className="text-xs2 text-gray-400 w-11 shrink-0 mt-0.5">정의</span>
+                    {!done ? (
+                      <textarea
+                        className="flex-1 text-xs2 text-gray-600 bg-gray-50 border border-gray-200 rounded px-2 py-0.5 outline-none focus:border-blue-300 focus:bg-white transition-colors resize-none"
+                        value={item.definition || ''}
+                        placeholder="구성요소의 기능·역할 설명"
+                        rows={2}
+                        onChange={e => upd(items.map(it => it.id===item.id ? {...it, definition: e.target.value} : it))}
+                      />
+                    ) : (
+                      <span className="text-xs2 text-gray-500 leading-relaxed">{item.definition || <span className="text-gray-300">—</span>}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs2 text-gray-400 w-11 shrink-0">상위어</span>
+                    {!done ? (
+                      <input
+                        className="flex-1 text-xs2 text-gray-600 bg-gray-50 border border-gray-200 rounded px-2 py-0.5 outline-none focus:border-blue-300 focus:bg-white transition-colors"
+                        value={item.parent || ''}
+                        placeholder="상위 개념 / hypernym"
+                        onChange={e => upd(items.map(it => it.id===item.id ? {...it, parent: e.target.value} : it))}
+                      />
+                    ) : (
+                      <span className="text-xs2 text-gray-500">{item.parent || <span className="text-gray-300">—</span>}</span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           ))}

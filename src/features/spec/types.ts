@@ -10,6 +10,9 @@ export interface SpecComponentItem {
   sel: boolean;
   num: string;
   depth: number;
+  englishName?: string;
+  definition?: string;
+  parent?: string;
 }
 
 export interface SpecDrawingItem {
