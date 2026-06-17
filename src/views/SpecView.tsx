@@ -342,7 +342,7 @@ export function SpecView() {
                 ↺ 다시 시작
               </button>
             )}
-            <div className="flex items-center justify-center w-full overflow-x-auto scroll-thin px-24">
+            <div className="flex items-center justify-center w-full overflow-x-auto scroll-thin px-2 md:px-24">
               {STEPS.map((s, i) => {
                 const isDone = isConfirmed(s.id);
                 const active = s.id === curStep && (phase === 'flow' || phase === 'done');
@@ -373,8 +373,8 @@ export function SpecView() {
                         {isDone && !active ? <Icon name="check" size={10} /> : s.num}
                       </span>
                       <span className={clsx(
-                        'text-sm2',
-                        active && 'text-blue-700 font-semibold',
+                        'text-sm2 max-md:hidden',
+                        active && 'max-md:inline text-blue-700 font-semibold',
                         isDone && !active && 'text-green-700 font-medium',
                         locked && 'text-gray-400',
                         !active && !isDone && !locked && 'text-gray-500',
@@ -384,6 +384,12 @@ export function SpecView() {
                 );
               })}
             </div>
+            {/* 모바일 전용 진행 표시 */}
+            {(phase === 'flow' || phase === 'done') && (
+              <div className="md:hidden absolute right-3 top-1/2 -translate-y-1/2 text-xs2 text-zinc-400 pointer-events-none">
+                {STEPS.findIndex(s => s.id === curStep) + 1} / {STEPS.length}
+              </div>
+            )}
           </div>
 
         <div ref={flowRef} className="flex-1 overflow-y-auto scroll-thin bg-ck-bg">
