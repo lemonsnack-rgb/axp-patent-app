@@ -52,7 +52,7 @@ export function Sidebar() {
       className={clsx(
         'border-r border-zinc-200 bg-white flex flex-col shrink-0 transition-all duration-200 relative',
         sidebarCollapsed ? 'w-nav-c min-w-nav-c' : 'w-nav min-w-nav',
-        // 모바일: 접힌 상태에서 콘텐츠가 완전히 보이지 않도록 (아이콘만 표시)
+        sidebarCollapsed && 'max-md:!w-0 max-md:!min-w-0 max-md:overflow-hidden max-md:border-0',
         'max-md:z-30',
       )}
     >
