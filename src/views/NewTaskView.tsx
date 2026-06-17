@@ -148,14 +148,7 @@ export function NewTaskView() {
               <button className="btn-outline btn-sm whitespace-nowrap" onClick={quickAddProject}>+ 새 프로젝트</button>
             </div>
           </Field>
-          <div className="flex flex-col gap-1.5 mb-3.5">
-            <label className="label flex items-center gap-1.5">
-              고객사 (선택)
-              <button
-                onClick={() => setMode('clients')}
-                className="text-xs2 text-blue-600 font-medium hover:underline"
-              >고객사 관리 →</button>
-            </label>
+          <Field label="고객사 (선택)">
             <div className="flex gap-1.5">
               <select className="input flex-1" value={clientId} onChange={e => { setClientId(e.target.value); setContactId(''); }}>
                 <option value="">— 미지정 —</option>
@@ -163,7 +156,13 @@ export function NewTaskView() {
               </select>
               <button className="btn-outline btn-sm whitespace-nowrap" onClick={quickAddClient}>+ 새로 추가</button>
             </div>
-          </div>
+            <button
+              onClick={() => setMode('clients')}
+              className="text-xs2 text-blue-500 hover:text-blue-700 hover:underline mt-1 self-start"
+            >
+              고객사 관리 →
+            </button>
+          </Field>
           {clientId && (
             <Field label="담당자 (선택)">
               <select className="input" value={contactId} onChange={e => setContactId(e.target.value)}>
