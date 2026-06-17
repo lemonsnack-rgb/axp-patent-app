@@ -1386,6 +1386,15 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
               )}>
                 {/* 명칭 row */}
                 <div className="flex items-center gap-1">
+                  {!done && (
+                    <input
+                      type="checkbox"
+                      checked={item.sel}
+                      onChange={() => upd(items.map(it => it.id===item.id ? {...it, sel: !it.sel} : it))}
+                      className="shrink-0 w-3.5 h-3.5 accent-blue-600 cursor-pointer"
+                      title={item.sel ? '미채택으로 변경' : '채택'}
+                    />
+                  )}
                   <span className="text-gray-300 cursor-grab active:cursor-grabbing shrink-0 select-none text-xs leading-none px-0.5">⠿</span>
                   <span className={clsx(
                     'w-8 text-xs2 font-bold rounded px-1 py-0.5 shrink-0 text-center',
@@ -1395,7 +1404,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                   </span>
                   {!done ? (
                     <input
-                      className="text-xs2 text-gray-800 font-medium flex-1 bg-transparent outline-none min-w-0 py-0.5"
+                      className="text-xs2 text-gray-800 font-medium flex-1 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 outline-none focus:border-blue-300 focus:bg-white transition-colors min-w-0"
                       value={item.text}
                       placeholder="구성요소 명칭..."
                       onChange={e => upd(items.map(it => it.id===item.id ? {...it, text: e.target.value} : it))}
@@ -1437,18 +1446,14 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                   linkedClaimIds(number[]) 필드를 추가하고, 도면·청구항 확정 시
                   해당 부호가 참조되는지 역추적해 여기에 렌더링할 것.
                 */}
-                <div className="pl-9 flex items-center gap-1.5 flex-wrap">
-                  {item.num ? (
+                {item.num && (
+                  <div className="pl-9 flex items-center gap-1.5 flex-wrap">
                     <span className="inline-flex items-center gap-1 text-xs2 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-200">
                       <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" width="8" height="8"><rect x="1" y="1" width="8" height="8" rx="1"/><path d="M3 5h4M5 3v4"/></svg>
                       도면 부호 배정
                     </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-xs2 px-1.5 py-0.5 rounded bg-gray-50 text-gray-400 border border-gray-200">
-                      부호 미배정
-                    </span>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* 추가 필드 (영문명, 정의, 상위어) */}
                 <div className="pl-9 space-y-1">
