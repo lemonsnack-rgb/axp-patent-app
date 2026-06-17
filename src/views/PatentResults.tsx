@@ -11,6 +11,33 @@ type ViewMode = 'list' | 'sliding' | 'gallery';
 
 interface AppliedFilter { facetKey: string; title: string; label: string }
 
+function applyFacetFilters(items: PatentResult[], filters: AppliedFilter[]): PatentResult[] {
+  if (!filters.length) return items;
+  return items.filter(p =>
+    filters.every(f => {
+      if (f.label === '전체') return true;
+      switch (f.facetKey) {
+        case 'country':      return p.country === f.label;
+        case 'right_status': return p.status === f.label;
+        case 'app_year': {
+          const yr = p.applicationDate?.slice(0, 4) ?? '';
+          return f.label === '2020 이전' ? parseInt(yr) <= 2020 : yr === f.label;
+        }
+        case 'applicant_top': return p.applicant.includes(f.label);
+        case 'ipc_top': {
+          const prefix = f.label.split(' ')[0].replace('-', ' ');
+          return p.ipc.startsWith(prefix);
+        }
+        case 'trial_dispute':
+          return f.label === '있음'
+            ? (p.dispute?.includes('있음') ?? false)
+            : (p.dispute?.includes('없음') ?? false);
+        default: return true;
+      }
+    })
+  );
+}
+
 interface Props {
   onModify: () => void;
   onOpenDetail: (idx: number) => void;
@@ -34,9 +61,9 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery }: P
   const [sortCol, setSortCol] = useState<'applicationDate' | 'title'>('applicationDate');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
-  // 결과 데이터 (mockup)
-  const data = PATENT_SEED;
-  const count = 4792; // 모의 전체 건수
+  // 결과 데이터 — appliedFilters 기반 필터링
+  const data = applyFacetFilters(PATENT_SEED, appliedFilters);
+  const count = data.length;
 
   // 검색식 칩 (mockup)
   const appliedQuery = 'TI=(자율주행* OR autonomous driving) AND IPCM=G01S*';
@@ -67,6 +94,8 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery }: P
     }
     setAppliedFilters(newApplied);
     setAppliedFilterRowVisible(newApplied.length > 0);
+    setPage(1);
+    setSelectedCard(null);
     setDrawerOpen(false);
   };
 
