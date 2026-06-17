@@ -570,80 +570,59 @@ export function SpecView() {
                         </>
                       )}
                       {isDone && (() => {
-                        const isExpanded = expandedCards.has(s.id);
                         const confirmedVal = confirmed[s.id] || '';
-                        // U4: 도면 완료 요약 표시
-                        const drawingSummary = s.id === 'drawings'
-                          ? confirmedVal.split('\n')[0] // "도면 N개 중 M개 편집 완료"
-                          : null;
-                        // 짧은 요약 (접힌 상태에서 표시)
-                        const summary = drawingSummary ||
-                          confirmedVal.split('\n')[0]?.slice(0, 60) + (confirmedVal.length > 60 ? '...' : '');
                         return (
                           <>
                             <div className="flex items-start gap-3 flex-row-reverse">
                               <div className="w-8 h-8 rounded-full bg-blue-700 text-white text-xs2 font-bold flex items-center justify-center shrink-0">나</div>
                               <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 shadow-xs min-w-0 break-words max-w-[calc(100%-2.75rem)]">
-                                {/* 헤더: 항상 표시 (U5: 클릭으로 접기/펼치기) */}
-                                <button
-                                  className="w-full flex items-center gap-2 text-left"
-                                  onClick={() => setExpandedCards(prev => {
-                                    const next = new Set(prev);
-                                    next.has(s.id) ? next.delete(s.id) : next.add(s.id);
-                                    return next;
-                                  })}
-                                >
+                                {/* 헤더 */}
+                                <div className="flex items-center gap-2 mb-2">
                                   <span className="w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center shrink-0"><Icon name="check" size={10} /></span>
                                   <span className="text-sm2 font-semibold text-blue-700 flex-1 min-w-0">{CONFIRM_LABEL[s.id]}</span>
-                                  {!isExpanded && <span className="text-xs2 text-gray-400 truncate max-w-[160px]">{summary}</span>}
-                                  <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="10" height="10"
-                                    className={clsx('text-gray-400 shrink-0 transition-transform', isExpanded && 'rotate-180')}>
-                                    <path d="M2 4l3 3 3-3"/>
-                                  </svg>
-                                </button>
-                                {/* 상세 내용: 펼쳐진 상태에서만 */}
-                                {isExpanded && (
-                                  <div className="mt-2">
-                                    <div className="bg-white rounded-lg border border-blue-100 p-3 mb-2">
-                                      {s.id === 'description' ? (
-                                        <div className="space-y-2">
-                                          {confirmedVal.split('\n\n').filter(Boolean).map((block, bi) => {
-                                            const lines = block.split('\n');
-                                            const label = lines[0]?.replace(/[【】]/g, '').trim();
-                                            const content = lines.slice(1).join('\n').trim();
-                                            return (
-                                              <div key={bi}>
-                                                <p className="text-xs2 font-bold text-blue-700 mb-0.5">{label}</p>
-                                                <p className="text-xs2 text-gray-700 leading-relaxed">{content}</p>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      ) : s.id === 'claims' ? (
-                                        <div className="space-y-2">
-                                          {confirmedVal.split('\n\n').filter(Boolean).map((block, bi) => {
-                                            if (bi === 0) return <p key={bi} className="text-xs2 font-bold text-green-700">{block}</p>;
-                                            const lines = block.split('\n');
-                                            const header = lines[0];
-                                            const content = lines.slice(1).join(' ').trim();
-                                            const isFirst = bi === 1;
-                                            return (
-                                              <div key={bi} className={clsx('pl-2 border-l-2', isFirst ? 'border-purple-400' : 'border-amber-300')}>
-                                                <p className={clsx('text-xs2 font-bold mb-0.5', isFirst ? 'text-purple-700' : 'text-amber-700')}>{header}</p>
-                                                <p className="text-xs2 text-gray-600 leading-relaxed line-clamp-2">{content}</p>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      ) : (
-                                        <p className="text-sm2 text-gray-700 leading-relaxed">{confirmedVal}</p>
-                                      )}
+                                </div>
+                                {/* 전체 내용 항상 표시 */}
+                                <div className={clsx(
+                                  'bg-white rounded-lg border border-blue-100 p-3 mb-2',
+                                  (s.id === 'description' || s.id === 'claims') && 'max-h-40 overflow-y-auto scroll-thin'
+                                )}>
+                                  {s.id === 'description' ? (
+                                    <div className="space-y-2">
+                                      {confirmedVal.split('\n\n').filter(Boolean).map((block, bi) => {
+                                        const lines = block.split('\n');
+                                        const label = lines[0]?.replace(/[【】]/g, '').trim();
+                                        const content = lines.slice(1).join('\n').trim();
+                                        return (
+                                          <div key={bi}>
+                                            <p className="text-xs2 font-bold text-blue-700 mb-0.5">{label}</p>
+                                            <p className="text-xs2 text-gray-700 leading-relaxed">{content}</p>
+                                          </div>
+                                        );
+                                      })}
                                     </div>
-                                    <button onClick={() => reselect(s.id)} className="text-xs2 text-blue-600 hover:text-blue-800 flex items-center gap-1">
-                                      <Icon name="chevron-left" size={10} /> 다시 선택
-                                    </button>
-                                  </div>
-                                )}
+                                  ) : s.id === 'claims' ? (
+                                    <div className="space-y-2">
+                                      {confirmedVal.split('\n\n').filter(Boolean).map((block, bi) => {
+                                        if (bi === 0) return <p key={bi} className="text-xs2 font-bold text-green-700">{block}</p>;
+                                        const lines = block.split('\n');
+                                        const header = lines[0];
+                                        const content = lines.slice(1).join(' ').trim();
+                                        const isFirst = bi === 1;
+                                        return (
+                                          <div key={bi} className={clsx('pl-2 border-l-2', isFirst ? 'border-purple-400' : 'border-amber-300')}>
+                                            <p className={clsx('text-xs2 font-bold mb-0.5', isFirst ? 'text-purple-700' : 'text-amber-700')}>{header}</p>
+                                            <p className="text-xs2 text-gray-600 leading-relaxed">{content}</p>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm2 text-gray-700 leading-relaxed">{confirmedVal}</p>
+                                  )}
+                                </div>
+                                <button onClick={() => reselect(s.id)} className="text-xs2 text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                                  <Icon name="edit" size={10} /> 수정
+                                </button>
                               </div>
                             </div>
                             <AiMsg text={AI_NEXT[s.id]} />
