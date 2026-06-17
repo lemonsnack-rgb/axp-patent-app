@@ -344,10 +344,10 @@ export function SpecView() {
             )}
             <div className="flex items-center justify-center w-full overflow-x-auto scroll-thin px-2 md:px-24">
               {STEPS.map((s, i) => {
-                const isDone = isConfirmed(s.id);
+                const isDone = si(s.id) < si(curStep) && (phase === 'flow' || phase === 'done');
                 const active = s.id === curStep && (phase === 'flow' || phase === 'done');
                 const locked = phase !== 'flow' && phase !== 'done' && s.id !== 'upload';
-                const prevDone = i > 0 && isConfirmed(STEPS[i - 1].id);
+                const prevDone = i > 0 && si(STEPS[i - 1].id) < si(curStep) && (phase === 'flow' || phase === 'done');
                 return (
                   <div key={s.id} className="flex items-center shrink-0">
                     {i > 0 && (
@@ -476,7 +476,7 @@ export function SpecView() {
                 <AiMsg text={AI_NEXT.upload} />
                 {STEPS.slice(1).map(s => {
                   if (!isVisible(s.id)) return null;
-                  const isDone = isConfirmed(s.id);
+                  const isDone = si(s.id) < si(curStep) && (phase === 'flow' || phase === 'done');
                   return (
                     <div key={s.id} className="space-y-3">
                       <AiMsg text={
