@@ -97,7 +97,7 @@ export function Sidebar() {
                   className={clsx(
                     'text-xs2 px-2 py-0.5 rounded-full border transition-colors',
                     taskSearchType === f.id
-                      ? 'bg-blue-600 text-white border-blue-600'
+                      ? 'bg-brand-400 text-white border-blue-600'
                       : 'border-zinc-200 text-zinc-500 hover:border-blue-400'
                   )}
                 >
@@ -245,7 +245,7 @@ export function Sidebar() {
         </button>
         {!sidebarCollapsed && (
           <div className="flex items-center gap-2 px-2 py-1.5 mt-1">
-            <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-xs2 font-semibold flex items-center justify-center">P</span>
+            <span className="w-7 h-7 rounded-full bg-brand-400 text-white text-xs2 font-semibold flex items-center justify-center">P</span>
             <div>
               <div className="text-md2 text-zinc-800">왕일</div>
               <div className="text-xs2 text-zinc-400">muhayu</div>
@@ -266,7 +266,7 @@ function NavItem({ icon, label, active, collapsed, onClick, primary }: {
       className={clsx(
         'flex items-center gap-2 px-3 py-2 rounded-md text-md2 font-medium transition-all active:scale-[0.98]',
         collapsed && 'justify-center px-0',
-        active && 'bg-blue-50 text-blue-700',
+        active && 'bg-blue-50 text-brand-400',
         !active && primary && 'text-zinc-800 hover:bg-zinc-100',
         !active && !primary && 'text-zinc-600 hover:bg-zinc-100',
       )}
@@ -317,7 +317,7 @@ function TaskRow({ t, active, onSelect, onToggleFav, menuOpen, onMenuToggle, onR
         <Icon name={meta.icon} size={13} />
       </span>
       <span className="flex-1 min-w-0">
-        <div className={clsx('text-md2 font-medium leading-tight truncate', active ? 'text-blue-700' : 'text-zinc-800')}>
+        <div className={clsx('text-md2 font-medium leading-tight truncate', active ? 'text-brand-400' : 'text-zinc-800')}>
           {t.name}
         </div>
         <div className="text-xs2 text-zinc-400 mt-0.5">{meta.label} · {ago}</div>

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { GripVertical } from 'lucide-react';
 import type { EditorReference, InventionComponent } from './types';
 import clsx from 'clsx';
+import { ConfirmModal } from '../../components/ConfirmModal';
 
 interface Props {
   references: EditorReference[];
@@ -93,6 +94,7 @@ export function RefListPanel({
   // 번호 없는 항목 배치 시도 시 가이드 표시
   const [noNumGuide, setNoNumGuide] = useState<string | null>(null); // ref key
   const [pulseAutoAssign, setPulseAutoAssign] = useState(false);
+  const [delConfirm, setDelConfirm] = useState<{ open: boolean; number: string; name: string }>({ open: false, number: '', name: '' });
 
   const showNoNumGuide = (key: string) => {
     setNoNumGuide(key);
@@ -212,6 +214,7 @@ export function RefListPanel({
   };
 
   return (
+    <>
     <aside className="flex h-full w-full flex-col bg-ck-bg overflow-hidden">
 
       {/* ── 헤더 ── */}
@@ -441,7 +444,7 @@ export function RefListPanel({
                   <span className="w-px h-3 bg-gray-200 mx-0.5" />
                   {/* 삭제 */}
                   <button
-                    onClick={() => { if (window.confirm(`"${r.name || r.number}" 부호를 삭제하시겠습니까?`)) onDelete(r.number); }}
+                    onClick={() => setDelConfirm({ open: true, number: r.number, name: r.name || r.number })}
                     className="rounded p-0.5 text-gray-400 hover:text-red-500" title="삭제">
                     <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 2l6 6M8 2l-6 6"/></svg>
                   </button>
@@ -507,5 +510,12 @@ export function RefListPanel({
         />
       </div>
     </aside>
+    <ConfirmModal
+      open={delConfirm.open}
+      message={`"${delConfirm.name}" 부호를 삭제하시겠습니까?`}
+      onConfirm={() => { onDelete(delConfirm.number); setDelConfirm({ open: false, number: '', name: '' }); }}
+      onCancel={() => setDelConfirm({ open: false, number: '', name: '' })}
+    />
+    </>
   );
 }

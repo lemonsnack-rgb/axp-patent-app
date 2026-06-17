@@ -8,6 +8,7 @@ import { useEditorStore } from "./useEditorStore";
 import { isOverlay } from "./canvas/overlay";
 import { CUSTOM_PROPS, META, FIXED_FONT_FAMILY } from "./canvas/constants";
 import type { EditorReference, PatentEditorProps, ToolMode } from "./types";
+import { ConfirmModal } from "../../components/ConfirmModal";
 
 const DEFAULT_WIDTH = 1000;
 const DEFAULT_HEIGHT = 700;
@@ -74,6 +75,7 @@ export function PatentEditor({
   const [zoom, setZoom] = useState(1);
   // 캔버스에 배치된 부호 번호 세트 (연결 상태 표시용)
   const [placedNums, setPlacedNums] = useState<Set<string>>(new Set());
+  const [refDelConfirm, setRefDelConfirm] = useState<{ open: boolean; refNumber: string }>({ open: false, refNumber: '' });
 
   // 캔버스 객체 변경 시 배치된 부호 목록 갱신
   const refreshPlacedNums = useCallback(() => {
@@ -410,16 +412,9 @@ export function PatentEditor({
 
   const handleReferenceDelete = useCallback(
     (refNumber: string) => {
-      const confirmed = window.confirm(
-        `'${refNumber}' 부호를 삭제합니다.\n이 부호를 사용한 캔버스의 모든 지시선·텍스트·원형부호가 함께 삭제됩니다.\n계속할까요?`,
-      );
-      if (!confirmed) return;
-      // 현재 활성 캔버스에서 즉시 제거
-      canvasHandleRef.current?.removeAllUsesOfRef(refNumber);
-      // 외부(App)에 알려서 풀에서 제거 + 다른 도면 JSON도 정리
-      onReferenceDelete?.(refNumber);
+      setRefDelConfirm({ open: true, refNumber });
     },
-    [onReferenceDelete],
+    [],
   );
 
   // 닫기 전 현재 도면 자동 저장 + 수락된 부호 일괄 갱신 콜백
@@ -594,6 +589,16 @@ export function PatentEditor({
       <div className="border-t border-ck-border bg-ck-bg px-3 py-1.5 text-sm2 text-gray-500">
         Fabric.js · 1-bit PNG 내보내기 · 도면 전환 시 자동 저장 · 지시선 더블클릭으로 부호 편집
       </div>
+      <ConfirmModal
+        open={refDelConfirm.open}
+        message={`'${refDelConfirm.refNumber}' 부호를 삭제합니다.\n이 부호를 사용한 캔버스의 모든 지시선·텍스트·원형부호가 함께 삭제됩니다.\n계속할까요?`}
+        onConfirm={() => {
+          canvasHandleRef.current?.removeAllUsesOfRef(refDelConfirm.refNumber);
+          onReferenceDelete?.(refDelConfirm.refNumber);
+          setRefDelConfirm({ open: false, refNumber: '' });
+        }}
+        onCancel={() => setRefDelConfirm({ open: false, refNumber: '' })}
+      />
     </div>
   );
 }

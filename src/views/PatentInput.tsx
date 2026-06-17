@@ -86,8 +86,8 @@ function tokenize(text: string): Token[] {
 }
 
 const TOKEN_CLS: Record<TokenType, string> = {
-  field:    'text-blue-700 font-medium',
-  operator: 'text-blue-700 font-medium',
+  field:    'text-brand-400 font-medium',
+  operator: 'text-brand-400 font-medium',
   colon:    'text-red-600',
   paren:    'text-slate-500',
   keyword:  'text-red-600',
@@ -180,6 +180,7 @@ export function PatentInput({ onRun }: Props) {
 
   // 파인더
   const [finderOpen, setFinderOpen] = useState<{ type: FinderType; fieldIdx: number } | null>(null);
+  const [addFieldOpen, setAddFieldOpen] = useState(false);
 
   // 국가 핸들러
   const toggleCountry = (code: string) => setCountries(prev => ({ ...prev, [code]: !prev[code] }));
@@ -257,7 +258,7 @@ export function PatentInput({ onRun }: Props) {
               <Chip key={c.code} active={!!countries[c.code]} onClick={() => toggleCountry(c.code)} size="xs">{c.label}</Chip>
             ))}
             {extraCountries.map(cc => (
-              <span key={cc} className="inline-flex items-center gap-0.5 px-2 py-0 bg-blue-700 text-white rounded-full text-xs2 font-medium">
+              <span key={cc} className="inline-flex items-center gap-0.5 px-2 py-0 bg-brand-400 text-white rounded-full text-xs2 font-medium">
                 {cc}
                 <button onClick={() => removeExtraCountry(cc)} className="ml-0.5 hover:opacity-70 leading-none">×</button>
               </span>
@@ -336,7 +337,7 @@ export function PatentInput({ onRun }: Props) {
                 <label key={cc} className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 px-1 py-0.5 rounded">
                   <input
                     type="checkbox"
-                    className="form-checkbox text-blue-700"
+                    className="form-checkbox text-brand-400"
                     checked={!!pickerSel[cc.split(' ')[0]]}
                     onChange={e => setPickerSel(prev => ({ ...prev, [cc.split(' ')[0]]: e.target.checked }))}
                   />
@@ -365,7 +366,7 @@ export function PatentInput({ onRun }: Props) {
                 className={clsx(
                   'px-3 py-1.5 text-sm2 font-medium border-r border-gray-200 last:border-r-0 transition-colors',
                   keyTab === tab.id
-                    ? 'bg-blue-700 text-white'
+                    ? 'bg-brand-400 text-white'
                     : 'bg-white text-gray-600 hover:bg-gray-50'
                 )}
               >
@@ -404,7 +405,7 @@ export function PatentInput({ onRun }: Props) {
               return (
                 <button key={k}
                   onClick={() => setFinderOpen({ type: k, fieldIdx: -1 })}
-                  className="px-1.5 py-0.5 text-xs2 bg-blue-50 text-blue-700 rounded hover:bg-blue-100">
+                  className="px-1.5 py-0.5 text-xs2 bg-blue-50 text-brand-400 rounded hover:bg-blue-100">
                   {labels[k]}
                 </button>
               );
@@ -430,7 +431,7 @@ export function PatentInput({ onRun }: Props) {
           <span className="flex items-center gap-1.5">
             <span className="text-gray-400 text-xs2">≡</span>
             검색필드
-            <span className="text-xs2 font-medium text-blue-700 bg-blue-50 px-1.5 py-0 rounded-full leading-5">{fields.length}</span>
+            <span className="text-xs2 font-medium text-brand-400 bg-blue-50 px-1.5 py-0 rounded-full leading-5">{fields.length}</span>
           </span>
           <span className="text-gray-400 text-xs2">{fieldsOpen ? '▲' : '▼'}</span>
         </button>
@@ -447,7 +448,7 @@ export function PatentInput({ onRun }: Props) {
                   className={clsx(
                     'px-3 py-1.5 text-sm2 font-medium border-b-2 -mb-px transition-colors',
                     fieldGroup === g.id
-                      ? 'border-blue-700 text-blue-700'
+                      ? 'border-brand-400 text-brand-400'
                       : 'border-transparent text-gray-500 hover:text-gray-700'
                   )}
                 >
@@ -460,7 +461,7 @@ export function PatentInput({ onRun }: Props) {
             <div className="px-4 pt-2 space-y-px">
               {visibleEntries.map(({ f, idx }) => (
                 <div
-                  key={f.code}
+                  key={idx}
                   className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-gray-50 group"
                 >
                   {/* 코드 뱃지 */}
@@ -522,7 +523,7 @@ export function PatentInput({ onRun }: Props) {
                   {f.finderLabel && f.finderType && (
                     <button
                       onClick={() => setFinderOpen({ type: f.finderType!, fieldIdx: idx })}
-                      className="text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-blue-700 rounded hover:bg-blue-100 shrink-0"
+                      className="text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 shrink-0"
                     >
                       {f.finderLabel}
                     </button>
@@ -539,12 +540,31 @@ export function PatentInput({ onRun }: Props) {
             </div>
 
             {/* 검색 필드 추가 */}
-            <button
-              onClick={() => toast.show('검색 필드 추가 (미구현)')}
-              className="mt-2 mx-4 w-[calc(100%-2rem)] flex items-center justify-center gap-1 text-sm2 text-gray-400 hover:text-blue-600 py-1.5 border border-dashed border-gray-200 rounded hover:border-blue-300 transition-colors"
-            >
-              ⊕ 검색 필드 추가
-            </button>
+            <div className="mt-2 mx-4 relative">
+              <button
+                onClick={() => setAddFieldOpen(v => !v)}
+                className="w-full flex items-center justify-center gap-1 text-sm2 text-gray-400 hover:text-brand-400 py-1.5 border border-dashed border-gray-200 rounded hover:border-brand-300 transition-colors"
+              >
+                ⊕ 검색 필드 추가
+              </button>
+              {addFieldOpen && (
+                <div className="absolute z-20 left-0 right-0 bg-white border border-gray-200 rounded shadow-md mt-0.5 max-h-52 overflow-y-auto">
+                  {DEFAULT_FIELDS.filter(df => (groupCodes as readonly string[]).includes(df.code)).map(df => (
+                    <button
+                      key={df.code}
+                      onClick={() => {
+                        setFields(prev => [...prev, { ...df, value: '', dateFrom: '', dateTo: '' }]);
+                        setAddFieldOpen(false);
+                      }}
+                      className="w-full text-left flex items-center gap-2 px-3 py-1.5 text-sm2 hover:bg-gray-50"
+                    >
+                      <span className="text-xs2 font-mono font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded min-w-[40px] text-center shrink-0">{df.code}</span>
+                      <span className="text-gray-700">{df.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -583,8 +603,8 @@ function Chip({ active, onClick, children, size = 'sm' }: {
         'rounded-full border transition-colors font-medium',
         size === 'xs' ? 'px-2 py-0 text-xs2' : 'px-2.5 py-0.5 text-sm2',
         active
-          ? 'bg-blue-700 text-white border-blue-700'
-          : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-700',
+          ? 'bg-brand-400 text-white border-brand-400'
+          : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-brand-400',
       )}
     >
       {children}

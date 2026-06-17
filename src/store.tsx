@@ -25,6 +25,7 @@ interface StoreCtx {
   mode: AppMode; setMode: (m: AppMode) => void;
   activeTaskId: string | null; setActiveTaskId: (id: string | null) => void;
   activeProjectId: string | null; setActiveProjectId: (id: string | null) => void;
+  bgPatentRef: string | null; setBgPatentRef: (ref: string | null) => void;
   // sidebar
   sidebarCollapsed: boolean; setSidebarCollapsed: (v: boolean) => void;
   // tasks
@@ -110,6 +111,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<AppMode>('newtask');
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [bgPatentRef, setBgPatentRef] = useState<string | null>(null);
 
   // 진입 시 디폴트 = 새 작업 (사용자 결정)
   // activeTaskId는 사이드바에서 task 클릭 시 설정됨
@@ -224,7 +226,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     mode, setMode,
     activeTaskId, setActiveTaskId,
     activeProjectId, setActiveProjectId,
+    bgPatentRef, setBgPatentRef,
     sidebarCollapsed, setSidebarCollapsed,
+
     tasks, taskAdd, taskUpdate, taskRemove, taskToggleFavorite,
     projects, projectAdd, projectUpdate, projectRemove, projectToggleFavorite,
     clients, clientAdd, clientUpdate, clientRemove,
@@ -232,7 +236,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     library, libraryAdd, libraryRemove, libraryToggleFavorite, libraryUpdate,
     collections, collectionAdd, collectionUpdate, collectionRemove, collectionToggleFavorite, ensureUncategorized,
   }), [
-    mode, activeTaskId, activeProjectId, sidebarCollapsed,
+    mode, activeTaskId, activeProjectId, bgPatentRef, sidebarCollapsed,
     tasks, projects, clients, contacts, library, collections,
     taskAdd, taskUpdate, taskRemove, taskToggleFavorite,
     projectAdd, projectUpdate, projectRemove, projectToggleFavorite,

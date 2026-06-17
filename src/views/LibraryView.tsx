@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { useToast } from '../components/Toast';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { LibrarySaveModal } from '../components/LibrarySaveModal';
 import { LibraryDetailModal } from '../components/LibraryDetailModal';
 import clsx from 'clsx';
@@ -19,6 +20,8 @@ export function LibraryView() {
   const [newOpen, setNewOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [sort, setSort] = useState<'recent' | 'title'>('recent');
+  const [confirmState, setConfirmState] = useState<{ open: boolean; message: string; onConfirm: () => void }>({ open: false, message: '', onConfirm: () => {} });
+  const showConfirm = (message: string, onConfirm: () => void) => setConfirmState({ open: true, message, onConfirm });
 
   const sortedCols = [...collections].sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0));
 
@@ -78,7 +81,7 @@ export function LibraryView() {
         </div>
         <button
           onClick={() => setNewOpen(true)}
-          className="card border-dashed border-zinc-300 p-4 flex items-center gap-3 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700 active:scale-[0.98] min-h-[84px] text-zinc-500 transition-all"
+          className="card border-dashed border-zinc-300 p-4 flex items-center gap-3 hover:border-blue-500 hover:bg-blue-50 hover:text-brand-400 active:scale-[0.98] min-h-[84px] text-zinc-500 transition-all"
         >
           <span className="w-8 h-8 bg-gray-100 rounded-md flex items-center justify-center"><Icon name="plus" size={18} /></span>
           <div>
@@ -120,7 +123,7 @@ export function LibraryView() {
                   <button
                     onClick={e => {
                       e.stopPropagation();
-                      if (confirm(`"${c.name}" 폴더를 삭제할까요? 자료는 미분류로 이동됩니다.`)) collectionRemove(c.id);
+                      showConfirm(`"${c.name}" 폴더를 삭제할까요?\n자료는 미분류로 이동됩니다.`, () => collectionRemove(c.id));
                     }}
                     className="opacity-0 hover:opacity-100 absolute bottom-1 right-1.5 text-xs2 text-red-500 hover:bg-red-50 px-1.5 py-0.5 rounded"
                   >삭제</button>
@@ -146,8 +149,8 @@ export function LibraryView() {
                   className={clsx(
                     'inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm2 border transition-all active:scale-[0.98]',
                     isActive
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-zinc-700 border-zinc-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700',
+                      ? 'bg-brand-400 text-white border-blue-600'
+                      : 'bg-white text-zinc-700 border-zinc-200 hover:bg-blue-50 hover:border-blue-300 hover:text-brand-400',
                   )}
                 >
                   #{t} <span className={clsx('text-xs2', isActive ? 'text-white/80' : 'text-gray-400')}>{cnt}</span>
@@ -171,6 +174,12 @@ export function LibraryView() {
 
       <NewCollectionModal open={newOpen} onClose={() => setNewOpen(false)} onCreate={(name, color) => { collectionAdd(name, color); setNewOpen(false); }} />
       <LibraryDetailModal id={detailId} onClose={() => setDetailId(null)} />
+      <ConfirmModal
+        open={confirmState.open}
+        message={confirmState.message}
+        onConfirm={() => { confirmState.onConfirm(); setConfirmState(s => ({ ...s, open: false })); }}
+        onCancel={() => setConfirmState(s => ({ ...s, open: false }))}
+      />
     </div>
   );
 }

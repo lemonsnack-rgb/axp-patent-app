@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 
 interface Props {
@@ -92,16 +91,19 @@ export function LoginView({ onLogin }: Props) {
               </p>
             )}
 
-            <Button
+            <button
               type="submit"
-              variant="primary"
-              size="md"
-              loading={loading}
-              disabled={!id.trim() || !pw.trim()}
-              className="w-full mt-2"
+              disabled={loading || !id.trim() || !pw.trim()}
+              className="btn-primary w-full mt-2 h-10 text-base2 font-semibold flex items-center justify-center gap-2"
             >
+              {loading && (
+                <svg className="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25"/>
+                  <path d="M12 2a10 10 0 0110 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                </svg>
+              )}
               {loading ? '로그인 중...' : '로그인'}
-            </Button>
+            </button>
           </form>
 
           {/* 가입 안내 */}

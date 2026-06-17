@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { useToast } from './Toast';
 import { Modal } from './Modal';
+import { QuickNameModal } from './QuickNameModal';
 import type { LibraryItem } from '../types';
 
 interface SaveContext {
@@ -27,6 +28,7 @@ export function LibrarySaveModal({ open, context, onClose }: Props) {
   const [tags, setTags] = useState('');
   const [note, setNote] = useState('');
   const [favorite, setFavorite] = useState(false);
+  const [quickFolderOpen, setQuickFolderOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -39,13 +41,7 @@ export function LibrarySaveModal({ open, context, onClose }: Props) {
 
   if (!context) return null;
 
-  const quickAddFolder = () => {
-    const name = prompt('새 폴더 이름:');
-    if (!name?.trim()) return;
-    const c = collectionAdd(name.trim());
-    setCollectionId(c.id);
-    toast.show(`폴더 추가: ${c.name}`);
-  };
+  const quickAddFolder = () => setQuickFolderOpen(true);
 
   const submit = () => {
     let folderId = collectionId;
@@ -73,6 +69,19 @@ export function LibrarySaveModal({ open, context, onClose }: Props) {
   };
 
   return (
+    <>
+    <QuickNameModal
+      open={quickFolderOpen}
+      title="새 폴더"
+      placeholder="폴더 이름을 입력하세요"
+      onSubmit={name => {
+        const c = collectionAdd(name);
+        setCollectionId(c.id);
+        toast.show(`폴더 추가: ${c.name}`);
+        setQuickFolderOpen(false);
+      }}
+      onClose={() => setQuickFolderOpen(false)}
+    />
     <Modal
       open={open}
       onClose={onClose}
@@ -120,5 +129,6 @@ export function LibrarySaveModal({ open, context, onClose }: Props) {
         </label>
       </div>
     </Modal>
+    </>
   );
 }

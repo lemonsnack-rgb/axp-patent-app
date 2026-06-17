@@ -1,6 +1,7 @@
 // StandaloneEditor — 새 탭에서 열리는 풀스크린 도면 편집 워크플로
 import { useEffect, useState } from 'react';
 import { DrawingEditorModal } from '../features/drawing-workflow/DrawingEditorModal';
+import { ConfirmModal } from '../components/ConfirmModal';
 import {
   readEditorSession,
   writeEditorResult,
@@ -13,6 +14,7 @@ export function StandaloneEditor() {
 
   // 도면 부호 상태 — 구성요소 목록으로 초기화, 편집 중 변경 가능
   const [refs] = useState<EditorReference[]>(() => session?.references ?? []);
+  const [closeConfirm, setCloseConfirm] = useState(false);
 
   // 탭 타이틀 업데이트
   useEffect(() => {
@@ -49,12 +51,7 @@ export function StandaloneEditor() {
         <div className="ml-auto">
           <button
             className="text-white/70 hover:text-white text-xs2 border border-white/30 rounded px-2 py-0.5"
-            onClick={() => {
-              if (window.confirm('편집을 종료하고 탭을 닫으시겠습니까?')) {
-                clearEditorChannel();
-                window.close();
-              }
-            }}>
+            onClick={() => setCloseConfirm(true)}>
             ✕ 닫기
           </button>
         </div>
@@ -81,6 +78,13 @@ export function StandaloneEditor() {
           }}
         />
       </div>
+      <ConfirmModal
+        open={closeConfirm}
+        message="편집을 종료하고 탭을 닫으시겠습니까?"
+        confirmLabel="닫기"
+        onConfirm={() => { clearEditorChannel(); window.close(); }}
+        onCancel={() => setCloseConfirm(false)}
+      />
     </div>
   );
 }

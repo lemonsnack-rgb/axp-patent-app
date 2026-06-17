@@ -65,6 +65,13 @@ export function TopBar() {
             </button>
           )}
         </div>
+        {mode !== 'home' && mode !== 'newtask' && (
+          <button
+            onClick={() => setMode('home')}
+            className="btn-ghost btn-xs flex items-center gap-1 text-zinc-500 shrink-0"
+            title="홈으로 이동"
+          >← 홈</button>
+        )}
         <span className="text-md2 text-zinc-500 ml-2">
           {label}
           {showTaskName && active && (

@@ -9,6 +9,7 @@ import {
 import type { InventionComponent } from '../features/patent-editor';
 import { useStore } from '../store';
 import { Icon } from '../components/Icon';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { PreviewModal } from '../components/PreviewModal';
 import type { PreviewSection } from '../components/PreviewModal';
 import clsx from 'clsx';
@@ -118,6 +119,9 @@ export function SpecView() {
 
   const flowRef = useRef<HTMLDivElement>(null);
   const flowSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [confirmState, setConfirmState] = useState<{ open: boolean; message: string; onConfirm: () => void }>({ open: false, message: '', onConfirm: () => {} });
+  const showConfirm = (message: string, onConfirm: () => void) => setConfirmState({ open: true, message, onConfirm });
 
   // 자동 저장 — 400ms 디바운스
   useEffect(() => {
@@ -163,7 +167,7 @@ export function SpecView() {
   };
 
   const resetAnalysis = () => {
-    if (!window.confirm('처음부터 다시 시작하면 모든 분석 내용이 삭제됩니다. 계속하시겠습니까?')) return;
+    showConfirm('처음부터 다시 시작하면 모든 분석 내용이 삭제됩니다.\n계속하시겠습니까?', () => {
     setPhase('upload');
     setCurStep('upload');
     setConfirmed({});
@@ -179,6 +183,7 @@ export function SpecView() {
         mainView: 'analysis',
       });
     }
+    });
   };
 
   const confirm = (id: StepId) => {
@@ -381,7 +386,7 @@ export function SpecView() {
                       )}>
                       <span className={clsx(
                         'w-5 h-5 rounded-full text-xs2 font-bold flex items-center justify-center shrink-0 border-2',
-                        active && 'border-blue-600 bg-blue-600 text-white',
+                        active && 'border-blue-600 bg-brand-400 text-white',
                         isDone && !active && 'border-green-500 bg-green-500 text-white',
                         locked && 'border-gray-300 bg-white text-gray-400',
                         !active && !isDone && !locked && 'border-gray-400 bg-white text-gray-500',
@@ -390,7 +395,7 @@ export function SpecView() {
                       </span>
                       <span className={clsx(
                         'text-sm2 max-md:hidden',
-                        active && 'max-md:inline text-blue-700 font-semibold',
+                        active && 'max-md:inline text-brand-400 font-semibold',
                         isDone && !active && 'text-green-700 font-medium',
                         locked && 'text-gray-400',
                         !active && !isDone && !locked && 'text-gray-500',
@@ -414,23 +419,42 @@ export function SpecView() {
             {/* 업로드 존 — PDF 파일 업로드 */}
             {phase !== 'flow' && phase !== 'done' && phase !== 'direct' && (
               <div className="text-center py-4">
-                <Icon name="doc" size={48} className="text-blue-700 mx-auto mb-3" />
+                <Icon name="doc" size={48} className="text-brand-400 mx-auto mb-3" />
                 <h2 className="text-lg2 font-bold text-gray-800 mb-2">새 특허 명세서 작성</h2>
                 <p className="text-md2 text-gray-500 mb-6">직무발명서(PDF)를 업로드하면 AI가 자동으로 분석합니다.</p>
-                <div
-                  onClick={() => {
-                    if (phase !== 'upload') return;
-                    startFlow({
-                      title:   diTitle.trim()   || '직무발명서',
-                      field:   diField.trim()   || '기술',
-                      content: diContent.trim() || '발명 내용',
-                    });
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx,.txt"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+                    setDiTitle(nameWithoutExt);
+                    const reader = new FileReader();
+                    reader.onload = ev => {
+                      const text = ev.target?.result as string;
+                      setDiContent(text?.slice(0, 2000) || '(파일 내용)');
+                      setPhase('direct');
+                    };
+                    if (file.type === 'text/plain') {
+                      reader.readAsText(file);
+                    } else {
+                      setDiContent(`[${file.name}] 파일이 업로드되었습니다. 아래 내용을 확인 후 AI 분석을 시작하세요.`);
+                      setPhase('direct');
+                    }
+                    e.target.value = '';
                   }}
+                />
+                <div
+                  onClick={() => { if (phase === 'upload') fileInputRef.current?.click(); }}
                   className={`border-2 border-dashed rounded-xl p-10 mb-5 transition-all ${phase === 'upload' ? 'border-gray-300 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30' : 'border-gray-200 opacity-50'}`}>
                   <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 text-gray-400">
                     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>
                   </svg>
                   <p className="text-md2 text-gray-600">직무발명서 PDF를 업로드 하세요.</p>
+                  <p className="text-xs2 text-gray-400 mt-1">.pdf · .docx · .txt 지원</p>
                 </div>
               </div>
             )}
@@ -439,7 +463,7 @@ export function SpecView() {
             {(phase === 'direct' || ((phase === 'flow' || phase === 'done') && diTitle.trim())) && (
               <div className="card overflow-hidden">
                 <div className="flex items-center gap-3 p-4 border-b border-gray-100 bg-gray-50">
-                  <Icon name="edit" size={20} className="text-blue-700" />
+                  <Icon name="edit" size={20} className="text-brand-400" />
                   <div>
                     <h3 className="text-base2 font-semibold text-gray-800">발명 기초 내용 입력</h3>
                     <p className="text-sm2 text-gray-500">아래 항목을 입력하면 AI가 명세서 항목을 분석합니다. <span className="text-red-500">*</span> 표시는 필수 항목입니다.</p>
@@ -472,8 +496,11 @@ export function SpecView() {
                 {phase === 'direct' && (
                   <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-100 bg-gray-50">
                     <button className="btn-outline btn-sm" onClick={() => {
-                      if ((diTitle || diContent) && !window.confirm('입력한 내용이 삭제됩니다. 계속할까요?')) return;
-                      setPhase('upload');
+                      if (diTitle || diContent) {
+                        showConfirm('입력한 내용이 삭제됩니다. 계속할까요?', () => setPhase('upload'));
+                      } else {
+                        setPhase('upload');
+                      }
                     }}>취소</button>
                     <button className="btn-primary btn-sm" onClick={() => startFlow()}
                       disabled={!diTitle.trim() || !diField.trim() || !diContent.trim() || analyzing}>
@@ -543,7 +570,7 @@ export function SpecView() {
                                     <div className="space-y-1">
                                       {confirmedComponents.slice(0, 6).map(c => (
                                         <div key={c.number || c.name} className="flex items-center gap-2 py-0.5">
-                                          <span className="text-xs2 font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded w-10 text-center shrink-0">{c.number || '—'}</span>
+                                          <span className="text-xs2 font-bold text-brand-400 bg-blue-100 px-1.5 py-0.5 rounded w-10 text-center shrink-0">{c.number || '—'}</span>
                                           <span className="text-sm2 text-gray-700">{c.name}</span>
                                         </div>
                                       ))}
@@ -594,7 +621,7 @@ export function SpecView() {
                                 {/* 헤더 */}
                                 <div className="flex items-center gap-2 mb-2">
                                   <span className="w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center shrink-0"><Icon name="check" size={10} /></span>
-                                  <span className="text-sm2 font-semibold text-blue-700 flex-1 min-w-0">{CONFIRM_LABEL[s.id]}</span>
+                                  <span className="text-sm2 font-semibold text-brand-400 flex-1 min-w-0">{CONFIRM_LABEL[s.id]}</span>
                                 </div>
                                 {/* 전체 내용 항상 표시 */}
                                 <div className={clsx(
@@ -609,7 +636,7 @@ export function SpecView() {
                                         const content = lines.slice(1).join('\n').trim();
                                         return (
                                           <div key={bi}>
-                                            <p className="text-xs2 font-bold text-blue-700 mb-0.5">{label}</p>
+                                            <p className="text-xs2 font-bold text-brand-400 mb-0.5">{label}</p>
                                             <p className="text-xs2 text-gray-700 leading-relaxed">{content}</p>
                                           </div>
                                         );
@@ -668,7 +695,7 @@ export function SpecView() {
                 })}
                 {phase === 'done' && (
                   <div className="text-center py-8">
-                    <Icon name="logo" size={40} className="text-blue-700 mx-auto mb-3" />
+                    <Icon name="logo" size={40} className="text-brand-400 mx-auto mb-3" />
                     <h3 className="text-lg2 font-bold text-gray-800 mb-2">모든 분석 항목이 확정되었습니다</h3>
                     <p className="text-md2 text-gray-500 mb-5">확정된 내용을 바탕으로 명세서 초안을 편집하세요.</p>
                     <button
@@ -706,17 +733,17 @@ export function SpecView() {
                   <button onClick={() => confirm('drawings')} className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors">건너뛰기</button>
                 )}
                 {doneCount >= 5 ? (
-                  <button onClick={() => handleSetMainView('editor')} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-blue-700 rounded-xl hover:bg-blue-800 transition-colors">명세서 초안 편집 →</button>
+                  <button onClick={() => handleSetMainView('editor')} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 transition-colors">명세서 초안 편집 →</button>
                 ) : guideStep === 'description' ? (
                   descSubInfo.allDone ? (
-                    <button onClick={() => confirm('description')} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-blue-700 rounded-xl hover:bg-blue-800 transition-colors">다음 →</button>
+                    <button onClick={() => confirm('description')} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 transition-colors">다음 →</button>
                   ) : (
-                    <button onClick={() => descSubInfo.doConfirm?.()} disabled={descMode === 'prompt' || descMode === 'diff'} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-blue-700 rounded-xl hover:bg-blue-800 disabled:opacity-40 transition-colors">다음 →</button>
+                    <button onClick={() => descSubInfo.doConfirm?.()} disabled={descMode === 'prompt' || descMode === 'diff'} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 disabled:opacity-40 transition-colors">다음 →</button>
                   )
                 ) : !isSpecialStep(guideStep) ? (
-                  <button onClick={() => { const cur = gSel[guideStep]; if (cur?.trim()) confirm(guideStep); }} disabled={!gSel[guideStep]?.trim()} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-blue-700 rounded-xl hover:bg-blue-800 disabled:opacity-40 transition-colors">다음 →</button>
+                  <button onClick={() => { const cur = gSel[guideStep]; if (cur?.trim()) confirm(guideStep); }} disabled={!gSel[guideStep]?.trim()} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 disabled:opacity-40 transition-colors">다음 →</button>
                 ) : (
-                  <button onClick={() => confirm(guideStep)} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-blue-700 rounded-xl hover:bg-blue-800 transition-colors">다음 →</button>
+                  <button onClick={() => confirm(guideStep)} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 transition-colors">다음 →</button>
                 )}
               </div>
             </div>
@@ -748,7 +775,7 @@ export function SpecView() {
         {/* 모바일 전용: AI 어시스턴트 FAB */}
         {(phase === 'flow' || phase === 'done') && (
           <button
-            className="md:hidden fixed bottom-5 right-4 z-30 bg-blue-600 text-white rounded-full px-4 py-2.5 text-sm font-medium shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform"
+            className="md:hidden fixed bottom-5 right-4 z-30 bg-brand-400 text-white rounded-full px-4 py-2.5 text-sm font-medium shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform"
             onClick={() => setMobileGuideOpen(true)}
             aria-label="AI 어시스턴트 열기"
           >
@@ -783,6 +810,12 @@ export function SpecView() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={confirmState.open}
+        message={confirmState.message}
+        onConfirm={() => { confirmState.onConfirm(); setConfirmState(s => ({ ...s, open: false })); }}
+        onCancel={() => setConfirmState(s => ({ ...s, open: false }))}
+      />
     </div>
   );
 }
@@ -864,7 +897,7 @@ function InlineCandidateCards({
             <div className="flex items-center gap-2 mb-1.5">
               <span className={clsx(
                 'w-5 h-5 rounded-full text-xs2 font-bold flex items-center justify-center shrink-0',
-                isSelected ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500',
+                isSelected ? 'bg-brand-400 text-white' : 'bg-gray-200 text-gray-500',
               )}>{letter}</span>
               {isSelected && <span className="text-xs2 text-blue-600 font-semibold">✓ 선택됨</span>}
               <div className="ml-auto">
@@ -1075,7 +1108,7 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
           style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
         <span className="text-sm font-bold text-gray-800">AI 어시스턴트</span>
         {focusCtx && !isDone && (
-          <span className="ml-auto inline-flex items-center gap-1 text-xs2 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
+          <span className="ml-auto inline-flex items-center gap-1 text-xs2 px-2 py-0.5 rounded-full bg-blue-100 text-brand-400 font-medium">
             ✎ {focusCtx.label} 수정 중
           </span>
         )}
@@ -1109,7 +1142,7 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
             </div>
             <button
               onClick={() => setIsEditingCtx(prev => !prev)}
-              className="text-xs2 text-blue-500 hover:text-blue-700 transition-colors font-medium"
+              className="text-xs2 text-blue-500 hover:text-brand-400 transition-colors font-medium"
             >
               {isEditingCtx ? '접기' : '편집'}
             </button>
@@ -1157,7 +1190,7 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
                     style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
                 )}
                 {m.role === 'user' ? (
-                  <div className="rounded-xl px-2.5 py-1.5 text-xs2 leading-relaxed max-w-[85%] bg-blue-600 text-white">
+                  <div className="rounded-xl px-2.5 py-1.5 text-xs2 leading-relaxed max-w-[85%] bg-brand-400 text-white">
                     {m.text}
                   </div>
                 ) : (
@@ -1192,7 +1225,7 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
                             }}
                             className={clsx(
                               'flex-1 py-1 text-xs2 font-semibold rounded-lg transition-colors',
-                              m.applied ? 'bg-green-100 text-green-700 cursor-default' : 'bg-blue-600 text-white hover:bg-blue-700',
+                              m.applied ? 'bg-green-100 text-green-700 cursor-default' : 'bg-brand-400 text-white hover:bg-brand-400',
                             )}
                           >
                             {m.applied ? '✓ 적용됨' : '✓ 적용'}
@@ -1240,7 +1273,7 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
           <button
             onClick={() => sendGuideChat()}
             disabled={!guideChatInput.trim()}
-            className="shrink-0 w-7 h-7 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center transition-colors">
+            className="shrink-0 w-7 h-7 rounded-xl bg-brand-400 hover:bg-brand-400 disabled:opacity-40 flex items-center justify-center transition-colors">
             <svg viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" width="12" height="12">
               <path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z" fill="white" stroke="none"/>
             </svg>
@@ -1329,12 +1362,9 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
   const moveDown = (idx: number) => { if (idx===items.length-1||done) return; const a=[...items]; [a[idx],a[idx+1]]=[a[idx+1],a[idx]]; applyUpd(a); };
   const indent   = (id: number)  => { if (!done) applyUpd(items.map(it => it.id===id ? {...it, depth: Math.min(it.depth+1,2)} : it)); };
   const outdent  = (id: number)  => { if (!done) applyUpd(items.map(it => it.id===id ? {...it, depth: Math.max(it.depth-1,0)} : it)); };
+  const [compConfirm, setCompConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null });
   const remove   = (id: number)  => {
-    if (!done) {
-      const item = items.find(it => it.id === id);
-      if (!window.confirm(`"${item?.text ? item.text.slice(0, 30) : '이 구성요소'}"를 삭제하시겠습니까?`)) return;
-      upd(items.filter(it => it.id !== id));
-    }
+    if (!done) setCompConfirm({ open: true, id });
   };
   const autoAssign = () => { if (!done) upd(calcAutoNums(items)); };
   const add = () => {
@@ -1373,7 +1403,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
           <span className="text-xs2 font-semibold text-gray-600">AI 추출 구성요소</span>
           {!done && (
             <button onClick={autoAssign}
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs2 font-semibold bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition-colors">
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs2 font-semibold bg-blue-50 border border-blue-200 text-brand-400 hover:bg-blue-100 transition-colors">
               <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="10" height="10">
                 <path d="M2 6h8M8 4l2 2-2 2"/>
               </svg>
@@ -1420,7 +1450,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                   <span className="text-gray-300 cursor-grab active:cursor-grabbing shrink-0 select-none text-xs leading-none px-0.5">⠿</span>
                   <span className={clsx(
                     'w-8 text-xs2 font-bold rounded px-1 py-0.5 shrink-0 text-center',
-                    item.num ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'
+                    item.num ? 'bg-blue-100 text-brand-400' : 'bg-gray-100 text-gray-400'
                   )}>
                     {item.num || '—'}
                   </span>
@@ -1550,6 +1580,12 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
           <div className="flex items-center gap-1.5 text-sm2 text-green-700 font-medium"><Icon name="check" size={13} /> 구성요소 확정 완료</div>
         </div>
       )}
+      <ConfirmModal
+        open={compConfirm.open}
+        message={`"${items.find(it => it.id === compConfirm.id)?.text?.slice(0, 30) ?? '이 구성요소'}"를 삭제하시겠습니까?`}
+        onConfirm={() => { if (compConfirm.id !== null) upd(items.filter(it => it.id !== compConfirm.id)); setCompConfirm({ open: false, id: null }); }}
+        onCancel={() => setCompConfirm({ open: false, id: null })}
+      />
     </>
   );
 }
@@ -1614,14 +1650,14 @@ function DrawingsPanel({ done, onUpdate, inventionComponents }: {
   };
 
   const LABEL_STYLES: Record<string, string> = {
-    '제안기술': 'bg-blue-100 text-blue-700',
+    '제안기술': 'bg-blue-100 text-brand-400',
     '종래기술': 'bg-gray-100 text-gray-600',
     'AI생성':   'bg-violet-100 text-violet-700',
   };
 
   const STAGE_LABEL: Record<string, { text: string; cls: string }> = {
     'extracted':        { text: '영역 확인 필요',    cls: 'bg-amber-100 text-amber-700' },
-    'bbox-adjusted':    { text: '영역 확인 완료 ✓', cls: 'bg-blue-100 text-blue-700' },
+    'bbox-adjusted':    { text: '영역 확인 완료 ✓', cls: 'bg-blue-100 text-brand-400' },
     'converting':       { text: '변환 중',           cls: 'bg-violet-100 text-violet-700' },
     'candidate-select': { text: '후보 선택 필요',    cls: 'bg-orange-100 text-orange-700' },
     'editing':          { text: '편집 중',            cls: 'bg-sky-100 text-sky-700' },
@@ -1633,7 +1669,7 @@ function DrawingsPanel({ done, onUpdate, inventionComponents }: {
   return (
     <>
       {newTabNotice && (
-        <div className="mx-3 mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs2 text-blue-700 flex items-center gap-1.5 shrink-0">
+        <div className="mx-3 mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs2 text-brand-400 flex items-center gap-1.5 shrink-0">
           <span>↗</span>
           도면 편집기가 새 탭에서 열렸습니다. 편집 완료 후 이 탭으로 돌아오세요.
         </div>
@@ -1940,7 +1976,7 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: { d
       <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2.5 ml-1.5">
         <p className="text-xs2 text-gray-500 leading-relaxed">
           기초자료를 분석하여 독립항 후보를 생성했습니다.<br />
-          <span className="text-blue-700 font-medium">여러 개를 선택</span>할 수 있습니다.
+          <span className="text-brand-400 font-medium">여러 개를 선택</span>할 수 있습니다.
         </p>
 
         {cands.map(cand => (
@@ -1955,11 +1991,11 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: { d
               <button
                 onClick={e => { e.stopPropagation(); if (!done) toggleIndep(cand.id); }}
                 className={clsx('w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all',
-                  cand.selected ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 bg-white hover:border-blue-400')}>
+                  cand.selected ? 'bg-brand-400 border-blue-600 text-white' : 'border-gray-300 bg-white hover:border-blue-400')}>
                 {cand.selected && <Icon name="check" size={9} />}
               </button>
               <span className={clsx('w-6 h-6 rounded-full flex items-center justify-center text-xs2 font-bold shrink-0',
-                cand.selected ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-600')}>
+                cand.selected ? 'bg-brand-400 text-white' : 'bg-gray-200 text-gray-600')}>
                 {cand.label}
               </span>
               <span className="text-xs2 px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">독립항</span>
@@ -2057,7 +2093,7 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: { d
                   onClick={() => !done && onFocusContext?.({ text: indep.text, label: `독립항 ${indep.label}`, apply: (newText) => setCands(p => p.map(c => c.id === indep.id ? { ...c, text: newText, editVal: newText } : c)) })}
                 >
                   <Icon name="check" size={11} className="text-blue-600" />
-                  <span className="text-xs2 font-bold text-blue-700">청구항 {indepClaimNum} · 독립항 {indep.label}</span>
+                  <span className="text-xs2 font-bold text-brand-400">청구항 {indepClaimNum} · 독립항 {indep.label}</span>
                   {!done && (
                     <div className="ml-auto">
                       <button
@@ -2129,10 +2165,10 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: { d
                             <button
                               onClick={e => { e.stopPropagation(); toggleDep(indep.id, dep.id); }}
                               className={clsx('w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all',
-                                dep.sel ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 bg-white hover:border-blue-400')}>
+                                dep.sel ? 'bg-brand-400 border-blue-600 text-white' : 'border-gray-300 bg-white hover:border-blue-400')}>
                               {dep.sel && <Icon name="check" size={8} />}
                             </button>
-                            <span className={clsx('text-xs2 font-bold shrink-0', dep.sel ? 'text-blue-700' : 'text-gray-400')}>
+                            <span className={clsx('text-xs2 font-bold shrink-0', dep.sel ? 'text-brand-400' : 'text-gray-400')}>
                               종속항 {depLocalNum}
                             </span>
                             {!done && (
@@ -2286,7 +2322,7 @@ function DescriptionPanel({ onUpdate, onSubInfoChange, onFocusContext, guidePane
             <div className="flex items-center gap-2 mb-1.5">
               <span className={clsx(
                 'text-xs2 font-bold px-2 py-0.5 rounded-full shrink-0',
-                isActive ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600',
+                isActive ? 'bg-brand-400 text-white' : 'bg-gray-100 text-gray-600',
               )}>{sec.label}</span>
               {isActive && <span className="text-xs2 text-blue-600 font-semibold">✓ 선택됨</span>}
               <div className="ml-auto">
@@ -2349,7 +2385,7 @@ function AbstractPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
   return (
     <>
       <div className="mx-3 mt-3 mb-2 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 shrink-0">
-        <p className="text-xs2 text-blue-700">명세서 전체 내용을 기반으로 <strong>요약서 2개 후보</strong>를 생성했습니다. 선택하거나 수정하세요.</p>
+        <p className="text-xs2 text-brand-400">명세서 전체 내용을 기반으로 <strong>요약서 2개 후보</strong>를 생성했습니다. 선택하거나 수정하세요.</p>
       </div>
 
       <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2 ml-1.5">
@@ -2370,7 +2406,7 @@ function AbstractPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
             >
               <div className="flex items-center gap-2 mb-1.5">
                 <span className={clsx('w-5 h-5 rounded-full text-xs2 font-bold flex items-center justify-center shrink-0',
-                  isSelected || isConfirmed ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500')}>
+                  isSelected || isConfirmed ? 'bg-brand-400 text-white' : 'bg-gray-200 text-gray-500')}>
                   {cand.letter}
                 </span>
                 {cand.badge2 && <span className="text-xs2 text-gray-500 font-medium">{cand.badge2}</span>}
