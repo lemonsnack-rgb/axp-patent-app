@@ -604,7 +604,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult, p
 
       </div>{/* 좌측 에디터 컬럼 끝 */}
 
-      {/* 우측 AI 보조 패널 */}
+      {/* 우측 AI 어시스턴트 패널 */}
       {mobileAiOpen && (
           <div
             className="fixed inset-0 z-40 bg-black/40 md:hidden"
@@ -638,7 +638,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult, p
               <>
                 <div className="w-5 h-5 rounded flex items-center justify-center text-white text-xs font-bold shrink-0"
                   style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
-                <span className="text-sm font-bold text-gray-800">AI 보조</span>
+                <span className="text-sm font-bold text-gray-800">AI 어시스턴트</span>
               </>
             )}
             {activePanel === 'drawings' && (
@@ -657,7 +657,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult, p
               <>
                 <div className="flex items-center justify-between px-3 pt-2 pb-1.5 shrink-0">
                   <span className="text-xs2 font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
-                    단락 {selSet.size}개 선택됨
+                    편집 명령 대상 · {selSet.size}개
                   </span>
                   <button
                     onClick={() => setSelSet(new Set())}
@@ -683,10 +683,11 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult, p
                 </div>
               </>
             ) : (
-              <p className="text-xs2 text-zinc-400 text-center py-2 px-3">
+              <p className="text-xs2 text-zinc-400 text-center py-2 px-3 leading-relaxed">
                 {activePanel === 'drawings'
                   ? '도면을 선택하거나 새 도면을 추가하세요'
-                  : '단락을 선택하면 해당 내용을 AI에 전달합니다 · 미선택 시 전체 대상'}
+                  : <>중앙에서 단락을 선택하고<br /><span className="text-zinc-500 font-medium">수정 명령을 입력하세요</span><br /><span className="text-xs2 text-zinc-300">미선택 시 전체 문서 대상</span></>
+                }
               </p>
             )}
           </div>
@@ -851,7 +852,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult, p
         <div className="hidden md:flex flex-col items-center border-l border-zinc-200 bg-white py-2 gap-1 shrink-0" style={{ width: 40 }}>
           <button
             onClick={() => setActivePanel(p => p === 'ai' ? 'drawings' : 'ai')}
-            title="AI 보조"
+            title="AI 어시스턴트"
             className={clsx('w-8 h-8 rounded-lg flex items-center justify-center transition-colors',
               activePanel === 'ai' ? 'bg-violet-100 text-violet-700' : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100')}>
             <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
@@ -878,8 +879,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult, p
           'shadow-lg flex items-center justify-center transition-all',
           mobileAiOpen && 'hidden',
         )}
-        title="AI 보조 열기"
-        aria-label="AI 보조 열기"
+        title="AI 어시스턴트 열기"
+        aria-label="AI 어시스턴트 열기"
       >
         <svg viewBox="0 0 20 20" fill="white" width="22" height="22">
           <path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v7a2 2 0 01-2 2H6l-4 4V5z"/>

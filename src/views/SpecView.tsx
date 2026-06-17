@@ -589,8 +589,8 @@ export function SpecView() {
                         return (
                           <>
                             <div className="flex items-start gap-3 flex-row-reverse">
-                              <div className="w-8 h-8 rounded-full bg-blue-700 text-white text-xs2 font-bold flex items-center justify-center shrink-0">나</div>
-                              <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 shadow-xs min-w-0 break-words max-w-[calc(100%-2.75rem)]">
+                              <div className="w-8 h-8 rounded-full bg-green-600 text-white text-sm font-bold flex items-center justify-center shrink-0">✓</div>
+                              <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3 shadow-xs min-w-0 break-words max-w-[calc(100%-2.75rem)]">
                                 {/* 헤더 */}
                                 <div className="flex items-center gap-2 mb-2">
                                   <span className="w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center shrink-0"><Icon name="check" size={10} /></span>
@@ -745,15 +745,15 @@ export function SpecView() {
           />
         )}
 
-        {/* 모바일 전용: AI 보조 FAB */}
+        {/* 모바일 전용: AI 어시스턴트 FAB */}
         {(phase === 'flow' || phase === 'done') && (
           <button
             className="md:hidden fixed bottom-5 right-4 z-30 bg-blue-600 text-white rounded-full px-4 py-2.5 text-sm font-medium shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform"
             onClick={() => setMobileGuideOpen(true)}
-            aria-label="AI 보조 열기"
+            aria-label="AI 어시스턴트 열기"
           >
             <Icon name="star" size={14} />
-            AI 보조
+            AI 어시스턴트
           </button>
         )}
       </div>
@@ -789,9 +789,8 @@ export function SpecView() {
 
 function AiMsg({ text }: { text: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-3">
-      <div className="w-8 h-8 rounded-full bg-blue-700 text-white text-xs2 font-bold flex items-center justify-center shrink-0">AI</div>
-      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-md2 text-gray-700 shadow-xs max-w-2xl">
+    <div className="flex items-start gap-2.5 border-l-2 border-blue-200 pl-3">
+      <div className="text-md2 text-zinc-500 leading-relaxed py-0.5">
         {text}
       </div>
     </div>
@@ -874,7 +873,7 @@ function InlineCandidateCards({
                   className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
                 >
                   <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                  AI 수정
+                  수정 요청
                 </button>
               </div>
             </div>
@@ -926,10 +925,12 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
   const guideChatIdRef = useRef(0);
   const guideChatEndRef = useRef<HTMLDivElement>(null);
   const [localText, setLocalText] = useState('');
+  const [isEditingCtx, setIsEditingCtx] = useState(false);
 
-  // focusCtx 변경(섹션 선택, AI 적용) 시 편집 텍스트 동기화
+  // focusCtx 변경(섹션 선택, AI 적용) 시 편집 텍스트 동기화 + 편집 모드 리셋
   useEffect(() => {
     setLocalText(focusCtx?.text ?? '');
+    setIsEditingCtx(false);
   }, [focusCtx]);
 
   const QA_REPLIES: Record<string, string> = {
@@ -1054,7 +1055,7 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
       {/* 모바일 전용: 시트 핸들바 + 닫기 */}
       <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-ck-border shrink-0 relative">
         <div className="w-8 h-1 bg-zinc-300 rounded-full absolute top-2 left-1/2 -translate-x-1/2" />
-        <span className="font-semibold text-sm">AI 보조</span>
+        <span className="font-semibold text-sm">AI 어시스턴트</span>
         <button onClick={onMobileClose} className="btn-ghost p-1" aria-label="가이드 닫기">
           <Icon name="close" size={16} />
         </button>
@@ -1072,7 +1073,12 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
       <div className="hidden md:flex shrink-0 items-center gap-2 px-4 border-b border-ck-border bg-gray-50 ml-1.5" style={{ height: 48 }}>
         <div className="w-5 h-5 rounded flex items-center justify-center text-white text-xs font-bold shrink-0"
           style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
-        <span className="text-sm font-bold text-gray-800">AI 보조</span>
+        <span className="text-sm font-bold text-gray-800">AI 어시스턴트</span>
+        {focusCtx && !isDone && (
+          <span className="ml-auto inline-flex items-center gap-1 text-xs2 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
+            ✎ {focusCtx.label} 수정 중
+          </span>
+        )}
         {isDone && (
           <span className="ml-auto inline-flex items-center gap-1 text-xs2 px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
             <Icon name="check" size={10} /> 확정됨
@@ -1084,37 +1090,53 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
         <div className="flex items-center gap-2 mb-1.5">
           <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs2 font-bold shrink-0"
             style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
-          <span className="text-base2 font-bold text-gray-800">AI 보조</span>
+          <span className="text-base2 font-bold text-gray-800">AI 어시스턴트</span>
           {isDone && (
             <span className="ml-auto inline-flex items-center gap-1 text-xs2 px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
               <Icon name="check" size={10} /> 확정됨
             </span>
           )}
         </div>
-        <p className="text-sm2 text-gray-500 leading-snug">카드를 선택하고 AI에게 수정을 요청하거나 질문하세요.</p>
       </div>
 
-      {/* 선택된 콘텐츠 — 전체 내용 표시 + 직접 편집 가능 */}
+      {/* 선택된 콘텐츠 — 미리보기/편집 모드 토글 */}
       {focusCtx ? (
         <div className="shrink-0 mx-3 mt-2 mb-1">
-          <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-xs2 text-blue-600 font-semibold">✎ 선택됨</span>
-            <span className="text-xs2 text-zinc-400">· {focusCtx.label}</span>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs2 text-blue-600 font-semibold">✎ 선택됨</span>
+              <span className="text-xs2 text-zinc-400">· {focusCtx.label}</span>
+            </div>
+            <button
+              onClick={() => setIsEditingCtx(prev => !prev)}
+              className="text-xs2 text-blue-500 hover:text-blue-700 transition-colors font-medium"
+            >
+              {isEditingCtx ? '접기' : '편집'}
+            </button>
           </div>
-          <textarea
-            className="w-full text-sm2 text-gray-800 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 outline-none resize-none leading-relaxed focus:border-blue-400 transition-colors overflow-y-auto scroll-thin"
-            value={localText}
-            rows={3}
-            onChange={e => {
-              setLocalText(e.target.value);
-              focusCtx.apply(e.target.value);
-              e.target.style.height = 'auto';
-              e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
-            }}
-            ref={el => {
-              if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 160) + 'px'; }
-            }}
-          />
+          {isEditingCtx ? (
+            <textarea
+              className="w-full text-sm2 text-gray-800 bg-blue-50 border border-blue-400 rounded-lg px-3 py-2 outline-none resize-none leading-relaxed transition-colors scroll-thin"
+              value={localText}
+              rows={4}
+              autoFocus
+              onChange={e => {
+                setLocalText(e.target.value);
+                focusCtx.apply(e.target.value);
+              }}
+            />
+          ) : (
+            <div
+              className="w-full text-sm2 text-gray-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 leading-relaxed line-clamp-3 cursor-pointer hover:bg-blue-100 hover:border-blue-300 transition-colors"
+              onClick={() => setIsEditingCtx(true)}
+              title="클릭하여 직접 편집"
+            >
+              {localText}
+            </div>
+          )}
+          {!isEditingCtx && (
+            <p className="text-xs2 text-zinc-400 mt-0.5 pl-1">클릭하거나 '편집'을 눌러 직접 수정할 수 있습니다.</p>
+          )}
         </div>
       ) : (
         <div className="shrink-0 mx-3 mt-2 mb-1 px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg">
@@ -1948,7 +1970,7 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: { d
                     className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
                   >
                     <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                    AI 수정
+                    수정 요청
                   </button>
                 </div>
               )}
@@ -2043,7 +2065,7 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: { d
                         className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
                       >
                         <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                        AI 수정
+                        수정 요청
                       </button>
                     </div>
                   )}
@@ -2273,7 +2295,7 @@ function DescriptionPanel({ onUpdate, onSubInfoChange, onFocusContext, guidePane
                   className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
                 >
                   <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                  AI 수정
+                  수정 요청
                 </button>
               </div>
             </div>
@@ -2361,7 +2383,7 @@ function AbstractPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                       className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
                     >
                       <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                      AI 수정
+                      수정 요청
                     </button>
                   </div>
                 )}
