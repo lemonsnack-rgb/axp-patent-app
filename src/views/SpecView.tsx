@@ -579,7 +579,7 @@ export function SpecView() {
                           <>
                             <div className="flex items-start gap-3 flex-row-reverse">
                               <div className="w-8 h-8 rounded-full bg-blue-700 text-white text-xs2 font-bold flex items-center justify-center shrink-0">나</div>
-                              <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 max-w-2xl shadow-xs w-full">
+                              <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 shadow-xs min-w-0 break-words max-w-[calc(100%-2.75rem)]">
                                 {/* 헤더: 항상 표시 (U5: 클릭으로 접기/펼치기) */}
                                 <button
                                   className="w-full flex items-center gap-2 text-left"
@@ -590,7 +590,7 @@ export function SpecView() {
                                   })}
                                 >
                                   <span className="w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center shrink-0"><Icon name="check" size={10} /></span>
-                                  <span className="text-sm2 font-semibold text-blue-700 flex-1">{CONFIRM_LABEL[s.id]}</span>
+                                  <span className="text-sm2 font-semibold text-blue-700 flex-1 min-w-0">{CONFIRM_LABEL[s.id]}</span>
                                   {!isExpanded && <span className="text-xs2 text-gray-400 truncate max-w-[160px]">{summary}</span>}
                                   <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="10" height="10"
                                     className={clsx('text-gray-400 shrink-0 transition-transform', isExpanded && 'rotate-180')}>
