@@ -130,7 +130,11 @@ export function NewTaskView() {
         <div className="card max-w-[760px] w-full p-5 animate-fade-up">
           <Field label="작업 이름 (선택)">
             <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder={PLACEHOLDER[type]} maxLength={80} autoFocus />
-            <div className="text-xs2 text-zinc-400 mt-1">검색 작업: 첫 검색 시 검색식 일부 · 명세서: 발명의 명칭 입력 시 자동 반영</div>
+            <div className="text-xs2 text-zinc-400 mt-1">
+              {type === 'spec'
+                ? '발명의 명칭을 입력하면 명세서 작성 중 자동 반영됩니다.'
+                : '첫 검색 시 검색식 일부가 자동으로 반영됩니다.'}
+            </div>
           </Field>
           <Field label="기술분야 (선택)">
             <input className="input" value={techField} onChange={e => setTechField(e.target.value)} placeholder="예: 자율주행 LIDAR, 무선통신, 의료영상" maxLength={60} />
