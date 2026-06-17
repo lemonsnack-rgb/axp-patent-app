@@ -8,7 +8,7 @@ import { LibraryDetailModal } from '../components/LibraryDetailModal';
 import clsx from 'clsx';
 import type { LibraryItem } from '../types';
 
-type DrillFilter = null | { kind: 'collection'; id: string } | { kind: 'tag'; tag: string };
+type DrillFilter = null | { kind: 'all' } | { kind: 'collection'; id: string } | { kind: 'tag'; tag: string };
 
 const COLLECTION_COLORS = ['#1e5fa6', '#10b981', '#f59e0b', '#6d28d9', '#dc2626', '#0ea5e9', '#84cc16', '#ec4899'];
 
@@ -60,6 +60,22 @@ export function LibraryView() {
 
       {/* 폴더 그리드 */}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
+        {/* 전체 자료 카드 */}
+        <div
+          onClick={() => setDrill({ kind: 'all' })}
+          className={clsx(
+            'card p-4 flex items-start gap-3 cursor-pointer hover:border-blue-500 hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.98] transition-all min-h-[84px]',
+            drill?.kind === 'all' && 'ring-2 ring-blue-500',
+          )}
+        >
+          <span className="w-8 h-8 rounded-md flex items-center justify-center shrink-0 bg-blue-50 text-blue-600">
+            <Icon name="library" size={18} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-base2 text-zinc-800">전체 자료</div>
+            <div className="text-sm2 text-zinc-500">{library.length}건</div>
+          </div>
+        </div>
         <button
           onClick={() => setNewOpen(true)}
           className="card border-dashed border-zinc-300 p-4 flex items-center gap-3 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700 active:scale-[0.98] min-h-[84px] text-zinc-500 transition-all"
@@ -142,10 +158,10 @@ export function LibraryView() {
         </section>
       )}
 
-      {/* 드릴다운: 자료 카드 */}
-      {drill && (
+      {/* 드릴다운: 자료 카드 (drill 선택 또는 검색어 입력 시 표시) */}
+      {(drill || search) && (
         <DrillDownItems
-          filter={drill}
+          filter={drill ?? { kind: 'all' }}
           search={search}
           sort={sort}
           onSortChange={setSort}
@@ -160,15 +176,16 @@ export function LibraryView() {
 }
 
 function DrillDownItems({ filter, search, sort, onSortChange, onOpenDetail }: {
-  filter: DrillFilter; search: string; sort: 'recent' | 'title';
+  filter: Exclude<DrillFilter, null>; search: string; sort: 'recent' | 'title';
   onSortChange: (s: 'recent' | 'title') => void; onOpenDetail: (id: string) => void;
 }) {
   const { library, collections, libraryToggleFavorite } = useStore();
-  if (!filter) return null;
 
   let items: LibraryItem[] = library;
   let label = '자료';
-  if (filter.kind === 'collection') {
+  if (filter.kind === 'all') {
+    label = '전체 자료';
+  } else if (filter.kind === 'collection') {
     const c = collections.find(x => x.id === filter.id);
     label = `폴더 · ${c?.name || ''}`;
     items = items.filter(l => l.collectionId === filter.id);
