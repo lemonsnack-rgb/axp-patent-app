@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import clsx from 'clsx';
 import { PATENT_SEED } from '../data/patentSeed';
 import { PatentDetail } from '../components/PatentDetail';
 import { LibrarySaveModal } from '../components/LibrarySaveModal';
@@ -9,22 +10,29 @@ import { PaperResults } from './PaperResults';
 import { useStore } from '../store';
 import type { PatentResult, PaperResult } from '../types';
 
-// 원본: 특허/논문 탭은 작업 타입으로 결정되므로 제거됨
 type SearchType = 'patent' | 'paper';
-type Stage = 'input' | 'results' | 'detail';
 
 export function SearchView() {
   const { tasks, activeTaskId } = useStore();
   const activeTask = activeTaskId ? tasks.find(t => t.id === activeTaskId) : null;
   const searchType: SearchType = activeTask?.type === 'paper_search' ? 'paper' : 'patent';
-  const [stage, setStage] = useState<Stage>('input');
+
+  // 특허 검색 — 인라인 결과
+  const [patentSearched, setPatentSearched] = useState(false);
+  const [patentDetailOpen, setPatentDetailOpen] = useState(false);
   const [detailIdx, setDetailIdx] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // 논문 검색 — 기존 stage 방식 유지
+  const [paperStage, setPaperStage] = useState<'input' | 'results'>('input');
+
   const [saveCtx, setSaveCtx] = useState<{ type: 'patent' | 'paper'; data: PatentResult | PaperResult } | null>(null);
 
-  // activeTask 변경 시 입력 단계로 리셋
   useEffect(() => {
     if (!activeTask) return;
-    setStage('input');
+    setPatentSearched(false);
+    setPatentDetailOpen(false);
+    setPaperStage('input');
   }, [activeTask?.id, activeTask?.type]);
 
   const openSavePatent = (idx: number) => {
@@ -36,32 +44,53 @@ export function SearchView() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
-      {/* 원본: 특허/논문 탭 없음 — task type으로 자동 분기 */}
-      {stage === 'input' && searchType === 'patent' && (
-        <PatentInput onRun={() => setStage('results')} />
-      )}
-      {stage === 'input' && searchType === 'paper' && (
-        <PaperInput onRun={() => setStage('results')} />
-      )}
-      {stage === 'results' && searchType === 'patent' && (
-        <PatentResults
-          onModify={() => setStage('input')}
-          onOpenDetail={(i) => { setDetailIdx(i); setStage('detail'); }}
-          onSave={openSavePatent}
-        />
-      )}
-      {stage === 'results' && searchType === 'paper' && (
-        <PaperResults onModify={() => setStage('input')} onSave={openSavePaper} />
-      )}
-      {stage === 'detail' && searchType === 'patent' && (
+
+      {/* 특허 검색 — 전체화면 상세 */}
+      {searchType === 'patent' && patentDetailOpen && (
         <PatentDetail
           data={PATENT_SEED[detailIdx]}
-          onBack={() => setStage('results')}
+          searchQuery={searchQuery}
+          onBack={() => setPatentDetailOpen(false)}
           posLabel={`${detailIdx + 1} / ${PATENT_SEED.length}`}
           onSave={() => openSavePatent(detailIdx)}
           onPrev={detailIdx > 0 ? () => setDetailIdx(detailIdx - 1) : undefined}
           onNext={detailIdx < PATENT_SEED.length - 1 ? () => setDetailIdx(detailIdx + 1) : undefined}
         />
+      )}
+
+      {/* 특허 검색 — 입력 + 인라인 결과 */}
+      {searchType === 'patent' && !patentDetailOpen && (
+        <>
+          {/* 검색 입력: 검색 전 전체 높이, 검색 후 상단 고정 */}
+          <div className={clsx(
+            'overflow-y-auto scroll-thin',
+            patentSearched
+              ? 'shrink-0 max-h-[280px] border-b border-gray-100'
+              : 'flex-1'
+          )}>
+            <PatentInput
+              onRun={q => { setSearchQuery(q); setPatentSearched(true); }}
+            />
+          </div>
+
+          {/* 인라인 검색 결과 */}
+          {patentSearched && (
+            <PatentResults
+              onModify={() => setPatentSearched(false)}
+              onOpenDetail={i => { setDetailIdx(i); setPatentDetailOpen(true); }}
+              onSave={openSavePatent}
+              searchQuery={searchQuery}
+            />
+          )}
+        </>
+      )}
+
+      {/* 논문 검색 */}
+      {searchType === 'paper' && paperStage === 'input' && (
+        <PaperInput onRun={() => setPaperStage('results')} />
+      )}
+      {searchType === 'paper' && paperStage === 'results' && (
+        <PaperResults onModify={() => setPaperStage('input')} onSave={openSavePaper} />
       )}
 
       <LibrarySaveModal
@@ -92,4 +121,3 @@ export function SearchView() {
     </div>
   );
 }
-

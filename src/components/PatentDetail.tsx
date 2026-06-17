@@ -1,10 +1,38 @@
 // Sheet 3 사양 — 특허 상세 페이지
+import { useRef, useState } from 'react';
+import clsx from 'clsx';
 import type { PatentResult } from '../types';
 import { Icon } from './Icon';
 
-export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext }: {
+function parseKeywords(query: string): string[] {
+  if (!query) return [];
+  const cleaned = query
+    .replace(/[A-Z_]+=\(/g, ' ')
+    .replace(/[A-Z_]+=/g, ' ')
+    .replace(/\b(AND|OR|NOT|ADJ|NEAR|KEY)\b/gi, ' ')
+    .replace(/[():*?"]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return [...new Set(
+    cleaned.split(' ').map(w => w.trim()).filter(w => w.length > 1)
+  )].slice(0, 10);
+}
+
+const KW_COLORS = [
+  { dot: '#ef4444', bg: '#fef2f2', text: '#dc2626', border: '#fecaca' },
+  { dot: '#f59e0b', bg: '#fffbeb', text: '#d97706', border: '#fde68a' },
+  { dot: '#10b981', bg: '#f0fdf4', text: '#059669', border: '#a7f3d0' },
+  { dot: '#3b82f6', bg: '#eff6ff', text: '#2563eb', border: '#bfdbfe' },
+  { dot: '#8b5cf6', bg: '#f5f3ff', text: '#7c3aed', border: '#ddd6fe' },
+  { dot: '#ec4899', bg: '#fdf2f8', text: '#db2777', border: '#fbcfe8' },
+  { dot: '#06b6d4', bg: '#ecfeff', text: '#0891b2', border: '#a5f3fc' },
+  { dot: '#84cc16', bg: '#f7fee7', text: '#65a30d', border: '#d9f99d' },
+];
+
+export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, searchQuery }: {
   data: PatentResult; onBack: () => void; posLabel?: string;
   onSave?: () => void; onPrev?: () => void; onNext?: () => void;
+  searchQuery?: string;
 }) {
   const timeline = buildTimeline(data);
   const statusClass = data.status === '등록' ? 'badge-green'
@@ -12,8 +40,40 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext }:
     : data.status === '소멸' || data.status === '거절' ? 'badge-gray'
     : 'badge-blue';
 
+  const [activeTab, setActiveTab] = useState('bib');
+  const [claimMode, setClaimMode] = useState<'independent' | 'all'>('independent');
+  const [familyTab, setFamilyTab] = useState('all');
+  const secBib      = useRef<HTMLDivElement>(null);
+  const secPerson   = useRef<HTMLDivElement>(null);
+  const secAbstract = useRef<HTMLDivElement>(null);
+  const secDesc     = useRef<HTMLDivElement>(null);
+  const secClaim    = useRef<HTMLDivElement>(null);
+  const secFamily   = useRef<HTMLDivElement>(null);
+  const secCite     = useRef<HTMLDivElement>(null);
+  const secClass    = useRef<HTMLDivElement>(null);
+  const secEtc      = useRef<HTMLDivElement>(null);
+
+  const TABS = [
+    { key: 'bib',      label: '서지사항',    ref: secBib },
+    { key: 'person',   label: '인명정보',    ref: secPerson },
+    { key: 'abstract', label: '요약',        ref: secAbstract },
+    { key: 'desc',     label: '상세설명',    ref: secDesc },
+    { key: 'claim',    label: '청구범위',    ref: secClaim },
+    { key: 'family',   label: '패밀리정보',  ref: secFamily },
+    { key: 'cite',     label: '인용·피인용', ref: secCite },
+    { key: 'class',    label: '분류코드',    ref: secClass },
+    { key: 'etc',      label: '기타정보',    ref: secEtc },
+  ] as const;
+
+  const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>, key: string) => {
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setActiveTab(key);
+  };
+
   return (
     <div className="flex-1 flex flex-col bg-white overflow-hidden">
+
+      {/* ── 상단 액션 바 (기존 유지) ── */}
       <div className="px-6 py-3 border-b border-gray-200 flex items-center gap-2 shrink-0">
         <button onClick={onBack} className="btn-outline btn-sm">
           <Icon name="arrow-left" size={13} /> 검색결과로
@@ -31,131 +91,271 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext }:
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto scroll-thin px-8 py-6">
-        {/* 타이틀바 */}
-        <div className="sticky -top-6 bg-white z-10 pt-4 pb-3 -mt-6 mb-1 border-b border-gray-100">
-          <div className="flex items-center gap-2 flex-wrap mb-1.5">
-            <span className={`badge ${statusClass}`}>● {data.status}</span>
-            <span className="badge badge-blue">{data.country}</span>
-            <span className="font-mono text-md2 font-semibold text-gray-600">{data.number}</span>
-            {data.grade && <span className="badge badge-blue">평가 {data.grade}</span>}
+      {/* ── 키워드 하이라이터 바 (keywert 참고) ── */}
+      {searchQuery && parseKeywords(searchQuery).length > 0 && (
+        <div className="shrink-0 bg-white border-b border-gray-200 px-4 py-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs2 font-semibold text-gray-400 shrink-0">키워드</span>
+            {parseKeywords(searchQuery).map((kw, i) => {
+              const c = KW_COLORS[i % KW_COLORS.length];
+              return (
+                <span
+                  key={kw}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-sm2 font-medium"
+                  style={{ backgroundColor: c.bg, color: c.text, borderColor: c.border }}
+                >
+                  <span
+                    className="inline-block w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: c.dot }}
+                  />
+                  {kw}
+                  <span className="text-xs2 opacity-60 font-mono ml-0.5">0/0</span>
+                  <span className="flex gap-0.5 ml-0.5">
+                    <button className="text-xs2 opacity-50 hover:opacity-100 leading-none">↑</button>
+                    <button className="text-xs2 opacity-50 hover:opacity-100 leading-none">↓</button>
+                  </span>
+                </span>
+              );
+            })}
+            <button className="ml-auto text-xs2 text-gray-400 hover:text-gray-600 shrink-0">- 접기</button>
           </div>
-          <h2 className="text-xl font-bold text-gray-800 leading-snug">{data.title}</h2>
+        </div>
+      )}
+
+      {/* ── 탭 + 2-column 본문 ── */}
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+
+        {/* 좌: 앵커 탭 + 스크롤 본문 */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+
+          {/* Sticky 앵커 탭 바 */}
+          <div className="sticky top-0 z-20 flex items-center gap-0 bg-white border-b border-gray-200 overflow-x-auto scroll-thin shrink-0">
+            {TABS.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => scrollToSection(tab.ref, tab.key)}
+                className={clsx(
+                  'px-3 py-2 text-sm2 font-medium whitespace-nowrap border-b-2 transition-colors shrink-0',
+                  activeTab === tab.key
+                    ? 'border-blue-400 text-blue-700 bg-blue-50/50'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50',
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 스크롤 본문 */}
+          <div className="flex-1 overflow-y-auto scroll-thin px-6 py-4">
+
+            {/* 타이틀 */}
+            <div className="mb-4 pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                <span className={`badge ${statusClass}`}>● {data.status}</span>
+                <span className="badge badge-blue">{data.country}</span>
+                <span className="font-mono text-md2 font-semibold text-gray-600">{data.number}</span>
+                {data.grade && <span className="badge badge-blue">평가 {data.grade}</span>}
+              </div>
+              <h2 className="text-xl font-bold text-gray-800 leading-snug">{data.title}</h2>
+            </div>
+
+            {/* 서지사항 */}
+            <div ref={secBib}>
+              <Section title="서지사항" icon="cal">
+                <table className="w-full text-md2">
+                  <tbody>
+                    <BibRow k="문헌번호" v={data.number} mono k2="(문헌일)" v2={data.publicationDate || '—'} />
+                    <BibRow k="출원번호" v={data.applicationNo} mono k2="(출원일)" v2={data.applicationDate || '—'} />
+                    <BibRow k="공개/공고번호" v={data.publicationNo} mono k2="(공개/공고일)" v2={data.publicationDate || '—'} />
+                    <BibRow k="등록번호" v={data.registerNo && data.registerNo !== '-' ? data.registerNo : '—'} mono k2="(등록일)" v2={data.registerDate && data.registerDate !== '-' ? data.registerDate : '—'} />
+                  </tbody>
+                </table>
+                <div className="mt-3.5">
+                  <div className="text-xs2 font-semibold text-gray-500 mb-2">타임라인</div>
+                  <Timeline items={timeline} />
+                </div>
+              </Section>
+            </div>
+
+            {/* 인명정보 */}
+            <div ref={secPerson}>
+              <Section title="인명정보" icon="user">
+                <table className="w-full text-md2">
+                  <tbody>
+                    <InfoRow k="출원인" v={data.applicant || '—'} />
+                    <InfoRow k="출원인 주소" v={data.applicantAddress || '—'} muted={!data.applicantAddress} />
+                    <InfoRow k={data.country === 'JP' ? '출원인식별기호 (JP)' : '특허고객번호 (KR)'} v={data.applicantCode || '—'} mono />
+                    <InfoRow k="발명자" v={data.inventors || '—'} />
+                    <InfoRow k="발명자 주소" v={data.inventorAddress || '(예시) 동일 — 출원인 주소'} muted />
+                  </tbody>
+                </table>
+              </Section>
+            </div>
+
+            {/* 요약 */}
+            <div ref={secAbstract}>
+              <Section title="요약" icon="doc">
+                <TextBlock>{data.abstract || '—'}</TextBlock>
+              </Section>
+            </div>
+
+            {/* 상세설명 */}
+            <div ref={secDesc}>
+              <Section title="상세설명" icon="book">
+                <TextBlock>{data.description || '(데모) 상세설명 원문이 표시되는 영역입니다. 발명의 배경, 기술적 과제, 해결수단, 효과 등 본문 전체가 노출됩니다.'}</TextBlock>
+              </Section>
+            </div>
+
+            {/* 청구범위 */}
+            <div ref={secClaim}>
+              <Section title="청구범위" icon="target">
+                <div className="flex items-center gap-1 mb-2.5">
+                  <button
+                    onClick={() => setClaimMode('independent')}
+                    className={clsx('px-2.5 py-0.5 rounded text-sm2 font-medium border', claimMode === 'independent' ? 'bg-blue-400 text-white border-blue-400' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400')}
+                  >독립항</button>
+                  <button
+                    onClick={() => setClaimMode('all')}
+                    className={clsx('px-2.5 py-0.5 rounded text-sm2 font-medium border', claimMode === 'all' ? 'bg-blue-400 text-white border-blue-400' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400')}
+                  >전체청구항</button>
+                </div>
+                <div className="border border-blue-200 rounded-lg p-3.5 bg-white">
+                  <div className="text-md2 font-semibold text-blue-700 mb-1.5">독립항 — 제1항</div>
+                  <div className="text-base2 text-gray-700 leading-relaxed bg-blue-50 px-3 py-2 rounded border-l-4 border-blue-500">
+                    {data.repClaim}
+                  </div>
+                  {claimMode === 'all' && (
+                    <div className="mt-2.5 space-y-1.5">
+                      <SubClaim n={2}>제2항에 있어서, … (예시)</SubClaim>
+                      <SubClaim n={3}>제3항에 있어서, … (예시)</SubClaim>
+                    </div>
+                  )}
+                </div>
+              </Section>
+            </div>
+
+            {/* 패밀리정보 — 국가 탭 필터 */}
+            <div ref={secFamily}>
+              <Section title="패밀리 정보" icon="grid">
+                {(() => {
+                  const families = renderFamilyPills(data.family);
+                  const total = families.reduce((s, [, n]) => s + n, 0);
+                  const filtered = familyTab === 'all' ? families : families.filter(([cc]) => cc === familyTab);
+                  return (
+                    <>
+                      <div className="flex items-center gap-0 border-b border-gray-100 mb-3 overflow-x-auto scroll-thin">
+                        {[['all', `전체(${total})`] as [string, string], ...families.map(([cc, n]) => [cc, `${cc}(${n})`] as [string, string])].map(([key, label]) => (
+                          <button
+                            key={key}
+                            onClick={() => setFamilyTab(key)}
+                            className={clsx(
+                              'px-3 py-1.5 text-sm2 font-medium whitespace-nowrap border-b-2 transition-colors shrink-0',
+                              familyTab === key
+                                ? 'border-blue-400 text-blue-700'
+                                : 'border-transparent text-gray-500 hover:text-gray-700',
+                            )}
+                          >{label}</button>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {filtered.map(([cc, n]) => (
+                          <span key={cc} className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-100 rounded-full text-md2 text-blue-700">
+                            <strong className="font-mono">{cc}</strong> <span>{n}건</span>
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  );
+                })()}
+              </Section>
+            </div>
+
+            {/* 인용·피인용 — 비특허 인용 별도 섹션 */}
+            <div ref={secCite}>
+              <Section title="인용·피인용" icon="link">
+                <CiteBlock title={`인용 (${data.citing}건)`} patentCount={Math.max(1, (data.citing||0) - 2)} nplCount={2} />
+                <div className="mt-3">
+                  <CiteBlock title={`피인용 (${data.cited}건)`} patentCount={Math.max(1, (data.cited||0) - 1)} nplCount={1} />
+                </div>
+                <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 px-3 py-1.5 text-sm2 font-semibold text-gray-600 border-b border-gray-200">비특허 인용</div>
+                  <table className="w-full text-sm2">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-100">
+                        <th className="px-2 py-1.5 text-left text-xs2 font-semibold text-gray-500">No</th>
+                        <th className="px-2 py-1.5 text-left text-xs2 font-semibold text-gray-500">카테고리</th>
+                        <th className="px-2 py-1.5 text-left text-xs2 font-semibold text-gray-500">단계</th>
+                        <th className="px-2 py-1.5 text-left text-xs2 font-semibold text-gray-500">출처</th>
+                        <th className="px-2 py-1.5 text-left text-xs2 font-semibold text-gray-500">내용</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-gray-50 hover:bg-gray-50">
+                        <td className="px-2 py-1.5 text-xs2 text-gray-400">1</td>
+                        <td className="px-2 py-1.5 text-xs2 text-gray-600">선행</td>
+                        <td className="px-2 py-1.5 text-xs2 text-gray-600">심사</td>
+                        <td className="px-2 py-1.5 text-xs2 text-gray-600">조사자</td>
+                        <td className="px-2 py-1.5 text-xs2 text-gray-600">(예시) 비특허 문헌 인용</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </Section>
+            </div>
+
+            {/* 분류코드 */}
+            <div ref={secClass}>
+              <Section title="분류코드" icon="tag">
+                <table className="w-full text-md2">
+                  <tbody>
+                    <InfoRow k="Original IPC" v={data.ipc || '—'} mono />
+                    <InfoRow k="Original CPC" v={data.cpc || '—'} mono />
+                  </tbody>
+                </table>
+              </Section>
+            </div>
+
+            {/* 기타정보 — 대리인 + 심판/소송 + 특허평가 통합 */}
+            <div ref={secEtc}>
+              <Section title="기타정보" icon="briefcase">
+                <table className="w-full text-md2 mb-3">
+                  <tbody>
+                    <InfoRow k="대리인" v={data.agent || '—'} muted={!data.agent} />
+                    <InfoRow k="대리인 주소" v={data.agentAddress || '—'} muted={!data.agentAddress} />
+                  </tbody>
+                </table>
+                {((data.trial && data.trial !== '심판 없음') || (data.dispute && data.dispute !== '분쟁 없음')) && (
+                  <div className="border-t border-gray-100 pt-3">
+                    <div className="text-sm2 font-semibold text-gray-500 mb-2">심판/소송 정보</div>
+                    {data.trial && data.trial !== '심판 없음' && <Row k="심판" v={data.trial} />}
+                    {data.dispute && data.dispute !== '분쟁 없음' && <Row k="분쟁" v={data.dispute} />}
+                  </div>
+                )}
+                {data.grade && (
+                  <div className="border-t border-gray-100 pt-3">
+                    <div className="text-sm2 font-semibold text-gray-500 mb-2">특허평가</div>
+                    <div className="flex items-center gap-2 text-md2">
+                      <span className="text-gray-500 w-24">평가등급</span>
+                      <span className="badge badge-blue">{data.grade}</span>
+                    </div>
+                  </div>
+                )}
+              </Section>
+            </div>
+
+          </div>
         </div>
 
-        <Section title="서지사항" icon="cal">
-          <table className="w-full text-md2">
-            <tbody>
-              <BibRow k="문헌번호" v={data.number} mono k2="(문헌일)" v2={data.publicationDate || '—'} />
-              <BibRow k="출원번호" v={data.applicationNo} mono k2="(출원일)" v2={data.applicationDate || '—'} />
-              <BibRow k="공개/공고번호" v={data.publicationNo} mono k2="(공개/공고일)" v2={data.publicationDate || '—'} />
-              <BibRow k="등록번호" v={data.registerNo && data.registerNo !== '-' ? data.registerNo : '—'} mono k2="(등록일)" v2={data.registerDate && data.registerDate !== '-' ? data.registerDate : '—'} />
-            </tbody>
-          </table>
-          <div className="mt-3.5">
-            <div className="text-xs2 font-semibold text-gray-500 mb-2">타임라인</div>
-            <Timeline items={timeline} />
+        {/* 우: 도면 패널 */}
+        <div className="w-56 shrink-0 border-l border-gray-200 bg-gray-50 flex flex-col overflow-hidden">
+          <div className="px-3 py-2 border-b border-gray-200 bg-white shrink-0">
+            <span className="text-sm2 font-bold text-gray-600">도면</span>
+            <span className="ml-1.5 text-xs2 text-gray-400">({(data.figures || []).length})</span>
           </div>
-        </Section>
+          <DrawingsPanel figures={data.figures} />
+        </div>
 
-        <Section title="인명정보" icon="user">
-          <table className="w-full text-md2">
-            <tbody>
-              <InfoRow k="출원인" v={data.applicant || '—'} />
-              <InfoRow k="출원인 주소" v={data.applicantAddress || '—'} muted={!data.applicantAddress} />
-              <InfoRow k={data.country === 'JP' ? '출원인식별기호 (JP)' : '특허고객번호 (KR)'} v={data.applicantCode || '—'} mono />
-              <InfoRow k="발명자" v={data.inventors || '—'} />
-              <InfoRow k="발명자 주소" v={data.inventorAddress || '(예시) 동일 — 출원인 주소'} muted />
-            </tbody>
-          </table>
-        </Section>
-
-        <Section title="분류코드" icon="tag">
-          <table className="w-full text-md2">
-            <tbody>
-              <InfoRow k="Original IPC" v={data.ipc || '—'} mono />
-              <InfoRow k="Original CPC" v={data.cpc || '—'} mono />
-            </tbody>
-          </table>
-        </Section>
-
-        <Section title="요약" icon="doc">
-          <TextBlock>{data.abstract || '—'}</TextBlock>
-        </Section>
-
-        <Section title="청구범위" icon="target">
-          <div className="border border-blue-200 rounded-lg p-3.5 bg-white">
-            <div className="text-md2 font-semibold text-blue-700 mb-1.5">독립항 — 제1항</div>
-            <div className="text-base2 text-gray-700 leading-relaxed bg-blue-50 px-3 py-2 rounded border-l-4 border-blue-500">
-              {data.repClaim}
-            </div>
-            <div className="mt-2.5 space-y-1.5">
-              <SubClaim n={2}>제1항에 있어서, … (예시)</SubClaim>
-              <SubClaim n={3}>제2항에 있어서, … (예시)</SubClaim>
-            </div>
-          </div>
-        </Section>
-
-        <Section title="도면의 설명" icon="image">
-          <TextBlock>
-            <ul className="list-disc pl-5 space-y-1">
-              {(data.figures || []).length === 0 && <li className="text-gray-400">도면 설명 없음</li>}
-              {(data.figures || []).map(f => (
-                <li key={f.label}><strong className="font-mono">{f.label}</strong> — {f.desc}</li>
-              ))}
-            </ul>
-          </TextBlock>
-        </Section>
-
-        <Section title="상세설명" icon="book">
-          <TextBlock>{data.description || '(데모) 상세설명 원문이 표시되는 영역입니다. 발명의 배경, 기술적 과제, 해결수단, 효과 등 본문 전체가 노출됩니다.'}</TextBlock>
-        </Section>
-
-        <Section title="패밀리 정보" icon="grid">
-          <div className="flex items-center gap-2 flex-wrap">
-            {renderFamilyPills(data.family).map(([cc, n]) => (
-              <span key={cc} className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-100 rounded-full text-md2 text-blue-700">
-                <strong className="font-mono">{cc}</strong> <span>{n}건</span>
-              </span>
-            ))}
-            <button className="btn-outline btn-sm ml-auto">중복제거</button>
-          </div>
-        </Section>
-
-        <Section title="인용/피인용" icon="link">
-          <div className="grid grid-cols-2 gap-3.5">
-            <CiteBlock title={`인용 (${data.citing}건)`} patentCount={Math.max(1, (data.citing||0) - 2)} nplCount={2} />
-            <CiteBlock title={`피인용 (${data.cited}건)`} patentCount={Math.max(1, (data.cited||0) - 1)} nplCount={1} />
-          </div>
-        </Section>
-
-        {data.grade && (
-          <Section title="특허평가정보" icon="award">
-            <div className="flex items-center gap-2 text-md2"><span className="text-gray-500 w-32">평가등급</span><span className="badge badge-blue">{data.grade}</span></div>
-          </Section>
-        )}
-
-        {((data.trial && data.trial !== '심판 없음') || (data.dispute && data.dispute !== '분쟁 없음')) && (
-          <Section title="심판/소송정보" icon="scale">
-            {data.trial && data.trial !== '심판 없음' && <Row k="심판" v={data.trial} />}
-            {data.dispute && data.dispute !== '분쟁 없음' && <Row k="분쟁" v={data.dispute} />}
-          </Section>
-        )}
-
-        {data.standardOrg && data.standardOrg !== '-' && (
-          <Section title="표준정보" icon="award">
-            <Row k="표준화기구" v={data.standardOrg} />
-          </Section>
-        )}
-
-        <Section title="대리인정보" icon="briefcase">
-          <table className="w-full text-md2">
-            <tbody>
-              <InfoRow k="대리인" v={data.agent || '—'} muted={!data.agent} />
-              <InfoRow k="대리인 주소" v={data.agentAddress || '—'} muted={!data.agentAddress} />
-            </tbody>
-          </table>
-        </Section>
       </div>
     </div>
   );
@@ -284,4 +484,49 @@ function renderFamilyPills(total: number): [string, number][] {
   for (const [cc, b] of seed) { if (rem <= 0) break; const n = Math.min(b, rem); out.push([cc, n]); rem -= n; }
   if (rem > 0) out.push(['기타', rem]);
   return out;
+}
+
+// ── 우측 도면 패널 (keywert 참고) ──
+function DrawingsPanel({ figures }: { figures?: { label: string; desc: string }[] }) {
+  const figs = figures || [];
+  const [selected, setSelected] = useState(0);
+
+  if (figs.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center flex-1 text-gray-300 px-4">
+        <Icon name="image" size={28} className="mb-2" />
+        <div className="text-sm2 text-center">도면 없음</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col flex-1 overflow-y-auto scroll-thin p-3">
+      {/* 메인 도면 */}
+      <div className="card h-44 flex flex-col items-center justify-center mb-2 shrink-0 p-2">
+        <Icon name="image" size={24} className="text-gray-300 mb-1" />
+        <div className="text-xs2 font-semibold text-gray-500">{figs[selected]?.label}</div>
+        <div className="text-xs2 text-gray-400 mt-0.5 px-2 text-center line-clamp-2">{figs[selected]?.desc}</div>
+      </div>
+
+      {/* 썸네일 그리드 (3열) */}
+      <div className="grid grid-cols-3 gap-1">
+        {figs.map((f, i) => (
+          <button
+            key={i}
+            onClick={() => setSelected(i)}
+            className={clsx(
+              'bg-gray-100 rounded-md h-14 flex flex-col items-center justify-center p-1 transition-all',
+              selected === i ? 'ring-2 ring-blue-400 bg-blue-50' : 'hover:bg-gray-200',
+            )}
+          >
+            <Icon name="image" size={12} className={selected === i ? 'text-blue-400' : 'text-gray-400'} />
+            <div className="text-xs2 text-gray-500 mt-0.5 font-mono truncate w-full text-center leading-tight">
+              {f.label}
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }

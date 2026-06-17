@@ -15,9 +15,10 @@ interface Props {
   onModify: () => void;
   onOpenDetail: (idx: number) => void;
   onSave: (idx: number) => void;
+  searchQuery?: string;
 }
 
-export function PatentResults({ onModify, onOpenDetail, onSave }: Props) {
+export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery }: Props) {
   const [sort, setSort] = useState<SortKey>('recent');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -27,6 +28,11 @@ export function PatentResults({ onModify, onOpenDetail, onSave }: Props) {
   const [extFilterValues, setExtFilterValues] = useState<Record<string, string>>({});
   const [selectedCard, setSelectedCard] = useState<number | null>(0);
   const [appliedFilterRowVisible, setAppliedFilterRowVisible] = useState(false);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState<20 | 50 | 100 | 200>(20);
+  const [checked, setChecked] = useState<Set<number>>(new Set());
+  const [sortCol, setSortCol] = useState<'applicationDate' | 'title'>('applicationDate');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   // 결과 데이터 (mockup)
   const data = PATENT_SEED;
@@ -120,6 +126,16 @@ export function PatentResults({ onModify, onOpenDetail, onSave }: Props) {
             <option value="cited">피인용 많은 순</option>
             <option value="grade">평가등급 높은 순</option>
             <option value="relevance">관련도 순</option>
+          </select>
+          <select
+            value={perPage}
+            onChange={e => { setPerPage(Number(e.target.value) as 20 | 50 | 100 | 200); setPage(1); }}
+            className="input text-sm2 py-0.5 h-7 w-28"
+          >
+            <option value={20}>20개씩 보기</option>
+            <option value={50}>50개씩 보기</option>
+            <option value={100}>100개씩 보기</option>
+            <option value={200}>200개씩 보기</option>
           </select>
           {/* 뷰 토글: 리스트 / 슬라이딩 / 갤러리 */}
           <div className="inline-flex border border-gray-300 rounded overflow-hidden">
@@ -219,12 +235,30 @@ export function PatentResults({ onModify, onOpenDetail, onSave }: Props) {
 
       {/* ── 5. 결과 본문 ── */}
       {viewMode === 'list' && (
-        <ListResults
+        <TableResults
           data={data}
           selectedCard={selectedCard}
-          onSelectCard={setSelectedCard}
+          onSelectCard={(i) => setSelectedCard(i === -1 ? null : i)}
           onOpenDetail={onOpenDetail}
           onSave={onSave}
+          page={page}
+          onPageChange={setPage}
+          totalCount={count}
+          perPage={perPage}
+          searchQuery={searchQuery}
+          checked={checked}
+          onToggleCheck={(i) => setChecked(prev => {
+            const next = new Set(prev);
+            next.has(i) ? next.delete(i) : next.add(i);
+            return next;
+          })}
+          onToggleAll={(all) => setChecked(all ? new Set(data.map((_, i) => i)) : new Set())}
+          sortCol={sortCol}
+          sortDir={sortDir}
+          onSort={(col) => {
+            if (col === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+            else { setSortCol(col); setSortDir('desc'); }
+          }}
         />
       )}
       {viewMode === 'sliding' && <SlidingView data={data} onOpenDetail={onOpenDetail} onSave={onSave} />}
@@ -331,80 +365,164 @@ function FilterDrawer({ pendingFilters, extFilterValues, onToggle, onExtChange, 
   );
 }
 
-// ── 리스트 뷰 (2-Column: 목록 + 우측 상세 패널) ──
-function ListResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave }: {
+// ── 테이블 목록 뷰 (참고: 선행기술조사 결과 화면) ──
+function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, page, onPageChange, totalCount, perPage, searchQuery, checked, onToggleCheck, onToggleAll, sortCol, sortDir, onSort }: {
   data: PatentResult[];
   selectedCard: number | null;
   onSelectCard: (i: number) => void;
   onOpenDetail: (i: number) => void;
   onSave: (i: number) => void;
+  page: number;
+  onPageChange: (p: number) => void;
+  totalCount: number;
+  perPage: number;
+  searchQuery?: string;
+  checked: Set<number>;
+  onToggleCheck: (i: number) => void;
+  onToggleAll: (all: boolean) => void;
+  sortCol: 'applicationDate' | 'title';
+  sortDir: 'asc' | 'desc';
+  onSort: (col: 'applicationDate' | 'title') => void;
 }) {
+  const totalPages = Math.ceil(totalCount / perPage);
+
   return (
     <div className="flex-1 flex min-h-0 overflow-hidden">
-      {/* 좌측: 목록 */}
+      {/* 결과 테이블 영역 */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden border-r border-gray-200">
-        <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-100 shrink-0">
-          <span className="text-sm2 text-gray-500">20개씩 보기</span>
+        {/* 테이블 상단 바 */}
+        <div className="flex items-center justify-between px-4 py-1.5 bg-white border-b border-gray-200 shrink-0">
+          <div className="flex items-center gap-3">
+            <span className="text-sm2 font-semibold text-gray-700">
+              총 <span className="text-blue-700">{totalCount.toLocaleString()}</span>건
+            </span>
+            <Pagination current={page} total={totalPages} onChange={onPageChange} />
+          </div>
           <div className="flex gap-1.5">
             <button className="btn-outline btn-xs">BibTeX</button>
             <button className="btn-outline btn-xs">CSV 다운</button>
             <button className="btn-outline btn-xs">컬럼</button>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto scroll-thin p-3 bg-gray-50">
-          {data.map((d, i) => (
-            <div
-              key={i}
-              onClick={() => onSelectCard(i)}
-              className={clsx(
-                'card mb-2 p-3 flex gap-3 cursor-pointer transition-colors',
-                selectedCard === i ? 'border-blue-500 bg-blue-50/40' : 'hover:border-blue-400',
-              )}
-            >
-              <div className="w-14 h-14 bg-gray-100 rounded flex items-center justify-center text-gray-400 shrink-0">
-                <Icon name="image" size={24} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                  <span className="text-sm2 font-bold text-blue-700 font-mono">{d.number}</span>
-                  <span className={clsx('badge text-xs2',
-                    d.status === '등록' ? 'badge-green' : d.status === '심사중' ? 'badge-amber' : 'badge-gray')}>{d.status}</span>
-                  {d.grade && <span className="badge badge-blue text-xs2">평가 {d.grade}</span>}
-                </div>
-                <div
-                  onClick={e => { e.stopPropagation(); onOpenDetail(i); }}
-                  className="text-base2 font-semibold text-gray-800 cursor-pointer hover:text-blue-700 leading-snug mb-1 line-clamp-2"
-                  title="제목 클릭으로 상세페이지 열기"
+
+        {/* 테이블 */}
+        <div className="flex-1 overflow-y-auto scroll-thin bg-white">
+          <table className="w-full text-sm2 border-collapse">
+            <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="w-8 px-2 py-2 text-center border-r border-gray-100">
+                  <input
+                    type="checkbox"
+                    className="form-checkbox text-blue-700 rounded w-3 h-3"
+                    checked={data.length > 0 && checked.size === data.length}
+                    onChange={e => onToggleAll(e.target.checked)}
+                  />
+                </th>
+                <th className="w-10 px-3 py-2 text-center font-semibold text-gray-500 border-r border-gray-100">No</th>
+                <th className="w-14 px-2 py-2 text-center font-semibold text-gray-500 border-r border-gray-100">상태</th>
+                <th className="w-40 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100">문헌번호</th>
+                <th className="w-24 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100">문헌일</th>
+                <th
+                  className="w-24 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 cursor-pointer select-none hover:text-blue-700"
+                  onClick={() => onSort('applicationDate')}
                 >
-                  {d.title}
-                </div>
-                <div className="text-sm2 text-gray-500 flex gap-3 flex-wrap">
-                  <span>출원인: <strong className="text-gray-700">{d.applicant}</strong></span>
-                  <span>출원일: {d.applicationDate}</span>
-                  <span>IPC: <span className="font-mono">{d.ipc}</span></span>
-                </div>
-                <div className="text-sm2 text-gray-600 mt-1.5 line-clamp-2 leading-relaxed">{d.abstract}</div>
-              </div>
-              <button
-                onClick={e => { e.stopPropagation(); onSave(i); }}
-                className="btn-outline btn-xs h-fit shrink-0"
-                title="라이브러리 저장"
-              ><Icon name="star" size={11} /></button>
-            </div>
-          ))}
+                  출원일 {sortCol === 'applicationDate' ? (sortDir === 'desc' ? '↓' : '↑') : '↕'}
+                </th>
+                <th
+                  className="px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 cursor-pointer select-none hover:text-blue-700"
+                  onClick={() => onSort('title')}
+                >
+                  발명의 명칭 {sortCol === 'title' ? (sortDir === 'desc' ? '↓' : '↑') : '↕'}
+                </th>
+                <th className="w-32 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100">출원인</th>
+                <th className="w-28 px-2 py-2 text-left font-semibold text-gray-500">만료일</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((d, i) => {
+                const rowNo = (page - 1) * perPage + i + 1;
+                const isSelected = selectedCard === i;
+                const statusClass =
+                  d.status === '등록' ? 'badge-green' :
+                  d.status === '심사중' || d.status === '출원' ? 'badge-amber' :
+                  'badge-gray';
+                return (
+                  <tr
+                    key={i}
+                    onClick={() => onSelectCard(i)}
+                    className={clsx(
+                      'border-b border-gray-100 cursor-pointer transition-colors',
+                      isSelected
+                        ? 'bg-blue-50 border-l-2 border-l-blue-600'
+                        : 'hover:bg-gray-50',
+                    )}
+                  >
+                    <td className="px-2 py-2 text-center border-r border-gray-100" onClick={e => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="form-checkbox text-blue-700 rounded w-3 h-3"
+                        checked={checked.has(i)}
+                        onChange={() => onToggleCheck(i)}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-center text-xs2 text-gray-400">{rowNo}</td>
+                    <td className="px-2 py-2 text-center">
+                      <span className={`badge text-xs2 ${statusClass}`}>{d.status}</span>
+                    </td>
+                    <td className="px-2 py-2">
+                      <div className="font-mono text-xs2 text-blue-700 leading-snug">{d.number}</div>
+                    </td>
+                    <td className="px-2 py-2 text-xs2 text-gray-600 font-mono">{d.publicationDate || '—'}</td>
+                    <td className="px-2 py-2 text-xs2 text-gray-600 font-mono">{d.applicationDate}</td>
+                    <td className="px-2 py-2">
+                      <button
+                        onClick={e => { e.stopPropagation(); onOpenDetail(i); }}
+                        className="text-left text-sm2 text-gray-800 hover:text-blue-700 line-clamp-2 leading-snug font-medium w-full"
+                        title={d.title}
+                      >
+                        {highlightText(d.title, searchQuery)}
+                      </button>
+                    </td>
+                    <td className="px-2 py-2 text-xs2 text-gray-600 truncate max-w-[120px]">{d.applicant}</td>
+                    <td className="px-2 py-2">
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs2 text-gray-600 font-mono">{d.expirationDate || '—'}</span>
+                        <button
+                          onClick={e => { e.stopPropagation(); onSave(i); }}
+                          className="ml-1 text-gray-400 hover:text-yellow-500 shrink-0"
+                          title="라이브러리 저장"
+                        >
+                          <Icon name="star" size={11} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 하단 페이지네이션 */}
+        <div className="flex justify-center py-2 border-t border-gray-100 bg-white shrink-0">
+          <Pagination current={page} total={totalPages} onChange={onPageChange} />
         </div>
       </div>
 
-      {/* 우측: 인라인 상세 패널 */}
+      {/* 우측 인라인 미리보기 (기존 InlineDetail 그대로 사용) */}
       <div className={clsx('flex flex-col overflow-hidden transition-all', selectedCard !== null ? 'w-80 min-w-80' : 'w-0 min-w-0')}>
         {selectedCard !== null && (
           <>
             <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200 shrink-0">
               <span className="text-md2 font-bold text-gray-700 truncate">{data[selectedCard]?.number}</span>
-              <button onClick={() => {}} className="btn-ghost p-1"><Icon name="close" size={14} /></button>
+              <button onClick={() => onSelectCard(-1)} className="btn-ghost p-1"><Icon name="close" size={14} /></button>
             </div>
             <div className="flex-1 overflow-y-auto scroll-thin p-3 text-md2">
-              <InlineDetail d={data[selectedCard]} onOpenDetail={() => onOpenDetail(selectedCard)} onSave={() => onSave(selectedCard)} />
+              <InlineDetail
+                d={data[selectedCard]}
+                onOpenDetail={() => onOpenDetail(selectedCard)}
+                onSave={() => onSave(selectedCard)}
+              />
             </div>
           </>
         )}
@@ -507,6 +625,82 @@ function SlidingView({ data, onOpenDetail, onSave }: { data: PatentResult[]; onO
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ── 키워드 하이라이트 ──
+function highlightText(text: string, query?: string): React.ReactNode {
+  if (!query || !query.trim()) return text;
+  const words = query.trim().split(/\s+/).filter(w => w.length > 1);
+  if (!words.length) return text;
+  const escaped = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const pattern = new RegExp(`(${escaped.join('|')})`, 'gi');
+  const parts = text.split(pattern);
+  return (
+    <>
+      {parts.map((p, i) =>
+        pattern.test(p)
+          ? <mark key={i} className="bg-yellow-100 text-yellow-900 rounded px-0.5">{p}</mark>
+          : p,
+      )}
+    </>
+  );
+}
+
+// ── 페이지네이션 ──
+function Pagination({ current, total, onChange }: {
+  current: number;
+  total: number;
+  onChange: (p: number) => void;
+}) {
+  const [jump, setJump] = useState('');
+  if (total <= 1) return null;
+
+  const start = Math.max(1, Math.min(current - 2, total - 4));
+  const pages = Array.from({ length: Math.min(5, total) }, (_, i) => start + i);
+
+  return (
+    <div className="inline-flex items-center gap-1 text-sm2">
+      <button
+        onClick={() => onChange(Math.max(1, current - 1))}
+        disabled={current === 1}
+        className="px-1.5 py-0.5 border border-gray-300 rounded-md text-gray-500 hover:border-blue-400 disabled:opacity-30"
+      >‹</button>
+      {pages.map(p => (
+        <button
+          key={p}
+          onClick={() => onChange(p)}
+          className={clsx(
+            'w-7 h-6 rounded-md border text-sm2 font-mono',
+            p === current
+              ? 'bg-blue-400 text-white border-blue-400'
+              : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400',
+          )}
+        >{p}</button>
+      ))}
+      <button
+        onClick={() => onChange(Math.min(total, current + 1))}
+        disabled={current === total}
+        className="px-1.5 py-0.5 border border-gray-300 rounded-md text-gray-500 hover:border-blue-400 disabled:opacity-30"
+      >›</button>
+      <span className="text-xs2 text-gray-400 ml-1">이동</span>
+      <input
+        type="number"
+        min={1}
+        max={total}
+        value={jump}
+        onChange={e => setJump(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') {
+            const p = parseInt(jump);
+            if (p >= 1 && p <= total) { onChange(p); setJump(''); }
+          }
+        }}
+        className="w-12 px-1 py-0.5 border border-gray-300 rounded-md text-xs2 font-mono text-center outline-none focus:border-blue-400"
+        placeholder="—"
+      />
+      <span className="text-xs2 text-gray-400">/ {total}쪽</span>
     </div>
   );
 }

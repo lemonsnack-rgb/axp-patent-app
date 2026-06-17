@@ -6,7 +6,6 @@
 import { useRef, useState } from 'react';
 import clsx from 'clsx';
 import katex from 'katex';
-import { useStore } from '../store';
 import { Icon } from '../components/Icon';
 import { MOCK_DRAWINGS } from '../features/drawing-workflow/types';
 import { openEditorTab } from '../features/drawing-workflow/editorChannel';
@@ -97,12 +96,7 @@ const RedoIcon = () => (
     <path d="M13 7H6a4 4 0 0 0 0 8H10"/><path d="M13 7L10 4M13 7L10 10"/>
   </svg>
 );
-const AiIcon = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11">
-    <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10"/>
-    <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6"/>
-  </svg>
-);
+
 const TableIcon = () => (
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
     <rect x="1" y="1" width="14" height="14" rx="1"/>
@@ -112,26 +106,11 @@ const TableIcon = () => (
     <line x1="10.5" y1="1" x2="10.5" y2="15"/>
   </svg>
 );
-const ImageIcon = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
-    <rect x="1" y="2" width="14" height="12" rx="1.5"/>
-    <circle cx="5.5" cy="6" r="1.5"/>
-    <path d="M1 11l3.5-3.5L8 11l2.5-2.5L15 13"/>
-  </svg>
-);
-const SaveIcon = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="13" height="13">
-    <path d="M13 13H3a1 1 0 0 1-1-1V2h9l2 2v9a1 1 0 0 1-1 1z"/>
-    <rect x="5" y="9" width="6" height="4" rx="0.5"/>
-    <rect x="5" y="2" width="5" height="3" rx="0.5"/>
-  </svg>
-);
 
 // ── 메인 컴포넌트 ──────────────────────────────────────────────────────────
 export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }: {
   task: any; onBack: () => void; confirmedTitle?: string; analysisResult?: SpecAnalysisResult;
 }) {
-  const { library } = useStore();
   const taskName: string = task?.name || '새 명세서';
   // 위저드에서 확정된 발명 명칭이 있으면 title 섹션에 사용
   const effectiveTitle = confirmedTitle || taskName;
@@ -182,15 +161,16 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
     ) as Record<SectionId, string[]>;
   });
 
-  // 선택된 블록 (sectionId + blockIdx)
-  // 에디터 진입 시 첫 번째 단락 자동 선택 (기술분야 첫 블록)
+  // 편집 중인 블록 (textarea 활성화, 단일)
   const [sel, setSel] = useState<{ sid: SectionId; idx: number } | null>({ sid: 'tech', idx: 0 });
+  // AI 컨텍스트용 다중 선택 — key: `${sid}-${idx}`
+  const [selSet, setSelSet] = useState<Set<string>>(new Set());
 
   // 활성 섹션 탭
   const [activeSec, setActiveSec] = useState<SectionId>('tech');
 
-  // 우측 패널 탭
-  const [panelTab, setPanelTab] = useState<'ai' | 'drawings' | 'refs'>('ai');
+  // 우측 아이콘 바 패널
+  const [activePanel, setActivePanel] = useState<'ai' | 'drawings'>('ai');
 
   // 모바일 AI 패널 오픈 상태
   const [mobileAiOpen, setMobileAiOpen] = useState(false);
@@ -218,8 +198,6 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
   const [formulaVal, setFormulaVal] = useState('');
   const [formulaMode, setFormulaMode] = useState<'inline' | 'block'>('inline');
 
-  // 저장 상태
-  const [saved, setSaved] = useState(true);
   const [editorPreviewOpen, setEditorPreviewOpen] = useState(false);
 
   // undo/redo
@@ -244,7 +222,6 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
       }
       return next;
     });
-    setSaved(false);
   };
 
   const undo = () => {
@@ -267,11 +244,22 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
     setActiveSec(id);
   };
 
-  // ── 블록 선택 ──────────────────────────────────────────────────────────
+  // ── 블록 선택 (편집 포커스) ────────────────────────────────────────────
   const selectBlock = (sid: SectionId, idx: number) => {
     setSel({ sid, idx });
-    setPanelTab('ai');
     setActiveSec(sid);
+  };
+
+  // ── AI 컨텍스트 다중 선택 toggle ───────────────────────────────────────
+  const toggleSelSet = (sid: SectionId, idx: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const key = `${sid}-${idx}`;
+    setSelSet(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   };
 
   // ── Q&A 응답 (블록 미선택 시) ─────────────────────────────────────────
@@ -302,17 +290,39 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
     const msg = (override ?? chatInput).trim();
     if (!msg) return;
     if (!override) setChatInput('');
-    const cur = sel ? (blocks[sel.sid]?.[sel.idx] || '') : '';
-    const blockRef = sel ? { sid: sel.sid, idx: sel.idx } : undefined;
+
+    // selSet 기반 컨텍스트 결정 (비어있으면 전체 문서)
+    let cur = '';
+    let blockRef: { sid: SectionId; idx: number } | undefined;
+    if (selSet.size > 0) {
+      const texts: string[] = [];
+      selSet.forEach(key => {
+        const dashIdx = key.indexOf('-');
+        const sid = key.slice(0, dashIdx) as SectionId;
+        const idx = parseInt(key.slice(dashIdx + 1));
+        const t = blocks[sid]?.[idx];
+        if (t) texts.push(t);
+      });
+      cur = texts.join('\n\n');
+      if (selSet.size === 1) {
+        const key = [...selSet][0];
+        const dashIdx = key.indexOf('-');
+        blockRef = { sid: key.slice(0, dashIdx) as SectionId, idx: parseInt(key.slice(dashIdx + 1)) };
+      }
+    } else if (sel) {
+      cur = blocks[sel.sid]?.[sel.idx] || '';
+      blockRef = sel ? { sid: sel.sid, idx: sel.idx } : undefined;
+    }
+
     setChatMessages(prev => [...prev, { id: ++msgIdRef.current, role: 'user', text: msg }]);
 
     setTimeout(() => {
       if (!cur) {
-        // Q&A 모드
+        // 전체 문서 대상 Q&A 모드
         const matchKey = Object.keys(CHAT_REPLIES).find(k => msg.includes(k));
         const aiText = matchKey
           ? CHAT_REPLIES[matchKey]
-          : `"${msg.slice(0, 30)}"에 대해 답변드립니다. 특정 단락을 선택하면 해당 내용을 직접 수정해드릴 수 있습니다.`;
+          : `"${msg.slice(0, 30)}"에 대해 답변드립니다. 단락을 선택하면 해당 내용을 직접 수정해드릴 수 있습니다.`;
         setChatMessages(prev => [...prev, { id: ++msgIdRef.current, role: 'ai', text: aiText }]);
         setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
         return;
@@ -382,7 +392,6 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
     setFormulaMode('inline');
   };
 
-  const selText = sel ? (blocks[sel.sid]?.[sel.idx] || '') : '';
 
   // ── 렌더 ────────────────────────────────────────────────────────────────
   // 에디터 미리보기 섹션 (#80 fix)
@@ -400,75 +409,40 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
         onClose={() => setEditorPreviewOpen(false)}
       />
     )}
-    <div className="flex-1 flex flex-col overflow-hidden bg-white">
+    <div className="flex-1 flex overflow-hidden min-h-0 bg-white">
 
-      {/* ① 편집 툴바 */}
-      <div className="flex items-center gap-0.5 px-3 h-10 border-b border-zinc-200 bg-white shrink-0">
-        {/* 뒤로 */}
+      {/* 좌측 에디터 컬럼 */}
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+
+      {/* 서브헤더 Row 1: 편집 툴바 */}
+      <div className="flex items-center border-b border-zinc-200 bg-white shrink-0 h-10">
         <button onClick={onBack}
-          className="flex items-center gap-1 text-xs2 text-blue-600 hover:text-blue-800 px-2 py-1.5 rounded hover:bg-zinc-100 transition-colors mr-1">
+          className="flex items-center gap-1 text-xs2 text-blue-600 hover:text-blue-800 px-3 h-full hover:bg-zinc-50 transition-colors shrink-0">
           ← 분석결과
         </button>
-        <div className="w-px h-5 bg-zinc-200 mx-1" />
-
-        {/* Undo / Redo */}
-        <button onClick={undo} disabled={!undoStack.length} title="실행 취소 (Ctrl+Z)"
-          className="p-1.5 rounded hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-600">
-          <UndoIcon />
-        </button>
-        <button onClick={redo} disabled={!redoStack.length} title="다시 실행 (Ctrl+Y)"
-          className="p-1.5 rounded hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-600">
-          <RedoIcon />
-        </button>
-        <div className="w-px h-5 bg-zinc-200 mx-1" />
-
-        {/* 저장 */}
-        <button onClick={() => setSaved(true)} title="저장"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded hover:bg-zinc-100 transition-colors text-xs2">
-          <SaveIcon />
-          <span className={saved ? 'text-green-600' : 'text-amber-600'}>{saved ? '저장됨' : '저장'}</span>
-        </button>
-        <div className="w-px h-5 bg-zinc-200 mx-1" />
-
-        {/* 표 삽입 */}
-        <button onClick={() => setTableModal(true)} disabled={!sel} title="표 삽입"
-          className="p-1.5 rounded hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-600">
-          <TableIcon />
-        </button>
-
-        {/* 이미지/도면 */}
-        <button onClick={() => setPanelTab('drawings')} disabled={!sel} title="도면 삽입"
-          className="p-1.5 rounded hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-600">
-          <ImageIcon />
-        </button>
-
-        {/* 수식 */}
-        <button onClick={() => setFormulaModal(true)} disabled={!sel} title="수식 입력"
-          className="px-2 py-1.5 rounded hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-600 text-base font-serif">
-          ∑
-        </button>
-
-        {/* 선택 블록 표시 */}
-        {sel && (
-          <span className="mr-auto ml-1 text-xs2 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-medium">
-            {EDITOR_SECTIONS.find(s => s.id === sel.sid)?.short} · 블록 {sel.idx + 1}
-          </span>
-        )}
-
-        {/* 미리보기 버튼 (#80 fix) */}
-        <div className="ml-auto flex items-center gap-1">
-          <button onClick={() => setEditorPreviewOpen(true)}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs2 text-zinc-600 hover:bg-zinc-100 transition-colors"
-            title="명세서 미리보기">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="12" height="12">
-              <circle cx="8" cy="8" r="3"/><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/>
-            </svg>
-            미리보기
+        <div className="w-px h-5 bg-zinc-200 mx-1 self-center shrink-0" />
+        <div className="flex items-center gap-0.5">
+          <button onClick={undo} disabled={!undoStack.length} title="실행 취소 (Ctrl+Z)"
+            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
+            <UndoIcon /><span>취소</span>
+          </button>
+          <button onClick={redo} disabled={!redoStack.length} title="다시 실행 (Ctrl+Y)"
+            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
+            <RedoIcon /><span>재실행</span>
+          </button>
+          <div className="w-px h-5 bg-zinc-200 mx-1" />
+          <button onClick={() => setTableModal(true)} disabled={!sel} title="표 삽입"
+            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
+            <TableIcon /><span>표</span>
+          </button>
+          <button onClick={() => setFormulaModal(true)} disabled={!sel} title="수식 입력"
+            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
+            <span className="font-serif text-sm leading-none">∑</span><span>수식</span>
           </button>
         </div>
       </div>
 
-      {/* ② 섹션 탭 (앵커 이동만) — 우측에 페이드 힌트로 스크롤 가능성 표시 */}
+      {/* 서브헤더 Row 2: 섹션 탭 */}
       <div className="flex border-b border-zinc-200 bg-white shrink-0 overflow-x-auto scroll-thin [mask-image:linear-gradient(to_right,transparent_0,black_8px,black_calc(100%-32px),transparent_100%)]">
         {EDITOR_SECTIONS.map(s => (
           <button key={s.id} onClick={() => goToSection(s.id)}
@@ -483,11 +457,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
         ))}
       </div>
 
-      {/* ③ 본문 + 우측 패널 */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
 
-        {/* 본문 — 전체 명세서 스크롤 */}
-        <div
+      {/* 본문 — 전체 명세서 스크롤 */}
+      <div
           ref={centerRef}
           className="flex-1 overflow-y-auto scroll-thin bg-zinc-50"
           onScroll={() => {
@@ -508,23 +480,38 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
                 </h2>
                 <div className="space-y-1.5">
                   {blocks[sec.id].map((blockText, blockIdx) => {
-                    const isSelected = sel?.sid === sec.id && sel?.idx === blockIdx;
+                    const isEditing = sel?.sid === sec.id && sel?.idx === blockIdx;
+                    const isChecked = selSet.has(`${sec.id}-${blockIdx}`);
                     return (
                       <div
                         key={blockIdx}
-                        onClick={() => { if (!isSelected) selectBlock(sec.id, blockIdx); }}
+                        onClick={() => { if (!isEditing) selectBlock(sec.id, blockIdx); }}
                         className={clsx(
-                          'group relative rounded-lg border-2 px-4 py-3 transition-all',
-                          isSelected
-                            ? 'border-blue-400 bg-white shadow-sm cursor-text'
-                            : 'border-transparent hover:border-zinc-300 bg-white cursor-pointer',
-                          !blockText.trim() && !isSelected && 'bg-zinc-100'
+                          'group relative pl-7 pr-4 py-2 transition-all rounded-sm',
+                          isEditing
+                            ? 'border-l-2 border-blue-400 bg-blue-50/20 cursor-text'
+                            : isChecked
+                              ? 'border-l-2 border-blue-500 bg-blue-50 cursor-pointer'
+                              : 'border-l-2 border-transparent hover:bg-zinc-50 cursor-pointer',
+                          !blockText.trim() && !isEditing && !isChecked && 'bg-zinc-50'
                         )}
                       >
-                        {/* 선택 표시 */}
-                        {isSelected && (
-                          <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500 rounded-l-lg" />
-                        )}
+                        {/* 체크박스 — 호버 시 표시, 선택 시 항상 표시 */}
+                        <div
+                          onClick={e => toggleSelSet(sec.id, blockIdx, e)}
+                          className={clsx(
+                            'absolute left-2 top-3 w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0',
+                            isChecked
+                              ? 'border-blue-500 bg-blue-500'
+                              : 'border-zinc-300 bg-white opacity-0 group-hover:opacity-100'
+                          )}
+                        >
+                          {isChecked && (
+                            <svg viewBox="0 0 10 10" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="9" height="9">
+                              <polyline points="1.5,5 4,7.5 8.5,2.5"/>
+                            </svg>
+                          )}
+                        </div>
                         {/* 단락 삭제 버튼 */}
                         {blocks[sec.id].length > 1 && (
                           <button
@@ -535,8 +522,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
                                 const next = p[sec.id].filter((_, i) => i !== blockIdx);
                                 return { ...p, [sec.id]: next };
                               });
-                              setSaved(false);
-                              if (sel?.sid === sec.id && sel?.idx === blockIdx) setSel(null);
+                                                        if (sel?.sid === sec.id && sel?.idx === blockIdx) { setSel(null); }
+                            setSelSet(prev => { const n = new Set(prev); n.delete(`${sec.id}-${blockIdx}`); return n; });
                             }}
                             className="absolute top-1.5 right-1.5 w-5 h-5 rounded flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
                             title="단락 삭제"
@@ -546,9 +533,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
                             </svg>
                           </button>
                         )}
-                        {isSelected ? (
+                        {isEditing ? (
                           <textarea
-                            className="w-full text-sm text-zinc-800 bg-transparent outline-none resize-none leading-relaxed overflow-hidden"
+                            className="w-full text-sm text-zinc-800 bg-transparent outline-none border-0 resize-none leading-relaxed overflow-hidden py-1.5 px-3"
                             value={blockText}
                             autoFocus
                             rows={Math.max(2, Math.ceil(blockText.length / 55))}
@@ -563,11 +550,11 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
                             onClick={e => e.stopPropagation()}
                           />
                         ) : blockText.includes('$') ? (
-                          <p className="text-sm leading-relaxed text-zinc-800"
+                          <p className="text-sm leading-relaxed text-zinc-800 py-1.5 px-3"
                             dangerouslySetInnerHTML={{ __html: renderBlockWithTeX(blockText) }} />
                         ) : (
                           <p className={clsx(
-                            'text-sm leading-relaxed whitespace-pre-wrap',
+                            'text-sm leading-relaxed whitespace-pre-wrap py-1.5 px-3',
                             blockText.trim() ? 'text-zinc-800' : 'text-zinc-400 italic'
                           )}>
                             {blockText.trim() || '단락 내용을 입력하세요...'}
@@ -595,8 +582,10 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
           </div>
         </div>
 
-        {/* 우측 AI 어시스턴트 패널 */}
-        {mobileAiOpen && (
+      </div>{/* 좌측 에디터 컬럼 끝 */}
+
+      {/* 우측 AI 어시스턴트 패널 */}
+      {mobileAiOpen && (
           <div
             className="fixed inset-0 z-40 bg-black/40 md:hidden"
             onClick={() => setMobileAiOpen(false)}
@@ -605,12 +594,13 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
         <aside className={clsx(
           'bg-white flex-col overflow-hidden',
           'md:flex md:relative md:shrink-0 md:border-l md:border-zinc-200',
-          'md:w-[380px] md:min-w-[320px]',
+          'md:w-[280px] md:min-w-[240px]',
           'max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-50',
           'max-md:h-[72vh] max-md:rounded-t-2xl max-md:shadow-2xl',
           'max-md:border-t max-md:border-zinc-200',
           'max-md:transition-transform max-md:duration-300 max-md:ease-out',
-          mobileAiOpen ? 'flex max-md:translate-y-0' : 'max-md:hidden md:flex',
+          mobileAiOpen ? 'max-md:flex max-md:translate-y-0' : 'max-md:hidden',
+          activePanel !== null ? 'md:flex' : 'md:hidden',
         )}>
           {/* 모바일 핸들 */}
           <div className="md:hidden shrink-0 pt-2 pb-1 px-4 flex items-center justify-between relative">
@@ -622,66 +612,71 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
               <Icon name="close" size={14} />
             </button>
           </div>
-          {/* 탭 헤더 */}
-          <div className="flex border-b border-zinc-200 shrink-0">
-            {([['ai', 'AI 어시스턴트'], ['drawings', '도면'], ['refs', '참고문헌']] as const).map(([id, label]) => (
-              <button key={id} onClick={() => setPanelTab(id)}
-                className={clsx(
-                  'flex-1 py-2.5 text-xs2 font-semibold border-b-2 transition-colors',
-                  panelTab === id ? 'border-blue-600 text-blue-700' : 'border-transparent text-zinc-500 hover:text-zinc-700'
-                )}>
-                {label}
-              </button>
-            ))}
+          {/* 헤더 (48px) */}
+          <div className="hidden md:flex shrink-0 items-center gap-2 px-4 border-b border-zinc-200 bg-gray-50" style={{ height: 48 }}>
+            {activePanel === 'ai' && (
+              <>
+                <div className="w-5 h-5 rounded flex items-center justify-center text-white text-xs font-bold shrink-0"
+                  style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
+                <span className="text-sm font-bold text-gray-800">AI 어시스턴트</span>
+              </>
+            )}
+            {activePanel === 'drawings' && (
+              <>
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="18" height="18" className="text-zinc-600 shrink-0">
+                  <rect x="2" y="2" width="16" height="16" rx="2"/><path d="M2 13l4-4 3 3 3-4 6 5"/>
+                </svg>
+                <span className="text-sm font-bold text-gray-800">도면</span>
+              </>
+            )}
           </div>
 
           {/* 선택된 블록 컨텍스트 — 탭 무관하게 항상 표시 */}
-          <div className="px-3 pt-2 pb-2 border-b border-zinc-100 shrink-0 bg-zinc-50">
-            {sel ? (
+          <div className={clsx('border-b border-zinc-100 bg-zinc-50', selSet.size > 0 ? 'flex-1 flex flex-col min-h-0' : 'shrink-0')}>
+            {selSet.size > 0 ? (
               <>
-                <div className="flex items-center gap-1.5 mb-1">
+                <div className="flex items-center justify-between px-3 pt-2 pb-1.5 shrink-0">
                   <span className="text-xs2 font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
-                    {EDITOR_SECTIONS.find(s => s.id === sel.sid)?.short}
+                    단락 {selSet.size}개 선택됨
                   </span>
-                  <span className="text-xs2 text-zinc-400">블록 {sel.idx + 1}</span>
+                  <button
+                    onClick={() => setSelSet(new Set())}
+                    className="text-xs2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                  >선택 해제</button>
                 </div>
-                <p className="text-xs2 text-zinc-600 leading-relaxed line-clamp-3 bg-white rounded border border-zinc-200 px-2.5 py-1.5">
-                  {selText || <span className="text-zinc-400 italic">빈 단락</span>}
-                </p>
+                <div className="flex-1 overflow-y-auto scroll-thin px-3 pb-2 space-y-1.5">
+                  {Array.from(selSet).map(key => {
+                    const dashIdx = key.indexOf('-');
+                    const sid = key.slice(0, dashIdx) as SectionId;
+                    const idx = parseInt(key.slice(dashIdx + 1));
+                    const text = blocks[sid]?.[idx] || '';
+                    const secLabel = EDITOR_SECTIONS.find(s => s.id === sid)?.short ?? sid;
+                    return (
+                      <div key={key} className="bg-white rounded border border-blue-100 px-2.5 py-1.5">
+                        <span className="text-xs2 font-semibold text-blue-500 mr-1.5">{secLabel} · {idx + 1}</span>
+                        <p className="text-xs2 text-zinc-700 leading-relaxed mt-0.5 whitespace-pre-wrap">
+                          {text || <span className="text-zinc-400 italic">빈 단락</span>}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
               </>
             ) : (
-              <p className="text-xs2 text-zinc-400 text-center py-0.5">
-                본문에서 단락을 선택하면 AI가 수정을 도와드립니다
+              <p className="text-xs2 text-zinc-400 text-center py-2 px-3">
+                {activePanel === 'drawings'
+                  ? '도면을 선택하거나 새 도면을 추가하세요'
+                  : '단락을 선택하면 해당 내용을 AI에 전달합니다 · 미선택 시 전체 대상'}
               </p>
             )}
           </div>
 
           {/* 탭 본문 (스크롤 영역) */}
-          <div className="flex-1 overflow-y-auto scroll-thin">
+          <div className={clsx('overflow-y-auto scroll-thin', selSet.size > 0 ? 'shrink-0 max-h-[30vh]' : 'flex-1')}>
 
-            {/* ── AI 탭: 채팅 메시지 ── */}
-            {panelTab === 'ai' && (
+            {/* ── AI 채팅 메시지 ── */}
+            {activePanel === 'ai' && (
               <div className="px-3 py-2 space-y-3">
-                {chatMessages.length === 0 && (
-                  <div className="py-6 px-1">
-                    <div className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center mx-auto mb-3">
-                      <AiIcon />
-                    </div>
-                    <p className="text-xs2 text-zinc-500 font-medium mb-2 text-center">AI 어시스턴트</p>
-                    <div className="space-y-1.5">
-                      {[
-                        sel ? '이 단락을 더 간결하게 수정해줘' : '청구항 작성 팁을 알려줘',
-                        sel ? '특허 문체로 바꿔줘' : '발명의 효과를 어떻게 써야 하나요?',
-                        sel ? '구체적인 수치를 추가해줘' : '독립항과 종속항 차이는?',
-                      ].map((q, i) => (
-                        <button key={i} onClick={() => sendChat(q)}
-                          className="w-full text-left text-xs2 text-zinc-500 px-2.5 py-1.5 rounded-lg border border-zinc-200 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50/50 transition-colors">
-                          {q}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
                 {chatMessages.map((m) => (
                   <div key={m.id} className={clsx('flex gap-2', m.role === 'user' ? 'justify-end' : 'justify-start')}>
                     {m.role === 'ai' && (
@@ -741,152 +736,74 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
               </div>
             )}
 
-            {/* ── 도면 탭 ── */}
-            {panelTab === 'drawings' && (
+            {/* ── 도면 패널 ── */}
+            {activePanel === 'drawings' && (
               <div className="px-3 py-3 space-y-1.5">
                 {(() => {
                   const drawings = analysisResult?.drawings ?? MOCK_DRAWINGS;
-                  return (
-                  <>
-                <p className="text-xs2 font-semibold text-zinc-500 mb-2">
-                  추출된 도면 <span className="font-normal text-zinc-400">
-                    ({drawings.length}개 · 완료 {drawings.filter(d => d.stage === 'done').length}개)
-                  </span>
-                </p>
-                {drawings.map(d => {
-                  const isDone = d.stage === 'done';
                   const LABEL_STYLES: Record<string, string> = {
                     '제안기술': 'bg-blue-100 text-blue-700',
                     '종래기술': 'bg-zinc-100 text-zinc-600',
                     'AI생성':   'bg-violet-100 text-violet-700',
                   };
                   return (
-                  <div key={d.id}
-                    className={clsx(
-                      'rounded-lg border overflow-hidden transition-all',
-                      isDone ? 'border-green-200 bg-green-50/30' : 'border-zinc-200 bg-white'
-                    )}>
-                    {/* 썸네일 + 메타 (DrawingsPanel과 동일한 compact row) */}
-                    <div className="flex items-center gap-2.5 px-2.5 pt-2 pb-1.5">
-                      <div className="w-10 shrink-0 aspect-[4/3] bg-zinc-100 rounded border border-zinc-200 flex items-center justify-center overflow-hidden">
-                        {d.exportedImageUrl
-                          ? <img src={d.exportedImageUrl} className="w-full h-full object-contain" alt="" />
-                          : <ImageIcon />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1 mb-0.5">
-                          <span className="text-xs2 font-bold text-zinc-700">기호 {d.symbol}</span>
-                          <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', LABEL_STYLES[d.label] ?? 'bg-zinc-100 text-zinc-500')}>
-                            {d.label}
-                          </span>
-                        </div>
-                        <p className="text-xs2 text-zinc-700 font-semibold truncate">{d.name}</p>
-                      </div>
-                      <div className="shrink-0">
-                        {isDone
-                          ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="11" height="11" className="text-green-500"><polyline points="2,6 5,9 10,3"/></svg>
-                          : <span className="w-2 h-2 rounded-full block bg-zinc-300" />}
-                      </div>
-                    </div>
-                    {/* 액션 버튼 */}
-                    <div className={clsx('flex border-t', isDone ? 'border-green-100' : 'border-zinc-100')}>
-                      <button
-                          onClick={() => {
-                            if (sel) {
-                              const cur = blocks[sel.sid][sel.idx] || '';
-                              updateBlock(sel.sid, sel.idx, `${cur} (도면 기호 ${d.symbol} 참조)`);
-                            }
-                          }}
-                          disabled={!sel}
-                          className="flex-1 py-1.5 text-xs2 font-semibold text-blue-600 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors border-r border-zinc-100"
-                        >
-                          참조 삽입
-                        </button>
-                        <button
-                          onClick={() => openEditorTab({
-                            drawingId: d.id,
-                            drawings: drawings as any,
-                            components: [],
-                            references: [],
-                            drawingName: d.name,
-                            timestamp: Date.now(),
-                          })}
-                          className={clsx(
-                            'px-4 py-1.5 text-xs2 font-semibold transition-colors',
-                            isDone ? 'text-green-600 hover:bg-green-50' : 'text-zinc-600 hover:bg-zinc-50'
-                          )}
-                        >
-                          편집
-                        </button>
-                    </div>
-                  </div>
-                  );
-                })}
-                  </>
+                    <>
+                      <p className="text-xs2 font-semibold text-zinc-500 mb-2">
+                        추출된 도면 <span className="font-normal text-zinc-400">
+                          ({drawings.length}개 · 완료 {drawings.filter(d => d.stage === 'done').length}개)
+                        </span>
+                      </p>
+                      {drawings.map(d => {
+                        const isDone = d.stage === 'done';
+                        return (
+                          <div key={d.id} className={clsx('rounded-lg border overflow-hidden transition-all', isDone ? 'border-green-200 bg-green-50/30' : 'border-zinc-200 bg-white')}>
+                            <div className="flex items-center gap-2.5 px-2.5 pt-2 pb-1.5">
+                              <div className="w-10 shrink-0 aspect-[4/3] bg-zinc-100 rounded border border-zinc-200 flex items-center justify-center overflow-hidden">
+                                {d.exportedImageUrl
+                                  ? <img src={d.exportedImageUrl} className="w-full h-full object-contain" alt="" />
+                                  : <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" width="14" height="14" className="text-zinc-400"><rect x="2" y="2" width="16" height="16" rx="2"/><path d="M2 13l4-4 3 3 3-4 6 5"/></svg>
+                                }
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1 mb-0.5">
+                                  <span className="text-xs2 font-bold text-zinc-700">기호 {d.symbol}</span>
+                                  <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', LABEL_STYLES[d.label] ?? 'bg-zinc-100 text-zinc-500')}>{d.label}</span>
+                                </div>
+                                <p className="text-xs2 text-zinc-700 font-semibold truncate">{d.name}</p>
+                              </div>
+                              <div className="shrink-0">
+                                {isDone
+                                  ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="11" height="11" className="text-green-500"><polyline points="2,6 5,9 10,3"/></svg>
+                                  : <span className="w-2 h-2 rounded-full block bg-zinc-300" />}
+                              </div>
+                            </div>
+                            <div className={clsx('flex border-t', isDone ? 'border-green-100' : 'border-zinc-100')}>
+                              <button
+                                onClick={() => { if (sel) { const cur = blocks[sel.sid][sel.idx] || ''; updateBlock(sel.sid, sel.idx, `${cur} (도면 기호 ${d.symbol} 참조)`); } }}
+                                disabled={!sel}
+                                className="flex-1 py-1.5 text-xs2 font-semibold text-blue-600 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors border-r border-zinc-100"
+                              >참조 삽입</button>
+                              <button
+                                onClick={() => openEditorTab({ drawingId: d.id, drawings: drawings as any, components: [], references: [], drawingName: d.name, timestamp: Date.now() })}
+                                className={clsx('px-4 py-1.5 text-xs2 font-semibold transition-colors', isDone ? 'text-green-600 hover:bg-green-50' : 'text-zinc-600 hover:bg-zinc-50')}
+                              >편집</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
                   );
                 })()}
               </div>
             )}
-
-            {/* ── 참고문헌 탭 ── */}
-            {panelTab === 'refs' && (
-              <div className="p-3">
-                {library.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="w-12 h-12 rounded-xl bg-zinc-100 flex items-center justify-center mx-auto mb-3">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="24" height="24" className="text-zinc-400">
-                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                      </svg>
-                    </div>
-                    <p className="text-sm2 text-zinc-600 font-medium mb-1">저장된 참고문헌 없음</p>
-                    <p className="text-xs2 text-zinc-400 leading-relaxed">
-                      특허·논문 검색에서 문헌을 저장하면<br />여기서 인용구로 삽입할 수 있습니다.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-xs2 font-semibold text-zinc-600 mb-2">내 라이브러리 ({library.length}건)</p>
-                    <div className="space-y-2">
-                      {library.slice(0, 15).map(item => (
-                        <div key={item.id} className="rounded-xl border border-zinc-200 p-3">
-                          <div className="flex items-center gap-1.5 mb-1.5">
-                            <span className={clsx(
-                              'text-xs2 px-1.5 py-0.5 rounded font-semibold',
-                              item.type === 'patent' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-amber-50 text-amber-700 border border-amber-100'
-                            )}>
-                              {item.type === 'patent' ? '특허' : '논문'}
-                            </span>
-                            <span className="text-xs2 text-zinc-400 font-mono truncate">{item.refNumber}</span>
-                          </div>
-                          <p className="text-xs2 text-zinc-800 font-semibold line-clamp-2 leading-snug mb-1">{item.title}</p>
-                          {item.applicant && <p className="text-xs2 text-zinc-400 truncate">{item.applicant}</p>}
-                          <button
-                            onClick={() => {
-                              if (sel) {
-                                const cur = blocks[sel.sid][sel.idx] || '';
-                                updateBlock(sel.sid, sel.idx, `${cur} [${item.refNumber}]`);
-                              }
-                            }}
-                            disabled={!sel}
-                            className="mt-2 w-full py-1.5 bg-zinc-800 text-white rounded text-xs2 font-semibold hover:bg-zinc-700 disabled:opacity-40"
-                          >
-                            인용 삽입
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
           </div>
 
-          {/* 하단 채팅 입력창 — 탭 관계없이 항상 표시 */}
-          <div className="border-t border-zinc-200 px-3 py-2.5 shrink-0 bg-white">
+          {/* 하단 채팅 입력창 — AI 패널일 때만 표시 */}
+          {activePanel === 'ai' && <div className="border-t border-zinc-200 px-3 py-2.5 shrink-0 bg-white">
             <div className="flex gap-2 items-end">
               <textarea
                 className="flex-1 text-xs2 border border-zinc-300 rounded-xl px-3 py-2 outline-none resize-none focus:border-blue-400 transition-colors leading-relaxed"
-                placeholder={sel ? "수정 지시를 입력하세요... (Enter 전송)" : "질문을 입력하세요... (Enter 전송)"}
+                placeholder={selSet.size > 0 ? `선택한 ${selSet.size}개 단락에 대해 명령하세요... (Enter 전송)` : "명령을 입력하세요... (Enter 전송, 미선택 시 전체 대상)"}
                 value={chatInput}
                 rows={1}
                 onChange={e => setChatInput(e.target.value)}
@@ -907,9 +824,30 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
                 </svg>
               </button>
             </div>
-          </div>
+          </div>}
         </aside>
-      </div>
+
+        {/* 우측 아이콘 바 — 데스크탑 전용 */}
+        <div className="hidden md:flex flex-col items-center border-l border-zinc-200 bg-white py-2 gap-1 shrink-0" style={{ width: 40 }}>
+          <button
+            onClick={() => setActivePanel(p => p === 'ai' ? 'drawings' : 'ai')}
+            title="AI 어시스턴트"
+            className={clsx('w-8 h-8 rounded-lg flex items-center justify-center transition-colors',
+              activePanel === 'ai' ? 'bg-violet-100 text-violet-700' : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100')}>
+            <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
+              <path d="M10 2a1 1 0 0 1 1 1v.5a1 1 0 0 1-2 0V3a1 1 0 0 1 1-1zm5.657 2.343a1 1 0 0 1 0 1.414l-.354.354a1 1 0 1 1-1.414-1.414l.354-.354a1 1 0 0 1 1.414 0zM18 9a1 1 0 1 1 0 2h-.5a1 1 0 1 1 0-2H18zm-2.05 5.657l-.354.354a1 1 0 0 1-1.414-1.414l.354-.354a1 1 0 0 1 1.414 1.414zM11 17.5a1 1 0 0 1-2 0V17a1 1 0 0 1 2 0v.5zm-5.657-1.843a1 1 0 0 1-1.414-1.414l.354-.354a1 1 0 0 1 1.414 1.414l-.354.354zM3 11a1 1 0 1 1 0-2h.5a1 1 0 1 1 0 2H3zm1.636-6.364l.354.354A1 1 0 0 1 3.576 6.404l-.354-.354a1 1 0 0 1 1.414-1.414zM10 6a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/>
+            </svg>
+          </button>
+          <button
+            onClick={() => setActivePanel(p => p === 'drawings' ? 'ai' : 'drawings')}
+            title="도면"
+            className={clsx('w-8 h-8 rounded-lg flex items-center justify-center transition-colors',
+              activePanel === 'drawings' ? 'bg-violet-100 text-violet-700' : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100')}>
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+              <rect x="2" y="2" width="16" height="16" rx="2"/><path d="M2 13l4-4 3 3 3-4 6 5"/>
+            </svg>
+          </button>
+        </div>
 
       {/* 모바일 AI 패널 FAB */}
       <button

@@ -74,7 +74,6 @@ export function SpecView() {
 
   const [mainView, setMainView] = useState<'analysis' | 'editor'>(savedSpec?.mainView ?? 'analysis');
   const handleSetMainView = (v: 'analysis' | 'editor') => setMainView(v);
-  const [guideOpen, setGuideOpen] = useState(true);
   const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
   const [specFocusCtx, setSpecFocusCtx] = useState<FocusCtx | null>(null);
   const guidePanelInputRef = useRef<HTMLInputElement>(null);
@@ -293,85 +292,8 @@ export function SpecView() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
-      {/* Action Bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 shrink-0">
-        <div className="flex items-center gap-2 text-md2 font-semibold text-gray-700">
-          <Icon name="doc" size={14} className="text-blue-700" />
-          <span>{task?.name || '새 명세서'}</span>
-          <span className="text-xs2 text-gray-400 font-normal ml-1">· 자동 저장됨 (방금)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {(diTitle || phase === 'flow' || phase === 'done') && (
-            <button onClick={() => setSourceDataOpen(o => !o)}
-              className={clsx('btn-outline btn-xs', sourceDataOpen && 'bg-zinc-100 border-zinc-400 text-zinc-700')}>
-              <Icon name="doc" size={11} /> 기초자료
-            </button>
-          )}
-          <button onClick={() => setGuideOpen(o => !o)}
-            className={clsx('btn-outline btn-xs', guideOpen && 'bg-violet-50 border-violet-400 text-violet-700')}>
-            <Icon name="star" size={11} /> AI 가이드
-          </button>
-          <button className="btn-outline btn-xs" onClick={() => setPreviewOpen(true)}><Icon name="search" size={11} /> 미리보기</button>
-          <button className="btn-primary btn-sm"><Icon name="doc" size={11} /> 저장</button>
-        </div>
-      </div>
 
-      {/* Stepper — 원본 stepper-bar / step-pill / step-connector 구조 */}
-      <div className="flex items-center px-4 border-b border-ck-border overflow-x-auto scroll-thin shrink-0" style={{ height: 48 }}>
-        {(phase === 'flow' || phase === 'done') && (
-          <button
-            onClick={resetAnalysis}
-            className="text-xs text-zinc-400 hover:text-red-500 transition-colors flex-shrink-0 mr-3 flex items-center gap-1"
-            title="처음부터 다시 시작"
-          >
-            ↺ 다시 시작
-          </button>
-        )}
-        {STEPS.map((s, i) => {
-          const isDone = isConfirmed(s.id);
-          const active = s.id === curStep && (phase === 'flow' || phase === 'done');
-          const locked = phase !== 'flow' && phase !== 'done' && s.id !== 'upload';
-          const prevDone = i > 0 && isConfirmed(STEPS[i - 1].id);
-          return (
-            <div key={s.id} className="flex items-center shrink-0">
-              {/* step-connector: 이전 단계 완료면 green, 아니면 gray */}
-              {i > 0 && (
-                <div className={clsx('h-0.5 shrink-0 mx-1', prevDone ? 'bg-green-500' : 'bg-gray-200')}
-                  style={{ width: 20 }} />
-              )}
-              {/* step-pill */}
-              <button
-                disabled={locked}
-                onClick={() => { if (!locked && (phase === 'flow' || phase === 'done')) { setCurStep(s.id); if (s.id !== 'upload') setGuideStep(s.id); } }}
-                className={clsx(
-                  'flex items-center gap-1.5 px-3 py-1 rounded-full border transition-colors',
-                  active && 'border-blue-200 bg-blue-50',
-                  !active && 'border-transparent',
-                  locked && 'cursor-default opacity-60',
-                )}>
-                {/* step-dot */}
-                <span className={clsx(
-                  'w-5 h-5 rounded-full text-xs2 font-bold flex items-center justify-center shrink-0 border-2',
-                  active && 'border-blue-600 bg-blue-600 text-white',
-                  isDone && !active && 'border-green-500 bg-green-500 text-white',
-                  locked && 'border-gray-300 bg-white text-gray-400',
-                  !active && !isDone && !locked && 'border-gray-400 bg-white text-gray-500',
-                )}>
-                  {isDone && !active ? <Icon name="check" size={10} /> : s.num}
-                </span>
-                {/* step-label */}
-                <span className={clsx(
-                  'text-sm2',
-                  active && 'text-blue-700 font-semibold',
-                  isDone && !active && 'text-green-700 font-medium',
-                  locked && 'text-gray-400',
-                  !active && !isDone && !locked && 'text-gray-500',
-                )}>{s.short}</span>
-              </button>
-            </div>
-          );
-        })}
-      </div>
+
 
       {/* 기초자료 보기 슬라이드 패널 — fixed overlay (B9: absolute → content 가림 수정) */}
       {sourceDataOpen && (
@@ -408,6 +330,62 @@ export function SpecView() {
       {/* Body */}
       <div className="flex-1 flex overflow-hidden min-h-0 relative">
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+
+          {/* Stepper — 에디터 컬럼 내부: 에디터 너비 기준으로 중앙 정렬 */}
+          <div className="relative flex items-center border-b border-ck-border shrink-0" style={{ height: 48 }}>
+            {(phase === 'flow' || phase === 'done') && (
+              <button
+                onClick={resetAnalysis}
+                className="absolute left-4 text-xs text-zinc-400 hover:text-red-500 transition-colors flex items-center gap-1 z-10"
+                title="처음부터 다시 시작"
+              >
+                ↺ 다시 시작
+              </button>
+            )}
+            <div className="flex items-center justify-center w-full overflow-x-auto scroll-thin px-24">
+              {STEPS.map((s, i) => {
+                const isDone = isConfirmed(s.id);
+                const active = s.id === curStep && (phase === 'flow' || phase === 'done');
+                const locked = phase !== 'flow' && phase !== 'done' && s.id !== 'upload';
+                const prevDone = i > 0 && isConfirmed(STEPS[i - 1].id);
+                return (
+                  <div key={s.id} className="flex items-center shrink-0">
+                    {i > 0 && (
+                      <div className={clsx('h-0.5 shrink-0 mx-1', prevDone ? 'bg-green-500' : 'bg-gray-200')}
+                        style={{ width: 20 }} />
+                    )}
+                    <button
+                      disabled={locked}
+                      onClick={() => { if (!locked && (phase === 'flow' || phase === 'done')) { setCurStep(s.id); if (s.id !== 'upload') setGuideStep(s.id); } }}
+                      className={clsx(
+                        'flex items-center gap-1.5 px-3 py-1 rounded-full border transition-colors',
+                        active && 'border-blue-200 bg-blue-50',
+                        !active && 'border-transparent',
+                        locked && 'cursor-default opacity-60',
+                      )}>
+                      <span className={clsx(
+                        'w-5 h-5 rounded-full text-xs2 font-bold flex items-center justify-center shrink-0 border-2',
+                        active && 'border-blue-600 bg-blue-600 text-white',
+                        isDone && !active && 'border-green-500 bg-green-500 text-white',
+                        locked && 'border-gray-300 bg-white text-gray-400',
+                        !active && !isDone && !locked && 'border-gray-400 bg-white text-gray-500',
+                      )}>
+                        {isDone && !active ? <Icon name="check" size={10} /> : s.num}
+                      </span>
+                      <span className={clsx(
+                        'text-sm2',
+                        active && 'text-blue-700 font-semibold',
+                        isDone && !active && 'text-green-700 font-medium',
+                        locked && 'text-gray-400',
+                        !active && !isDone && !locked && 'text-gray-500',
+                      )}>{s.short}</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
         <div ref={flowRef} className="flex-1 overflow-y-auto scroll-thin bg-ck-bg">
           <div className="max-w-3xl mx-auto py-8 px-4 space-y-3">
 
@@ -734,7 +712,7 @@ export function SpecView() {
           />
         )}
 
-        {(guideOpen || mobileGuideOpen) && (phase === 'flow' || phase === 'done') && (
+        {(phase === 'flow' || phase === 'done') && (
           <GuidePanel
             key={`guide-panel-${guideStep}`}
             step={guideStep}
@@ -829,6 +807,12 @@ function InlineCandidateCards({
   const letters = ['A', 'B', 'C', 'D', 'E'];
   const curSel = gSel[stepId] || cands[0] || '';
   const [editVals, setEditVals] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    if (!gSel[stepId] && cands[0]) {
+      setGSel(p => ({ ...p, [stepId]: cands[0] }));
+    }
+  }, [stepId, cands[0]]);
 
   const getCardVal = (i: number) => editVals[i] ?? cands[i];
 
@@ -1064,14 +1048,23 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
         title="패널 너비 조정"
       />
 
-      {/* 헤더 */}
-      <div className="px-4 py-3 border-b border-ck-border bg-gray-50 shrink-0 ml-1.5">
+      {/* 헤더 — 스텝바(48px)와 수직 정렬, 데스크탑 단일 행 */}
+      <div className="hidden md:flex shrink-0 items-center gap-2 px-4 border-b border-ck-border bg-gray-50 ml-1.5" style={{ height: 48 }}>
+        <div className="w-5 h-5 rounded flex items-center justify-center text-white text-xs font-bold shrink-0"
+          style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
+        <span className="text-sm font-bold text-gray-800">AI 어시스턴트</span>
+        {isDone && (
+          <span className="ml-auto inline-flex items-center gap-1 text-xs2 px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
+            <Icon name="check" size={10} /> 확정됨
+          </span>
+        )}
+      </div>
+      {/* 모바일 헤더 — 기존 스타일 유지 */}
+      <div className="md:hidden px-4 py-3 border-b border-ck-border bg-gray-50 shrink-0">
         <div className="flex items-center gap-2 mb-1.5">
           <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs2 font-bold shrink-0"
             style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
-          <span className="text-base2 font-bold text-gray-800">
-            {STEP_LABEL[step] || step}
-          </span>
+          <span className="text-base2 font-bold text-gray-800">AI 어시스턴트</span>
           {isDone && (
             <span className="ml-auto inline-flex items-center gap-1 text-xs2 px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
               <Icon name="check" size={10} /> 확정됨
