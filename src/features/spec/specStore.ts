@@ -34,7 +34,6 @@ export function getDefaultSpecState(taskId: string): SpecAnalysisState {
     gSel: {},
     diTitle: '', diField: '', diContent: '', diProblem: '', diKeywords: '',
     titleCandidates: [],
-    abstractCandidates: [],
     componentItems: [],
     drawings: [],
     mainView: 'analysis',

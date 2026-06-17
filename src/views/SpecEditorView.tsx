@@ -68,12 +68,10 @@ const EDITOR_SECTIONS = [
   { id: 'tech',      label: '기술분야',                          short: '기술분야' },
   { id: 'bg',        label: '발명의 배경기술',                    short: '배경기술' },
   { id: 'problem',   label: '해결하고자 하는 과제',               short: '해결과제' },
-  { id: 'solution',  label: '과제의 해결 수단',                   short: '해결수단' },
   { id: 'effect',    label: '발명의 효과',                        short: '효과' },
   { id: 'draw_desc', label: '도면의 간단한 설명',                  short: '도면설명' },
   { id: 'detail',    label: '발명을 실시하기 위한 구체적인 내용',   short: '구체적 내용' },
   { id: 'claims',    label: '청구범위',                           short: '청구범위' },
-  { id: 'abstract',  label: '요약서',                             short: '요약서' },
 ] as const;
 type SectionId = typeof EDITOR_SECTIONS[number]['id'];
 
@@ -123,12 +121,10 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult, p
         tech:      ar.tech,
         bg:        ar.bg,
         problem:   ar.problem,
-        solution:  ar.solution,
         effect:    ar.effect,
         draw_desc: ar.drawDesc,
         detail:    ar.detail,
         claims:    ar.claims,
-        abstract:  ar.abstract,
       };
       if (map[id]) return map[id]!;
     }
@@ -138,12 +134,10 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult, p
       tech:      `본 발명은 ${name}에 관한 것이다.`,
       bg:        '관련 배경기술을 기술하세요.',
       problem:   '해결하려는 과제를 기술하세요.',
-      solution:  '과제의 해결 수단을 기술하세요.',
       effect:    '발명의 효과를 기술하세요.',
       draw_desc: '도면에 대한 설명을 기술하세요.',
       detail:    '발명의 구체적인 내용을 기술하세요.',
       claims:    `청구항 1.\n${name} 장치.`,
-      abstract:  `${name}에 관한 발명입니다.`,
     };
     return fallback[id] || '';
   }
@@ -438,6 +432,23 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult, p
           <button onClick={() => setFormulaModal(true)} disabled={!sel} title="수식 입력"
             className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
             <span className="font-serif text-sm leading-none">∑</span><span>수식</span>
+          </button>
+          <div className="w-px h-5 bg-zinc-200 mx-1" />
+          <button onClick={() => setEditorPreviewOpen(true)} title="미리보기"
+            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 transition-colors text-zinc-500 text-xs2">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
+            <span>미리보기</span>
+          </button>
+          <button onClick={() => {
+            const fileName = `${task?.name || '명세서'}.docx`;
+            const blob = new Blob(['명세서 내용 (DOCX 내보내기 미구현)'], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
+            URL.revokeObjectURL(url);
+          }} title="DOCX 내보내기"
+            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 transition-colors text-zinc-600 text-xs2 font-medium">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><path d="M9 2v4h4"/><path d="M5 9h6M5 11h4"/></svg>
+            <span>내보내기</span>
           </button>
         </div>
       </div>

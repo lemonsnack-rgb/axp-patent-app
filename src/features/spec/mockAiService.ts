@@ -1,5 +1,5 @@
 // src/features/spec/mockAiService.ts
-import type { InventionInput, SpecComponentItem, SpecDrawingItem } from './types';
+import type { InventionInput, SpecComponentItem, SpecDrawingItem, IndependentClaimSet } from './types';
 
 export function generateTitleCandidates(input: InventionInput): string[] {
   const { title, field } = input;
@@ -11,16 +11,15 @@ export function generateTitleCandidates(input: InventionInput): string[] {
 }
 
 export function generateDescriptionSection(
-  sectionKey: 'tech' | 'bg' | 'problem' | 'solution' | 'effect',
+  sectionKey: 'tech' | 'bg' | 'problem' | 'effect',
   input: InventionInput,
 ): string {
   const { title, field, content, problem } = input;
   const map: Record<string, string> = {
-    tech:     `본 발명은 ${field}에 관한 것으로, 보다 구체적으로는 ${title}에 관한 것이다.\n\n${content.slice(0, 120)}`,
-    bg:       `${field} 분야에서 기존 방법은 여러 한계가 있었다.\n\n특히 ${problem || '처리 효율 및 정확도 측면에서 문제점이 있었다.'}`,
-    problem:  `본 발명은 상기와 같은 문제점을 해결하기 위해 안출된 것으로, ${problem || `${title}을 효율적으로 수행할 수 있는 장치 및 방법을 제공하는 것을 목적으로 한다.`}`,
-    solution: `상기 과제를 해결하기 위해, 본 발명은 ${content.slice(0, 200)}\n\n이를 통해 높은 정확도와 효율적인 처리를 달성한다.`,
-    effect:   `본 발명에 의하면, ${field} 기반의 처리를 통해 기존 방식 대비 성능이 향상되고, 높은 정확도가 달성된다.\n\n또한 다양한 환경에서도 안정적인 동작이 가능하다.`,
+    tech:    `본 발명은 ${field}에 관한 것으로, 보다 구체적으로는 ${title}에 관한 것이다.\n\n${content.slice(0, 120)}`,
+    bg:      `${field} 분야에서 기존 방법은 여러 한계가 있었다.\n\n특히 ${problem || '처리 효율 및 정확도 측면에서 문제점이 있었다.'}`,
+    problem: `본 발명은 상기와 같은 문제점을 해결하기 위해 안출된 것으로, ${problem || `${title}을 효율적으로 수행할 수 있는 장치 및 방법을 제공하는 것을 목적으로 한다.`}`,
+    effect:  `본 발명에 의하면, ${field} 기반의 처리를 통해 기존 방식 대비 성능이 향상되고, 높은 정확도가 달성된다.\n\n또한 다양한 환경에서도 안정적인 동작이 가능하다.`,
   };
   return map[sectionKey] || '';
 }
@@ -42,52 +41,115 @@ export function generateComponentCandidates(input: InventionInput): SpecComponen
   }));
 }
 
-export interface IndepClaimCandidate {
-  id: number; label: string; text: string;
-}
-
-export function generateIndependentClaims(
+// ── 독립항 세트 생성 (M2 연구노트 기반) ─────────────────────────────────────
+// abstraction_level은 내부 분류값. UI에는 '넓은 권리범위/균형 권리범위/한정 권리범위'로 표시.
+export function generateIndependentClaimSets(
   input: InventionInput,
   components: SpecComponentItem[],
-): IndepClaimCandidate[] {
+): IndependentClaimSet[] {
   const { title, field } = input;
   const selComps = components.filter(c => c.sel).slice(0, 3);
-  return [
-    {
-      id: 1, label: 'A',
-      text: `${selComps.map(c => {
-        const name = c.text.split(':')[0];
-        const desc = c.text.split(':')[1]?.trim() || '';
-        return `${name}${c.num ? `(${c.num})` : ''}: ${desc}`;
-      }).join(';\n')}을 포함하며,\n${field} 환경에서 실시간 처리가 가능한 ${title} 장치.`,
-    },
-    {
-      id: 2, label: 'B',
-      text: `외부로부터 데이터를 획득하는 단계;\n상기 데이터를 전처리하는 단계;\n${title} 알고리즘을 적용하여 처리 결과를 출력하는 단계를 포함하는, ${title} 방법.`,
-    },
-  ];
-}
+  const compNames = selComps.map(c => c.text.split(':')[0]).join(', ');
 
-export function generateAbstractCandidates(input: InventionInput): string[] {
-  const { title, field, content } = input;
   return [
-    `본 발명은 ${field}에서 ${title}하는 장치 및 방법에 관한 것으로, ${content.slice(0, 100)} 이를 통해 높은 성능과 신뢰성을 달성한다.`,
-    `${field} 기반 ${title} 시스템으로서, ${content.slice(0, 80)} 다양한 환경에서 효율적으로 동작하는 것을 특징으로 한다.`,
+    // ── broad × 2 (넓은 권리범위) ─────────────────────────────────────────
+    {
+      id: 'broad-1',
+      abstraction_level: 'broad',
+      claims: [
+        {
+          category: 'machine',
+          value: `데이터를 처리하는 처리부를 포함하며,\n${field} 환경에서 ${title}을 수행하는 장치.`,
+        },
+        {
+          category: 'process',
+          value: `데이터를 획득하는 단계;\n상기 데이터를 처리하는 단계;\n처리 결과를 출력하는 단계를 포함하는, ${title} 방법.`,
+        },
+      ],
+    },
+    {
+      id: 'broad-2',
+      abstraction_level: 'broad',
+      claims: [
+        {
+          category: 'machine',
+          value: `외부로부터 입력을 수신하는 입력부; 및\n상기 입력을 처리하여 결과를 생성하는 처리부를 포함하는, ${title} 장치.`,
+        },
+        {
+          category: 'process',
+          value: `외부 입력을 수신하는 단계; 및\n상기 입력을 처리하여 결과를 출력하는 단계를 포함하는, ${title} 방법.`,
+        },
+      ],
+    },
+    // ── intermediate × 2 (균형 권리범위) ────────────────────────────────────
+    {
+      id: 'intermediate-1',
+      abstraction_level: 'intermediate',
+      claims: [
+        {
+          category: 'machine',
+          value: `${selComps.length > 0 ? selComps.map(c => {
+            const name = c.text.split(':')[0];
+            const desc = c.text.split(':')[1]?.trim() || '';
+            return `${name}: ${desc}`;
+          }).join(';\n') + '을 포함하며,\n' : ''}${field} 환경에서 실시간 처리가 가능한 ${title} 장치.`,
+        },
+        {
+          category: 'process',
+          value: `외부로부터 데이터를 획득하는 단계;\n상기 데이터를 전처리하는 단계;\n${title} 알고리즘을 적용하여 처리 결과를 출력하는 단계를 포함하는, ${title} 방법.`,
+        },
+      ],
+    },
+    {
+      id: 'intermediate-2',
+      abstraction_level: 'intermediate',
+      claims: [
+        {
+          category: 'machine',
+          value: `${compNames ? compNames + '을 포함하며,\n' : ''}${field} 기반의 ${title}이 가능한 장치.`,
+        },
+        {
+          category: 'process',
+          value: `${field} 환경에서 데이터를 수집하는 단계;\n수집된 데이터를 분석하여 ${title} 결과를 생성하는 단계;\n상기 결과를 제공하는 단계를 포함하는, ${title} 방법.`,
+        },
+      ],
+    },
+    // ── specific × 1 (한정 권리범위) ─────────────────────────────────────────
+    {
+      id: 'specific-1',
+      abstraction_level: 'specific',
+      claims: [
+        {
+          category: 'machine',
+          value: `${selComps.length > 0 ? selComps.map(c => {
+            const name = c.text.split(':')[0];
+            const desc = c.text.split(':')[1]?.trim() || '';
+            return `상기 ${name}은 ${desc || '관련 기능을 수행하도록 구성되고'}`;
+          }).join(';\n') + ';\n' : ''}딥러닝 모델을 이용하여 ${title}을 수행하는 ${field} 기반 장치.`,
+        },
+        {
+          category: 'process',
+          value: `${field} 센서로부터 원시 데이터를 수집하는 단계;\n상기 원시 데이터에서 노이즈를 제거하고 정규화하는 전처리 단계;\n딥러닝 모델을 적용하여 ${title} 결과를 생성하는 단계;\n상기 결과를 외부 시스템에 전달하는 단계를 포함하는, ${title} 방법.`,
+        },
+      ],
+    },
   ];
 }
 
 export function generateDependentClaims(
-  indepId: number,
+  indepId: string,
   indepText: string,
+  category: 'machine' | 'process' | string,
   input: InventionInput,
 ): Array<{ id: number; text: string; sel: boolean }> {
-  const isDevice = indepText.includes('장치');
+  const isDevice = category === 'machine' || indepText.includes('장치');
   const suffix = isDevice ? `${input.title} 장치.` : `${input.title} 방법.`;
+  const ref = `[${indepId}]`;
   return [
-    { id: 1, sel: true,  text: `제${indepId}항에 있어서, 상기 처리부는 ${input.field} 알고리즘을 포함하는, ${suffix}` },
-    { id: 2, sel: true,  text: `제${indepId}항에 있어서, 상기 입력부는 복수의 센서를 포함하는, ${suffix}` },
-    { id: 3, sel: true,  text: `제${indepId}항에 있어서, 상기 출력부는 처리 결과를 시각화하여 표시하는, ${suffix}` },
-    { id: 4, sel: false, text: `제${indepId}항에 있어서, 상기 구성은 클라우드 환경에서 동작하는, ${suffix}` },
+    { id: 1, sel: true,  text: `${ref}항에 있어서, 상기 처리부는 ${input.field} 알고리즘을 포함하는, ${suffix}` },
+    { id: 2, sel: true,  text: `${ref}항에 있어서, 상기 입력부는 복수의 센서를 포함하는, ${suffix}` },
+    { id: 3, sel: true,  text: `${ref}항에 있어서, 상기 출력부는 처리 결과를 시각화하여 표시하는, ${suffix}` },
+    { id: 4, sel: false, text: `${ref}항에 있어서, 상기 구성은 클라우드 환경에서 동작하는, ${suffix}` },
   ];
 }
 

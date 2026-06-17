@@ -14,14 +14,15 @@ import { PreviewModal } from '../components/PreviewModal';
 import type { PreviewSection } from '../components/PreviewModal';
 import clsx from 'clsx';
 import {
-  generateTitleCandidates, generateAbstractCandidates,
+  generateTitleCandidates,
   generateComponentCandidates,
+  generateIndependentClaimSets,
 } from '../features/spec/mockAiService';
 import type { SpecAnalysisResult, SpecAnalysisState } from '../features/spec/types';
 import { loadSpecState, saveSpecState } from '../features/spec/specStore';
 import { analyzePromptClarity, generateIntentOptions, generateMockModification } from '../features/ai/clarityAnalyzer';
 
-type StepId = 'upload' | 'title' | 'description' | 'components' | 'drawings' | 'claims' | 'abstract';
+type StepId = 'upload' | 'title' | 'description' | 'components' | 'drawings' | 'claims';
 const STEPS: { id: StepId; num: number; short: string }[] = [
   { id: 'upload', num: 1, short: '시작' },
   { id: 'title', num: 2, short: '명칭' },
@@ -29,17 +30,16 @@ const STEPS: { id: StepId; num: number; short: string }[] = [
   { id: 'components', num: 4, short: '구성요소' },
   { id: 'drawings', num: 5, short: '도면' },
   { id: 'claims', num: 6, short: '청구항' },
-  { id: 'abstract', num: 7, short: '요약서' },
 ];
 
 const STEP_LABEL: Partial<Record<StepId, string>> = {
   title: '발명의 명칭', description: '발명의 설명', components: '구성요소',
-  drawings: '도면', claims: '청구항', abstract: '요약서',
+  drawings: '도면', claims: '청구항',
 };
 const CONFIRM_LABEL: Partial<Record<StepId, string>> = {
   title: '발명의 명칭 선택 완료', description: '발명의 설명 선택 완료',
   components: '구성요소 선택 완료', drawings: '도면 선택 완료',
-  claims: '청구항 선택 완료', abstract: '요약서 선택 완료',
+  claims: '청구항 선택 완료',
 };
 const AI_NEXT: Record<StepId, string> = {
   upload: '업로드하신 문서를 분석했습니다. 발명의 명칭 후보를 생성합니다.',
@@ -47,8 +47,7 @@ const AI_NEXT: Record<StepId, string> = {
   description: '설명 항목을 확정했습니다. 발명의 구성요소를 추출합니다.',
   components: '구성요소를 확정했습니다. 업로드된 도면을 분석합니다.',
   drawings: '도면을 확정했습니다. 청구항을 생성합니다.',
-  claims: '청구항을 확정했습니다. 요약서를 생성합니다.',
-  abstract: '모든 분석 항목이 확정되었습니다. 명세서를 생성할 준비가 완료되었습니다.',
+  claims: '청구항을 확정했습니다. 명세서 초안을 생성할 준비가 완료되었습니다.',
 };
 const GUIDE_CANDS: Record<string, string[]> = {
   title: [
@@ -60,11 +59,7 @@ const GUIDE_CANDS: Record<string, string[]> = {
     '기술분야: 본 발명은 자율주행 차량에서 라이다 센서를 이용한 객체 감지 분야에 관한 것이다.',
     '배경기술: 자율주행 기술의 발전으로 LiDAR 기반 3D 객체 감지가 핵심 기술로 부각되고 있다.',
     '해결과제: 기존 방식의 실시간 처리 속도 한계 및 불완전한 포인트 클라우드 처리 문제를 해결한다.',
-    '해결수단: 딥러닝 기반 PointNet++ 아키텍처를 적용하여 포인트 클라우드를 직접 처리한다.',
     '효과: 처리 속도 40% 향상 및 객체 인식 정확도 95% 이상 달성.',
-  ],
-  abstract: [
-    '본 발명은 자율주행 차량에서 라이다 센서를 이용하여 주변 객체를 실시간으로 감지하고 분류하는 장치 및 방법에 관한 것이다.',
   ],
 };
 
@@ -110,7 +105,6 @@ export function SpecView() {
 
   // AI 분석 생성 후보 (mockAiService 연결)
   const [titleCandidates, setTitleCandidates] = useState<string[]>(savedSpec?.titleCandidates ?? []);
-  const [abstractCandidates, setAbstractCandidates] = useState<string[]>(savedSpec?.abstractCandidates ?? []);
   const [aiComponents, setAiComponents] = useState<{ id: number; text: string; sel: boolean; num: string; depth: number }[]>(
     (savedSpec?.componentItems as { id: number; text: string; sel: boolean; num: string; depth: number }[]) ?? []
   );
@@ -136,7 +130,6 @@ export function SpecView() {
         gSel: gSel as SpecAnalysisState['gSel'],
         diTitle, diField, diContent, diProblem, diKeywords,
         titleCandidates,
-        abstractCandidates,
         componentItems: aiComponents as SpecAnalysisState['componentItems'],
         mainView,
       });
@@ -144,7 +137,7 @@ export function SpecView() {
     }, 400);
     return () => { if (flowSaveTimerRef.current) clearTimeout(flowSaveTimerRef.current); };
   }, [phase, curStep, confirmed, gSel, diTitle, diField, diContent,
-      diProblem, diKeywords, titleCandidates, abstractCandidates, aiComponents, mainView, task?.id]);
+      diProblem, diKeywords, titleCandidates, aiComponents, mainView, task?.id]);
 
   // U7: 분석 진행 중 이탈 확인
   useEffect(() => {
@@ -159,7 +152,7 @@ export function SpecView() {
 
   const si = (id: StepId) => STEPS.findIndex(s => s.id === id);
   const isSpecialStep = (id: StepId) =>
-    id === 'description' || id === 'components' || id === 'drawings' || id === 'claims' || id === 'abstract';
+    id === 'description' || id === 'components' || id === 'drawings' || id === 'claims';
   const isVisible = (id: StepId) => {
     if (id === 'upload') return true;
     if (phase === 'upload' || phase === 'direct') return false;
@@ -173,13 +166,12 @@ export function SpecView() {
     setConfirmed({});
     setGSel({});
     setTitleCandidates([]);
-    setAbstractCandidates([]);
     setAiComponents([]);
     if (task?.id) {
       saveSpecState(task.id, {
         phase: 'upload', curStep: 'upload',
         confirmed: {}, gSel: {},
-        titleCandidates: [], abstractCandidates: [], componentItems: [],
+        titleCandidates: [], componentItems: [],
         mainView: 'analysis',
       });
     }
@@ -210,7 +202,6 @@ export function SpecView() {
     setTimeout(() => {
       const comps = generateComponentCandidates(input);
       setTitleCandidates(generateTitleCandidates(input));
-      setAbstractCandidates(generateAbstractCandidates(input));
       setAiComponents(comps);
       // 이전 확정 상태 초기화 (새 분석 시작)
       setConfirmed({});
@@ -238,16 +229,13 @@ export function SpecView() {
       return m?.[1]?.trim() || '';
     };
     const claims = gSel['claims'] || confirmed['claims'] || '';
-    const abstract = gSel['abstract'] || confirmed['abstract'] || '';
     return [
       { label: '발명의 명칭', content: title },
       { label: '기술분야', content: extractDesc('기술분야') },
       { label: '배경기술', content: extractDesc('배경기술') },
       { label: '해결하고자 하는 과제', content: extractDesc('해결하려는 과제') },
-      { label: '과제의 해결 수단', content: extractDesc('과제의 해결 수단') },
       { label: '발명의 효과', content: extractDesc('발명의 효과') },
       { label: '청구범위', content: claims },
-      { label: '요약서', content: abstract },
     ].filter(s => s.content.trim());
   };
 
@@ -273,12 +261,10 @@ export function SpecView() {
       tech: extractDescSec('기술분야'),
       bg: extractDescSec('배경기술'),
       problem: extractDescSec('해결하려는 과제'),
-      solution: extractDescSec('과제의 해결 수단'),
       effect: extractDescSec('발명의 효과'),
       drawDesc,
       detail,
       claims: gSel['claims'] || confirmed['claims'] || '',
-      abstract: gSel['abstract'] || confirmed['abstract'] || '',
       drawings: MOCK_DRAWINGS as any[],
       componentItems: comps as any[],
     };
@@ -594,15 +580,6 @@ export function SpecView() {
                                   done={false}
                                   onConfirm={() => confirm('claims')}
                                   onUpdate={v => setGSel(p => ({ ...p, claims: v }))}
-                                  onFocusContext={setSpecFocusCtx}
-                                  guidePanelInputRef={guidePanelInputRef}
-                                />
-                              )}
-                              {s.id === 'abstract' && (
-                                <AbstractPanel
-                                  done={false}
-                                  onConfirm={() => confirm('abstract')}
-                                  onUpdate={v => setGSel(p => ({ ...p, abstract: v }))}
                                   onFocusContext={setSpecFocusCtx}
                                   guidePanelInputRef={guidePanelInputRef}
                                 />
@@ -1756,488 +1733,407 @@ function DrawingsPanel({ done, onUpdate, inventionComponents }: {
   );
 }
 
-// ── 청구항 패널 (#22) — n개 독립항 다중 선택 + 독립항별 종속항 + AI 재생성 ──
-// Phase 'indep' : 독립항 후보 중 n개 체크박스 선택
-// Phase 'dep'   : 선택된 독립항별 종속항 섹션 + AI 재생성 인라인 UI
-
-interface IndepCandState {
-  id: number; label: string; text: string;
-  selected: boolean;
-  editing: boolean; editVal: string;
-  aiOpen: boolean; aiPromptVal: string;
-  aiProposed: string; aiDiffOpen: boolean; aiDiffSel: 'current' | 'proposed';
-}
-
-const INDEP_CANDS_INIT: Omit<IndepCandState, 'selected'|'editing'|'editVal'|'aiOpen'|'aiPromptVal'|'aiProposed'|'aiDiffOpen'|'aiDiffSel'>[] = [
-  {
-    id: 1, label: 'A',
-    text: '라이다 센서로부터 3차원 포인트 클라우드 데이터를 획득하는 데이터 수집부;\n상기 포인트 클라우드 데이터에서 지면 포인트를 분리하고 노이즈를 제거하는 전처리부;\n딥러닝 모델을 적용하여 객체를 분류하는 인식부를 포함하며,\n실시간 3D 객체 인식이 가능한 라이다 기반 객체 감지 장치.',
-  },
-  {
-    id: 2, label: 'B',
-    text: '라이다 센서로부터 포인트 클라우드 데이터를 획득하는 단계;\n상기 포인트 클라우드 데이터를 기둥(Pillar) 단위로 구성하여 2D 의사 이미지를 생성하는 전처리 단계;\nPointNet++ 기반 딥러닝 모델을 이용하여 객체를 인식하는 인식 단계를 포함하는, 라이다 기반 객체 감지 방법.',
-  },
-];
-
-interface DepItemState {
-  id: number; text: string; sel: boolean; expanded: boolean;
-  editing: boolean; editVal: string;
-  aiOpen: boolean; aiPromptVal: string;
-  aiProposed: string; aiDiffOpen: boolean; aiDiffSel: 'current' | 'proposed';
-}
-
-// 독립항별 더미 종속항 — 실제에서는 AI가 독립항 텍스트 기반으로 생성
-const MOCK_DEPS_BY_INDEP: Record<number, Pick<DepItemState,'text'|'sel'>[]> = {
-  1: [
-    { sel: true,  text: '제1항에 있어서, 상기 전처리부는 RANSAC 알고리즘을 이용하여 지면 포인트를 분리하는, 라이다 기반 객체 감지 장치.' },
-    { sel: true,  text: '제1항에 있어서, 상기 인식부는 PointNet++ 기반의 다층 신경망을 포함하는, 라이다 기반 객체 감지 장치.' },
-    { sel: true,  text: '제2항에 있어서, 상기 다층 신경망은 포인트 클라우드를 기둥(pillar) 단위로 처리하는, 라이다 기반 객체 감지 장치.' },
-    { sel: false, text: '제1항에 있어서, 상기 데이터 수집부는 복수의 라이다 센서를 포함하는, 라이다 기반 객체 감지 장치.' },
-    { sel: true,  text: '제1항에 있어서, 상기 출력부는 3D 바운딩 박스를 이용하여 감지된 객체의 위치 및 크기를 표시하는, 라이다 기반 객체 감지 장치.' },
-  ],
-  2: [
-    { sel: true,  text: '제1항에 있어서, 상기 전처리 단계는 RANSAC 알고리즘으로 지면 포인트를 분리하는 단계를 포함하는, 라이다 기반 객체 감지 방법.' },
-    { sel: true,  text: '제1항에 있어서, 상기 인식 단계는 인식된 객체에 3D 바운딩 박스를 할당하는 단계를 더 포함하는, 라이다 기반 객체 감지 방법.' },
-    { sel: false, text: '제2항에 있어서, 상기 3D 바운딩 박스는 객체의 방위각을 포함하는, 라이다 기반 객체 감지 방법.' },
-  ],
+// ── 독립항 세트 권리범위 레이블 매핑 ──────────────────────────────────────────
+const SCOPE_LABELS: Record<string, { label: string; sub: string }> = {
+  broad:        { label: '넓은 권리범위', sub: '청구 범위 최대화 — 심사 대응 필요' },
+  intermediate: { label: '균형 권리범위', sub: '등록 가능성과 보호 범위 균형' },
+  specific:     { label: '한정 권리범위', sub: '구체 구성 한정 — 등록 용이' },
 };
 
+const CATEGORY_LABEL: Record<string, string> = {
+  machine:       '장치항',
+  process:       '방법항',
+  manufacture:   '제조항',
+  composition:   '조성물항',
+};
+
+interface DepItemState {
+  id: number; text: string; sel: boolean;
+  editing: boolean; editVal: string;
+}
 interface DepGroupState { generated: boolean; items: DepItemState[]; newText: string }
 
+// 선택된 세트의 각 claim별 종속항 그룹 (key: claimIndex 문자열 "0"|"1")
+type DepGroupsForSet = Record<string, DepGroupState>;
 
-function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: { done: boolean; onConfirm: () => void; onUpdate: (v: string) => void; onFocusContext?: (ctx: { text: string; label: string; apply: (t: string) => void }) => void; guidePanelInputRef?: React.RefObject<HTMLInputElement | null> }) {
+function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
+  done: boolean;
+  onConfirm: () => void;
+  onUpdate: (v: string) => void;
+  onFocusContext?: (ctx: { text: string; label: string; apply: (t: string) => void }) => void;
+  guidePanelInputRef?: React.RefObject<HTMLInputElement | null>;
+}) {
   const [claimsPhase, setClaimsPhase] = useState<'indep' | 'dep'>('indep');
-
-  // 독립항 후보 상태 (n개 다중 선택)
-  const [cands, setCands] = useState<IndepCandState[]>(
-    INDEP_CANDS_INIT.map(c => ({ ...c, selected: c.id === 1, editing: false, editVal: c.text, aiOpen: false, aiPromptVal: '', aiProposed: '', aiDiffOpen: false, aiDiffSel: 'proposed' as const }))
+  const [claimSets] = useState<import('../features/spec/types').IndependentClaimSet[]>(() =>
+    generateIndependentClaimSets(
+      { title: '라이다 기반 객체 감지', field: '자율주행', content: '라이다 포인트 클라우드 데이터를 활용한 실시간 3D 객체 인식 기술', problem: '실시간 처리 속도 및 탐지 정확도 문제' },
+      []
+    )
   );
+  const [selectedSetId, setSelectedSetId] = useState<string | null>(claimSets[2]?.id ?? null); // 기본: intermediate-1
+  const [depGroupsMap, setDepGroupsMap] = useState<Record<string, DepGroupsForSet>>({});
+  const [claimTexts, setClaimTexts] = useState<Record<string, Record<number, string>>>({}); // setId → claimIdx → text
 
-  // 독립항별 종속항 그룹
-  const [depGroups, setDepGroups] = useState<Record<number, DepGroupState>>({});
+  const getClaimText = (setId: string, claimIdx: number): string => {
+    return claimTexts[setId]?.[claimIdx] ?? claimSets.find(s => s.id === setId)?.claims[claimIdx]?.value ?? '';
+  };
+  const setClaimText = (setId: string, claimIdx: number, text: string) => {
+    setClaimTexts(p => ({ ...p, [setId]: { ...(p[setId] ?? {}), [claimIdx]: text } }));
+  };
 
-  // 선택된 독립항 목록
-  const selectedCands = cands.filter(c => c.selected);
+  const selectedSet = claimSets.find(s => s.id === selectedSetId) ?? null;
 
-  // 마운트 시 초기 요약을 상위로 전달 → 확정 카드에 실제 내용 표시
-  useEffect(() => {
-    const sel = INDEP_CANDS_INIT.filter((_, i) => i === 0);
-    onUpdate(`독립항 1개, 종속항 0개\n\n청구항 1.\n${sel[0].text}`);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // 전체 요약을 상위로 전달 (청구항 번호 자동 부여)
-  const syncUpdate = (updCands: IndepCandState[], updGroups: Record<number, DepGroupState>) => {
-    const selCands = updCands.filter(c => c.selected);
+  // 전체 요약을 상위에 동기화
+  const syncUpdate = (setId: string | null, groups: Record<string, DepGroupsForSet>) => {
+    const set = claimSets.find(s => s.id === setId);
+    if (!set) { onUpdate('독립항 0개, 종속항 0개'); return; }
     let num = 0;
     const lines: string[] = [];
-    selCands.forEach(c => {
-      const text = c.editing ? c.editVal : c.text;
-      lines.push(`청구항 ${++num}.\n${text}`);
-      const grp = updGroups[c.id];
+    const setGroups = groups[setId!] ?? {};
+    set.claims.forEach((claim, ci) => {
+      const text = claimTexts[setId!]?.[ci] ?? claim.value;
+      const indepNum = ++num; // 이 독립항의 실제 번호
+      lines.push(`청구항 ${indepNum}.\n${text}`);
+      const grp = setGroups[String(ci)];
       if (grp?.generated) {
         grp.items.filter(d => d.sel).forEach(d => {
-          lines.push(`청구항 ${++num}.\n${d.text}`);
+          // ci+1 기반 임시 참조를 실제 독립항 번호로 교정
+          const correctedText = d.text.replace(new RegExp(`제${ci + 1}항에 있어서`, 'g'), `제${indepNum}항에 있어서`);
+          lines.push(`청구항 ${++num}.\n${correctedText}`);
         });
       }
     });
-    const indepCount = selCands.length;
-    const depCount = selCands.reduce((acc, c) => {
-      const grp = updGroups[c.id];
-      return acc + (grp?.items.filter(d => d.sel).length ?? 0);
-    }, 0);
+    const indepCount = set.claims.length;
+    const depCount = Object.values(setGroups).reduce((acc, g) => acc + (g?.items.filter(d => d.sel).length ?? 0), 0);
     onUpdate(`독립항 ${indepCount}개, 종속항 ${depCount}개\n\n${lines.join('\n\n')}`);
   };
 
-  const requestAIClaim = (text: string, label: string, applyFn: (t: string) => void) => {
-    onFocusContext?.({ text, label, apply: applyFn });
-    setTimeout(() => guidePanelInputRef?.current?.focus(), 50);
-  };
+  // 마운트 시 초기값 동기화
+  useEffect(() => {
+    if (selectedSet) {
+      const text = selectedSet.claims.map((c, i) => `청구항 ${i + 1}.\n${c.value}`).join('\n\n');
+      onUpdate(`독립항 ${selectedSet.claims.length}개, 종속항 0개\n\n${text}`);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // 독립항 선택 토글
-  const toggleIndep = (id: number) => {
-    const next = cands.map(c => c.id === id ? { ...c, selected: !c.selected } : c);
-    setCands(next);
-    syncUpdate(next, depGroups);
-  };
-
-  // 독립항 Phase B로 이동 — 선택된 독립항의 종속항 자동 생성
   const confirmIndep = () => {
-    if (selectedCands.length === 0) return;
-    const autoGroups = { ...depGroups };
-    cands.filter(c => c.selected).forEach(c => {
-      if (!autoGroups[c.id]?.generated) {
-        const items = (MOCK_DEPS_BY_INDEP[c.id] ?? MOCK_DEPS_BY_INDEP[1]).map((d, i) => ({
-          id: i + 1, ...d, expanded: false, editing: false, editVal: d.text,
-          aiOpen: false, aiPromptVal: '', aiProposed: '', aiDiffOpen: false, aiDiffSel: 'proposed' as const,
-        }));
-        autoGroups[c.id] = { generated: true, items, newText: '' };
+    if (!selectedSetId || !selectedSet) return;
+    // 선택된 세트의 각 claim에 대한 종속항 자동 생성
+    const autoGroups: DepGroupsForSet = {};
+    selectedSet.claims.forEach((claim, ci) => {
+      const key = String(ci);
+      if (!(depGroupsMap[selectedSetId]?.[key]?.generated)) {
+        const isDevice = claim.category === 'machine';
+        const suffix = isDevice ? '라이다 기반 객체 감지 장치.' : '라이다 기반 객체 감지 방법.';
+        const ref = `제${ci + 1}`;
+        autoGroups[key] = {
+          generated: true,
+          newText: '',
+          items: [
+            { id: 1, sel: true,  text: `${ref}항에 있어서, 상기 처리부는 딥러닝 알고리즘을 포함하는, ${suffix}`, editing: false, editVal: '' },
+            { id: 2, sel: true,  text: `${ref}항에 있어서, 상기 입력부는 복수의 센서를 포함하는, ${suffix}`, editing: false, editVal: '' },
+            { id: 3, sel: true,  text: `${ref}항에 있어서, 상기 출력부는 처리 결과를 시각화하여 표시하는, ${suffix}`, editing: false, editVal: '' },
+            { id: 4, sel: false, text: `${ref}항에 있어서, 상기 구성은 클라우드 환경에서 동작하는, ${suffix}`, editing: false, editVal: '' },
+          ],
+        };
+      } else {
+        autoGroups[key] = depGroupsMap[selectedSetId]![key];
       }
     });
-    setDepGroups(autoGroups);
+    const nextMap = { ...depGroupsMap, [selectedSetId]: autoGroups };
+    setDepGroupsMap(nextMap);
     setClaimsPhase('dep');
-    syncUpdate(cands, autoGroups);
+    syncUpdate(selectedSetId, nextMap);
   };
 
-  // 독립항 AI 재생성 — prompt → diff 모드로 전환 (mock 생성)
-  const regenIndep = (id: number) => {
-    const c = cands.find(x => x.id === id);
-    if (!c) return;
-    const baseText = c.aiDiffOpen && c.aiProposed ? c.aiProposed : (c.editing ? c.editVal : c.text);
-    const proposed = `${c.aiPromptVal.trim() ? `[${c.aiPromptVal.trim()} 반영] ` : ''}${baseText.split(';')[0]}; 상기 구성의 유기적 결합을 통해 높은 정확도와 실시간 처리를 달성하는, ${baseText.includes('장치') ? '라이다 기반 객체 감지 장치.' : '라이다 기반 객체 감지 방법.'}`;
-    const next = cands.map(x => x.id === id ? { ...x, aiOpen: false, aiPromptVal: '', aiProposed: proposed, aiDiffOpen: true, aiDiffSel: 'proposed' as const } : x);
-    setCands(next);
-  };
-
-  // 독립항 diff 선택 완료
-  const applyIndepDiff = (id: number) => {
-    const c = cands.find(x => x.id === id);
-    if (!c) return;
-    const finalText = c.aiDiffSel === 'proposed' ? c.aiProposed : (c.editing ? c.editVal : c.text);
-    const next = cands.map(x => x.id === id ? { ...x, text: finalText, editVal: finalText, aiDiffOpen: false, aiProposed: '', aiDiffSel: 'proposed' as const } : x);
-    setCands(next);
-    syncUpdate(next, depGroups);
-  };
-
-  // 종속항 AI 생성 (mock)
-  const generateDeps = (indepId: number) => {
-    const mockItems = (MOCK_DEPS_BY_INDEP[indepId] ?? MOCK_DEPS_BY_INDEP[1]).map((d, i) => ({
-      id: i + 1, ...d, expanded: false, editing: false, editVal: d.text, aiOpen: false, aiPromptVal: '', aiProposed: '', aiDiffOpen: false, aiDiffSel: 'proposed' as const,
-    }));
-    const next: Record<number, DepGroupState> = { ...depGroups, [indepId]: { generated: true, items: mockItems, newText: '' } };
-    setDepGroups(next);
-    syncUpdate(cands, next);
-  };
-
-  // 종속항 토글
-  const toggleDep = (indepId: number, depId: number) => {
-    if (done) return;
-    const grp = depGroups[indepId];
+  const toggleDep = (claimKey: string, depId: number) => {
+    if (done || !selectedSetId) return;
+    const setGroups = depGroupsMap[selectedSetId] ?? {};
+    const grp = setGroups[claimKey];
     if (!grp) return;
-    const next = { ...depGroups, [indepId]: { ...grp, items: grp.items.map(d => d.id === depId ? { ...d, sel: !d.sel } : d) } };
-    setDepGroups(next);
-    syncUpdate(cands, next);
+    const next = { ...setGroups, [claimKey]: { ...grp, items: grp.items.map(d => d.id === depId ? { ...d, sel: !d.sel } : d) } };
+    const nextMap = { ...depGroupsMap, [selectedSetId]: next };
+    setDepGroupsMap(nextMap);
+    syncUpdate(selectedSetId, nextMap);
   };
 
-  const removeDep = (indepId: number, depId: number) => {
-    const grp = depGroups[indepId];
+  const removeDep = (claimKey: string, depId: number) => {
+    if (!selectedSetId) return;
+    const setGroups = depGroupsMap[selectedSetId] ?? {};
+    const grp = setGroups[claimKey];
     if (!grp) return;
-    const next = { ...depGroups, [indepId]: { ...grp, items: grp.items.filter(d => d.id !== depId) } };
-    setDepGroups(next);
-    syncUpdate(cands, next);
+    const next = { ...setGroups, [claimKey]: { ...grp, items: grp.items.filter(d => d.id !== depId) } };
+    const nextMap = { ...depGroupsMap, [selectedSetId]: next };
+    setDepGroupsMap(nextMap);
+    syncUpdate(selectedSetId, nextMap);
   };
 
-  const addDep = (indepId: number) => {
-    const grp = depGroups[indepId];
+  const addDep = (claimKey: string) => {
+    if (!selectedSetId) return;
+    const setGroups = depGroupsMap[selectedSetId] ?? {};
+    const grp = setGroups[claimKey];
     if (!grp || !grp.newText.trim()) return;
     const maxId = grp.items.reduce((m, d) => Math.max(m, d.id), 0);
-    const newItem: DepItemState = { id: maxId + 1, text: grp.newText.trim(), sel: true, expanded: false, editing: false, editVal: grp.newText.trim(), aiOpen: false, aiPromptVal: '', aiProposed: '', aiDiffOpen: false, aiDiffSel: 'proposed' };
-    const next = { ...depGroups, [indepId]: { ...grp, items: [...grp.items, newItem], newText: '' } };
-    setDepGroups(next);
-    syncUpdate(cands, next);
+    const newItem: DepItemState = { id: maxId + 1, text: grp.newText.trim(), sel: true, editing: false, editVal: grp.newText.trim() };
+    const next = { ...setGroups, [claimKey]: { ...grp, items: [...grp.items, newItem], newText: '' } };
+    const nextMap = { ...depGroupsMap, [selectedSetId]: next };
+    setDepGroupsMap(nextMap);
+    syncUpdate(selectedSetId, nextMap);
   };
 
-  const regenDep = (indepId: number, depId: number) => {
-    const grp = depGroups[indepId];
-    if (!grp) return;
-    const dep = grp.items.find(d => d.id === depId);
-    if (!dep) return;
-    const baseText = dep.aiDiffOpen && dep.aiProposed ? dep.aiProposed : dep.text;
-    const suffix = baseText.includes('장치') ? ', 라이다 기반 객체 감지 장치.' : ', 라이다 기반 객체 감지 방법.';
-    const proposed = `${baseText.split('있어서')[0]}있어서, ${dep.aiPromptVal.trim() || '상기 구성을 더 구체적으로 포함하는'}${suffix}`;
-    const next = { ...depGroups, [indepId]: { ...grp, items: grp.items.map(d => d.id === depId ? { ...d, aiOpen: false, aiPromptVal: '', aiProposed: proposed, aiDiffOpen: true, aiDiffSel: 'proposed' as const } : d) } };
-    setDepGroups(next);
+  const updateDepNewText = (claimKey: string, text: string) => {
+    if (!selectedSetId) return;
+    const setGroups = depGroupsMap[selectedSetId] ?? {};
+    const grp = setGroups[claimKey] ?? { generated: true, newText: '', items: [] };
+    const nextMap = { ...depGroupsMap, [selectedSetId]: { ...setGroups, [claimKey]: { ...grp, newText: text } } };
+    setDepGroupsMap(nextMap);
   };
 
-  // 종속항 diff 선택 완료
-  const applyDepDiff = (indepId: number, depId: number) => {
-    const grp = depGroups[indepId];
-    if (!grp) return;
-    const dep = grp.items.find(d => d.id === depId);
-    if (!dep) return;
-    const finalText = dep.aiDiffSel === 'proposed' ? dep.aiProposed : dep.text;
-    const next = { ...depGroups, [indepId]: { ...grp, items: grp.items.map(d => d.id === depId ? { ...d, text: finalText, editVal: finalText, aiDiffOpen: false, aiProposed: '', aiDiffSel: 'proposed' as const } : d) } };
-    setDepGroups(next);
-    syncUpdate(cands, next);
-  };
-
-  void applyIndepDiff; void regenIndep; void regenDep; void applyDepDiff;
-
-  const updateDepGroup = (indepId: number, patch: Partial<DepGroupState>) => {
-    setDepGroups(p => ({ ...p, [indepId]: { ...p[indepId], ...patch } }));
-  };
-
-  // 청구항 전체 카운트
-  const totalIndep = selectedCands.length;
-  const totalDep = selectedCands.reduce((acc, c) => acc + (depGroups[c.id]?.items.filter(d => d.sel).length ?? 0), 0);
-
-  // ── Phase A: 독립항 다중 선택 (체크박스) ─────────────────────────────
+  // ── Phase A: 세트 단일 선택 (라디오) ───────────────────────────────────────
   if (claimsPhase === 'indep') {
     return (
       <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2.5 ml-1.5">
-        <p className="text-xs2 text-gray-500 leading-relaxed">
-          기초자료를 분석하여 독립항 후보를 생성했습니다.<br />
-          <span className="text-brand-400 font-medium">여러 개를 선택</span>할 수 있습니다.
-        </p>
+        {/* D-01: 명확한 액션 지시 */}
+        <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2.5">
+          <p className="text-xs2 text-brand-400 font-medium">AI가 권리범위별 독립항 세트를 생성했습니다.</p>
+          <p className="text-xs2 text-gray-500 mt-0.5">각 세트는 장치항·방법항 쌍으로 구성됩니다. <strong className="text-gray-700">1개를 선택</strong>하면 종속항이 구성됩니다.</p>
+        </div>
 
-        {cands.map(cand => (
-          <div key={cand.id}
-            className={clsx('rounded-lg border-2 transition-all',
-              cand.selected ? 'border-blue-600 bg-blue-50 shadow-sm' : 'border-ck-border bg-ck-bg opacity-70'
-            )}>
-
-            {/* 헤더 — 체크박스 + 뱃지만 */}
-            <div className="flex items-center gap-2 px-3 pt-3 pb-2 cursor-pointer"
-              onClick={() => { if (!done) { toggleIndep(cand.id); onFocusContext?.({ text: cand.text, label: `독립항 ${cand.label}`, apply: (newText) => setCands(p => p.map(c => c.id === cand.id ? { ...c, text: newText, editVal: newText } : c)) }); } }}>
-              <button
-                onClick={e => { e.stopPropagation(); if (!done) toggleIndep(cand.id); }}
-                className={clsx('w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all',
-                  cand.selected ? 'bg-brand-400 border-blue-600 text-white' : 'border-gray-300 bg-white hover:border-blue-400')}>
-                {cand.selected && <Icon name="check" size={9} />}
-              </button>
-              <span className={clsx('w-6 h-6 rounded-full flex items-center justify-center text-xs2 font-bold shrink-0',
-                cand.selected ? 'bg-brand-400 text-white' : 'bg-gray-200 text-gray-600')}>
-                {cand.label}
-              </span>
-              <span className="text-xs2 px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">독립항</span>
-              {!done && (
-                <div className="ml-auto">
-                  <button
-                    onClick={e => { e.stopPropagation(); requestAIClaim(cand.text, `독립항 ${cand.label}`, (newText) => setCands(p => p.map(c => c.id === cand.id ? { ...c, text: newText, editVal: newText } : c))); }}
-                    className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
-                  >
-                    <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                    수정 요청
-                  </button>
-                </div>
+        {claimSets.map(set => {
+          const isSelected = selectedSetId === set.id;
+          const scopeInfo = SCOPE_LABELS[set.abstraction_level] ?? { label: set.abstraction_level, sub: '' };
+          return (
+            <div
+              key={set.id}
+              onClick={() => { if (!done) { setSelectedSetId(set.id); syncUpdate(set.id, depGroupsMap); } }}
+              className={clsx(
+                'rounded-xl border-2 transition-all cursor-pointer',
+                // D-10: opacity 방식 제거 — border/bg만으로 상태 표현
+                isSelected
+                  ? 'border-blue-600 bg-blue-50 shadow-sm'
+                  : 'border-zinc-200 bg-white hover:border-blue-300 hover:bg-blue-50/30'
               )}
-            </div>
-
-            {/* 본문 — 3가지 모드 전환 (DescriptionPanel과 동일 패턴) */}
-            <div className="px-3 pb-3">
-
-              {/* 일반 모드: textarea (항상 편집 가능) */}
-              {(
-                <div className={clsx('rounded-lg border-2 transition-all',
-                  !done ? 'border-ck-border focus-within:border-blue-400' : 'border-green-300 bg-green-50')}>
-                  {!done ? (
-                    <textarea
-                      className="w-full text-xs2 text-gray-800 bg-transparent px-3 py-3 outline-none resize-none leading-relaxed rounded-lg overflow-hidden"
-                      value={cand.text}
-                      rows={Math.max(4, Math.ceil(cand.text.length / 40))}
-                      placeholder="독립항 내용을 입력하거나 수정하세요..."
-                      onClick={e => e.stopPropagation()}
-                      onFocus={() => onFocusContext?.({
-                        text: cand.text,
-                        label: `독립항 ${cand.label}`,
-                        apply: (newText) => setCands(p => p.map(c => c.id === cand.id ? { ...c, text: newText, editVal: newText } : c)),
-                      })}
-                      onChange={e => setCands(p => p.map(c => c.id === cand.id ? { ...c, text: e.target.value } : c))}
-                      ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
-                    />
-                  ) : (
-                    <p className="text-xs2 text-gray-700 leading-relaxed px-3 py-3">{cand.text}</p>
+            >
+              {/* 세트 헤더 */}
+              <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
+                {/* 라디오 버튼 */}
+                <button
+                  onClick={e => { e.stopPropagation(); if (!done) { setSelectedSetId(set.id); syncUpdate(set.id, depGroupsMap); } }}
+                  className={clsx(
+                    'w-4.5 h-4.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all',
+                    isSelected ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white hover:border-blue-400'
                   )}
+                  style={{ width: '18px', height: '18px' }}
+                >
+                  {isSelected && <span className="w-2 h-2 rounded-full bg-white block" />}
+                </button>
+                {/* 권리범위 레이블 */}
+                <div className="flex-1 min-w-0">
+                  <span className={clsx('text-sm2 font-semibold', isSelected ? 'text-blue-700' : 'text-gray-700')}>
+                    {scopeInfo.label}
+                  </span>
+                  <span className="text-xs2 text-gray-400 ml-2">{scopeInfo.sub}</span>
                 </div>
-              )}
+                {isSelected && !done && (
+                  <span className="text-xs2 text-blue-600 font-semibold shrink-0">선택됨</span>
+                )}
+              </div>
 
-
-            </div>{/* /본문 px-3 pb-3 */}
-          </div>
-        ))}
+              {/* 세트 내 claim 미리보기 */}
+              <div className="px-3 pb-3 space-y-1.5">
+                {set.claims.map((claim, ci) => {
+                  const text = getClaimText(set.id, ci);
+                  const catLabel = CATEGORY_LABEL[claim.category] ?? claim.category;
+                  return (
+                    <div key={ci} className={clsx(
+                      'rounded-lg border px-3 py-2',
+                      isSelected ? 'border-blue-200 bg-white' : 'border-zinc-100 bg-zinc-50'
+                    )}>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-xs2 px-1.5 py-0.5 rounded font-medium bg-purple-100 text-purple-700">{catLabel}</span>
+                        {!done && isSelected && (
+                          <button
+                            onClick={e => { e.stopPropagation(); onFocusContext?.({ text, label: `${scopeInfo.label} — ${catLabel}`, apply: (newText) => setClaimText(set.id, ci, newText) }); setTimeout(() => guidePanelInputRef?.current?.focus(), 50); }}
+                            className="ml-auto flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
+                          >
+                            <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
+                            수정 요청
+                          </button>
+                        )}
+                      </div>
+                      {isSelected && !done ? (
+                        <textarea
+                          className="w-full text-xs2 text-gray-800 bg-transparent outline-none resize-none leading-relaxed overflow-hidden"
+                          value={text}
+                          rows={Math.max(3, Math.ceil(text.length / 44))}
+                          onClick={e => e.stopPropagation()}
+                          onChange={e => { setClaimText(set.id, ci, e.target.value); syncUpdate(set.id, depGroupsMap); }}
+                          onFocus={() => onFocusContext?.({ text, label: `${scopeInfo.label} — ${catLabel}`, apply: (newText) => setClaimText(set.id, ci, newText) })}
+                          ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                        />
+                      ) : (
+                        <p className="text-xs2 text-gray-600 leading-relaxed line-clamp-3">{text}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
 
         {!done && (
           <button
             onClick={confirmIndep}
-            disabled={selectedCands.length === 0}
-            className="w-full py-2.5 border border-blue-400 text-blue-600 bg-blue-50 rounded-lg text-sm2 font-medium hover:bg-blue-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-            선택한 독립항 {selectedCands.length > 0 ? `${selectedCands.length}개` : ''} 으로 종속항 구성 →
+            disabled={!selectedSetId}
+            className="w-full py-2.5 border border-blue-400 text-blue-600 bg-blue-50 rounded-lg text-sm2 font-medium hover:bg-blue-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {selectedSetId
+              ? `선택한 세트로 종속항 구성 →`
+              : '세트를 선택하세요'}
           </button>
         )}
       </div>
     );
   }
 
-  // ── Phase B: 독립항별 종속항 섹션 ───────────────────────────────────
-  // 청구항 번호 계산
-  let claimNum = 0;
-  const indepNums: Record<number, number> = {};
-  selectedCands.forEach(c => { indepNums[c.id] = ++claimNum; depGroups[c.id]?.items.filter(d => d.sel).forEach(() => { ++claimNum; }); });
-  claimNum = 0; // reset to recompute inline
+  // ── Phase B: 선택된 세트의 각 claim별 종속항 ──────────────────────────────
+  if (!selectedSet) return null;
+  const setGroups = depGroupsMap[selectedSetId!] ?? {};
+  const scopeInfo = SCOPE_LABELS[selectedSet.abstraction_level] ?? { label: selectedSet.abstraction_level, sub: '' };
+  const totalDep = Object.values(setGroups).reduce((acc, g) => acc + (g?.items.filter(d => d.sel).length ?? 0), 0);
+
+  let globalClaimNum = 0;
 
   return (
-    <>
-      <div className="flex-1 overflow-y-auto scroll-thin p-3 ml-1.5 space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs2 font-semibold text-gray-600">
-            청구항 구성 — 독립항 {totalIndep}개, 종속항 {totalDep}개
-          </span>
-          {!done && (
-            <button onClick={() => setClaimsPhase('indep')}
-              className="text-xs2 text-blue-600 hover:underline">
-              ← 독립항 재선택
-            </button>
-          )}
-        </div>
-
-        {selectedCands.map(indep => {
-          const indepClaimNum = ++claimNum;
-          const grp = depGroups[indep.id] ?? { generated: false, items: [], newText: '' };
-
-          return (
-            <div key={indep.id} className="rounded-xl border border-zinc-200 overflow-hidden">
-              {/* 독립항 헤더 */}
-              <div className="border-b px-3 py-2.5 bg-blue-50 border-blue-200">
-                {/* 타이틀 (항상 표시) */}
-                <div
-                  className="flex items-center gap-2 mb-2 cursor-pointer"
-                  onClick={() => !done && onFocusContext?.({ text: indep.text, label: `독립항 ${indep.label}`, apply: (newText) => setCands(p => p.map(c => c.id === indep.id ? { ...c, text: newText, editVal: newText } : c)) })}
-                >
-                  <Icon name="check" size={11} className="text-blue-600" />
-                  <span className="text-xs2 font-bold text-brand-400">청구항 {indepClaimNum} · 독립항 {indep.label}</span>
-                  {!done && (
-                    <div className="ml-auto">
-                      <button
-                        onClick={e => { e.stopPropagation(); requestAIClaim(indep.text, `독립항 ${indep.label}`, (newText) => setCands(p => p.map(c => c.id === indep.id ? { ...c, text: newText, editVal: newText } : c))); }}
-                        className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
-                      >
-                        <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                        수정 요청
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* 일반 모드: textarea */}
-                {(
-                  <div className="rounded border border-blue-200 focus-within:border-blue-400 transition-all">
-                    <textarea
-                      className="w-full text-xs2 text-blue-900 bg-transparent px-2.5 py-2 outline-none resize-none leading-relaxed overflow-hidden"
-                      value={indep.text}
-                      rows={Math.max(3, Math.ceil(indep.text.length / 45))}
-                      onClick={e => e.stopPropagation()}
-                      onFocus={() => onFocusContext?.({
-                        text: indep.text,
-                        label: `독립항 ${indep.label}`,
-                        apply: (newText) => setCands(p => p.map(c => c.id === indep.id ? { ...c, text: newText, editVal: newText } : c)),
-                      })}
-                      onChange={e => setCands(p => p.map(c => c.id === indep.id ? { ...c, text: e.target.value } : c))}
-                      ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
-                    />
-                  </div>
-                )}
-
-              </div>
-
-              {/* 종속항 섹션 */}
-              <div className="p-2.5 space-y-1.5">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs2 font-semibold text-gray-500">
-                    종속항 ({grp.items.filter(d => d.sel).length}개 선택)
-                  </span>
-                  {!done && (
-                    <button onClick={() => generateDeps(indep.id)}
-                      className="text-xs2 text-gray-400 hover:text-violet-600 flex items-center gap-1 transition-colors">
-                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="10" height="10">
-                        <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10"/><path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6"/>
-                      </svg>
-                      재생성
-                    </button>
-                  )}
-                </div>
-
-                {(
-                  <>
-                    {grp.items.map((dep, depLocalIdx) => {
-                      if (dep.sel) ++claimNum;
-                      const depLocalNum = depLocalIdx + 1; // 그룹 내 1,2,3...
-                      return (
-                        <div key={dep.id}
-                          className={clsx('rounded-lg border transition-all',
-                            dep.sel && !done ? 'border-blue-200 bg-white' : '',
-                            !dep.sel ? 'border-gray-200 bg-gray-50 opacity-60' : '',
-                            done && dep.sel ? 'border-green-200 bg-green-50/30' : ''
-                          )}>
-                          {/* 헤더: 체크박스 + 종속항 N + 삭제 */}
-                          <div
-                            className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer"
-                            onClick={() => !done && onFocusContext?.({ text: dep.text, label: `종속항 ${dep.id}`, apply: (newText) => { const next = { ...depGroups, [indep.id]: { ...grp, items: grp.items.map(d => d.id === dep.id ? { ...d, text: newText, editVal: newText } : d) } }; setDepGroups(next); syncUpdate(cands, next); } })}
-                          >
-                            <button
-                              onClick={e => { e.stopPropagation(); toggleDep(indep.id, dep.id); }}
-                              className={clsx('w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all',
-                                dep.sel ? 'bg-brand-400 border-blue-600 text-white' : 'border-gray-300 bg-white hover:border-blue-400')}>
-                              {dep.sel && <Icon name="check" size={8} />}
-                            </button>
-                            <span className={clsx('text-xs2 font-bold shrink-0', dep.sel ? 'text-brand-400' : 'text-gray-400')}>
-                              종속항 {depLocalNum}
-                            </span>
-                            {!done && (
-                              <button onClick={() => removeDep(indep.id, dep.id)}
-                                className="shrink-0 text-gray-300 hover:text-red-400 ml-auto">
-                                <Icon name="close" size={9} />
-                              </button>
-                            )}
-                          </div>
-
-                          {/* 항상 펼침 */}
-                          <div className="px-2.5 pb-2.5 border-t border-gray-100 pt-2">
-                              {/* 일반 모드: textarea */}
-                              {(
-                                <div className="rounded border border-gray-200 focus-within:border-blue-400 transition-all">
-                                  <textarea
-                                    className="w-full text-xs2 text-gray-800 bg-transparent px-2.5 py-2 outline-none resize-none leading-relaxed"
-                                    value={dep.text}
-                                    rows={Math.max(6, Math.ceil(dep.text.length / 40))}
-                                    onFocus={() => onFocusContext?.({
-                                      text: dep.text,
-                                      label: `종속항 ${dep.id}`,
-                                      apply: (newText) => {
-                                        const next = { ...depGroups, [indep.id]: { ...grp, items: grp.items.map(d => d.id === dep.id ? { ...d, text: newText, editVal: newText } : d) } };
-                                        setDepGroups(next);
-                                        syncUpdate(cands, next);
-                                      },
-                                    })}
-                                    onChange={e => updateDepGroup(indep.id, { items: grp.items.map(d => d.id === dep.id ? { ...d, text: e.target.value } : d) })}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                        </div>
-                      );
-                    })}
-
-                    {/* 직접 추가 */}
-                    {!done && (
-                      <div className="flex gap-1.5 mt-1">
-                        <input
-                          className="input text-xs2 py-1 flex-1"
-                          placeholder={`제${indepClaimNum}항에 있어서, ...`}
-                          value={grp.newText}
-                          onChange={e => updateDepGroup(indep.id, { newText: e.target.value })}
-                          onKeyDown={e => e.key === 'Enter' && addDep(indep.id)}
-                        />
-                        <button onClick={() => addDep(indep.id)} className="btn-outline btn-xs px-2 shrink-0">
-                          <Icon name="plus" size={11} />
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })}
+    <div className="flex-1 overflow-y-auto scroll-thin p-3 ml-1.5 space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs2 font-semibold text-gray-600">
+          <span className="text-blue-700">{scopeInfo.label}</span>
+          {' '}— 독립항 {selectedSet.claims.length}개, 종속항 {totalDep}개
+        </span>
+        {!done && (
+          <button onClick={() => setClaimsPhase('indep')} className="text-xs2 text-blue-600 hover:underline">
+            ← 세트 재선택
+          </button>
+        )}
       </div>
 
-      {done && (
-        <div className="p-3 border-t border-gray-100 bg-green-50 shrink-0 ml-1.5">
-          <div className="flex items-center gap-1.5 text-sm2 text-green-700 font-medium">
-            <Icon name="check" size={13} /> 청구항 확정 완료 (독립항 {totalIndep}개, 종속항 {totalDep}개)
+      {selectedSet.claims.map((claim, ci) => {
+        const claimKey = String(ci);
+        const indepNum = ++globalClaimNum;
+        const grp = setGroups[claimKey] ?? { generated: false, items: [], newText: '' };
+        const catLabel = CATEGORY_LABEL[claim.category] ?? claim.category;
+        const claimText = getClaimText(selectedSetId!, ci);
+
+        return (
+          <div key={ci} className="rounded-xl border border-zinc-200 overflow-hidden">
+            {/* 독립항 헤더 */}
+            <div className="border-b px-3 py-2.5 bg-blue-50 border-blue-200">
+              <div className="flex items-center gap-2 mb-1.5 cursor-pointer"
+                onClick={() => !done && onFocusContext?.({ text: claimText, label: `독립항 ${ci + 1} (${catLabel})`, apply: (newText) => setClaimText(selectedSetId!, ci, newText) })}>
+                <Icon name="check" size={11} className="text-blue-600" />
+                <span className="text-xs2 font-bold text-brand-400">청구항 {indepNum}</span>
+                <span className="text-xs2 px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium">{catLabel}</span>
+                {!done && (
+                  <button
+                    onClick={e => { e.stopPropagation(); onFocusContext?.({ text: claimText, label: `독립항 ${ci + 1} (${catLabel})`, apply: (newText) => setClaimText(selectedSetId!, ci, newText) }); setTimeout(() => guidePanelInputRef?.current?.focus(), 50); }}
+                    className="ml-auto flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
+                  >
+                    <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
+                    수정 요청
+                  </button>
+                )}
+              </div>
+              <p className="text-xs2 text-gray-700 leading-relaxed whitespace-pre-wrap px-1">{claimText}</p>
+            </div>
+
+            {/* 종속항 목록 */}
+            <div className="p-2.5 space-y-1.5">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs2 font-semibold text-gray-500">
+                  종속항 ({grp.items.filter(d => d.sel).length}개 선택)
+                </span>
+                {!done && grp.generated && (
+                  <button
+                    onClick={() => {
+                      const isDevice = claim.category === 'machine';
+                      const suffix = isDevice ? '라이다 기반 객체 감지 장치.' : '라이다 기반 객체 감지 방법.';
+                      const ref = `제${indepNum}`;
+                      const newItems: DepItemState[] = [
+                        { id: 1, sel: true,  text: `${ref}항에 있어서, 상기 처리부는 딥러닝 알고리즘을 포함하는, ${suffix}`, editing: false, editVal: '' },
+                        { id: 2, sel: true,  text: `${ref}항에 있어서, 상기 입력부는 복수의 센서를 포함하는, ${suffix}`, editing: false, editVal: '' },
+                        { id: 3, sel: true,  text: `${ref}항에 있어서, 상기 출력부는 처리 결과를 시각화하여 표시하는, ${suffix}`, editing: false, editVal: '' },
+                        { id: 4, sel: false, text: `${ref}항에 있어서, 상기 구성은 클라우드 환경에서 동작하는, ${suffix}`, editing: false, editVal: '' },
+                      ];
+                      const next = { ...setGroups, [claimKey]: { ...grp, items: newItems } };
+                      const nextMap = { ...depGroupsMap, [selectedSetId!]: next };
+                      setDepGroupsMap(nextMap);
+                      syncUpdate(selectedSetId, nextMap);
+                    }}
+                    className="text-xs2 text-blue-500 hover:underline"
+                  >재생성</button>
+                )}
+              </div>
+
+              {grp.items.map(dep => {
+                const depNum = ++globalClaimNum;
+                // UI 표시 시 임시 참조 번호(ci+1)를 실제 독립항 번호로 교정
+                const displayText = dep.text.replace(new RegExp(`제${ci + 1}항에 있어서`, 'g'), `제${indepNum}항에 있어서`);
+                return (
+                  <div key={dep.id} className={clsx('rounded-lg border overflow-hidden', dep.sel ? 'border-zinc-200 bg-white' : 'border-zinc-100 bg-zinc-50 opacity-60')}>
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer"
+                      onClick={() => !done && onFocusContext?.({ text: displayText, label: `종속항 ${depNum}`, apply: (newText) => {
+                        const next = { ...setGroups, [claimKey]: { ...grp, items: grp.items.map(d => d.id === dep.id ? { ...d, text: newText } : d) } };
+                        const nextMap = { ...depGroupsMap, [selectedSetId!]: next };
+                        setDepGroupsMap(nextMap);
+                        syncUpdate(selectedSetId, nextMap);
+                      } })}>
+                      <button
+                        onClick={e => { e.stopPropagation(); toggleDep(claimKey, dep.id); }}
+                        className={clsx('w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all',
+                          dep.sel ? 'bg-brand-400 border-blue-600 text-white' : 'border-gray-300 bg-white hover:border-blue-400')}
+                      >
+                        {dep.sel && <Icon name="check" size={8} />}
+                      </button>
+                      <span className="text-xs2 text-gray-500 font-medium shrink-0">종속항 {depNum}</span>
+                      {!done && (
+                        <button
+                          onClick={e => { e.stopPropagation(); removeDep(claimKey, dep.id); }}
+                          className="ml-auto text-xs2 text-gray-300 hover:text-red-400 transition-colors"
+                        >✕</button>
+                      )}
+                    </div>
+                    <div className="px-2.5 pb-2">
+                      <p className="text-xs2 text-gray-700 leading-relaxed">{displayText}</p>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* 새 종속항 추가 */}
+              {!done && (
+                <div className="flex gap-1.5 pt-1">
+                  <input
+                    value={grp.newText}
+                    onChange={e => updateDepNewText(claimKey, e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addDep(claimKey)}
+                    placeholder={`제${indepNum}항에 있어서, ...`}
+                    className="flex-1 text-xs2 px-2.5 py-1.5 border border-zinc-200 rounded-lg bg-zinc-50 focus:outline-none focus:border-blue-400 focus:bg-white"
+                  />
+                  <button
+                    onClick={() => addDep(claimKey)}
+                    disabled={!grp.newText.trim()}
+                    className="px-2 py-1.5 text-xs2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 disabled:opacity-40"
+                  >추가</button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-    </>
+        );
+      })}
+    </div>
   );
 }
 
@@ -2254,10 +2150,6 @@ const DESC_SECTIONS: { key: string; label: string; badge2?: string; text: string
   {
     key: 'problem', label: '해결하려는 과제',
     text: '본 발명은 상기와 같은 문제점을 해결하기 위해 안출된 것으로, 라이다 포인트 클라우드 데이터를 효율적으로 전처리하여 실시간 처리 속도를 확보하면서도, 근거리·원거리 객체 모두에 대해 높은 탐지 정확도를 달성할 수 있는 3D 객체 인식 장치 및 방법을 제공하는 것을 목적으로 한다.',
-  },
-  {
-    key: 'solution', label: '과제의 해결 수단',
-    text: '본 발명의 과제를 해결하기 위한 수단으로, 라이다 포인트 클라우드 데이터를 입력받는 데이터 수집부(100)와, 입력된 데이터를 정규화·필터링하는 전처리부(200)와, 딥러닝 기반 특징을 추출하는 특징 추출부(300)와, 최종 객체를 분류하는 인식부(400)와, 인식 결과를 자율주행 제어부에 전달하는 출력부(500)를 포함한다.',
   },
   {
     key: 'effect', label: '발명의 효과',
@@ -2341,96 +2233,6 @@ function DescriptionPanel({ onUpdate, onSubInfoChange, onFocusContext, guidePane
         );
       })}
     </div>
-  );
-}
-
-
-// ── 요약서 패널 — A(상세) + B(간결) 2개 후보 ──
-const ABSTRACT_CANDS = [
-  {
-    letter: 'A', charCount: 187, badge2: null,
-    text: '본 발명은 자율주행 차량에 장착된 라이다 센서에서 수신한 포인트 클라우드 데이터를 기반으로 실시간 객체 인식 및 분류를 수행하는 장치 및 방법에 관한 것으로, RANSAC 기반 전처리와 PointNet++ 딥러닝 모델을 결합하여 보행자, 차량, 자전거 등 다양한 객체를 높은 정확도로 인식하고 추적한다.',
-  },
-  {
-    letter: 'B', charCount: 132, badge2: '간결 버전',
-    text: '라이다 포인트 클라우드의 전처리와 딥러닝 기반 3D 객체 탐지를 결합한 실시간 객체 인식 장치로, 자율주행 환경에서 다양한 객체를 정확하게 인식·추적하는 기술에 관한 것이다.',
-  },
-];
-
-function AbstractPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
-  done: boolean;
-  onConfirm: () => void;
-  onUpdate: (v: string) => void;
-  onFocusContext?: (ctx: { text: string; label: string; apply: (t: string) => void }) => void;
-  guidePanelInputRef?: React.RefObject<HTMLInputElement | null>;
-}) {
-  const [selectedIdx, setSelectedIdx] = useState(0);
-  const [editVals, setEditVals] = useState<Record<number, string>>({});
-
-  const getVal = (i: number) => editVals[i] ?? ABSTRACT_CANDS[i].text;
-
-  const selectCand = (i: number) => {
-    setSelectedIdx(i);
-    onFocusContext?.({
-      text: getVal(i),
-      label: '요약서',
-      apply: (newText) => { setEditVals(prev => ({ ...prev, [i]: newText })); onUpdate(newText); },
-    });
-  };
-
-  const requestAI = (i: number) => {
-    selectCand(i);
-    setTimeout(() => guidePanelInputRef?.current?.focus(), 50);
-  };
-
-  return (
-    <>
-      <div className="mx-3 mt-3 mb-2 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 shrink-0">
-        <p className="text-xs2 text-brand-400">명세서 전체 내용을 기반으로 <strong>요약서 2개 후보</strong>를 생성했습니다. 선택하거나 수정하세요.</p>
-      </div>
-
-      <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2 ml-1.5">
-        {ABSTRACT_CANDS.map((cand, i) => {
-          const isSelected = selectedIdx === i && !done;
-          const isConfirmed = done && selectedIdx === i;
-          return (
-            <div
-              key={cand.letter}
-              onClick={() => !done && selectCand(i)}
-              className={clsx(
-                'rounded-xl border-2 p-3 cursor-pointer transition-all bg-white',
-                isSelected && 'border-blue-600 bg-blue-50 shadow-sm',
-                isConfirmed && 'border-green-500 bg-green-50',
-                !isSelected && !isConfirmed && !done && 'border-zinc-200 hover:border-blue-300 hover:bg-blue-50/30',
-                done && !isConfirmed && 'border-gray-200 opacity-60',
-              )}
-            >
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className={clsx('w-5 h-5 rounded-full text-xs2 font-bold flex items-center justify-center shrink-0',
-                  isSelected || isConfirmed ? 'bg-brand-400 text-white' : 'bg-gray-200 text-gray-500')}>
-                  {cand.letter}
-                </span>
-                {cand.badge2 && <span className="text-xs2 text-gray-500 font-medium">{cand.badge2}</span>}
-                <span className="text-xs2 text-gray-400">{getVal(i).length}자</span>
-                {isSelected && <span className="text-xs2 text-blue-600 font-semibold">✓ 선택됨</span>}
-                {!done && (
-                  <div className="ml-auto">
-                    <button
-                      onClick={e => { e.stopPropagation(); requestAI(i); }}
-                      className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
-                    >
-                      <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                      수정 요청
-                    </button>
-                  </div>
-                )}
-              </div>
-              <p className="text-sm2 text-gray-700 leading-relaxed">{getVal(i)}</p>
-            </div>
-          );
-        })}
-      </div>
-    </>
   );
 }
 

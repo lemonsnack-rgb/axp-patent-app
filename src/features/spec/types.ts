@@ -1,9 +1,25 @@
 // src/features/spec/types.ts
 
 export type SpecStepId =
-  'upload' | 'title' | 'description' | 'components' | 'drawings' | 'claims' | 'abstract';
+  'upload' | 'title' | 'description' | 'components' | 'drawings' | 'claims';
 export type SpecPhase = 'upload' | 'direct' | 'flow' | 'done';
 
+// ── 청구항 타입 ──────────────────────────────────────────────────────────────
+export type ClaimCategory = 'process' | 'machine' | 'manufacture' | 'composition';
+export type AbstractionLevel = 'broad' | 'intermediate' | 'specific'; // 내부값 — UI 직접 노출 금지
+
+export interface Claim {
+  category: ClaimCategory;
+  value: string;
+}
+
+export interface IndependentClaimSet {
+  id: string;
+  abstraction_level: AbstractionLevel;
+  claims: Claim[]; // 2~3개, 기본: machine + process 쌍
+}
+
+// ── 기타 타입 ────────────────────────────────────────────────────────────────
 export interface SpecComponentItem {
   id: number;
   text: string;
@@ -34,10 +50,9 @@ export interface SpecDrawingItem {
 
 export interface SpecClaimsState {
   phase: 'indep' | 'dep';
-  indepCands: Array<{
-    id: number; label: string; text: string; selected: boolean;
-  }>;
-  depGroups: Record<number, {
+  claimSets: IndependentClaimSet[];
+  selectedSetId: string | null;
+  depGroups: Record<string, {
     generated: boolean;
     newText: string;
     items: Array<{ id: number; text: string; sel: boolean }>;
@@ -48,7 +63,6 @@ export interface SpecDescTexts {
   tech?: string;
   bg?: string;
   problem?: string;
-  solution?: string;
   effect?: string;
 }
 
@@ -65,7 +79,6 @@ export interface SpecAnalysisState {
   diKeywords: string;
   uploadedFileName?: string;
   titleCandidates: string[];
-  abstractCandidates: string[];
   componentItems: SpecComponentItem[];
   drawings: SpecDrawingItem[];
   claimsState?: SpecClaimsState;
@@ -89,12 +102,10 @@ export interface SpecAnalysisResult {
   tech: string;
   bg: string;
   problem: string;
-  solution: string;
   effect: string;
   drawDesc: string;
   detail: string;
   claims: string;
-  abstract: string;
   drawings: SpecDrawingItem[];
   componentItems: SpecComponentItem[];
 }
