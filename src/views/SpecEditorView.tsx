@@ -7,13 +7,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import katex from 'katex';
 import { Icon } from '../components/Icon';
-import { MOCK_DRAWINGS } from '../features/drawing-workflow/types';
-import { openEditorTab } from '../features/drawing-workflow/editorChannel';
-import type { SpecAnalysisResult } from '../features/spec/types';
+import type { InventionContext, MidspecSection, InventionSpecification } from '../features/spec/types';
 import { loadSpecState, saveSpecState } from '../features/spec/specStore';
 import { PreviewModal } from '../components/PreviewModal';
 import type { PreviewSection } from '../components/PreviewModal';
 import { analyzePromptClarity, generateIntentOptions, generateMockModification } from '../features/ai/clarityAnalyzer';
+import { exportDocx } from '../utils/exportDocx';
 
 // ── KaTeX 유틸리티 ─────────────────────────────────────────────────────────
 function renderTeX(tex: string, displayMode = false): { html: string; error?: string } {
@@ -99,14 +98,15 @@ const FORMULA_TEMPLATES = [
 
 // ── 섹션 정의 ──────────────────────────────────────────────────────────────
 const EDITOR_SECTIONS = [
-  { id: 'title',     label: '발명의 명칭',                       short: '명칭' },
-  { id: 'tech',      label: '기술분야',                          short: '기술분야' },
-  { id: 'bg',        label: '발명의 배경기술',                    short: '배경기술' },
-  { id: 'problem',   label: '해결하고자 하는 과제',               short: '해결과제' },
-  { id: 'effect',    label: '발명의 효과',                        short: '효과' },
-  { id: 'draw_desc', label: '도면의 간단한 설명',                  short: '도면설명' },
-  { id: 'detail',    label: '발명을 실시하기 위한 구체적인 내용',   short: '구체적 내용' },
-  { id: 'claims',    label: '청구범위',                           short: '청구범위' },
+  { id: 'title',                  label: '발명의 명칭',                       short: '명칭' },
+  { id: 'technical_field',        label: '기술분야',                          short: '기술분야' },
+  { id: 'background_art',         label: '발명의 배경기술',                    short: '배경기술' },
+  { id: 'technical_problem',      label: '해결하고자 하는 과제',               short: '해결과제' },
+  { id: 'technical_solution',     label: '해결수단',                          short: '해결수단' },
+  { id: 'advantageous_effects',   label: '발명의 효과',                        short: '효과' },
+  { id: 'drawing_descriptions',   label: '도면의 간단한 설명',                  short: '도면설명' },
+  { id: 'embodiment_description', label: '발명을 실시하기 위한 구체적인 내용',   short: '구체적 내용' },
+  { id: 'claims',                 label: '청구범위',                           short: '청구범위' },
 ] as const;
 type SectionId = typeof EDITOR_SECTIONS[number]['id'];
 
@@ -141,40 +141,45 @@ const TableIcon = () => (
 );
 
 // ── 메인 컴포넌트 ──────────────────────────────────────────────────────────
-export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }: {
-  task: any; onBack: () => void; confirmedTitle?: string; analysisResult?: SpecAnalysisResult;
+export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context, confirmedClaimsText }: {
+  task: any
+  onBack: () => void
+  confirmedTitle?: string
+  midspec?: MidspecSection[]
+  context?: InventionContext
+  confirmedClaimsText?: string
 }) {
   const taskName: string = task?.name || '새 명세서';
-  // 위저드에서 확정된 발명 명칭이 있으면 title 섹션에 사용
   const effectiveTitle = confirmedTitle || taskName;
 
-  // ── 초기 콘텐츠 헬퍼 (analysisResult 우선, 없으면 중립 플레이스홀더) ──
-  function getInitialContent(id: SectionId, name: string, ar?: SpecAnalysisResult): string {
-    if (ar) {
-      const map: Partial<Record<SectionId, string>> = {
-        title:     ar.title || name,
-        tech:      ar.tech,
-        bg:        ar.bg,
-        problem:   ar.problem,
-        effect:    ar.effect,
-        draw_desc: ar.drawDesc,
-        detail:    ar.detail,
-        claims:    ar.claims,
-      };
-      if (map[id]) return map[id]!;
+  // ── 초기 콘텐츠 헬퍼 (MidspecSection 기반) ──
+  function getMidspecText(key: string): string {
+    const section = midspec?.find(s => s.key === key)
+    return section?.blocks.map(b => b.text).join('\n\n') ?? ''
+  }
+
+  function getInitialContent(
+    id: SectionId,
+    name: string,
+  ): string {
+    if (id === 'title') return confirmedTitle || name
+    if (id === 'claims') return confirmedClaimsText || `청구항 1.\n${name} 장치.`
+    if (id !== 'embodiment_description') {
+      const text = getMidspecText(id as keyof InventionSpecification)
+      if (text) return text
     }
-    // fallback — 중립 플레이스홀더
     const fallback: Partial<Record<SectionId, string>> = {
-      title:     name,
-      tech:      `본 발명은 ${name}에 관한 것이다.`,
-      bg:        '관련 배경기술을 기술하세요.',
-      problem:   '해결하려는 과제를 기술하세요.',
-      effect:    '발명의 효과를 기술하세요.',
-      draw_desc: '도면에 대한 설명을 기술하세요.',
-      detail:    '발명의 구체적인 내용을 기술하세요.',
-      claims:    `청구항 1.\n${name} 장치.`,
-    };
-    return fallback[id] || '';
+      title:                  name,
+      technical_field:        `본 발명은 ${name}에 관한 것이다.`,
+      background_art:         '관련 배경기술을 기술하세요.',
+      technical_problem:      '해결하려는 과제를 기술하세요.',
+      technical_solution:     '해결수단을 기술하세요.',
+      advantageous_effects:   '발명의 효과를 기술하세요.',
+      drawing_descriptions:   '도면에 대한 설명을 기술하세요.',
+      embodiment_description: '발명의 구체적인 내용을 기술하세요.',
+      claims:                 `청구항 1.\n${name} 장치.`,
+    }
+    return fallback[id] || ''
   }
 
   // 섹션별 블록 배열 (localStorage 복원 우선)
@@ -186,17 +191,17 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
       }
     }
     return Object.fromEntries(
-      EDITOR_SECTIONS.map(s => [s.id, toBlocks(getInitialContent(s.id, effectiveTitle, analysisResult))])
+      EDITOR_SECTIONS.map(s => [s.id, toBlocks(getInitialContent(s.id, effectiveTitle))])
     ) as Record<SectionId, string[]>;
   });
 
   // 편집 중인 블록 (textarea 활성화, 단일)
-  const [sel, setSel] = useState<{ sid: SectionId; idx: number } | null>({ sid: 'tech', idx: 0 });
+  const [sel, setSel] = useState<{ sid: SectionId; idx: number } | null>({ sid: 'technical_field', idx: 0 });
   // AI 컨텍스트용 다중 선택 — key: `${sid}-${idx}`
   const [selSet, setSelSet] = useState<Set<string>>(new Set());
 
   // 활성 섹션 탭
-  const [activeSec, setActiveSec] = useState<SectionId>('tech');
+  const [activeSec, setActiveSec] = useState<SectionId>('technical_field');
 
   // 모바일 AI 패널 오픈 상태
   const [mobileAiOpen, setMobileAiOpen] = useState(false);
@@ -225,17 +230,22 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }, [chatInput]);
 
-  // 도면 데이터 (draw_desc 인라인 카드 + 과거 패널 공용)
-  const drawings = analysisResult?.drawings ?? MOCK_DRAWINGS;
+  // 도면 데이터 (drawing_descriptions 인라인 카드용)
+  const drawings = context?.drawings ?? [];
+  const DRAWING_LABEL_MAP: Record<string, string> = {
+    proposed_implementation: '제안기술',
+    previous_implementation: '종래기술',
+    background:              '종래기술',
+    effect:                  '제안기술',
+  };
   const DRAWING_LABEL_STYLES: Record<string, string> = {
     '제안기술': 'bg-blue-100 text-blue-700',
     '종래기술': 'bg-zinc-100 text-zinc-600',
     'AI생성':   'bg-violet-100 text-violet-700',
   };
 
-  const compNames = (analysisResult?.componentItems ?? [])
-    .filter((c: any) => c.sel)
-    .map((c: any) => c.text.split(':')[0].trim())
+  const compNames = (context?.elements ?? [])
+    .map(el => el.value_ko)
     .filter(Boolean);
 
   // 구성요소 이름 변경 모달
@@ -572,13 +582,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
             <span>미리보기</span>
           </button>
-          <button onClick={() => {
-            const fileName = `${task?.name || '명세서'}.docx`;
-            const blob = new Blob(['명세서 내용 (DOCX 내보내기 미구현)'], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
-            URL.revokeObjectURL(url);
-          }} title="DOCX 내보내기"
+          <button onClick={() => exportDocx(task?.name ?? '명세서', editorPreviewSections)} title="DOCX 내보내기"
             className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 transition-colors text-zinc-600 text-xs2 font-medium">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><path d="M9 2v4h4"/><path d="M5 9h6M5 11h4"/></svg>
             <span>내보내기</span>
@@ -625,20 +629,17 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
                 </h2>
 
                 {/* 도면의 간단한 설명 섹션 — 도면 인라인 카드 */}
-                {sec.id === 'draw_desc' && drawings.length > 0 && (
+                {sec.id === 'drawing_descriptions' && drawings.length > 0 && (
                   <div className="mb-6">
                     <div className="grid grid-cols-2 gap-4 mb-3">
-                      {drawings.map(d => {
-                        const isDone = d.stage === 'done';
+                      {drawings.map((d, idx) => {
+                        const labelKo = DRAWING_LABEL_MAP[d.detail.label] ?? 'AI생성';
                         return (
-                          <div key={d.id} className={clsx('rounded-xl border overflow-hidden bg-white shadow-sm', isDone ? 'border-green-200' : 'border-zinc-200')}>
-                            {/* 이미지 영역 — 클릭으로 편집 진입 */}
-                            <div
-                              className="relative cursor-pointer group/img aspect-[4/3] bg-zinc-100 border-b border-zinc-200 flex flex-col items-center justify-center gap-1 overflow-hidden"
-                              onClick={() => openEditorTab({ drawingId: d.id, drawings: drawings as any, components: [], references: [], drawingName: d.name, timestamp: Date.now() })}
-                            >
-                              {d.exportedImageUrl ? (
-                                <img src={d.exportedImageUrl} className="w-full h-full object-contain" alt={d.name} />
+                          <div key={idx} className="rounded-xl border overflow-hidden bg-white shadow-sm border-zinc-200">
+                            {/* 이미지 영역 */}
+                            <div className="relative aspect-[4/3] bg-zinc-100 border-b border-zinc-200 flex flex-col items-center justify-center gap-1 overflow-hidden">
+                              {d.image.file.data ? (
+                                <img src={`data:${d.image.file.media_type};base64,${d.image.file.data}`} className="w-full h-full object-contain" alt={d.detail.name} />
                               ) : (
                                 <>
                                   <svg viewBox="0 0 120 90" width="80" height="60" className="text-zinc-300" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -650,28 +651,22 @@ export function SpecEditorView({ task, onBack, confirmedTitle, analysisResult }:
                                     <line x1="60" y1="42" x2="60" y2="52" strokeDasharray="3 2"/>
                                     <polyline points="100,28 110,28 110,64 78,64" strokeDasharray="3 2"/>
                                   </svg>
-                                  <span className="text-[11px] font-semibold text-zinc-400">도 {d.symbol}</span>
+                                  <span className="text-[11px] font-semibold text-zinc-400">{d.detail.symbol}</span>
                                 </>
                               )}
-                              <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/25 transition-colors flex items-center justify-center opacity-0 group-hover/img:opacity-100">
-                                <span className="text-white text-xs font-semibold bg-black/50 px-2.5 py-1 rounded-full flex items-center gap-1">
-                                  <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" width="11" height="11"><path d="M10 2l2 2-7 7H3v-2L10 2z"/></svg>
-                                  편집
-                                </span>
-                              </div>
                             </div>
                             {/* 캡션 */}
                             <div className="px-3 pt-2 pb-1.5">
                               <div className="flex items-center gap-1.5 mb-0.5">
-                                <span className="text-xs2 font-bold text-zinc-700">도 {d.symbol}</span>
-                                <span className={clsx('text-[10px] px-1.5 py-px rounded-full font-medium', DRAWING_LABEL_STYLES[d.label] ?? 'bg-zinc-100 text-zinc-500')}>{d.label}</span>
+                                <span className="text-xs2 font-bold text-zinc-700">{d.detail.symbol}</span>
+                                <span className={clsx('text-[10px] px-1.5 py-px rounded-full font-medium', DRAWING_LABEL_STYLES[labelKo] ?? 'bg-zinc-100 text-zinc-500')}>{labelKo}</span>
                               </div>
-                              <p className="text-xs2 text-zinc-600 leading-snug">{d.name}</p>
+                              <p className="text-xs2 text-zinc-600 leading-snug">{d.detail.name}</p>
                             </div>
                             {/* 참조 삽입 */}
                             <div className="border-t border-zinc-100 px-3 py-1.5">
                               <button
-                                onClick={() => { if (sel) { const cur = blocks[sel.sid]?.[sel.idx] || ''; updateBlock(sel.sid, sel.idx, `${cur}${cur ? ' ' : ''}(도면 기호 ${d.symbol} 참조)`); } }}
+                                onClick={() => { if (sel) { const cur = blocks[sel.sid]?.[sel.idx] || ''; updateBlock(sel.sid, sel.idx, `${cur}${cur ? ' ' : ''}(${d.detail.symbol} 참조)`); } }}
                                 disabled={!sel}
                                 className="text-xs2 font-semibold text-blue-500 hover:text-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                               >+ 참조 삽입</button>

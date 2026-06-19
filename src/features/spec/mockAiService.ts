@@ -1,233 +1,200 @@
 // src/features/spec/mockAiService.ts
-import type { InventionInput, SpecComponentItem, SpecDrawingItem, IndependentClaimSet, TitleCandidate, InventionDescription } from './types';
+import type {
+  InventionInput,
+  InventionContext,
+  InventionElement,
+  InventionDescriptionItem,
+  SpecComponentItem,
+  Drawing,
+  TitleCandidate,
+  IndependentClaimSet,
+  DepClaimItem,
+  MidspecSection,
+} from './types';
 
-export function generateTitleCandidates(input: InventionInput): TitleCandidate[] {
-  const { title } = input;
-  const f = input.field || '기술';
-  return [
-    {
-      id: 't1',
-      title: `${f} 기반 ${title} 장치 및 방법`,
-      abstract: `본 발명은 ${f} 환경에서 ${title}을 수행하는 장치 및 방법에 관한 것으로, 처리 효율 향상 및 정확도 개선을 목적으로 한다.`,
-      sel: false,
-    },
-    {
-      id: 't2',
-      title: `인공지능을 이용한 ${title} 시스템`,
-      abstract: `딥러닝 및 인공지능 기술을 활용하여 ${title}을 자동화하는 시스템으로, 기존 방식 대비 성능을 향상시킨 발명이다.`,
-      sel: false,
-    },
-    {
-      id: 't3',
-      title: `${title}을 위한 ${f} 처리 방법`,
-      abstract: `${f} 기반의 처리 파이프라인을 통해 ${title}을 효율적으로 수행하는 방법으로, 실시간 처리 및 다양한 환경 적용이 가능하다.`,
-      sel: false,
-    },
-  ];
+// ── 제목 후보 mock ────────────────────────────────────────────────────────────
+
+export const MOCK_ABSTRACTS = [
+  {
+    title: '병렬 분산 처리 기반의 고속 데이터 처리 시스템 및 방법',
+    summary: '복수의 처리 모듈을 이용한 병렬 처리 방식으로 데이터 처리 속도를 향상시키는 시스템에 관한 것이다.',
+    reason: '기술적 특징(병렬 처리)과 효과(고속)를 명확히 드러내어 청구항과 연결성이 높음',
+  },
+  {
+    title: '데이터 처리 효율화를 위한 분산 처리 장치',
+    summary: '처리 모듈의 병렬 동작으로 오류율을 줄이고 처리 속도를 개선한 장치에 관한 발명이다.',
+    reason: '장치 청구항에 적합한 간결한 표현. 효과(오류율 감소)를 포함',
+  },
+  {
+    title: '멀티 프로세싱 아키텍처를 활용한 실시간 데이터 처리 시스템, 방법 및 컴퓨터 프로그램',
+    summary: '실시간 데이터를 복수의 처리 모듈이 분산 처리하며 결과를 통합하는 시스템으로, 처리 속도 300% 향상 효과를 제공한다.',
+    reason: '시스템·방법·프로그램 3종 청구항 대응. 구체적 수치(300%)로 심사 유리',
+  },
+]
+
+export function generateTitleCandidates(_input: InventionInput): TitleCandidate[] {
+  return MOCK_ABSTRACTS.map((a, i) => ({
+    id: `t${i + 1}`,
+    title: a.title,
+    summary: a.summary,
+    reason: a.reason,
+    sel: false,
+  }))
 }
 
-export function generateDescriptionItems(input: InventionInput): InventionDescription[] {
-  const { title, content, problem } = input;
-  const field = input.field || '기술';
-  const excerpt = content.length > 60 ? content.slice(0, 60) + '…' : content;
-  return [
-    {
-      id: 'desc-p1',
-      type: 'proposed',
-      text: `본 발명은 ${field} 기반의 ${title}에 관한 것으로, ${excerpt}의 기술을 제안한다.`,
-      sel: true,
-    },
-    {
-      id: 'desc-p2',
-      type: 'proposed',
-      text: `제안 기술은 ${field} 환경에서 실시간 처리가 가능하며, 기존 대비 처리 속도 및 정확도가 향상된다.`,
-      sel: true,
-    },
-    {
-      id: 'desc-p3',
-      type: 'proposed',
-      text: `${problem ? problem : `${title}의 핵심 문제를 해결하기 위해`} 딥러닝 모델을 적용하여 자동화된 처리 파이프라인을 구성한다.`,
-      sel: false,
-    },
-    {
-      id: 'desc-r1',
-      type: 'prior',
-      text: `종래의 ${field} 기술은 수동 처리 방식에 의존하여 처리 속도가 느리고 오류율이 높은 문제가 있었다.`,
-      sel: true,
-    },
-    {
-      id: 'desc-r2',
-      type: 'prior',
-      text: `기존 ${title} 시스템은 특정 환경에만 제한적으로 동작하여 범용성이 부족하다는 단점이 있었다.`,
-      sel: true,
-    },
-  ];
+// ── 발명 설명 mock ────────────────────────────────────────────────────────────
+
+export const MOCK_PREVIOUS: InventionDescriptionItem[] = [
+  { label: 'background',     text: '기존 시스템은 단일 프로세서 기반의 직렬 처리 방식으로 처리 속도가 느리고 오류율이 높은 문제가 있었다.' },
+  { label: 'implementation', text: '종래 기술은 하나의 중앙 처리 장치가 모든 데이터를 순차적으로 처리하는 구조를 사용하였다.' },
+]
+
+export const MOCK_PROPOSED: InventionDescriptionItem[] = [
+  { label: 'objective',      text: '본 발명은 병렬 처리 방식을 도입하여 처리 속도를 획기적으로 향상시키는 것을 목적으로 한다.' },
+  { label: 'implementation', text: '복수의 처리 모듈이 데이터를 분산 처리하고, 결과를 통합하는 구조를 채택한다.' },
+  { label: 'effect',         text: '처리 속도 300% 향상 및 오류율 90% 감소 효과를 달성한다.' },
+]
+
+// ── 구성요소 mock ─────────────────────────────────────────────────────────────
+
+export const MOCK_ELEMENTS: InventionElement[] = [
+  { symbol: '100', value_ko: '데이터 수집부',  value_en: 'Data Collector',    description: '외부 장치로부터 원시 데이터를 수집하는 모듈', hypernym_ko: '수집 장치', hypernym_en: 'Collecting Device' },
+  { symbol: '200', value_ko: '전처리부',       value_en: 'Preprocessor',       description: '수집된 데이터를 정규화·필터링하는 모듈',         hypernym_ko: '처리 장치', hypernym_en: 'Processing Device' },
+  { symbol: '300', value_ko: '병렬 처리부',    value_en: 'Parallel Processor', description: '복수의 스레드로 데이터를 동시에 처리하는 모듈',   hypernym_ko: '처리 장치', hypernym_en: 'Processing Device' },
+  { symbol: '400', value_ko: '결과 통합부',    value_en: 'Result Integrator',  description: '처리 결과를 통합하여 최종 출력을 생성하는 모듈',  hypernym_ko: '통합 장치', hypernym_en: 'Integration Device' },
+]
+
+export function generateComponentCandidates(_input: InventionInput): SpecComponentItem[] {
+  return MOCK_ELEMENTS.map((el, i) => ({
+    ...el,
+    id: i + 1,
+    depth: 0,
+    sel: true,
+  }))
 }
 
-export function generateDescriptionSection(
-  sectionKey: 'tech' | 'bg' | 'problem' | 'effect',
-  input: InventionInput,
-): string {
-  const { title, content, problem } = input;
-  const field = input.field || '기술';
-  const map: Record<string, string> = {
-    tech:    `본 발명은 ${field}에 관한 것으로, 보다 구체적으로는 ${title}에 관한 것이다.\n\n${content.slice(0, 120)}`,
-    bg:      `${field} 분야에서 기존 방법은 여러 한계가 있었다.\n\n특히 ${problem || '처리 효율 및 정확도 측면에서 문제점이 있었다.'}`,
-    problem: `본 발명은 상기와 같은 문제점을 해결하기 위해 안출된 것으로, ${problem || `${title}을 효율적으로 수행할 수 있는 장치 및 방법을 제공하는 것을 목적으로 한다.`}`,
-    effect:  `본 발명에 의하면, ${field} 기반의 처리를 통해 기존 방식 대비 성능이 향상되고, 높은 정확도가 달성된다.\n\n또한 다양한 환경에서도 안정적인 동작이 가능하다.`,
-  };
-  return map[sectionKey] || '';
-}
+// ── 도면 mock ─────────────────────────────────────────────────────────────────
 
-export function generateComponentCandidates(input: InventionInput): SpecComponentItem[] {
-  const { title, content } = input;
-  const field = input.field || '기술';
-  const base = [
-    { text: `입력부: ${field} 환경에서 외부 데이터를 수신하여 처리 파이프라인에 전달`, englishName: 'input unit', definition: `${field} 환경에서 외부 신호 또는 데이터를 수신하여 내부 처리 파이프라인에 전달하는 구성요소`, parent: `데이터 처리 시스템 / data processing system` },
-    { text: `전처리부: 수신된 데이터에 대한 전처리 및 정규화를 수행`, englishName: 'preprocessing unit', definition: '수신된 원시 데이터의 노이즈 제거, 정규화, 변환 등의 전처리 과정을 수행하는 구성요소', parent: `데이터 처리 시스템 / data processing system` },
-    { text: `처리부: ${title} 핵심 알고리즘을 적용하여 데이터를 분석·처리`, englishName: 'processing unit', definition: `${title}의 핵심 알고리즘을 적용하여 입력 데이터를 분석하고 처리 결과를 산출하는 구성요소`, parent: `데이터 처리 시스템 / data processing system` },
-    { text: `출력부: 처리 결과를 외부 시스템에 출력`, englishName: 'output unit', definition: '처리 결과를 사용자 인터페이스 또는 외부 시스템에 전달하는 구성요소', parent: `데이터 처리 시스템 / data processing system` },
-  ];
-  if (content.length > 50) {
-    base.push({ text: `제어부: ${content.slice(0, 30)}... 전반을 제어·관리`, englishName: 'control unit', definition: '시스템 각 구성요소의 동작을 조율하고 전반적인 처리 흐름을 제어·관리하는 구성요소', parent: `데이터 처리 시스템 / data processing system` });
+export const MOCK_DRAWINGS: Drawing[] = [
+  {
+    image: {
+      file: { data: '', media_type: 'image/png' },
+      bbox: { x1: 0, y1: 53, x2: 1507, y2: 518 },
+    },
+    detail: { symbol: '도면1', name: '시스템 전체 구성도', description: '발명의 전체 구성을 나타내는 블록도', label: 'proposed_implementation' },
+    included: true, useForSpec: false, isRepresentative: false,
+  },
+  {
+    image: {
+      file: { data: '', media_type: 'image/png' },
+      bbox: { x1: 0, y1: 600, x2: 1507, y2: 900 },
+    },
+    detail: { symbol: '도면2', name: '종래 기술 구성도', description: '기존 기술 구조를 나타낸 도면', label: 'previous_implementation' },
+    included: true, useForSpec: false, isRepresentative: false,
+  },
+]
+
+// ── 독립항 세트 mock (API v0.2.0) ─────────────────────────────────────────────
+
+export const MOCK_INDEPENDENT_CLAIM_SETS: IndependentClaimSet[] = [
+  {
+    abstraction_level: 'BROAD',
+    claims: [
+      { value: '데이터를 수집하는 수집부; 수집된 데이터를 병렬로 처리하는 처리부; 처리 결과를 통합하는 통합부를 포함하는 데이터 처리 시스템.', category: 'MACHINE', element_idxs: [0, 2, 3] },
+      { value: '데이터를 수집하는 단계; 수집된 데이터를 병렬로 처리하는 단계; 처리 결과를 통합하는 단계를 포함하는 데이터 처리 방법.', category: 'PROCESS', element_idxs: [0, 2, 3] },
+    ],
+  },
+  {
+    abstraction_level: 'BROAD',
+    claims: [
+      { value: '입력 데이터를 복수의 처리 경로로 분산하는 분산부; 각 처리 경로에서 데이터를 처리하는 처리부; 처리된 결과를 병합하는 병합부를 포함하는 데이터 처리 장치.', category: 'MACHINE', element_idxs: [0, 2, 3] },
+    ],
+  },
+  {
+    abstraction_level: 'INTERMEDIATE',
+    claims: [
+      { value: '원시 데이터를 수집하는 데이터 수집부(100); 수집된 데이터를 정규화하는 전처리부(200); 복수의 스레드로 데이터를 동시 처리하는 병렬 처리부(300); 처리 결과를 통합하는 결과 통합부(400)를 포함하는 데이터 처리 시스템.', category: 'MACHINE', element_idxs: [0, 1, 2, 3] },
+      { value: '원시 데이터를 수집하는 단계; 수집된 데이터를 정규화하는 단계; 복수의 스레드로 데이터를 동시 처리하는 단계; 처리 결과를 통합하는 단계를 포함하는 데이터 처리 방법.', category: 'PROCESS', element_idxs: [0, 1, 2, 3] },
+    ],
+  },
+  {
+    abstraction_level: 'INTERMEDIATE',
+    claims: [
+      { value: '외부 장치로부터 원시 데이터를 수집하는 수집부(100); 수집 데이터의 오류를 검출하고 보정하는 전처리부(200); 병렬 알고리즘으로 데이터를 처리하는 처리부(300); 처리 결과를 가중 합산하는 통합부(400)를 포함하는 데이터 처리 시스템.', category: 'MACHINE', element_idxs: [0, 1, 2, 3] },
+    ],
+  },
+  {
+    abstraction_level: 'NARROW',
+    claims: [
+      { value: 'IoT 센서 신호를 수신하는 데이터 수집부(100); 신호에서 노이즈를 제거하고 표준 포맷으로 변환하는 전처리부(200); 4개 이상의 독립 스레드로 분산 처리하는 병렬 처리부(300); 가중 평균 방식으로 결과를 통합하는 결과 통합부(400)를 포함하는 실시간 데이터 처리 시스템.', category: 'MACHINE', element_idxs: [0, 1, 2, 3] },
+    ],
+  },
+]
+
+// ── 종속항 mock ───────────────────────────────────────────────────────────────
+
+export const MOCK_DEPENDENT_CLAIMS: Omit<DepClaimItem, 'id' | 'sel'>[] = [
+  { no: 2, value: '제1항에 있어서, 상기 병렬 처리부(300)는 처리 결과의 신뢰도를 수치화하는 신뢰도 산출 모듈을 더 포함하는 데이터 처리 시스템.', depends_on: 1, element_idxs: [2] },
+  { no: 3, value: '제1항에 있어서, 상기 전처리부(200)는 이상치 검출 알고리즘을 포함하는 데이터 처리 시스템.', depends_on: 1, element_idxs: [1] },
+  { no: 4, value: '제2항에 있어서, 신뢰도가 기준값 미만인 경우 재처리를 요청하는 피드백 모듈을 더 포함하는 데이터 처리 시스템.', depends_on: 2, element_idxs: [2] },
+]
+
+// ── 중간명세서 mock ───────────────────────────────────────────────────────────
+
+export const MOCK_MIDSPEC: MidspecSection[] = [
+  {
+    key: 'technical_field',
+    label: '기술분야',
+    blocks: [{ text: '본 발명은 병렬 분산 처리 기반의 데이터 처리 시스템 및 방법에 관한 것이다.' }],
+  },
+  {
+    key: 'background_art',
+    label: '배경기술',
+    blocks: [
+      { text: '종래의 데이터 처리 시스템은 단일 프로세서 기반의 직렬 처리 방식을 사용하였다.' },
+      { text: '이러한 방식은 처리 속도가 느리고 오류율이 높은 문제점이 있었다.' },
+    ],
+  },
+  {
+    key: 'technical_problem',
+    label: '해결과제',
+    blocks: [{ text: '본 발명이 해결하려는 과제는 병렬 처리를 통해 데이터 처리 속도를 향상시키고 오류율을 낮추는 것이다.' }],
+  },
+  {
+    key: 'technical_solution',
+    label: '해결수단',
+    blocks: [{ text: '상기 과제를 해결하기 위하여, 본 발명은 복수의 처리 모듈이 데이터를 병렬로 분산 처리하고 결과를 통합하는 구조를 채택한다.' }],
+  },
+  {
+    key: 'advantageous_effects',
+    label: '발명의 효과',
+    blocks: [{ text: '본 발명에 따르면 데이터 처리 속도를 300% 향상시키고 오류율을 90% 감소시키는 효과가 있다.' }],
+  },
+  {
+    key: 'drawing_descriptions',
+    label: '도면의 간단한 설명',
+    blocks: [
+      { text: '도 1은 본 발명의 일 실시예에 따른 데이터 처리 시스템의 전체 구성을 나타낸 블록도이다.' },
+      { text: '도 2는 종래 기술에 따른 데이터 처리 구조를 나타낸 도면이다.' },
+    ],
+  },
+]
+
+// ── upload 완료 시 context 초기화 ─────────────────────────────────────────────
+
+export function getMockExtractResult(): InventionContext {
+  return {
+    title:    MOCK_ABSTRACTS[0].title,
+    summary:  MOCK_ABSTRACTS[0].summary,
+    elements: MOCK_ELEMENTS,
+    previous: MOCK_PREVIOUS.map(item => ({ ...item, adopted: true })),
+    proposed: MOCK_PROPOSED.map(item => ({ ...item, adopted: true })),
+    drawings: MOCK_DRAWINGS,
   }
-  return base.map((c, i) => ({
-    id: i + 1, text: c.text, sel: true, num: '', depth: 0,
-    englishName: c.englishName, definition: c.definition, parent: c.parent,
-  }));
 }
 
-// ── 독립항 세트 생성 (M2 연구노트 기반) ─────────────────────────────────────
-// abstraction_level은 내부 분류값. UI에는 '넓은 권리범위/균형 권리범위/한정 권리범위'로 표시.
-export function generateIndependentClaimSets(
-  input: InventionInput,
-  components: SpecComponentItem[],
-): IndependentClaimSet[] {
-  const { title } = input;
-  const field = input.field || '기술';
-  const selComps = components.filter(c => c.sel).slice(0, 3);
-  const compNames = selComps.map(c => c.text.split(':')[0]).join(', ');
+// ── AI 부분 수정 mock ─────────────────────────────────────────────────────────
 
-  return [
-    // ── broad × 2 (넓은 권리범위) ─────────────────────────────────────────
-    {
-      id: 'broad-1',
-      abstraction_level: 'broad',
-      claims: [
-        {
-          category: 'machine',
-          value: `데이터를 처리하는 처리부를 포함하며,\n${field} 환경에서 ${title}을 수행하는 장치.`,
-        },
-        {
-          category: 'process',
-          value: `데이터를 획득하는 단계;\n상기 데이터를 처리하는 단계;\n처리 결과를 출력하는 단계를 포함하는, ${title} 방법.`,
-        },
-      ],
-    },
-    {
-      id: 'broad-2',
-      abstraction_level: 'broad',
-      claims: [
-        {
-          category: 'machine',
-          value: `외부로부터 입력을 수신하는 입력부; 및\n상기 입력을 처리하여 결과를 생성하는 처리부를 포함하는, ${title} 장치.`,
-        },
-        {
-          category: 'process',
-          value: `외부 입력을 수신하는 단계; 및\n상기 입력을 처리하여 결과를 출력하는 단계를 포함하는, ${title} 방법.`,
-        },
-      ],
-    },
-    // ── intermediate × 2 (균형 권리범위) ────────────────────────────────────
-    {
-      id: 'intermediate-1',
-      abstraction_level: 'intermediate',
-      claims: [
-        {
-          category: 'machine',
-          value: `${selComps.length > 0 ? selComps.map(c => {
-            const name = c.text.split(':')[0];
-            const desc = c.text.split(':')[1]?.trim() || '';
-            return `${name}: ${desc}`;
-          }).join(';\n') + '을 포함하며,\n' : ''}${field} 환경에서 실시간 처리가 가능한 ${title} 장치.`,
-        },
-        {
-          category: 'process',
-          value: `외부로부터 데이터를 획득하는 단계;\n상기 데이터를 전처리하는 단계;\n${title} 알고리즘을 적용하여 처리 결과를 출력하는 단계를 포함하는, ${title} 방법.`,
-        },
-      ],
-    },
-    {
-      id: 'intermediate-2',
-      abstraction_level: 'intermediate',
-      claims: [
-        {
-          category: 'machine',
-          value: `${compNames ? compNames + '을 포함하며,\n' : ''}${field} 기반의 ${title}이 가능한 장치.`,
-        },
-        {
-          category: 'process',
-          value: `${field} 환경에서 데이터를 수집하는 단계;\n수집된 데이터를 분석하여 ${title} 결과를 생성하는 단계;\n상기 결과를 제공하는 단계를 포함하는, ${title} 방법.`,
-        },
-      ],
-    },
-    // ── specific × 1 (한정 권리범위) ─────────────────────────────────────────
-    {
-      id: 'specific-1',
-      abstraction_level: 'specific',
-      claims: [
-        {
-          category: 'machine',
-          value: `${selComps.length > 0 ? selComps.map(c => {
-            const name = c.text.split(':')[0];
-            const desc = c.text.split(':')[1]?.trim() || '';
-            return `상기 ${name}은 ${desc || '관련 기능을 수행하도록 구성되고'}`;
-          }).join(';\n') + ';\n' : ''}딥러닝 모델을 이용하여 ${title}을 수행하는 ${field} 기반 장치.`,
-        },
-        {
-          category: 'process',
-          value: `${field} 센서로부터 원시 데이터를 수집하는 단계;\n상기 원시 데이터에서 노이즈를 제거하고 정규화하는 전처리 단계;\n딥러닝 모델을 적용하여 ${title} 결과를 생성하는 단계;\n상기 결과를 외부 시스템에 전달하는 단계를 포함하는, ${title} 방법.`,
-        },
-      ],
-    },
-  ];
-}
-
-export function generateDependentClaims(
-  indepId: string,
-  indepText: string,
-  category: 'machine' | 'process' | string,
-  input: InventionInput,
-): Array<{ id: number; text: string; sel: boolean }> {
-  const isDevice = category === 'machine' || indepText.includes('장치');
-  const suffix = isDevice ? `${input.title} 장치.` : `${input.title} 방법.`;
-  const ref = `[${indepId}]`;
-  return [
-    { id: 1, sel: true,  text: `${ref}항에 있어서, 상기 처리부는 ${input.field} 알고리즘을 포함하는, ${suffix}` },
-    { id: 2, sel: true,  text: `${ref}항에 있어서, 상기 입력부는 복수의 센서를 포함하는, ${suffix}` },
-    { id: 3, sel: true,  text: `${ref}항에 있어서, 상기 출력부는 처리 결과를 시각화하여 표시하는, ${suffix}` },
-    { id: 4, sel: false, text: `${ref}항에 있어서, 상기 구성은 클라우드 환경에서 동작하는, ${suffix}` },
-  ];
-}
-
-export function generateMockDrawings(input: InventionInput): SpecDrawingItem[] {
-  const { title } = input;
-  return [
-    { id: 'd1', symbol: 1, label: '종래기술', name: `종래 ${title} 전체 구성도`,
-      description: `종래 기술에 따른 ${title} 장치의 전체 구성을 나타내는 블록도.`,
-      applied: false, pageNumber: 1, stage: 'extracted',
-      bbox: { x: 60, y: 80, w: 376, h: 273 }, originalImageUrl: '' },
-    { id: 'd2', symbol: 2, label: '종래기술', name: `종래 ${title} 처리 흐름도`,
-      description: `종래 기술에 따른 ${title} 처리 순서를 나타내는 순서도.`,
-      applied: false, pageNumber: 2, stage: 'extracted',
-      bbox: { x: 40, y: 120, w: 336, h: 259 }, originalImageUrl: '' },
-    { id: 'd3', symbol: 3, label: '제안기술', name: `제안 ${title} 구성도`,
-      description: `본 발명에 따른 ${title} 장치 구성을 나타내는 블록도.`,
-      applied: true, pageNumber: 3, stage: 'extracted',
-      bbox: { x: 50, y: 100, w: 406, h: 315 }, originalImageUrl: '' },
-    { id: 'd4', symbol: 4, label: '제안기술', name: `${title} 처리 흐름도`,
-      description: `본 발명에 따른 ${title} 처리 순서를 나타내는 순서도.`,
-      applied: true, pageNumber: 4, stage: 'extracted',
-      bbox: { x: 70, y: 90, w: 237, h: 271 }, originalImageUrl: '' },
-  ];
+export function mockPartialModify(selectedText: string, _instruction: string): string {
+  return `[AI 수정] ${selectedText.slice(0, 30)}... → 수정된 내용이 여기에 표시됩니다.`
 }

@@ -66,8 +66,13 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery }: P
   const [sortCol, setSortCol] = useState<'applicationDate' | 'title'>('applicationDate');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
-  // 결과 데이터 — appliedFilters 기반 필터링
-  const data = applyFacetFilters(PATENT_SEED, appliedFilters);
+  // 결과 데이터 — 필터링 → 정렬
+  const filtered = applyFacetFilters(PATENT_SEED, appliedFilters);
+  const data = [...filtered].sort((a, b) => {
+    const va = (a[sortCol] ?? '');
+    const vb = (b[sortCol] ?? '');
+    return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+  });
   const count = data.length;
 
   // 검색식 칩 (mockup)
@@ -300,6 +305,7 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery }: P
           sortCol={sortCol}
           sortDir={sortDir}
           onSort={(col) => {
+            setPage(1);
             if (col === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
             else { setSortCol(col); setSortDir('desc'); }
           }}
