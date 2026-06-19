@@ -155,7 +155,7 @@ export function SpecView() {
 
   const si = (id: StepId) => STEPS.findIndex(s => s.id === id);
   const isSpecialStep = (id: StepId) =>
-    id === 'components' || id === 'drawings' || id === 'claims' || id === 'midspec';
+    id === 'description' || id === 'components' || id === 'drawings' || id === 'claims' || id === 'midspec';
   const isVisible = (id: StepId) => {
     if (id === 'upload') return true;
     if (phase === 'upload' || phase === 'direct') return false;
