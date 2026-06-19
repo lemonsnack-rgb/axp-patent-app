@@ -305,6 +305,7 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery }: P
           sortCol={sortCol}
           sortDir={sortDir}
           onSort={(col) => {
+            setPage(1);
             if (col === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
             else { setSortCol(col); setSortDir('desc'); }
           }}
