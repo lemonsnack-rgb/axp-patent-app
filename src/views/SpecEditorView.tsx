@@ -165,10 +165,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
   ): string {
     if (id === 'title') return confirmedTitle || name
     if (id === 'claims') return confirmedClaimsText || `청구항 1.\n${name} 장치.`
-    if (id !== 'embodiment_description') {
-      const text = getMidspecText(id as keyof InventionSpecification)
-      if (text) return text
-    }
+    const text = getMidspecText(id as keyof InventionSpecification)
+    if (text) return text
     const fallback: Partial<Record<SectionId, string>> = {
       title:                  name,
       technical_field:        `본 발명은 ${name}에 관한 것이다.`,
