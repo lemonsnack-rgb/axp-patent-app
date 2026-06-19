@@ -16,7 +16,7 @@ const MODE_LABELS: Record<string, string> = {
 };
 
 export function TopBar() {
-  const { mode, sidebarCollapsed, setSidebarCollapsed, setMode, tasks, activeTaskId, taskUpdate } = useStore();
+  const { mode, sidebarCollapsed, setSidebarCollapsed, tasks, activeTaskId, taskUpdate } = useStore();
   const active = activeTaskId ? tasks.find(t => t.id === activeTaskId) : null;
   const label = mode === 'search' && active
     ? (active.type === 'patent_search' ? '특허 검색' : active.type === 'paper_search' ? '논문 검색' : '선행기술 검색')
@@ -52,9 +52,9 @@ export function TopBar() {
           style={{ width: `calc(${sidebarCollapsed ? '72px' : '260px'} - 24px)` }}
         >
           <button
-            onClick={() => sidebarCollapsed ? setSidebarCollapsed(false) : setMode('home')}
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             className="flex items-center gap-2 cursor-pointer hover:opacity-80 active:scale-[0.98] transition-all"
-            title={sidebarCollapsed ? '사이드바 열기' : '프로젝트로 이동'}
+            title="사이드바 토글"
           >
             <span className="w-5 h-5 text-blue-600"><Icon name="logo" size={20} /></span>
             {!sidebarCollapsed && <span className="font-semibold text-base2 text-zinc-800">AXPlain.ai</span>}
@@ -65,13 +65,6 @@ export function TopBar() {
             </button>
           )}
         </div>
-        {mode !== 'home' && mode !== 'newtask' && (
-          <button
-            onClick={() => setMode('home')}
-            className="btn-ghost btn-xs flex items-center gap-1 text-zinc-500 shrink-0"
-            title="홈으로 이동"
-          >← 홈</button>
-        )}
         <span className="text-md2 text-zinc-500 ml-2">
           {label}
           {showTaskName && active && (

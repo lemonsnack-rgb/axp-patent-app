@@ -1,179 +1,130 @@
 import { useState } from 'react';
-import { useStore, taskTypeMeta } from '../store';
-import { useToast } from '../components/Toast';
+import { useStore } from '../store';
 import type { TaskType } from '../types';
 import { Icon } from '../components/Icon';
 import clsx from 'clsx';
 
-const TYPES: { type: TaskType; title: string; desc: string; icon: any; color: string }[] = [
-  { type: 'spec',          title: '명세서',     desc: '직무발명서를 분석해 명세서 초안을 작성합니다.', icon: 'doc',    color: 'blue' },
-  { type: 'patent_search', title: '특허 검색', desc: '국내·해외 특허를 검색해 선행기술을 조사합니다.', icon: 'search', color: 'violet' },
-  { type: 'paper_search',  title: '논문 검색', desc: '학술 논문·저널을 검색해 참고문헌을 수집합니다.', icon: 'paper',  color: 'amber' },
+const TYPES: { type: TaskType; title: string; desc: string; icon: 'doc' | 'search' | 'paper'; color: string }[] = [
+  { type: 'spec',          title: '명세서',   desc: '직무발명서를 분석해 특허 명세서 초안을 작성합니다.', icon: 'doc',    color: 'blue' },
+  { type: 'patent_search', title: '특허 검색', desc: '국내·해외 특허를 검색해 선행기술을 조사합니다.',   icon: 'search', color: 'violet' },
+  { type: 'paper_search',  title: '논문 검색', desc: '학술 논문·저널을 검색해 참고문헌을 수집합니다.',   icon: 'paper',  color: 'amber' },
 ];
 
 const PLACEHOLDER: Record<TaskType, string> = {
-  spec:          '발명의 명칭을 입력하면 자동 반영됩니다',
-  patent_search: '검색식 일부가 자동 반영됩니다 (첫 검색 시)',
-  paper_search:  '검색식 일부가 자동 반영됩니다 (첫 검색 시)',
+  spec:          '예: 라이다 기반 실시간 3D 객체 인식 장치',
+  patent_search: '예: 자율주행 객체 인식 특허 검색',
+  paper_search:  '예: LiDAR 딥러닝 논문 리뷰',
 };
 
 export function NewTaskView() {
-  const { taskAdd, setActiveTaskId, setMode, projects, clients, contactByClient, tasks, projectAdd, clientAdd } = useStore();
-  const toast = useToast();
-  const [type, setType] = useState<TaskType | null>(null);
+  const { taskAdd, setActiveTaskId, setMode, tasks } = useStore();
+  const [selectedType, setSelectedType] = useState<TaskType | null>(null);
   const [name, setName] = useState('');
   const [techField, setTechField] = useState('');
-  const [projectId, setProjectId] = useState('');
-  const [clientId, setClientId] = useState('');
-  const [contactId, setContactId] = useState('');
+
+  const handleSelect = (type: TaskType) => {
+    setSelectedType(type);
+    setName('');
+    setTechField('');
+  };
 
   const submit = () => {
-    if (!type) return;
-    const meta = TYPES.find(t => t.type === type)!;
+    if (!selectedType) return;
+    const meta = TYPES.find(t => t.type === selectedType)!;
     const nt = taskAdd({
-      type,
+      type: selectedType,
       name: name.trim() || `새 ${meta.title}`,
       techField: techField.trim() || undefined,
-      folderId: projectId || undefined,
-      clientId: clientId || undefined,
-      contactId: contactId || undefined,
     });
     setActiveTaskId(nt.id);
-    setMode(nt.type === 'spec' ? 'spec' : 'search');
+    setMode(selectedType === 'spec' ? 'spec' : 'search');
   };
 
   const cancel = () => {
-    if (tasks.length > 0) {
-      const recent = [...tasks].sort((a, b) => b.updatedAt - a.updatedAt)[0];
-      setActiveTaskId(recent.id);
-      setMode(recent.type === 'spec' ? 'spec' : 'search');
+    const recentSpec = [...tasks]
+      .filter(t => t.type === 'spec')
+      .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+    if (recentSpec) {
+      setActiveTaskId(recentSpec.id);
+      setMode('spec');
     } else {
       setMode('home');
     }
   };
 
-  const quickAddProject = () => {
-    const n = prompt('새 프로젝트 이름:');
-    if (n?.trim()) {
-      const p = projectAdd({ name: n.trim(), color: '#1e5fa6' });
-      setProjectId(p.id);
-      toast.show(`프로젝트 추가: ${p.name}`);
-    }
-  };
-  const quickAddClient = () => {
-    const n = prompt('새 고객사 이름:');
-    if (!n?.trim()) return;
-    const industry = prompt('업종 (선택):') || '';
-    const c = clientAdd({ name: n.trim(), industry: industry || undefined });
-    setClientId(c.id);
-    toast.show(`고객사 추가: ${c.name}`);
-  };
-
-  const contacts = clientId ? contactByClient(clientId) : [];
-
   return (
     <div className="flex-1 overflow-y-auto scroll-thin flex flex-col items-center pt-16 pb-12 px-8 bg-zinc-50">
-      <div className="max-w-3xl w-full text-center mb-9">
-        <h2 className="text-h1 font-bold text-zinc-900 tracking-tight mb-2.5">어떤 작업을 시작하시겠어요?</h2>
-        <p className="text-lg2 text-zinc-500">작업 유형을 선택하세요. 작업 이름·프로젝트·고객사는 아래에서 지정할 수 있습니다.</p>
+      <div className="max-w-2xl w-full text-center mb-8">
+        <h2 className="text-h1 font-bold text-zinc-900 tracking-tight mb-2">새 작업 만들기</h2>
+        <p className="text-lg2 text-zinc-500">작업 유형을 선택하세요.</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 max-w-3xl w-full mb-6">
-        {TYPES.map(t => (
-          <button
-            key={t.type}
-            onClick={() => setType(t.type)}
-            className={clsx(
-              'flex flex-row items-center sm:flex-col sm:items-start gap-3 p-4 sm:p-5 bg-white rounded-xl text-left border transition-all duration-200 sm:min-h-[140px] active:scale-[0.98] shadow-card',
-              type === t.type
-                ? 'border-brand-400 bg-brand-50 shadow-[0_0_0_2px_rgba(59,142,245,0.2)]'
-                : 'border-neutral-150 hover:border-brand-200 hover:-translate-y-px hover:shadow-card-hover',
-            )}
-          >
-            <span className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg shrink-0 flex items-center justify-center bg-${t.color}-50 text-${t.color}-700`}>
-              <Icon name={t.icon} size={24} />
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="text-base2 sm:text-lg2 font-bold text-neutral-700">{t.title}</div>
-              <div className="text-xs2 sm:text-sm2 text-neutral-400 leading-snug line-clamp-2">{t.desc}</div>
-            </div>
-          </button>
-        ))}
-      </div>
-
-      {/* 최근 작업 — 빈 공간 활용 (작업 미선택 시 표시) */}
-      {!type && tasks.length > 0 && (
-        <div className="max-w-3xl w-full mt-6">
-          <p className="text-sm2 font-semibold text-zinc-500 mb-3">최근 작업</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {tasks.slice(0, 3).map(t => {
-              const meta = taskTypeMeta(t.type);
-              return (
-                <button key={t.id} onClick={() => {
-                  setActiveTaskId(t.id);
-                  setMode(t.type === 'spec' ? 'spec' : 'search');
-                }} className="card p-3.5 text-left hover:border-blue-400 hover:-translate-y-0.5 hover:shadow-card-hover active:scale-[0.98] transition-all">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <Icon name={meta.icon} size={14} className={`text-${meta.color}-600`} />
-                    <span className={`text-xs2 px-1.5 py-0.5 rounded-full font-medium bg-${meta.color}-50 text-${meta.color}-700`}>{meta.label}</span>
-                  </div>
-                  <p className="text-sm2 font-semibold text-zinc-800 truncate">{t.name}</p>
-                  <p className="text-xs2 text-zinc-400 mt-0.5">{t.updatedAt && isFinite(t.updatedAt) ? new Date(t.updatedAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }) + ' 수정' : '날짜 없음'}</p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {type && (
-        <div className="card max-w-[760px] w-full p-5 animate-fade-up">
-          <Field label="작업 이름 (선택)">
-            <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder={PLACEHOLDER[type]} maxLength={80} autoFocus />
-            <div className="text-xs2 text-zinc-400 mt-1">
-              {type === 'spec'
-                ? '발명의 명칭을 입력하면 명세서 작성 중 자동 반영됩니다.'
-                : '첫 검색 시 검색식 일부가 자동으로 반영됩니다.'}
-            </div>
-          </Field>
-          <Field label="기술분야 (선택)">
-            <input className="input" value={techField} onChange={e => setTechField(e.target.value)} placeholder="예: 자율주행 LIDAR, 무선통신, 의료영상" maxLength={60} />
-          </Field>
-          <Field label="프로젝트 (선택)">
-            <div className="flex gap-1.5">
-              <select className="input flex-1" value={projectId} onChange={e => setProjectId(e.target.value)}>
-                <option value="">— 프로젝트 미지정 —</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-              <button className="btn-outline btn-sm whitespace-nowrap" onClick={quickAddProject}>+ 새 프로젝트</button>
-            </div>
-          </Field>
-          <Field label="고객사 (선택)">
-            <div className="flex gap-1.5">
-              <select className="input flex-1" value={clientId} onChange={e => { setClientId(e.target.value); setContactId(''); }}>
-                <option value="">— 미지정 —</option>
-                {clients.map(c => <option key={c.id} value={c.id}>{c.name}{c.industry ? ` · ${c.industry}` : ''}</option>)}
-              </select>
-              <button className="btn-outline btn-sm whitespace-nowrap" onClick={quickAddClient}>+ 새로 추가</button>
-            </div>
+      {/* 작업 유형 카드 */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl w-full mb-5">
+        {TYPES.map(t => {
+          const isSelected = selectedType === t.type;
+          return (
             <button
-              onClick={() => setMode('clients')}
-              className="text-xs2 text-blue-500 hover:text-blue-700 hover:underline mt-1 self-start"
+              key={t.type}
+              onClick={() => handleSelect(t.type)}
+              className={clsx(
+                'relative flex flex-col items-start gap-3 p-5 bg-white rounded-xl text-left border-2 transition-all duration-200 shadow-card min-h-[130px]',
+                isSelected
+                  ? 'border-brand-400 bg-brand-50 shadow-[0_0_0_3px_rgba(59,142,245,0.12)] active:scale-[0.99]'
+                  : 'border-zinc-200 hover:border-zinc-300 hover:shadow-card-hover active:scale-[0.98]',
+              )}
             >
-              고객사 관리 →
+              {isSelected && (
+                <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-brand-400 flex items-center justify-center shrink-0">
+                  <svg viewBox="0 0 10 10" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" width="10" height="10">
+                    <polyline points="1.5,5 4,7.5 8.5,2.5"/>
+                  </svg>
+                </span>
+              )}
+              <span className={`w-11 h-11 rounded-lg flex items-center justify-center bg-${t.color}-50 text-${t.color}-600`}>
+                <Icon name={t.icon} size={22} />
+              </span>
+              <div>
+                <div className="text-base2 font-bold text-zinc-800 mb-0.5">{t.title}</div>
+                <div className="text-xs2 text-zinc-400 leading-snug">{t.desc}</div>
+              </div>
             </button>
+          );
+        })}
+      </div>
+
+      {/* 입력 폼 */}
+      {selectedType && (
+        <div className="card max-w-2xl w-full p-5 animate-fade-up">
+          <Field label="작업 이름 (선택)">
+            <input
+              className="input"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder={PLACEHOLDER[selectedType]}
+              maxLength={80}
+              autoFocus
+            />
+            {selectedType === 'spec' && (
+              <div className="text-xs2 text-zinc-400 mt-1">
+                발명의 명칭을 입력하면 명세서 작성 중 자동 반영됩니다.
+              </div>
+            )}
           </Field>
-          {clientId && (
-            <Field label="담당자 (선택)">
-              <select className="input" value={contactId} onChange={e => setContactId(e.target.value)}>
-                <option value="">— 미지정 —</option>
-                {contacts.map(c => <option key={c.id} value={c.id}>{c.name}{c.role ? ` · ${c.role}` : ''}</option>)}
-              </select>
+          {selectedType === 'spec' && (
+            <Field label="기술분야 (선택)">
+              <input
+                className="input"
+                value={techField}
+                onChange={e => setTechField(e.target.value)}
+                placeholder="예: 자율주행 LIDAR, 무선통신, 의료영상"
+                maxLength={60}
+              />
             </Field>
           )}
           <div className="flex justify-end gap-2 mt-3 pt-3.5 border-t border-zinc-100">
             <button className="btn-outline btn-sm" onClick={cancel}>취소</button>
-            <button className="btn-primary btn-sm" disabled={!type} onClick={submit}>작업 만들기</button>
+            <button className="btn-primary btn-sm" onClick={submit}>작업 만들기</button>
           </div>
         </div>
       )}

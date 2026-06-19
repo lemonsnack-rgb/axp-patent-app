@@ -1,12 +1,66 @@
 // src/features/spec/mockAiService.ts
-import type { InventionInput, SpecComponentItem, SpecDrawingItem, IndependentClaimSet } from './types';
+import type { InventionInput, SpecComponentItem, SpecDrawingItem, IndependentClaimSet, TitleCandidate, InventionDescription } from './types';
 
-export function generateTitleCandidates(input: InventionInput): string[] {
-  const { title, field } = input;
+export function generateTitleCandidates(input: InventionInput): TitleCandidate[] {
+  const { title } = input;
+  const f = input.field || '기술';
   return [
-    `${field} 기반 ${title} 장치 및 방법`,
-    `인공지능을 이용한 ${title} 시스템`,
-    `${title}을 위한 ${field} 처리 방법`,
+    {
+      id: 't1',
+      title: `${f} 기반 ${title} 장치 및 방법`,
+      abstract: `본 발명은 ${f} 환경에서 ${title}을 수행하는 장치 및 방법에 관한 것으로, 처리 효율 향상 및 정확도 개선을 목적으로 한다.`,
+      sel: false,
+    },
+    {
+      id: 't2',
+      title: `인공지능을 이용한 ${title} 시스템`,
+      abstract: `딥러닝 및 인공지능 기술을 활용하여 ${title}을 자동화하는 시스템으로, 기존 방식 대비 성능을 향상시킨 발명이다.`,
+      sel: false,
+    },
+    {
+      id: 't3',
+      title: `${title}을 위한 ${f} 처리 방법`,
+      abstract: `${f} 기반의 처리 파이프라인을 통해 ${title}을 효율적으로 수행하는 방법으로, 실시간 처리 및 다양한 환경 적용이 가능하다.`,
+      sel: false,
+    },
+  ];
+}
+
+export function generateDescriptionItems(input: InventionInput): InventionDescription[] {
+  const { title, content, problem } = input;
+  const field = input.field || '기술';
+  const excerpt = content.length > 60 ? content.slice(0, 60) + '…' : content;
+  return [
+    {
+      id: 'desc-p1',
+      type: 'proposed',
+      text: `본 발명은 ${field} 기반의 ${title}에 관한 것으로, ${excerpt}의 기술을 제안한다.`,
+      sel: true,
+    },
+    {
+      id: 'desc-p2',
+      type: 'proposed',
+      text: `제안 기술은 ${field} 환경에서 실시간 처리가 가능하며, 기존 대비 처리 속도 및 정확도가 향상된다.`,
+      sel: true,
+    },
+    {
+      id: 'desc-p3',
+      type: 'proposed',
+      text: `${problem ? problem : `${title}의 핵심 문제를 해결하기 위해`} 딥러닝 모델을 적용하여 자동화된 처리 파이프라인을 구성한다.`,
+      sel: false,
+    },
+    {
+      id: 'desc-r1',
+      type: 'prior',
+      text: `종래의 ${field} 기술은 수동 처리 방식에 의존하여 처리 속도가 느리고 오류율이 높은 문제가 있었다.`,
+      sel: true,
+    },
+    {
+      id: 'desc-r2',
+      type: 'prior',
+      text: `기존 ${title} 시스템은 특정 환경에만 제한적으로 동작하여 범용성이 부족하다는 단점이 있었다.`,
+      sel: true,
+    },
   ];
 }
 
@@ -14,7 +68,8 @@ export function generateDescriptionSection(
   sectionKey: 'tech' | 'bg' | 'problem' | 'effect',
   input: InventionInput,
 ): string {
-  const { title, field, content, problem } = input;
+  const { title, content, problem } = input;
+  const field = input.field || '기술';
   const map: Record<string, string> = {
     tech:    `본 발명은 ${field}에 관한 것으로, 보다 구체적으로는 ${title}에 관한 것이다.\n\n${content.slice(0, 120)}`,
     bg:      `${field} 분야에서 기존 방법은 여러 한계가 있었다.\n\n특히 ${problem || '처리 효율 및 정확도 측면에서 문제점이 있었다.'}`,
@@ -25,7 +80,8 @@ export function generateDescriptionSection(
 }
 
 export function generateComponentCandidates(input: InventionInput): SpecComponentItem[] {
-  const { title, field, content } = input;
+  const { title, content } = input;
+  const field = input.field || '기술';
   const base = [
     { text: `입력부: ${field} 환경에서 외부 데이터를 수신하여 처리 파이프라인에 전달`, englishName: 'input unit', definition: `${field} 환경에서 외부 신호 또는 데이터를 수신하여 내부 처리 파이프라인에 전달하는 구성요소`, parent: `데이터 처리 시스템 / data processing system` },
     { text: `전처리부: 수신된 데이터에 대한 전처리 및 정규화를 수행`, englishName: 'preprocessing unit', definition: '수신된 원시 데이터의 노이즈 제거, 정규화, 변환 등의 전처리 과정을 수행하는 구성요소', parent: `데이터 처리 시스템 / data processing system` },
@@ -47,7 +103,8 @@ export function generateIndependentClaimSets(
   input: InventionInput,
   components: SpecComponentItem[],
 ): IndependentClaimSet[] {
-  const { title, field } = input;
+  const { title } = input;
+  const field = input.field || '기술';
   const selComps = components.filter(c => c.sel).slice(0, 3);
   const compNames = selComps.map(c => c.text.split(':')[0]).join(', ');
 

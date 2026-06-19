@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+import forms from '@tailwindcss/forms'
+
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   safelist: [
@@ -96,5 +98,5 @@ export default {
       },
     },
   },
-  plugins: [require('@tailwindcss/forms')({ strategy: 'class' })],
+  plugins: [forms({ strategy: 'class' })],
 }

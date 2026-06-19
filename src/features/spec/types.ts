@@ -19,6 +19,21 @@ export interface IndependentClaimSet {
   claims: Claim[]; // 2~3개, 기본: machine + process 쌍
 }
 
+// ── 명칭 후보 / 설명 항목 타입 ───────────────────────────────────────────────
+export interface TitleCandidate {
+  id: string;
+  title: string;
+  abstract: string;
+  sel: boolean;
+}
+
+export interface InventionDescription {
+  id: string;
+  type: 'proposed' | 'prior';
+  text: string;
+  sel: boolean;
+}
+
 // ── 기타 타입 ────────────────────────────────────────────────────────────────
 export interface SpecComponentItem {
   id: number;
@@ -78,7 +93,8 @@ export interface SpecAnalysisState {
   diProblem: string;
   diKeywords: string;
   uploadedFileName?: string;
-  titleCandidates: string[];
+  titleCandidates: TitleCandidate[];
+  descriptionItems?: InventionDescription[];
   componentItems: SpecComponentItem[];
   drawings: SpecDrawingItem[];
   claimsState?: SpecClaimsState;

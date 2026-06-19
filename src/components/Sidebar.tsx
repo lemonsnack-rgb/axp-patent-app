@@ -19,9 +19,6 @@ export function Sidebar() {
   const [taskFilter, setTaskFilter] = useState<'all' | 'fav'>('all');
   const [search, setSearch] = useState('');
   const [menuFor, setMenuFor] = useState<string | null>(null);
-  const [taskSearchOpen, setTaskSearchOpen] = useState(false);
-  const [taskSearchQuery, setTaskSearchQuery] = useState('');
-  const [taskSearchType, setTaskSearchType] = useState('all');
   const [renameState, setRenameState] = useState<{ open: boolean; taskId: string; current: string }>({ open: false, taskId: '', current: '' });
   const [deleteState, setDeleteState] = useState<{ open: boolean; taskId: string; taskName: string }>({ open: false, taskId: '', taskName: '' });
 
@@ -39,7 +36,9 @@ export function Sidebar() {
 
   const isActive = (k: string) => mode === k || (k === 'home' && mode === 'project');
 
-  const sorted = [...tasks].sort((a, b) => b.updatedAt - a.updatedAt);
+  const sorted = [...tasks]
+    .filter(t => t.type === 'spec')
+    .sort((a, b) => b.updatedAt - a.updatedAt);
   let list: Task[];
   if (search) {
     const s = search.toLowerCase();
@@ -61,111 +60,9 @@ export function Sidebar() {
         'max-md:z-30',
       )}
     >
-      {/* 작업 검색 오버레이 */}
-      {taskSearchOpen && (
-        <div className="absolute inset-0 z-30 bg-white flex flex-col">
-          {/* 헤더 */}
-          <div className="flex items-center gap-2 px-3 py-2 border-b border-zinc-200 shrink-0">
-            <span className="text-sm font-semibold flex-1">작업 검색</span>
-            <button
-              onClick={() => setTaskSearchOpen(false)}
-              className="text-zinc-400 hover:text-zinc-700 w-6 h-6 flex items-center justify-center rounded"
-              aria-label="닫기"
-            >
-              <Icon name="close" size={14} />
-            </button>
-          </div>
-          {/* 검색 입력 */}
-          <div className="px-3 py-2 border-b border-zinc-200 shrink-0 space-y-1.5">
-            <div className="relative">
-              <Icon name="search" size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
-              <input
-                autoFocus
-                type="text"
-                value={taskSearchQuery}
-                onChange={e => setTaskSearchQuery(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Escape') setTaskSearchOpen(false); }}
-                placeholder="작업 이름 검색..."
-                className="w-full pl-7 pr-3 py-1.5 text-xs border border-zinc-200 rounded-lg bg-zinc-50 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
-              />
-            </div>
-            <div className="flex gap-1 flex-wrap">
-              {[
-                { id: 'all', label: '전체' },
-                { id: 'spec', label: '명세서' },
-                { id: 'patent_search', label: '특허 검색' },
-                { id: 'paper_search', label: '논문 검색' },
-              ].map(f => (
-                <button
-                  key={f.id}
-                  onClick={() => setTaskSearchType(f.id)}
-                  className={clsx(
-                    'text-xs2 px-2 py-0.5 rounded-full border transition-colors',
-                    taskSearchType === f.id
-                      ? 'bg-brand-400 text-white border-blue-600'
-                      : 'border-zinc-200 text-zinc-500 hover:border-blue-400'
-                  )}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          {/* 결과 */}
-          <div className="flex-1 overflow-y-auto scroll-thin py-1">
-            {(() => {
-              const q = taskSearchQuery.toLowerCase();
-              const filtered = tasks.filter(t => {
-                if (q && !t.name.toLowerCase().includes(q)) return false;
-                if (taskSearchType !== 'all' && t.type !== taskSearchType) return false;
-                return true;
-              });
-              if (filtered.length === 0) {
-                return (
-                  <EmptyState
-                    compact
-                    title="검색 결과 없음"
-                    action={(taskSearchQuery || taskSearchType !== 'all') ? (
-                      <button onClick={() => { setTaskSearchQuery(''); setTaskSearchType('all'); }} className="text-xs text-blue-500 hover:underline">필터 초기화</button>
-                    ) : undefined}
-                  />
-                );
-              }
-              return filtered.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => {
-                    setActiveTaskId(t.id);
-                    setMode(t.type === 'spec' ? 'spec' : 'search');
-                    setTaskSearchOpen(false);
-                  }}
-                  className={clsx(
-                    'w-full text-left px-3 py-2 hover:bg-zinc-50 transition-colors flex items-center gap-2',
-                    t.id === activeTaskId && 'bg-blue-50'
-                  )}
-                >
-                  {t.favorite && <span className="text-amber-400 text-xs leading-none shrink-0">★</span>}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate text-zinc-800">{t.name}</p>
-                    <p className="text-xs2 text-zinc-400">
-                      {t.type === 'spec' ? '명세서' : t.type === 'patent_search' ? '특허 검색' : '논문 검색'}
-                    </p>
-                  </div>
-                </button>
-              ));
-            })()}
-          </div>
-          <div className="px-3 py-1.5 border-t border-zinc-100 shrink-0">
-            <p className="text-xs2 text-zinc-400">총 {tasks.length}개 작업</p>
-          </div>
-        </div>
-      )}
-
       <nav className="p-2 flex flex-col gap-0.5">
-        <NavItem icon="edit"    label="새 작업"    active={isActive('newtask')} collapsed={sidebarCollapsed} onClick={() => setMode('newtask')} primary />
-        <NavItem icon="folder"  label="프로젝트"   active={isActive('home')}    collapsed={sidebarCollapsed} onClick={() => setMode('home')} />
+        <NavItem icon="edit"    label="새 작업"   active={isActive('newtask')} collapsed={sidebarCollapsed} onClick={() => setMode('newtask')} primary />
         <NavItem icon="library" label="라이브러리" active={isActive('library')} collapsed={sidebarCollapsed} onClick={() => setMode('library')} />
-        <NavItem icon="search"  label="작업 검색"  active={taskSearchOpen}   collapsed={sidebarCollapsed} onClick={() => { setTaskSearchOpen(true); setTaskSearchQuery(''); setTaskSearchType('all'); }} />
       </nav>
 
       {!sidebarCollapsed && (
@@ -207,6 +104,10 @@ export function Sidebar() {
                 t={t}
                 active={t.id === activeTaskId}
                 onSelect={() => {
+                  if (t.type === 'patent_search' || t.type === 'paper_search') {
+                    toast.show('준비 중입니다. 추후 오픈될 예정입니다.');
+                    return;
+                  }
                   setActiveTaskId(t.id);
                   setMode(t.type === 'spec' ? 'spec' : 'search');
                 }}
@@ -227,19 +128,10 @@ export function Sidebar() {
       )}
 
       <div className={clsx('mt-auto border-t border-zinc-100', sidebarCollapsed ? 'p-2' : 'p-3')}>
-        <button className={clsx('flex items-center gap-2 w-full px-2 py-1.5 rounded-md hover:bg-zinc-100 active:scale-[0.98] transition-all text-md2 text-zinc-700', sidebarCollapsed && 'justify-center')}
-          title="고객사"
-          onClick={() => setMode('clients')}>
-          <Icon name="user" size={16} />
-          {!sidebarCollapsed && <span>고객사</span>}
-        </button>
         {!sidebarCollapsed && (
           <div className="flex items-center gap-2 px-2 py-1.5 mt-1">
-            <span className="w-7 h-7 rounded-full bg-brand-400 text-white text-xs2 font-semibold flex items-center justify-center">P</span>
-            <div>
-              <div className="text-md2 text-zinc-800">왕일</div>
-              <div className="text-xs2 text-zinc-400">muhayu</div>
-            </div>
+            <span className="w-7 h-7 rounded-full bg-brand-400 text-white text-xs2 font-semibold flex items-center justify-center">왕</span>
+            <div className="text-md2 text-zinc-800">왕일</div>
           </div>
         )}
       </div>
@@ -322,10 +214,19 @@ function TaskRow({ t, active, onSelect, onToggleFav, menuOpen, onMenuToggle, onR
         <Icon name={meta.icon} size={13} />
       </span>
       <span className="flex-1 min-w-0">
-        <div className={clsx('text-md2 font-medium leading-tight truncate', active ? 'text-brand-400' : 'text-zinc-800')}>
-          {t.name}
+        <div className="flex items-center gap-1 min-w-0">
+          <span className={clsx('text-md2 font-medium leading-tight truncate', active ? 'text-brand-400' : 'text-zinc-800')}>
+            {t.name}
+          </span>
+          {(t.name === '직무발명서' || t.name === '새 명세서') && (
+            <span className="shrink-0 text-[10px] px-1 py-px bg-zinc-100 text-zinc-400 rounded font-medium">미지정</span>
+          )}
         </div>
-        <div className="text-xs2 text-zinc-400 mt-0.5">{meta.label} · {ago}</div>
+        <div className="text-xs2 text-zinc-400 mt-0.5 truncate">
+          {t.techField
+            ? <><span className="text-zinc-500 font-medium">{t.techField}</span> · {ago}</>
+            : ago}
+        </div>
       </span>
       <button
         onClick={(e) => { e.stopPropagation(); onMenuToggle(); }}

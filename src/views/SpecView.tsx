@@ -17,16 +17,17 @@ import {
   generateTitleCandidates,
   generateComponentCandidates,
   generateIndependentClaimSets,
+  generateDescriptionItems,
 } from '../features/spec/mockAiService';
-import type { SpecAnalysisResult, SpecAnalysisState } from '../features/spec/types';
+import type { SpecAnalysisResult, SpecAnalysisState, TitleCandidate, InventionDescription } from '../features/spec/types';
 import { loadSpecState, saveSpecState } from '../features/spec/specStore';
 import { analyzePromptClarity, generateIntentOptions, generateMockModification } from '../features/ai/clarityAnalyzer';
 
 type StepId = 'upload' | 'title' | 'description' | 'components' | 'drawings' | 'claims';
 const STEPS: { id: StepId; num: number; short: string }[] = [
   { id: 'upload', num: 1, short: '시작' },
-  { id: 'title', num: 2, short: '명칭' },
-  { id: 'description', num: 3, short: '설명' },
+  { id: 'description', num: 2, short: '설명' },
+  { id: 'title', num: 3, short: '명칭' },
   { id: 'components', num: 4, short: '구성요소' },
   { id: 'drawings', num: 5, short: '도면' },
   { id: 'claims', num: 6, short: '청구항' },
@@ -42,9 +43,9 @@ const CONFIRM_LABEL: Partial<Record<StepId, string>> = {
   claims: '청구항 선택 완료',
 };
 const AI_NEXT: Record<StepId, string> = {
-  upload: '업로드하신 문서를 분석했습니다. 발명의 명칭 후보를 생성합니다.',
-  title: '발명 명칭을 확정했습니다. 발명의 설명 항목을 분석합니다.',
-  description: '설명 항목을 확정했습니다. 발명의 구성요소를 추출합니다.',
+  upload: '업로드하신 문서를 분석했습니다. 발명의 설명 항목을 분석합니다.',
+  description: '설명 항목을 확정했습니다. 발명의 명칭 후보를 생성합니다.',
+  title: '발명 명칭을 확정했습니다. 발명의 구성요소를 추출합니다.',
   components: '구성요소를 확정했습니다. 업로드된 도면을 분석합니다.',
   drawings: '도면을 확정했습니다. 청구항을 생성합니다.',
   claims: '청구항을 확정했습니다. 명세서 초안을 생성할 준비가 완료되었습니다.',
@@ -74,10 +75,6 @@ export function SpecView() {
   const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
   const [specFocusCtx, setSpecFocusCtx] = useState<FocusCtx | null>(null);
   const guidePanelInputRef = useRef<HTMLTextAreaElement>(null);
-  const [descMode] = useState<string>('view');
-  const [descSubInfo, setDescSubInfo] = useState<{
-    subStep: number; currentLabel: string; allDone: boolean; doConfirm: (() => void) | null;
-  }>({ subStep: 0, currentLabel: '기술분야', allDone: false, doConfirm: null });
   const [confirmedComponents, setConfirmedComponents] = useState<InventionComponent[]>([
     { number: '100', name: '데이터 수집부' },
     { number: '200', name: '전처리부' },
@@ -104,7 +101,12 @@ export function SpecView() {
   const [sourceDataOpen, setSourceDataOpen] = useState(false);
 
   // AI 분석 생성 후보 (mockAiService 연결)
-  const [titleCandidates, setTitleCandidates] = useState<string[]>(savedSpec?.titleCandidates ?? []);
+  const [titleCandidates, setTitleCandidates] = useState<TitleCandidate[]>(
+    (savedSpec?.titleCandidates as TitleCandidate[] | undefined) ?? []
+  );
+  const [descriptionItems, setDescriptionItems] = useState<InventionDescription[]>(
+    (savedSpec?.descriptionItems as InventionDescription[] | undefined) ?? []
+  );
   const [aiComponents, setAiComponents] = useState<{ id: number; text: string; sel: boolean; num: string; depth: number }[]>(
     (savedSpec?.componentItems as { id: number; text: string; sel: boolean; num: string; depth: number }[]) ?? []
   );
@@ -131,6 +133,7 @@ export function SpecView() {
         gSel: gSel as SpecAnalysisState['gSel'],
         diTitle, diField, diContent, diProblem, diKeywords,
         titleCandidates,
+        descriptionItems,
         componentItems: aiComponents as SpecAnalysisState['componentItems'],
         mainView,
       });
@@ -138,7 +141,19 @@ export function SpecView() {
     }, 400);
     return () => { if (flowSaveTimerRef.current) clearTimeout(flowSaveTimerRef.current); };
   }, [phase, curStep, confirmed, gSel, diTitle, diField, diContent,
-      diProblem, diKeywords, titleCandidates, aiComponents, mainView, task?.id]);
+      diProblem, diKeywords, titleCandidates, descriptionItems, aiComponents, mainView, task?.id]);
+
+  // descriptionItems 변경 시 gSel['description'] 동기화
+  useEffect(() => {
+    const selected = descriptionItems.filter(i => i.sel);
+    const proposed = selected.filter(i => i.type === 'proposed');
+    const prior = selected.filter(i => i.type === 'prior');
+    const parts: string[] = [];
+    if (proposed.length > 0) parts.push('【제안기술】\n' + proposed.map(i => '- ' + i.text).join('\n'));
+    if (prior.length > 0) parts.push('【종래기술】\n' + prior.map(i => '- ' + i.text).join('\n'));
+    const val = parts.join('\n\n');
+    setGSel(p => p.description === val ? p : { ...p, description: val });
+  }, [descriptionItems]);
 
   // U7: 분석 진행 중 이탈 확인
   useEffect(() => {
@@ -153,7 +168,7 @@ export function SpecView() {
 
   const si = (id: StepId) => STEPS.findIndex(s => s.id === id);
   const isSpecialStep = (id: StepId) =>
-    id === 'description' || id === 'components' || id === 'drawings' || id === 'claims';
+    id === 'components' || id === 'drawings' || id === 'claims';
   const isVisible = (id: StepId) => {
     if (id === 'upload') return true;
     if (phase === 'upload' || phase === 'direct') return false;
@@ -167,6 +182,7 @@ export function SpecView() {
     setConfirmed({});
     setGSel({});
     setTitleCandidates([]);
+    setDescriptionItems([]);
     setAiComponents([]);
     if (task?.id) {
       saveSpecState(task.id, {
@@ -205,13 +221,15 @@ export function SpecView() {
     setTimeout(() => setLoadingStage(3), 1000);
     setTimeout(() => {
       const comps = generateComponentCandidates(input);
+      const descItems = generateDescriptionItems(input);
       setTitleCandidates(generateTitleCandidates(input));
+      setDescriptionItems(descItems);
       setAiComponents(comps);
       setConfirmed({});
       setGSel({});
       setPhase('flow');
-      setCurStep('title');
-      setGuideStep('title');
+      setCurStep('description');
+      setGuideStep('description');
       setAnalyzing(false);
       setLoadingStage(0);
       if (task?.id && title && (!task.name || task.name === '새 명세서' || task.name === '새 작업')) {
@@ -552,28 +570,26 @@ export function SpecView() {
                               업로드 내용을 기반으로 {STEP_LABEL[s.id]} 후보를 생성했습니다. 아래에서 선택하거나 직접 입력하세요.</>
                             )
                           } />
-                          {/* 현재 단계 후보 카드 인라인 — 비특수 단계만 */}
-                          {s.id === guideStep && !isDone && !isSpecialStep(s.id) && (
-                            <InlineCandidateCards
-                              stepId={s.id}
-                              cands={(s.id === 'title' ? (titleCandidates.length > 0 ? titleCandidates : undefined) : undefined) || GUIDE_CANDS[s.id] || []}
+                          {/* 현재 단계 후보 카드 인라인 */}
+                          {s.id === guideStep && !isDone && s.id === 'title' && (
+                            <TitleCandidateCards
+                              candidates={titleCandidates}
                               gSel={gSel}
                               setGSel={setGSel}
                               setFocusCtx={setSpecFocusCtx}
                               guidePanelInputRef={guidePanelInputRef}
                             />
                           )}
+                          {s.id === guideStep && !isDone && s.id === 'description' && (
+                            <DescriptionItemCards
+                              items={descriptionItems}
+                              onToggle={id => setDescriptionItems(prev => prev.map(i => i.id === id ? { ...i, sel: !i.sel } : i))}
+                              onAdd={(type, text) => setDescriptionItems(prev => [...prev, { id: `desc-custom-${Date.now()}`, type, text, sel: true }])}
+                            />
+                          )}
                           {/* 현재 단계 특수 패널 인라인 */}
                           {s.id === guideStep && !isDone && isSpecialStep(s.id) && (
                             <div className="mt-3">
-                              {s.id === 'description' && (
-                                <DescriptionPanel
-                                  onUpdate={v => setGSel(p => ({ ...p, description: v }))}
-                                  onSubInfoChange={setDescSubInfo}
-                                  onFocusContext={setSpecFocusCtx}
-                                  guidePanelInputRef={guidePanelInputRef}
-                                />
-                              )}
                               {s.id === 'components' && (
                                 <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2 ml-1.5">
                                   <div className="rounded-xl border-2 border-zinc-200 bg-white p-3">
@@ -745,12 +761,6 @@ export function SpecView() {
                 )}
                 {doneCount >= 5 ? (
                   <button onClick={() => handleSetMainView('editor')} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 transition-colors">명세서 초안 편집 →</button>
-                ) : guideStep === 'description' ? (
-                  descSubInfo.allDone ? (
-                    <button onClick={() => confirm('description')} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 transition-colors">다음 →</button>
-                  ) : (
-                    <button onClick={() => descSubInfo.doConfirm?.()} disabled={descMode === 'prompt' || descMode === 'diff'} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 disabled:opacity-40 transition-colors">다음 →</button>
-                  )
                 ) : !isSpecialStep(guideStep) ? (
                   <button onClick={() => { const cur = gSel[guideStep]; if (cur?.trim()) confirm(guideStep); }} disabled={!gSel[guideStep]?.trim()} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 disabled:opacity-40 transition-colors">다음 →</button>
                 ) : (
@@ -856,98 +866,220 @@ type GuideChatMsg = {
   applied?: boolean;
 };
 
-// ── 본문 인라인 후보 카드 ─────────────────────────────────────────
-function InlineCandidateCards({
-  stepId, cands, gSel, setGSel, setFocusCtx, guidePanelInputRef,
+// ── 발명의 명칭 후보 카드 (title + abstract) ──────────────────────
+function TitleCandidateCards({
+  candidates, gSel, setGSel, setFocusCtx, guidePanelInputRef,
 }: {
-  stepId: StepId;
-  cands: string[];
+  candidates: TitleCandidate[];
   gSel: Partial<Record<StepId, string>>;
   setGSel: React.Dispatch<React.SetStateAction<Partial<Record<StepId, string>>>>;
   setFocusCtx: (ctx: FocusCtx | null) => void;
   guidePanelInputRef: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const letters = ['A', 'B', 'C', 'D', 'E'];
-  const curSel = gSel[stepId] || cands[0] || '';
-  const [editVals, setEditVals] = useState<Record<number, string>>({});
+  const curSel = gSel['title'] || '';
+  const [titleEdits, setTitleEdits] = useState<Record<string, string>>({});
+  const [abstractEdits, setAbstractEdits] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (!gSel[stepId] && cands[0]) {
-      setGSel(p => ({ ...p, [stepId]: cands[0] }));
+    if (!gSel['title'] && candidates[0]) {
+      setGSel(p => ({ ...p, title: candidates[0].title }));
     }
-  }, [stepId, cands[0]]);
+  }, [candidates.length]);
 
-  const getCardVal = (i: number) => editVals[i] ?? cands[i];
+  const isFromCandidates = (val: string) =>
+    candidates.some(c => (titleEdits[c.id] ?? c.title) === val || c.title === val);
 
-  const selectCard = (i: number) => {
-    const cardVal = getCardVal(i);
-    setGSel(p => ({ ...p, [stepId]: cardVal }));
-    setFocusCtx({ text: cardVal, label: STEP_LABEL[stepId] || stepId, apply: (newText) => { setEditVals(prev => ({ ...prev, [i]: newText })); setGSel(p => ({ ...p, [stepId]: newText })); } });
-  };
-  const requestAI = (i: number) => {
-    selectCard(i);
+  const requestAI = (text: string, label: string, applyFn: (t: string) => void) => {
+    setFocusCtx({ text, label, apply: applyFn });
     setTimeout(() => guidePanelInputRef.current?.focus(), 50);
   };
 
   return (
     <div className="space-y-2 mt-3">
-      {cands.map((c, i) => {
-        const cardVal = getCardVal(i);
+      {candidates.map((c, i) => {
+        const titleVal = titleEdits[c.id] ?? c.title;
+        const abstractVal = abstractEdits[c.id] ?? c.abstract;
         const letter = letters[i] || String(i + 1);
-        const isSelected = curSel === cardVal || curSel === c;
+        const isSelected = curSel === titleVal || curSel === c.title;
         return (
           <div
-            key={i}
-            onClick={() => selectCard(i)}
+            key={c.id}
+            onClick={() => setGSel(p => ({ ...p, title: titleVal }))}
             className={clsx(
               'rounded-xl border-2 p-3 cursor-pointer transition-all bg-white',
               isSelected && 'border-blue-600 bg-blue-50 shadow-sm',
               !isSelected && 'border-zinc-200 hover:border-blue-300 hover:bg-blue-50/30',
             )}
           >
-            <div className="flex items-center gap-2 mb-1.5">
+            {/* 카드 헤더 */}
+            <div className="flex items-center gap-2 mb-2">
               <span className={clsx(
                 'w-5 h-5 rounded-full text-xs2 font-bold flex items-center justify-center shrink-0',
                 isSelected ? 'bg-brand-400 text-white' : 'bg-gray-200 text-gray-500',
               )}>{letter}</span>
               {isSelected && <span className="text-xs2 text-blue-600 font-semibold">✓ 선택됨</span>}
-              <div className="ml-auto">
-                <button
-                  onClick={e => { e.stopPropagation(); requestAI(i); }}
-                  className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
-                >
-                  <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                  수정 요청
-                </button>
-              </div>
             </div>
-            <p className="text-sm2 font-semibold text-gray-800 leading-snug">{cardVal}</p>
+            {/* 명칭 행 */}
+            <div className="flex items-start gap-2 mb-1.5">
+              <div className="flex-1 min-w-0">
+                <span className="text-xs2 text-gray-400 font-medium block mb-0.5">명칭</span>
+                <p className="text-sm2 font-semibold text-gray-800 leading-snug">{titleVal}</p>
+              </div>
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  setGSel(p => ({ ...p, title: titleVal }));
+                  requestAI(titleVal, '발명의 명칭', (newText) => {
+                    setTitleEdits(prev => ({ ...prev, [c.id]: newText }));
+                    setGSel(p => ({ ...p, title: newText }));
+                  });
+                }}
+                className="shrink-0 flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors mt-4"
+              >
+                <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
+                수정
+              </button>
+            </div>
+            {/* 개요 행 */}
+            <div className="flex items-start gap-2 pt-1.5 border-t border-gray-100">
+              <div className="flex-1 min-w-0">
+                <span className="text-xs2 text-gray-400 font-medium block mb-0.5">개요</span>
+                <p className="text-xs2 text-gray-500 leading-relaxed">{abstractVal}</p>
+              </div>
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  requestAI(abstractVal, '개요', (newText) => {
+                    setAbstractEdits(prev => ({ ...prev, [c.id]: newText }));
+                  });
+                }}
+                className="shrink-0 flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors mt-4"
+              >
+                <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
+                수정
+              </button>
+            </div>
           </div>
         );
       })}
-
-      {/* 직접 입력 */}
       <div className={clsx(
         'rounded-xl border-2 p-3 bg-white transition-all',
-        !cands.includes(curSel) && curSel.trim() ? 'border-blue-600 bg-blue-50' : 'border-zinc-200',
+        !isFromCandidates(curSel) && curSel.trim() ? 'border-blue-600 bg-blue-50' : 'border-zinc-200',
       )}>
         <div className="flex items-center gap-2 mb-1.5">
           <span className="w-5 h-5 rounded-full text-xs2 font-bold flex items-center justify-center shrink-0 bg-gray-200 text-gray-500">
-            {letters[cands.length] || 'D'}
+            {letters[candidates.length] || 'D'}
           </span>
           <span className="text-xs2 text-gray-500 font-semibold">직접 입력</span>
         </div>
         <textarea
           className="w-full text-sm2 font-semibold bg-transparent outline-none resize-none"
-          style={{ color: !cands.includes(curSel) && curSel ? '#1f2937' : '#9ca3af', fontStyle: !cands.includes(curSel) && curSel ? 'normal' : 'italic' }}
-          placeholder={`${STEP_LABEL[stepId]}을 직접 입력하세요`}
-          value={cands.includes(curSel) ? '' : curSel}
-          onChange={e => setGSel(p => ({ ...p, [stepId]: e.target.value }))}
+          style={{
+            color: !isFromCandidates(curSel) && curSel ? '#1f2937' : '#9ca3af',
+            fontStyle: !isFromCandidates(curSel) && curSel ? 'normal' : 'italic',
+          }}
+          placeholder="발명의 명칭을 직접 입력하세요"
+          value={isFromCandidates(curSel) ? '' : curSel}
+          onChange={e => setGSel(p => ({ ...p, title: e.target.value }))}
           onClick={e => e.stopPropagation()}
           rows={2}
         />
       </div>
+    </div>
+  );
+}
 
+// ── 발명의 설명 항목 카드 (제안기술 / 종래기술 그룹) ──────────────────
+function DescriptionItemCards({
+  items, onToggle, onAdd,
+}: {
+  items: InventionDescription[];
+  onToggle: (id: string) => void;
+  onAdd: (type: 'proposed' | 'prior', text: string) => void;
+}) {
+  const proposed = items.filter(i => i.type === 'proposed');
+  const prior = items.filter(i => i.type === 'prior');
+  const [newTexts, setNewTexts] = useState({ proposed: '', prior: '' });
+
+  const addItem = (type: 'proposed' | 'prior') => {
+    const text = newTexts[type].trim();
+    if (!text) return;
+    onAdd(type, text);
+    setNewTexts(p => ({ ...p, [type]: '' }));
+  };
+
+  if (items.length === 0) {
+    return (
+      <div className="mt-3 text-center py-6 text-gray-400">
+        <p className="text-sm2">발명의 설명 항목을 생성 중입니다...</p>
+      </div>
+    );
+  }
+
+  const renderGroup = (label: string, accent: 'blue' | 'amber', type: 'proposed' | 'prior', groupItems: InventionDescription[]) => (
+    <div className="mb-4">
+      <div className={clsx(
+        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg mb-2 text-xs2 font-bold',
+        accent === 'blue' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700',
+      )}>
+        <span>{label}</span>
+        <span className="opacity-60 font-normal">{groupItems.filter(i => i.sel).length}/{groupItems.length} 선택</span>
+      </div>
+      <div className="space-y-2">
+        {groupItems.map(item => (
+          <div
+            key={item.id}
+            onClick={() => onToggle(item.id)}
+            className={clsx(
+              'rounded-xl border-2 p-3 cursor-pointer transition-all bg-white flex gap-3',
+              item.sel
+                ? (accent === 'blue' ? 'border-blue-500 bg-blue-50' : 'border-amber-400 bg-amber-50')
+                : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50',
+            )}
+          >
+            <div className={clsx(
+              'w-5 h-5 rounded flex items-center justify-center shrink-0 mt-0.5 border-2 transition-colors',
+              item.sel
+                ? (accent === 'blue' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-amber-500 border-amber-500 text-white')
+                : 'border-gray-300',
+            )}>
+              {item.sel && <Icon name="check" size={10} />}
+            </div>
+            <p className="text-sm2 text-gray-700 leading-relaxed">{item.text}</p>
+          </div>
+        ))}
+        {/* 직접 추가 */}
+        <div className={clsx(
+          'flex gap-2 items-center rounded-xl border-2 border-dashed p-2 transition-colors',
+          accent === 'blue' ? 'border-blue-200 focus-within:border-blue-400' : 'border-amber-200 focus-within:border-amber-400',
+        )}>
+          <input
+            type="text"
+            className="flex-1 text-sm2 bg-transparent outline-none px-1 text-gray-700 placeholder-gray-400"
+            placeholder="직접 추가..."
+            value={newTexts[type]}
+            onChange={e => setNewTexts(p => ({ ...p, [type]: e.target.value }))}
+            onKeyDown={e => { if (e.key === 'Enter') addItem(type); }}
+            onClick={e => e.stopPropagation()}
+          />
+          <button
+            onClick={e => { e.stopPropagation(); addItem(type); }}
+            disabled={!newTexts[type].trim()}
+            className={clsx(
+              'shrink-0 text-xs2 font-semibold px-2.5 py-1 rounded-lg transition-colors disabled:opacity-40',
+              accent === 'blue' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : 'bg-amber-100 text-amber-700 hover:bg-amber-200',
+            )}
+          >추가</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="mt-3">
+      {renderGroup('제안기술', 'blue', 'proposed', proposed)}
+      {renderGroup('종래기술', 'amber', 'prior', prior)}
     </div>
   );
 }
@@ -2180,102 +2312,4 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
   );
 }
 
-// ── 발명의 설명 패널 — 섹션별 1개 생성, 편집/프롬프트 수정/Diff 채택 ──
-const DESC_SECTIONS: { key: string; label: string; badge2?: string; text: string }[] = [
-  {
-    key: 'tech', label: '기술분야',
-    text: '본 발명은 자율주행 기술에 관한 것으로, 보다 구체적으로는 라이다(LiDAR) 센서 데이터를 활용한 실시간 3D 객체 인식 장치 및 방법에 관한 것이다. 특히, 포인트 클라우드 데이터의 효율적인 전처리와 딥러닝 기반 객체 탐지를 결합하여 자율주행 환경에서의 안전성을 향상시키는 기술에 관한 것이다.',
-  },
-  {
-    key: 'bg', label: '배경기술', badge2: '선행기술 3건 기반',
-    text: '자율주행 차량에서 주변 환경 인식은 안전한 주행을 위한 핵심 기술이다. 기존의 카메라 기반 인식 방법은 조명 조건에 민감하고 거리 정보가 부정확한 한계가 있다. 이에 라이다 센서를 활용한 3D 인식 기술이 주목받고 있으나, 기존 복셀(Voxel) 기반 처리 방식은 연산량이 많아 실시간 처리에 어려움이 있으며, 포인트 단위 처리 방식은 근거리·원거리 객체 간 밀도 차이로 인해 탐지 정확도가 불균일한 문제가 있다.',
-  },
-  {
-    key: 'problem', label: '해결하려는 과제',
-    text: '본 발명은 상기와 같은 문제점을 해결하기 위해 안출된 것으로, 라이다 포인트 클라우드 데이터를 효율적으로 전처리하여 실시간 처리 속도를 확보하면서도, 근거리·원거리 객체 모두에 대해 높은 탐지 정확도를 달성할 수 있는 3D 객체 인식 장치 및 방법을 제공하는 것을 목적으로 한다.',
-  },
-  {
-    key: 'effect', label: '발명의 효과',
-    text: '본 발명에 의하면, 딥러닝 기반의 포인트 클라우드 처리를 통해 기존 방식 대비 처리 속도가 40% 향상되고, 객체 인식 정확도가 95% 이상 달성된다. 또한, 야간 및 악천후 환경에서도 안정적인 객체 인식 성능을 유지할 수 있으며, 다양한 자율주행 플랫폼에 적용 가능하다.',
-  },
-];
-
-// 발명의 설명 패널 — 5개 섹션 동시 표시, 섹션 클릭으로 AI 패널 연결
-function DescriptionPanel({ onUpdate, onSubInfoChange, onFocusContext, guidePanelInputRef }: {
-  onUpdate: (v: string) => void;
-  onSubInfoChange?: (info: { subStep: number; currentLabel: string; allDone: boolean; doConfirm: (() => void) | null }) => void;
-  onFocusContext?: (ctx: { text: string; label: string; apply: (t: string) => void }) => void;
-  guidePanelInputRef?: React.RefObject<HTMLTextAreaElement | null>;
-}) {
-  const [texts, setTexts] = useState<Record<string, string>>(
-    Object.fromEntries(DESC_SECTIONS.map(s => [s.key, s.text]))
-  );
-  const [activeKey, setActiveKey] = useState<string | null>(null);
-
-  // 항상 확정 준비 완료 상태 — 하단 바에서 바로 다음 단계 진행 가능
-  useEffect(() => {
-    onSubInfoChange?.({ subStep: 0, currentLabel: '발명의 설명', allDone: true, doConfirm: null });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // texts 변경 시 상위에 동기화
-  useEffect(() => {
-    onUpdate(DESC_SECTIONS.map(s => `【${s.label}】\n${texts[s.key] || s.text}`).join('\n\n'));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [texts]);
-
-  const selectSection = (key: string) => {
-    setActiveKey(key);
-    const sec = DESC_SECTIONS.find(s => s.key === key);
-    if (!sec) return;
-    onFocusContext?.({
-      text: texts[key] || sec.text,
-      label: sec.label,
-      apply: (newText) => setTexts(p => ({ ...p, [key]: newText })),
-    });
-  };
-
-  const requestAI = (key: string) => {
-    selectSection(key);
-    setTimeout(() => guidePanelInputRef?.current?.focus(), 50);
-  };
-
-  return (
-    <div className="space-y-2">
-      {DESC_SECTIONS.map(sec => {
-        const isActive = activeKey === sec.key;
-        const cardText = texts[sec.key] ?? sec.text;
-        return (
-          <div
-            key={sec.key}
-            onClick={() => selectSection(sec.key)}
-            className={clsx(
-              'rounded-xl border-2 p-3 cursor-pointer transition-all bg-white',
-              isActive && 'border-blue-600 bg-blue-50 shadow-sm',
-              !isActive && 'border-zinc-200 hover:border-blue-300 hover:bg-blue-50/30',
-            )}
-          >
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className={clsx(
-                'text-xs2 font-bold px-2 py-0.5 rounded-full shrink-0',
-                isActive ? 'bg-brand-400 text-white' : 'bg-gray-100 text-gray-600',
-              )}>{sec.label}</span>
-              {isActive && <span className="text-xs2 text-blue-600 font-semibold">✓ 선택됨</span>}
-              <div className="ml-auto">
-                <button
-                  onClick={e => { e.stopPropagation(); requestAI(sec.key); }}
-                  className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
-                >
-                  <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                  수정 요청
-                </button>
-              </div>
-            </div>
-            <p className="text-sm2 text-gray-700 leading-relaxed">{cardText}</p>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
