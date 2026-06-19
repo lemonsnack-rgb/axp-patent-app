@@ -1,12 +1,6 @@
 // SpecView
 import { useEffect, useRef, useState } from 'react';
 import { SpecEditorView } from './SpecEditorView';
-import { DrawingEditorModal } from '../features/drawing-workflow/DrawingEditorModal';
-import { MOCK_DRAWINGS } from '../features/drawing-workflow/types';
-import {
-  openEditorTab, onEditorResult, isMobile,
-} from '../features/drawing-workflow/editorChannel';
-import type { InventionComponent } from '../features/patent-editor';
 import { useStore } from '../store';
 import { Icon } from '../components/Icon';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -16,39 +10,46 @@ import clsx from 'clsx';
 import {
   generateTitleCandidates,
   generateComponentCandidates,
-  generateIndependentClaimSets,
-  generateDescriptionItems,
+  MOCK_INDEPENDENT_CLAIM_SETS,
+  MOCK_DRAWINGS,
+  getMockExtractResult,
 } from '../features/spec/mockAiService';
-import type { SpecAnalysisResult, SpecAnalysisState, TitleCandidate, InventionDescription } from '../features/spec/types';
+import type {
+  SpecAnalysisState, SpecStepId, StepConfig,
+  TitleCandidate, SpecComponentItem,
+  InventionContext, MidspecSection, InventionDescriptionItem, Drawing,
+} from '../features/spec/types';
 import { loadSpecState, saveSpecState } from '../features/spec/specStore';
 import { analyzePromptClarity, generateIntentOptions, generateMockModification } from '../features/ai/clarityAnalyzer';
 
-type StepId = 'upload' | 'title' | 'description' | 'components' | 'drawings' | 'claims';
-const STEPS: { id: StepId; num: number; short: string }[] = [
-  { id: 'upload', num: 1, short: '시작' },
-  { id: 'description', num: 2, short: '설명' },
-  { id: 'title', num: 3, short: '명칭' },
-  { id: 'components', num: 4, short: '구성요소' },
-  { id: 'drawings', num: 5, short: '도면' },
-  { id: 'claims', num: 6, short: '청구항' },
+type StepId = SpecStepId;
+const STEPS: StepConfig[] = [
+  { id: 'upload',      label: '업로드',      step: 1 },
+  { id: 'description', label: '발명 설명',   step: 2 },
+  { id: 'title',       label: '제목·요약',   step: 3 },
+  { id: 'components',  label: '구성요소',    step: 4 },
+  { id: 'drawings',    label: '도면',        step: 5 },
+  { id: 'claims',      label: '청구항',      step: 6 },
+  { id: 'midspec',     label: '중간명세서',  step: 7 },
 ];
 
 const STEP_LABEL: Partial<Record<StepId, string>> = {
   title: '발명의 명칭', description: '발명의 설명', components: '구성요소',
-  drawings: '도면', claims: '청구항',
+  drawings: '도면', claims: '청구항', midspec: '중간명세서',
 };
 const CONFIRM_LABEL: Partial<Record<StepId, string>> = {
   title: '발명의 명칭 선택 완료', description: '발명의 설명 선택 완료',
   components: '구성요소 선택 완료', drawings: '도면 선택 완료',
-  claims: '청구항 선택 완료',
+  claims: '청구항 선택 완료', midspec: '중간명세서 확정 완료',
 };
 const AI_NEXT: Record<StepId, string> = {
-  upload: '업로드하신 문서를 분석했습니다. 발명의 설명 항목을 분석합니다.',
+  upload:      '업로드하신 문서를 분석했습니다. 발명의 설명 항목을 분석합니다.',
   description: '설명 항목을 확정했습니다. 발명의 명칭 후보를 생성합니다.',
-  title: '발명 명칭을 확정했습니다. 발명의 구성요소를 추출합니다.',
-  components: '구성요소를 확정했습니다. 업로드된 도면을 분석합니다.',
-  drawings: '도면을 확정했습니다. 청구항을 생성합니다.',
-  claims: '청구항을 확정했습니다. 명세서 초안을 생성할 준비가 완료되었습니다.',
+  title:       '발명 명칭을 확정했습니다. 발명의 구성요소를 추출합니다.',
+  components:  '구성요소를 확정했습니다. 업로드된 도면을 분석합니다.',
+  drawings:    '도면을 확정했습니다. 청구항을 생성합니다.',
+  claims:      '청구항을 확정했습니다. 중간명세서를 확인하고 편집하세요.',
+  midspec:     '중간명세서를 확정했습니다. 명세서 에디터로 이동합니다.',
 };
 const GUIDE_CANDS: Record<string, string[]> = {
   title: [
@@ -75,17 +76,16 @@ export function SpecView() {
   const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
   const [specFocusCtx, setSpecFocusCtx] = useState<FocusCtx | null>(null);
   const guidePanelInputRef = useRef<HTMLTextAreaElement>(null);
-  const [confirmedComponents, setConfirmedComponents] = useState<InventionComponent[]>([
-    { number: '100', name: '데이터 수집부' },
-    { number: '200', name: '전처리부' },
-    { number: '300', name: '특징 추출부' },
-    { number: '400', name: '인식부' },
-    { number: '500', name: '출력부' },
-  ]);
+  const [context, setContext] = useState<InventionContext>(
+    savedSpec?.context ?? {
+      title: '', summary: '', elements: [], previous: [], proposed: [], drawings: [],
+    }
+  );
+  const [midspec, setMidspec] = useState<MidspecSection[] | undefined>(savedSpec?.midspec);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [compModalOpen, setCompModalOpen] = useState(false);
   const [compModalMounted, setCompModalMounted] = useState(false);
-  const [expandedCards, setExpandedCards] = useState<Set<StepId>>(new Set());
+  const [expandedCards, setExpandedCards] = useState<Set<SpecStepId>>(new Set());
   const [phase, setPhase] = useState<'upload' | 'direct' | 'flow' | 'done'>(savedSpec?.phase ?? 'upload');
   const [curStep, setCurStep] = useState<StepId>((savedSpec?.curStep as StepId) ?? 'upload');
   const [confirmed, setConfirmed] = useState<Partial<Record<StepId, string>>>((savedSpec?.confirmed as Partial<Record<StepId, string>>) ?? {});
@@ -100,15 +100,14 @@ export function SpecView() {
   // 기초자료 보기 패널
   const [sourceDataOpen, setSourceDataOpen] = useState(false);
 
-  // AI 분석 생성 후보 (mockAiService 연결)
+  // AI 분석 생성 후보
   const [titleCandidates, setTitleCandidates] = useState<TitleCandidate[]>(
-    (savedSpec?.titleCandidates as TitleCandidate[] | undefined) ?? []
+    savedSpec?.titleCandidates ?? []
   );
-  const [descriptionItems, setDescriptionItems] = useState<InventionDescription[]>(
-    (savedSpec?.descriptionItems as InventionDescription[] | undefined) ?? []
-  );
-  const [aiComponents, setAiComponents] = useState<{ id: number; text: string; sel: boolean; num: string; depth: number }[]>(
-    (savedSpec?.componentItems as { id: number; text: string; sel: boolean; num: string; depth: number }[]) ?? []
+  const [aiComponents, setAiComponents] = useState<SpecComponentItem[]>(
+    savedSpec?.context?.elements
+      ? savedSpec.context.elements.map((el, i) => ({ ...el, id: i + 1, depth: 0, sel: true }))
+      : []
   );
   const [analyzing, setAnalyzing] = useState(false);
   const [loadingStage, setLoadingStage] = useState(0);
@@ -133,27 +132,15 @@ export function SpecView() {
         gSel: gSel as SpecAnalysisState['gSel'],
         diTitle, diField, diContent, diProblem, diKeywords,
         titleCandidates,
-        descriptionItems,
-        componentItems: aiComponents as SpecAnalysisState['componentItems'],
+        context,
+        midspec,
         mainView,
       });
       setSaveStatus('saved');
     }, 400);
     return () => { if (flowSaveTimerRef.current) clearTimeout(flowSaveTimerRef.current); };
   }, [phase, curStep, confirmed, gSel, diTitle, diField, diContent,
-      diProblem, diKeywords, titleCandidates, descriptionItems, aiComponents, mainView, task?.id]);
-
-  // descriptionItems 변경 시 gSel['description'] 동기화
-  useEffect(() => {
-    const selected = descriptionItems.filter(i => i.sel);
-    const proposed = selected.filter(i => i.type === 'proposed');
-    const prior = selected.filter(i => i.type === 'prior');
-    const parts: string[] = [];
-    if (proposed.length > 0) parts.push('【제안기술】\n' + proposed.map(i => '- ' + i.text).join('\n'));
-    if (prior.length > 0) parts.push('【종래기술】\n' + prior.map(i => '- ' + i.text).join('\n'));
-    const val = parts.join('\n\n');
-    setGSel(p => p.description === val ? p : { ...p, description: val });
-  }, [descriptionItems]);
+      diProblem, diKeywords, titleCandidates, context, midspec, mainView, task?.id]);
 
   // U7: 분석 진행 중 이탈 확인
   useEffect(() => {
@@ -168,7 +155,7 @@ export function SpecView() {
 
   const si = (id: StepId) => STEPS.findIndex(s => s.id === id);
   const isSpecialStep = (id: StepId) =>
-    id === 'components' || id === 'drawings' || id === 'claims';
+    id === 'components' || id === 'drawings' || id === 'claims' || id === 'midspec';
   const isVisible = (id: StepId) => {
     if (id === 'upload') return true;
     if (phase === 'upload' || phase === 'direct') return false;
@@ -177,21 +164,24 @@ export function SpecView() {
 
   const resetAnalysis = () => {
     showConfirm('처음부터 다시 시작하면 모든 분석 내용이 삭제됩니다.\n계속하시겠습니까?', () => {
-    setPhase('upload');
-    setCurStep('upload');
-    setConfirmed({});
-    setGSel({});
-    setTitleCandidates([]);
-    setDescriptionItems([]);
-    setAiComponents([]);
-    if (task?.id) {
-      saveSpecState(task.id, {
-        phase: 'upload', curStep: 'upload',
-        confirmed: {}, gSel: {},
-        titleCandidates: [], componentItems: [],
-        mainView: 'analysis',
-      });
-    }
+      setPhase('upload');
+      setCurStep('upload');
+      setConfirmed({});
+      setGSel({});
+      setTitleCandidates([]);
+      setAiComponents([]);
+      setContext({ title: '', summary: '', elements: [], previous: [], proposed: [], drawings: [] });
+      setMidspec(undefined);
+      if (task?.id) {
+        saveSpecState(task.id, {
+          phase: 'upload', curStep: 'upload',
+          confirmed: {}, gSel: {},
+          titleCandidates: [],
+          context: { title: '', summary: '', elements: [], previous: [], proposed: [], drawings: [] },
+          midspec: undefined,
+          mainView: 'analysis',
+        });
+      }
     });
   };
 
@@ -220,10 +210,10 @@ export function SpecView() {
     setTimeout(() => setLoadingStage(2), 500);
     setTimeout(() => setLoadingStage(3), 1000);
     setTimeout(() => {
+      const extractResult = getMockExtractResult();
       const comps = generateComponentCandidates(input);
-      const descItems = generateDescriptionItems(input);
+      setContext(extractResult);
       setTitleCandidates(generateTitleCandidates(input));
-      setDescriptionItems(descItems);
       setAiComponents(comps);
       setConfirmed({});
       setGSel({});
@@ -260,37 +250,6 @@ export function SpecView() {
     ].filter(s => s.content.trim());
   };
 
-  // 에디터 진입 시 analysisResult 구성 (#58 fix)
-  const makeAnalysisResult = (): SpecAnalysisResult => {
-    const title = gSel['title'] || confirmed['title'] || diTitle || task?.name || '';
-    const descRaw = gSel['description'] || confirmed['description'] || '';
-    const extractDescSec = (label: string) => {
-      const m = descRaw.match(new RegExp(`【${label}】\\n([^【]*)`));
-      return m?.[1]?.trim() || '';
-    };
-    const comps = aiComponents.filter(c => c.sel);
-    const drawDesc = (MOCK_DRAWINGS as any[]).map((d, i) => `도 ${i + 1}은 ${d.name}.`).join('\n');
-    const detail = comps.length > 0
-      ? comps.map(c => {
-          const name = c.text.split(':')[0];
-          const desc = (c.text.split(':')[1] || '').trim();
-          return `상기 ${name}${c.num ? `(${c.num})` : ''}은 ${desc || '관련 기능을 수행한다.'}`;
-        }).join('\n\n')
-      : '';
-    return {
-      title,
-      tech: extractDescSec('기술분야'),
-      bg: extractDescSec('배경기술'),
-      problem: extractDescSec('해결하려는 과제'),
-      effect: extractDescSec('발명의 효과'),
-      drawDesc,
-      detail,
-      claims: gSel['claims'] || confirmed['claims'] || '',
-      drawings: MOCK_DRAWINGS as any[],
-      componentItems: comps as any[],
-    };
-  };
-
   if (mainView === 'editor') {
     return (
       <>
@@ -298,7 +257,9 @@ export function SpecView() {
           task={task}
           onBack={() => handleSetMainView('analysis')}
           confirmedTitle={gSel['title'] || confirmed['title'] || diTitle}
-          analysisResult={makeAnalysisResult()}
+          midspec={midspec}
+          context={context}
+          confirmedClaimsText={gSel['claims'] || confirmed['claims'] || ''}
         />
         {previewOpen && <PreviewModal taskName={task?.name} sections={makePreviewSections()} onClose={() => setPreviewOpen(false)} />}
       </>
@@ -395,7 +356,7 @@ export function SpecView() {
                         locked && 'border-gray-300 bg-white text-gray-400',
                         !active && !isDone && !locked && 'border-gray-400 bg-white text-gray-500',
                       )}>
-                        {isDone && !active ? <Icon name="check" size={10} /> : s.num}
+                        {isDone && !active ? <Icon name="check" size={10} /> : s.step}
                       </span>
                       <span className={clsx(
                         'text-sm2 max-md:hidden',
@@ -403,7 +364,7 @@ export function SpecView() {
                         isDone && !active && 'text-green-700 font-medium',
                         locked && 'text-gray-400',
                         !active && !isDone && !locked && 'text-gray-500',
-                      )}>{s.short}</span>
+                      )}>{s.label}</span>
                     </div>
                   </div>
                 );
@@ -582,9 +543,16 @@ export function SpecView() {
                           )}
                           {s.id === guideStep && !isDone && s.id === 'description' && (
                             <DescriptionItemCards
-                              items={descriptionItems}
-                              onToggle={id => setDescriptionItems(prev => prev.map(i => i.id === id ? { ...i, sel: !i.sel } : i))}
-                              onAdd={(type, text) => setDescriptionItems(prev => [...prev, { id: `desc-custom-${Date.now()}`, type, text, sel: true }])}
+                              previous={context.previous}
+                              proposed={context.proposed}
+                              onToggle={(type, idx) => setContext(p => ({
+                                ...p,
+                                [type]: p[type].map((item, i) => i === idx ? { ...item, adopted: !item.adopted } : item),
+                              }))}
+                              onAdd={(type, text) => setContext(p => ({
+                                ...p,
+                                [type]: [...p[type], { label: 'implementation' as const, text, adopted: true }],
+                              }))}
                             />
                           )}
                           {/* 현재 단계 특수 패널 인라인 */}
@@ -594,7 +562,7 @@ export function SpecView() {
                                 <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2 ml-1.5">
                                   <div className="rounded-xl border-2 border-zinc-200 bg-white p-3">
                                     <div className="flex items-center justify-between mb-2.5">
-                                      <span className="text-xs2 font-semibold text-gray-600">AI 추출 구성요소 ({confirmedComponents.length}개)</span>
+                                      <span className="text-xs2 font-semibold text-gray-600">AI 추출 구성요소 ({aiComponents.filter(c => c.sel).length}개)</span>
                                       <button
                                         onClick={() => { setCompModalOpen(true); setCompModalMounted(true); }}
                                         className="flex items-center gap-1.5 px-2.5 py-1 text-xs2 font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
@@ -604,14 +572,14 @@ export function SpecView() {
                                       </button>
                                     </div>
                                     <div className="space-y-1">
-                                      {confirmedComponents.slice(0, 6).map(c => (
-                                        <div key={c.number || c.name} className="flex items-center gap-2 py-0.5">
-                                          <span className="text-xs2 font-bold text-brand-400 bg-blue-100 px-1.5 py-0.5 rounded w-10 text-center shrink-0">{c.number || '—'}</span>
-                                          <span className="text-sm2 text-gray-700">{c.name}</span>
+                                      {aiComponents.filter(c => c.sel).slice(0, 6).map(c => (
+                                        <div key={c.symbol || c.value_ko} className="flex items-center gap-2 py-0.5">
+                                          <span className="text-xs2 font-bold text-brand-400 bg-blue-100 px-1.5 py-0.5 rounded w-10 text-center shrink-0">{c.symbol || '—'}</span>
+                                          <span className="text-sm2 text-gray-700">{c.value_ko}</span>
                                         </div>
                                       ))}
-                                      {confirmedComponents.length > 6 && (
-                                        <p className="text-xs2 text-gray-400 pl-12">+{confirmedComponents.length - 6}개 더</p>
+                                      {aiComponents.filter(c => c.sel).length > 6 && (
+                                        <p className="text-xs2 text-gray-400 pl-12">+{aiComponents.filter(c => c.sel).length - 6}개 더</p>
                                       )}
                                     </div>
                                   </div>
@@ -622,7 +590,8 @@ export function SpecView() {
                                   done={false}
                                   onConfirm={() => confirm('drawings')}
                                   onUpdate={v => setGSel(p => ({ ...p, drawings: v }))}
-                                  inventionComponents={confirmedComponents}
+                                  drawings={context.drawings}
+                                  onUpdateDrawings={next => setContext(p => ({ ...p, drawings: next }))}
                                 />
                               )}
                               {s.id === 'claims' && (
@@ -824,7 +793,7 @@ export function SpecView() {
                 done={false}
                 onConfirm={() => setCompModalOpen(false)}
                 onUpdate={v => setGSel(p => ({ ...p, components: v }))}
-                onComponentsChange={setConfirmedComponents}
+                onComponentsChange={setAiComponents}
                 initialItems={aiComponents}
               />
             </div>
@@ -899,7 +868,7 @@ function TitleCandidateCards({
     <div className="space-y-2 mt-3">
       {candidates.map((c, i) => {
         const titleVal = titleEdits[c.id] ?? c.title;
-        const abstractVal = abstractEdits[c.id] ?? c.abstract;
+        const abstractVal = abstractEdits[c.id] ?? c.summary;
         const letter = letters[i] || String(i + 1);
         const isSelected = curSel === titleVal || curSel === c.title;
         return (
@@ -991,25 +960,28 @@ function TitleCandidateCards({
 }
 
 // ── 발명의 설명 항목 카드 (제안기술 / 종래기술 그룹) ──────────────────
-function DescriptionItemCards({
-  items, onToggle, onAdd,
-}: {
-  items: InventionDescription[];
-  onToggle: (id: string) => void;
-  onAdd: (type: 'proposed' | 'prior', text: string) => void;
-}) {
-  const proposed = items.filter(i => i.type === 'proposed');
-  const prior = items.filter(i => i.type === 'prior');
-  const [newTexts, setNewTexts] = useState({ proposed: '', prior: '' });
+const DESC_LABEL_MAP: Record<string, string> = {
+  background: '배경기술', implementation: '구현', objective: '목적', effect: '효과',
+};
 
-  const addItem = (type: 'proposed' | 'prior') => {
+function DescriptionItemCards({
+  previous, proposed, onToggle, onAdd,
+}: {
+  previous: InventionDescriptionItem[];
+  proposed: InventionDescriptionItem[];
+  onToggle: (type: 'previous' | 'proposed', idx: number) => void;
+  onAdd: (type: 'previous' | 'proposed', text: string) => void;
+}) {
+  const [newTexts, setNewTexts] = useState({ previous: '', proposed: '' });
+
+  const addItem = (type: 'previous' | 'proposed') => {
     const text = newTexts[type].trim();
     if (!text) return;
     onAdd(type, text);
     setNewTexts(p => ({ ...p, [type]: '' }));
   };
 
-  if (items.length === 0) {
+  if (previous.length === 0 && proposed.length === 0) {
     return (
       <div className="mt-3 text-center py-6 text-gray-400">
         <p className="text-sm2">발명의 설명 항목을 생성 중입니다...</p>
@@ -1017,38 +989,50 @@ function DescriptionItemCards({
     );
   }
 
-  const renderGroup = (label: string, accent: 'blue' | 'amber', type: 'proposed' | 'prior', groupItems: InventionDescription[]) => (
+  const renderGroup = (
+    label: string,
+    accent: 'blue' | 'amber',
+    type: 'previous' | 'proposed',
+    groupItems: InventionDescriptionItem[],
+  ) => (
     <div className="mb-4">
       <div className={clsx(
         'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg mb-2 text-xs2 font-bold',
         accent === 'blue' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700',
       )}>
         <span>{label}</span>
-        <span className="opacity-60 font-normal">{groupItems.filter(i => i.sel).length}/{groupItems.length} 선택</span>
+        <span className="opacity-60 font-normal">{groupItems.filter(i => i.adopted !== false).length}/{groupItems.length} 선택</span>
       </div>
       <div className="space-y-2">
-        {groupItems.map(item => (
-          <div
-            key={item.id}
-            onClick={() => onToggle(item.id)}
-            className={clsx(
-              'rounded-xl border-2 p-3 cursor-pointer transition-all bg-white flex gap-3',
-              item.sel
-                ? (accent === 'blue' ? 'border-blue-500 bg-blue-50' : 'border-amber-400 bg-amber-50')
-                : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50',
-            )}
-          >
-            <div className={clsx(
-              'w-5 h-5 rounded flex items-center justify-center shrink-0 mt-0.5 border-2 transition-colors',
-              item.sel
-                ? (accent === 'blue' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-amber-500 border-amber-500 text-white')
-                : 'border-gray-300',
-            )}>
-              {item.sel && <Icon name="check" size={10} />}
+        {groupItems.map((item, idx) => {
+          const isAdopted = item.adopted !== false;
+          const sublabel = DESC_LABEL_MAP[item.label] ?? item.label;
+          return (
+            <div
+              key={idx}
+              onClick={() => onToggle(type, idx)}
+              className={clsx(
+                'rounded-xl border-2 p-3 cursor-pointer transition-all bg-white flex gap-3',
+                isAdopted
+                  ? (accent === 'blue' ? 'border-blue-500 bg-blue-50' : 'border-amber-400 bg-amber-50')
+                  : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50',
+              )}
+            >
+              <div className={clsx(
+                'w-5 h-5 rounded flex items-center justify-center shrink-0 mt-0.5 border-2 transition-colors',
+                isAdopted
+                  ? (accent === 'blue' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-amber-500 border-amber-500 text-white')
+                  : 'border-gray-300',
+              )}>
+                {isAdopted && <Icon name="check" size={10} />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-xs2 text-gray-400 font-medium">{sublabel}</span>
+                <p className="text-sm2 text-gray-700 leading-relaxed mt-0.5">{item.text}</p>
+              </div>
             </div>
-            <p className="text-sm2 text-gray-700 leading-relaxed">{item.text}</p>
-          </div>
-        ))}
+          );
+        })}
         {/* 직접 추가 */}
         <div className={clsx(
           'flex gap-2 items-center rounded-xl border-2 border-dashed p-2 transition-colors',
@@ -1079,7 +1063,7 @@ function DescriptionItemCards({
   return (
     <div className="mt-3">
       {renderGroup('제안기술', 'blue', 'proposed', proposed)}
-      {renderGroup('종래기술', 'amber', 'prior', prior)}
+      {renderGroup('종래기술', 'amber', 'previous', previous)}
     </div>
   );
 }
@@ -1476,22 +1460,52 @@ function calcAutoNums(items: CompItem[]): CompItem[] {
   return next;
 }
 
+function specItemToCompItem(el: SpecComponentItem): CompItem {
+  return {
+    id: el.id,
+    text: el.value_ko + (el.description ? ': ' + el.description : ''),
+    sel: el.sel,
+    num: el.symbol,
+    depth: el.depth,
+    englishName: el.value_en,
+    definition: el.hypernym_ko,
+    parent: '',
+  };
+}
+
+function compItemToSpecItem(item: CompItem, origMap: Map<number, SpecComponentItem>): SpecComponentItem {
+  const orig = origMap.get(item.id);
+  return {
+    symbol: item.num,
+    value_ko: extractCompName(item.text),
+    value_en: item.englishName ?? orig?.value_en ?? '',
+    description: item.text.includes(':') ? item.text.split(':').slice(1).join(':').trim() : (orig?.description ?? ''),
+    hypernym_ko: item.definition ?? orig?.hypernym_ko ?? '',
+    hypernym_en: orig?.hypernym_en ?? '',
+    id: item.id,
+    depth: item.depth,
+    sel: item.sel,
+  };
+}
+
 function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
   done: boolean;
   onConfirm: () => void;
   onUpdate: (v: string) => void;
-  onComponentsChange?: (comps: InventionComponent[]) => void;
-  initialItems?: { id: number; text: string; sel: boolean; num: string; depth: number; englishName?: string; definition?: string; parent?: string }[];
+  onComponentsChange?: (comps: SpecComponentItem[]) => void;
+  initialItems?: SpecComponentItem[];
 }) {
-  const initData = (initialItems && initialItems.length > 0) ? initialItems : INIT_COMPS;
-  const [items, setItems] = useState<CompItem[]>(initData as CompItem[]);
+  const initData: CompItem[] = (initialItems && initialItems.length > 0)
+    ? initialItems.map(specItemToCompItem)
+    : INIT_COMPS;
+  const origMapRef = useRef(new Map<number, SpecComponentItem>(initialItems?.map(el => [el.id, el]) ?? []));
+  const [items, setItems] = useState<CompItem[]>(initData);
   const [newText, setNewText] = useState('');
 
   useEffect(() => {
-    const data = (initialItems && initialItems.length > 0) ? initialItems : INIT_COMPS;
-    const selected = (data as CompItem[]).filter(it => it.sel);
+    const selected = initData.filter(it => it.sel);
     onUpdate(selected.map(it => `${it.num || '—'} ${it.text}`).join('\n'));
-    onComponentsChange?.(selected.map(it => ({ number: it.num || '', name: extractCompName(it.text) })));
+    onComponentsChange?.(selected.map(it => compItemToSpecItem(it, origMapRef.current)));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1503,7 +1517,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
       if (it.englishName) line += ` (${it.englishName})`;
       return line;
     }).join('\n'));
-    onComponentsChange?.(selected.map(it => ({ number: it.num || '', name: extractCompName(it.text) })));
+    onComponentsChange?.(next.map(it => compItemToSpecItem(it, origMapRef.current)));
   };
 
   const hasNums = (arr: CompItem[]) => arr.some(it => it.num);
@@ -1744,182 +1758,118 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
 
 // 도면 패널 (#21)
 
-// DrawingsPanel — 썸네일/기호/라벨/도면명 표시, 단일 편집 버튼
-function DrawingsPanel({ done, onUpdate, inventionComponents }: {
+const DRAWING_LABEL_MAP: Record<string, { text: string; cls: string }> = {
+  proposed_implementation: { text: '제안기술', cls: 'bg-blue-100 text-brand-400' },
+  previous_implementation: { text: '종래기술', cls: 'bg-gray-100 text-gray-600' },
+  background:              { text: '배경',     cls: 'bg-zinc-100 text-zinc-600' },
+  effect:                  { text: '효과',     cls: 'bg-violet-100 text-violet-700' },
+};
+
+function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawings }: {
   done: boolean;
   onConfirm: () => void;
   onUpdate: (v: string) => void;
-  inventionComponents?: InventionComponent[];
+  drawings?: Drawing[];
+  onUpdateDrawings?: (next: Drawing[]) => void;
 }) {
-  const [drawings, setDrawings] = useState(() => MOCK_DRAWINGS.map(d => ({ ...d })));
-  // 모바일 전용 모달 상태
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalStartId, setModalStartId] = useState('');
-  const [newTabNotice, setNewTabNotice] = useState(false);
+  const drawings = propDrawings ?? MOCK_DRAWINGS;
 
-  const handleSave = (drawingId: string, updates: Partial<typeof drawings[0]>) => {
-    const next = drawings.map(d => d.id === drawingId ? { ...d, ...updates } : d);
-    setDrawings(next);
-    onUpdate(next.filter(d => d.stage === 'done').map(d => `기호${d.symbol} ${d.name}: ${d.description}`).join('\n\n'));
-  };
-
-  // 편집기 탭 결과 수신 (데스크탑 새 탭 편집 후 반영)
-  useEffect(() => {
-    const off = onEditorResult((result) => {
-      handleSave(result.drawingId, {
-        stage: result.stage,
-        savedEditorJson: result.editorJson,
-        exportedImageUrl: result.exportedImageUrl,
-      });
+  const toggle = (idx: number, field: 'useForSpec' | 'isRepresentative') => {
+    if (done) return;
+    const next = drawings.map((d, i) => {
+      if (i !== idx) return field === 'isRepresentative' ? { ...d, isRepresentative: false } : d;
+      return { ...d, [field]: !d[field] };
     });
-    return off;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const openEditor = (id: string) => {
-    if (isMobile()) {
-      setModalStartId(id);
-      setModalOpen(true);
-    } else {
-      const draw = drawings.find(d => d.id === id);
-      const opened = openEditorTab({
-        drawingId: id,
-        drawings,
-        components: inventionComponents ?? [],
-        references: (inventionComponents ?? []).map(c => ({ number: c.number, name: c.name })),
-        drawingName: draw?.name ?? id,
-        timestamp: Date.now(),
-      });
-      if (opened) {
-        setNewTabNotice(true);
-        setTimeout(() => setNewTabNotice(false), 4000);
-      } else {
-        // 팝업 차단 시 모달로 폴백
-        setModalStartId(id);
-        setModalOpen(true);
-      }
-    }
+    onUpdateDrawings?.(next);
+    onUpdate(next.filter(d => d.useForSpec).map(d => `${d.detail.symbol} ${d.detail.name}: ${d.detail.description}`).join('\n\n'));
   };
 
-  const LABEL_STYLES: Record<string, string> = {
-    '제안기술': 'bg-blue-100 text-brand-400',
-    '종래기술': 'bg-gray-100 text-gray-600',
-    'AI생성':   'bg-violet-100 text-violet-700',
-  };
-
-  const STAGE_LABEL: Record<string, { text: string; cls: string }> = {
-    'extracted':        { text: '영역 확인 필요',    cls: 'bg-amber-100 text-amber-700' },
-    'bbox-adjusted':    { text: '영역 확인 완료 ✓', cls: 'bg-blue-100 text-brand-400' },
-    'converting':       { text: '변환 중',           cls: 'bg-violet-100 text-violet-700' },
-    'candidate-select': { text: '후보 선택 필요',    cls: 'bg-orange-100 text-orange-700' },
-    'editing':          { text: '편집 중',            cls: 'bg-sky-100 text-sky-700' },
-    'done':             { text: '편집 완료',          cls: 'bg-green-100 text-green-700' },
-  };
-
-  const doneCount = drawings.filter(d => d.stage === 'done').length;
+  const useForSpecCount = drawings.filter(d => d.useForSpec).length;
 
   return (
-    <>
-      {newTabNotice && (
-        <div className="mx-3 mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs2 text-brand-400 flex items-center gap-1.5 shrink-0">
-          <span>↗</span>
-          도면 편집기가 새 탭에서 열렸습니다. 편집 완료 후 이 탭으로 돌아오세요.
+    <div className="flex-1 overflow-y-auto scroll-thin px-3 py-3 ml-1.5">
+      <p className="text-xs2 font-semibold text-gray-500 mb-2.5">
+        추출된 도면 <span className="font-normal text-gray-400">({drawings.length}개 · 명세서 포함 {useForSpecCount}개)</span>
+      </p>
+      {drawings.length === 0 && (
+        <div className="text-center py-8 text-gray-400">
+          <p className="text-sm2">도면이 없습니다. 업로드 시 자동으로 추출됩니다.</p>
         </div>
       )}
-      <div className="flex-1 overflow-y-auto scroll-thin px-3 py-3 ml-1.5">
-        {/* 헤더 */}
-        <p className="text-xs2 font-semibold text-gray-500 mb-2.5">
-          추출된 도면 <span className="font-normal text-gray-400">({drawings.length}개 · 완료 {doneCount}개)</span>
-        </p>
-
-        <div className="grid grid-cols-2 gap-2">
-        {drawings.map(d => {
-          const isEditable = !done;
-          const isDone = d.stage === 'done';
-          const stageBadge = STAGE_LABEL[d.stage];
+      <div className="grid grid-cols-2 gap-2">
+        {drawings.map((d, idx) => {
+          const labelInfo = DRAWING_LABEL_MAP[d.detail.label] ?? { text: d.detail.label, cls: 'bg-gray-100 text-gray-600' };
+          const isRepresentative = d.isRepresentative ?? false;
+          const isForSpec = d.useForSpec ?? false;
           return (
-            <div key={d.id}
+            <div key={idx}
               className={clsx(
                 'rounded-xl border-2 overflow-hidden transition-all flex flex-col bg-white',
-                isDone ? 'border-green-200' : 'border-zinc-200',
+                isForSpec ? 'border-blue-300' : 'border-zinc-200',
                 done && 'opacity-60',
               )}>
-              {/* 썸네일 (상단, 큰 영역) */}
+              {/* 썸네일 */}
               <div className="w-full aspect-[4/3] bg-gray-100 flex items-center justify-center overflow-hidden relative">
-                {d.exportedImageUrl
-                  ? <img src={d.exportedImageUrl} className="w-full h-full object-contain" alt="" />
+                {d.image.file.data
+                  ? <img src={`data:${d.image.file.media_type};base64,${d.image.file.data}`} className="w-full h-full object-contain" alt="" />
                   : <Icon name="image" size={28} className="text-gray-200" />}
-                {/* 상태 배지 오버레이 */}
-                {stageBadge && (
-                  <span className={clsx(
-                    'absolute bottom-1.5 left-1.5 text-xs2 px-2 py-0.5 rounded-full font-semibold shadow-sm',
-                    stageBadge.cls,
-                  )}>
-                    {stageBadge.text}
-                  </span>
+                {isRepresentative && (
+                  <span className="absolute top-1.5 right-1.5 text-xs2 px-2 py-0.5 rounded-full font-semibold shadow-sm bg-blue-600 text-white">대표도</span>
                 )}
               </div>
 
               {/* 메타 */}
               <div className="px-2.5 pt-2 pb-1.5 flex-1">
                 <div className="flex items-center gap-1 mb-0.5 flex-wrap">
-                  <span className="text-xs2 font-bold text-gray-700">기호 {d.symbol}</span>
-                  <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium shrink-0', LABEL_STYLES[d.label])}>
-                    {d.label}
+                  <span className="text-xs2 font-bold text-gray-700">{d.detail.symbol}</span>
+                  <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium shrink-0', labelInfo.cls)}>
+                    {labelInfo.text}
                   </span>
                 </div>
-                <p className="text-xs2 text-gray-700 font-semibold leading-snug line-clamp-2">{d.name}</p>
+                <p className="text-xs2 text-gray-700 font-semibold leading-snug line-clamp-2">{d.detail.name}</p>
               </div>
 
-              {/* 편집 버튼 */}
-              {isEditable && (
-                <button
-                  onClick={() => openEditor(d.id)}
-                  title="새 탭에서 열립니다"
-                  className="w-full flex items-center justify-center gap-1 py-1.5 text-xs2 font-semibold transition-colors border-t border-gray-100 text-blue-600 hover:bg-blue-50 shrink-0">
-                  <Icon name="edit" size={10} />
-                  도면 편집 →
-                </button>
+              {/* 토글 버튼 */}
+              {!done && (
+                <div className="flex border-t border-gray-100">
+                  <button
+                    onClick={() => toggle(idx, 'useForSpec')}
+                    className={clsx(
+                      'flex-1 py-1.5 text-xs2 font-semibold transition-colors',
+                      isForSpec ? 'bg-blue-50 text-blue-700' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50',
+                    )}>
+                    {isForSpec ? '✓ 명세서 포함' : '포함'}
+                  </button>
+                  <button
+                    onClick={() => toggle(idx, 'isRepresentative')}
+                    className={clsx(
+                      'flex-1 py-1.5 text-xs2 font-semibold border-l border-gray-100 transition-colors',
+                      isRepresentative ? 'bg-blue-50 text-blue-700' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50',
+                    )}>
+                    대표도
+                  </button>
+                </div>
               )}
             </div>
           );
         })}
-        </div>
       </div>
-
-      {done && (
-        <div className="p-3 border-t border-ck-border bg-green-50 shrink-0 ml-1.5">
-          <div className="flex items-center gap-1.5 text-sm2 text-green-700 font-medium">
-            <Icon name="check" size={13} /> 도면 확정 완료 ({doneCount}개 편집 완료)
-          </div>
-        </div>
-      )}
-
-      {modalOpen && (
-        <DrawingEditorModal
-          drawings={drawings}
-          initialDrawingId={modalStartId}
-          availableReferences={(inventionComponents ?? []).map(c => ({ number: c.number, name: c.name }))}
-          onSave={handleSave}
-          onClose={() => setModalOpen(false)}
-        />
-      )}
-    </>
+    </div>
   );
 }
 
 // ── 독립항 세트 권리범위 레이블 매핑 ──────────────────────────────────────────
 const SCOPE_LABELS: Record<string, { label: string; sub: string }> = {
-  broad:        { label: '넓은 권리범위', sub: '청구 범위 최대화 — 심사 대응 필요' },
-  intermediate: { label: '균형 권리범위', sub: '등록 가능성과 보호 범위 균형' },
-  specific:     { label: '한정 권리범위', sub: '구체 구성 한정 — 등록 용이' },
+  BROAD:        { label: '넓은 권리범위', sub: '청구 범위 최대화 — 심사 대응 필요' },
+  INTERMEDIATE: { label: '균형 권리범위', sub: '등록 가능성과 보호 범위 균형' },
+  NARROW:       { label: '한정 권리범위', sub: '구체 구성 한정 — 등록 용이' },
 };
 
 const CATEGORY_LABEL: Record<string, string> = {
-  machine:       '장치항',
-  process:       '방법항',
-  manufacture:   '제조항',
-  composition:   '조성물항',
+  MACHINE:       '장치항',
+  PROCESS:       '방법항',
+  MANUFACTURE:   '제조항',
+  COMPOSITION:   '조성물항',
 };
 
 interface DepItemState {
@@ -1928,8 +1878,8 @@ interface DepItemState {
 }
 interface DepGroupState { generated: boolean; items: DepItemState[]; newText: string }
 
-// 선택된 세트의 각 claim별 종속항 그룹 (key: claimIndex 문자열 "0"|"1")
-type DepGroupsForSet = Record<string, DepGroupState>;
+// 선택된 세트의 각 claim별 종속항 그룹 (key: claimIndex 숫자)
+type DepGroupsForSet = Record<number, DepGroupState>;
 
 function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
   done: boolean;
@@ -1939,53 +1889,47 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
   guidePanelInputRef?: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const [claimsPhase, setClaimsPhase] = useState<'indep' | 'dep'>('indep');
-  const [claimSets] = useState<import('../features/spec/types').IndependentClaimSet[]>(() =>
-    generateIndependentClaimSets(
-      { title: '라이다 기반 객체 감지', field: '자율주행', content: '라이다 포인트 클라우드 데이터를 활용한 실시간 3D 객체 인식 기술', problem: '실시간 처리 속도 및 탐지 정확도 문제' },
-      []
-    )
-  );
-  const [selectedSetId, setSelectedSetId] = useState<string | null>(claimSets[2]?.id ?? null); // 기본: intermediate-1
-  const [depGroupsMap, setDepGroupsMap] = useState<Record<string, DepGroupsForSet>>({});
-  const [claimTexts, setClaimTexts] = useState<Record<string, Record<number, string>>>({}); // setId → claimIdx → text
+  const [claimSets] = useState(MOCK_INDEPENDENT_CLAIM_SETS);
+  const [selectedSetIndex, setSelectedSetIndex] = useState<number | null>(2); // 기본: INTERMEDIATE
+  const [depGroupsMap, setDepGroupsMap] = useState<Record<number, DepGroupsForSet>>({});
+  const [claimTexts, setClaimTexts] = useState<Record<number, Record<number, string>>>({}); // setIdx → claimIdx → text
 
-  const getClaimText = (setId: string, claimIdx: number): string => {
-    return claimTexts[setId]?.[claimIdx] ?? claimSets.find(s => s.id === setId)?.claims[claimIdx]?.value ?? '';
+  const getClaimText = (setIdx: number, claimIdx: number): string => {
+    return claimTexts[setIdx]?.[claimIdx] ?? claimSets[setIdx]?.claims[claimIdx]?.value ?? '';
   };
-  const setClaimText = (setId: string, claimIdx: number, text: string) => {
-    setClaimTexts(p => ({ ...p, [setId]: { ...(p[setId] ?? {}), [claimIdx]: text } }));
+  const setClaimText = (setIdx: number, claimIdx: number, text: string) => {
+    setClaimTexts(p => ({ ...p, [setIdx]: { ...(p[setIdx] ?? {}), [claimIdx]: text } }));
   };
 
-  const selectedSet = claimSets.find(s => s.id === selectedSetId) ?? null;
+  const selectedSet = selectedSetIndex !== null ? claimSets[selectedSetIndex] ?? null : null;
 
   // 전체 요약을 상위에 동기화
-  const syncUpdate = (setId: string | null, groups: Record<string, DepGroupsForSet>) => {
-    const set = claimSets.find(s => s.id === setId);
-    if (!set) { onUpdate('독립항 0개, 종속항 0개'); return; }
+  const syncUpdate = (idx: number | null, groups: Record<number, DepGroupsForSet>) => {
+    const set = idx !== null ? claimSets[idx] : null;
+    if (!set || idx === null) { onUpdate('독립항 0개, 종속항 0개'); return; }
     let num = 0;
     const lines: string[] = [];
-    const setGroups = groups[setId!] ?? {};
+    const setGroups = groups[idx] ?? {};
     set.claims.forEach((claim, ci) => {
-      const text = claimTexts[setId!]?.[ci] ?? claim.value;
-      const indepNum = ++num; // 이 독립항의 실제 번호
+      const text = claimTexts[idx]?.[ci] ?? claim.value;
+      const indepNum = ++num;
       lines.push(`청구항 ${indepNum}.\n${text}`);
-      const grp = setGroups[String(ci)];
+      const grp = setGroups[ci];
       if (grp?.generated) {
         grp.items.filter(d => d.sel).forEach(d => {
-          // ci+1 기반 임시 참조를 실제 독립항 번호로 교정
           const correctedText = d.text.replace(new RegExp(`제${ci + 1}항에 있어서`, 'g'), `제${indepNum}항에 있어서`);
           lines.push(`청구항 ${++num}.\n${correctedText}`);
         });
       }
     });
     const indepCount = set.claims.length;
-    const depCount = Object.values(setGroups).reduce((acc, g) => acc + (g?.items.filter(d => d.sel).length ?? 0), 0);
+    const depCount = Object.values(setGroups).reduce((acc, g) => acc + ((g as DepGroupState)?.items.filter(d => d.sel).length ?? 0), 0);
     onUpdate(`독립항 ${indepCount}개, 종속항 ${depCount}개\n\n${lines.join('\n\n')}`);
   };
 
   // 마운트 시 초기값 동기화
   useEffect(() => {
-    if (selectedSet) {
+    if (selectedSet && selectedSetIndex !== null) {
       const text = selectedSet.claims.map((c, i) => `청구항 ${i + 1}.\n${c.value}`).join('\n\n');
       onUpdate(`독립항 ${selectedSet.claims.length}개, 종속항 0개\n\n${text}`);
     }
@@ -1993,16 +1937,14 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
   }, []);
 
   const confirmIndep = () => {
-    if (!selectedSetId || !selectedSet) return;
-    // 선택된 세트의 각 claim에 대한 종속항 자동 생성
+    if (selectedSetIndex === null || !selectedSet) return;
     const autoGroups: DepGroupsForSet = {};
     selectedSet.claims.forEach((claim, ci) => {
-      const key = String(ci);
-      if (!(depGroupsMap[selectedSetId]?.[key]?.generated)) {
-        const isDevice = claim.category === 'machine';
-        const suffix = isDevice ? '라이다 기반 객체 감지 장치.' : '라이다 기반 객체 감지 방법.';
+      if (!(depGroupsMap[selectedSetIndex]?.[ci]?.generated)) {
+        const isDevice = claim.category === 'MACHINE';
+        const suffix = isDevice ? '데이터 처리 시스템.' : '데이터 처리 방법.';
         const ref = `제${ci + 1}`;
-        autoGroups[key] = {
+        autoGroups[ci] = {
           generated: true,
           newText: '',
           items: [
@@ -2013,55 +1955,55 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
           ],
         };
       } else {
-        autoGroups[key] = depGroupsMap[selectedSetId]![key];
+        autoGroups[ci] = depGroupsMap[selectedSetIndex]![ci];
       }
     });
-    const nextMap = { ...depGroupsMap, [selectedSetId]: autoGroups };
+    const nextMap = { ...depGroupsMap, [selectedSetIndex]: autoGroups };
     setDepGroupsMap(nextMap);
     setClaimsPhase('dep');
-    syncUpdate(selectedSetId, nextMap);
+    syncUpdate(selectedSetIndex, nextMap);
   };
 
-  const toggleDep = (claimKey: string, depId: number) => {
-    if (done || !selectedSetId) return;
-    const setGroups = depGroupsMap[selectedSetId] ?? {};
-    const grp = setGroups[claimKey];
+  const toggleDep = (claimIdx: number, depId: number) => {
+    if (done || selectedSetIndex === null) return;
+    const setGroups = depGroupsMap[selectedSetIndex] ?? {};
+    const grp = setGroups[claimIdx];
     if (!grp) return;
-    const next = { ...setGroups, [claimKey]: { ...grp, items: grp.items.map(d => d.id === depId ? { ...d, sel: !d.sel } : d) } };
-    const nextMap = { ...depGroupsMap, [selectedSetId]: next };
+    const next = { ...setGroups, [claimIdx]: { ...grp, items: grp.items.map(d => d.id === depId ? { ...d, sel: !d.sel } : d) } };
+    const nextMap = { ...depGroupsMap, [selectedSetIndex]: next };
     setDepGroupsMap(nextMap);
-    syncUpdate(selectedSetId, nextMap);
+    syncUpdate(selectedSetIndex, nextMap);
   };
 
-  const removeDep = (claimKey: string, depId: number) => {
-    if (!selectedSetId) return;
-    const setGroups = depGroupsMap[selectedSetId] ?? {};
-    const grp = setGroups[claimKey];
+  const removeDep = (claimIdx: number, depId: number) => {
+    if (selectedSetIndex === null) return;
+    const setGroups = depGroupsMap[selectedSetIndex] ?? {};
+    const grp = setGroups[claimIdx];
     if (!grp) return;
-    const next = { ...setGroups, [claimKey]: { ...grp, items: grp.items.filter(d => d.id !== depId) } };
-    const nextMap = { ...depGroupsMap, [selectedSetId]: next };
+    const next = { ...setGroups, [claimIdx]: { ...grp, items: grp.items.filter(d => d.id !== depId) } };
+    const nextMap = { ...depGroupsMap, [selectedSetIndex]: next };
     setDepGroupsMap(nextMap);
-    syncUpdate(selectedSetId, nextMap);
+    syncUpdate(selectedSetIndex, nextMap);
   };
 
-  const addDep = (claimKey: string) => {
-    if (!selectedSetId) return;
-    const setGroups = depGroupsMap[selectedSetId] ?? {};
-    const grp = setGroups[claimKey];
+  const addDep = (claimIdx: number) => {
+    if (selectedSetIndex === null) return;
+    const setGroups = depGroupsMap[selectedSetIndex] ?? {};
+    const grp = setGroups[claimIdx];
     if (!grp || !grp.newText.trim()) return;
     const maxId = grp.items.reduce((m, d) => Math.max(m, d.id), 0);
     const newItem: DepItemState = { id: maxId + 1, text: grp.newText.trim(), sel: true, editing: false, editVal: grp.newText.trim() };
-    const next = { ...setGroups, [claimKey]: { ...grp, items: [...grp.items, newItem], newText: '' } };
-    const nextMap = { ...depGroupsMap, [selectedSetId]: next };
+    const next = { ...setGroups, [claimIdx]: { ...grp, items: [...grp.items, newItem], newText: '' } };
+    const nextMap = { ...depGroupsMap, [selectedSetIndex]: next };
     setDepGroupsMap(nextMap);
-    syncUpdate(selectedSetId, nextMap);
+    syncUpdate(selectedSetIndex, nextMap);
   };
 
-  const updateDepNewText = (claimKey: string, text: string) => {
-    if (!selectedSetId) return;
-    const setGroups = depGroupsMap[selectedSetId] ?? {};
-    const grp = setGroups[claimKey] ?? { generated: true, newText: '', items: [] };
-    const nextMap = { ...depGroupsMap, [selectedSetId]: { ...setGroups, [claimKey]: { ...grp, newText: text } } };
+  const updateDepNewText = (claimIdx: number, text: string) => {
+    if (selectedSetIndex === null) return;
+    const setGroups = depGroupsMap[selectedSetIndex] ?? {};
+    const grp = setGroups[claimIdx] ?? { generated: true, newText: '', items: [] };
+    const nextMap = { ...depGroupsMap, [selectedSetIndex]: { ...setGroups, [claimIdx]: { ...grp, newText: text } } };
     setDepGroupsMap(nextMap);
   };
 
@@ -2069,32 +2011,28 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
   if (claimsPhase === 'indep') {
     return (
       <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2.5 ml-1.5">
-        {/* D-01: 명확한 액션 지시 */}
         <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2.5">
           <p className="text-xs2 text-brand-400 font-medium">AI가 권리범위별 독립항 세트를 생성했습니다.</p>
           <p className="text-xs2 text-gray-500 mt-0.5">각 세트는 장치항·방법항 쌍으로 구성됩니다. <strong className="text-gray-700">1개를 선택</strong>하면 종속항이 구성됩니다.</p>
         </div>
 
-        {claimSets.map(set => {
-          const isSelected = selectedSetId === set.id;
+        {claimSets.map((set, setIdx) => {
+          const isSelected = selectedSetIndex === setIdx;
           const scopeInfo = SCOPE_LABELS[set.abstraction_level] ?? { label: set.abstraction_level, sub: '' };
           return (
             <div
-              key={set.id}
-              onClick={() => { if (!done) { setSelectedSetId(set.id); syncUpdate(set.id, depGroupsMap); } }}
+              key={setIdx}
+              onClick={() => { if (!done) { setSelectedSetIndex(setIdx); syncUpdate(setIdx, depGroupsMap); } }}
               className={clsx(
                 'rounded-xl border-2 transition-all cursor-pointer',
-                // D-10: opacity 방식 제거 — border/bg만으로 상태 표현
                 isSelected
                   ? 'border-blue-600 bg-blue-50 shadow-sm'
                   : 'border-zinc-200 bg-white hover:border-blue-300 hover:bg-blue-50/30'
               )}
             >
-              {/* 세트 헤더 */}
               <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
-                {/* 라디오 버튼 */}
                 <button
-                  onClick={e => { e.stopPropagation(); if (!done) { setSelectedSetId(set.id); syncUpdate(set.id, depGroupsMap); } }}
+                  onClick={e => { e.stopPropagation(); if (!done) { setSelectedSetIndex(setIdx); syncUpdate(setIdx, depGroupsMap); } }}
                   className={clsx(
                     'w-4.5 h-4.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all',
                     isSelected ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white hover:border-blue-400'
@@ -2103,7 +2041,6 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                 >
                   {isSelected && <span className="w-2 h-2 rounded-full bg-white block" />}
                 </button>
-                {/* 권리범위 레이블 */}
                 <div className="flex-1 min-w-0">
                   <span className={clsx('text-sm2 font-semibold', isSelected ? 'text-blue-700' : 'text-gray-700')}>
                     {scopeInfo.label}
@@ -2115,10 +2052,9 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                 )}
               </div>
 
-              {/* 세트 내 claim 미리보기 */}
               <div className="px-3 pb-3 space-y-1.5">
                 {set.claims.map((claim, ci) => {
-                  const text = getClaimText(set.id, ci);
+                  const text = getClaimText(setIdx, ci);
                   const catLabel = CATEGORY_LABEL[claim.category] ?? claim.category;
                   return (
                     <div key={ci} className={clsx(
@@ -2129,7 +2065,7 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                         <span className="text-xs2 px-1.5 py-0.5 rounded font-medium bg-purple-100 text-purple-700">{catLabel}</span>
                         {!done && isSelected && (
                           <button
-                            onClick={e => { e.stopPropagation(); onFocusContext?.({ text, label: `${scopeInfo.label} — ${catLabel}`, apply: (newText) => setClaimText(set.id, ci, newText) }); setTimeout(() => guidePanelInputRef?.current?.focus(), 50); }}
+                            onClick={e => { e.stopPropagation(); onFocusContext?.({ text, label: `${scopeInfo.label} — ${catLabel}`, apply: (newText) => setClaimText(setIdx, ci, newText) }); setTimeout(() => guidePanelInputRef?.current?.focus(), 50); }}
                             className="ml-auto flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
                           >
                             <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
@@ -2143,8 +2079,8 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                           value={text}
                           rows={Math.max(3, Math.ceil(text.length / 44))}
                           onClick={e => e.stopPropagation()}
-                          onChange={e => { setClaimText(set.id, ci, e.target.value); syncUpdate(set.id, depGroupsMap); }}
-                          onFocus={() => onFocusContext?.({ text, label: `${scopeInfo.label} — ${catLabel}`, apply: (newText) => setClaimText(set.id, ci, newText) })}
+                          onChange={e => { setClaimText(setIdx, ci, e.target.value); syncUpdate(setIdx, depGroupsMap); }}
+                          onFocus={() => onFocusContext?.({ text, label: `${scopeInfo.label} — ${catLabel}`, apply: (newText) => setClaimText(setIdx, ci, newText) })}
                           ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                         />
                       ) : (
@@ -2161,10 +2097,10 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
         {!done && (
           <button
             onClick={confirmIndep}
-            disabled={!selectedSetId}
+            disabled={selectedSetIndex === null}
             className="w-full py-2.5 border border-blue-400 text-blue-600 bg-blue-50 rounded-lg text-sm2 font-medium hover:bg-blue-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {selectedSetId
+            {selectedSetIndex !== null
               ? `선택한 세트로 종속항 구성 →`
               : '세트를 선택하세요'}
           </button>
@@ -2174,10 +2110,10 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
   }
 
   // ── Phase B: 선택된 세트의 각 claim별 종속항 ──────────────────────────────
-  if (!selectedSet) return null;
-  const setGroups = depGroupsMap[selectedSetId!] ?? {};
+  if (!selectedSet || selectedSetIndex === null) return null;
+  const setGroups = depGroupsMap[selectedSetIndex] ?? {};
   const scopeInfo = SCOPE_LABELS[selectedSet.abstraction_level] ?? { label: selectedSet.abstraction_level, sub: '' };
-  const totalDep = Object.values(setGroups).reduce((acc, g) => acc + (g?.items.filter(d => d.sel).length ?? 0), 0);
+  const totalDep = Object.values(setGroups).reduce((acc, g) => acc + ((g as DepGroupState)?.items.filter(d => d.sel).length ?? 0), 0);
 
   let globalClaimNum = 0;
 
@@ -2196,24 +2132,22 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
       </div>
 
       {selectedSet.claims.map((claim, ci) => {
-        const claimKey = String(ci);
         const indepNum = ++globalClaimNum;
-        const grp = setGroups[claimKey] ?? { generated: false, items: [], newText: '' };
+        const grp = setGroups[ci] ?? { generated: false, items: [], newText: '' };
         const catLabel = CATEGORY_LABEL[claim.category] ?? claim.category;
-        const claimText = getClaimText(selectedSetId!, ci);
+        const claimText = getClaimText(selectedSetIndex, ci);
 
         return (
           <div key={ci} className="rounded-xl border border-zinc-200 overflow-hidden">
-            {/* 독립항 헤더 */}
             <div className="border-b px-3 py-2.5 bg-blue-50 border-blue-200">
               <div className="flex items-center gap-2 mb-1.5 cursor-pointer"
-                onClick={() => !done && onFocusContext?.({ text: claimText, label: `독립항 ${ci + 1} (${catLabel})`, apply: (newText) => setClaimText(selectedSetId!, ci, newText) })}>
+                onClick={() => !done && onFocusContext?.({ text: claimText, label: `독립항 ${ci + 1} (${catLabel})`, apply: (newText) => setClaimText(selectedSetIndex, ci, newText) })}>
                 <Icon name="check" size={11} className="text-blue-600" />
                 <span className="text-xs2 font-bold text-brand-400">청구항 {indepNum}</span>
                 <span className="text-xs2 px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium">{catLabel}</span>
                 {!done && (
                   <button
-                    onClick={e => { e.stopPropagation(); onFocusContext?.({ text: claimText, label: `독립항 ${ci + 1} (${catLabel})`, apply: (newText) => setClaimText(selectedSetId!, ci, newText) }); setTimeout(() => guidePanelInputRef?.current?.focus(), 50); }}
+                    onClick={e => { e.stopPropagation(); onFocusContext?.({ text: claimText, label: `독립항 ${ci + 1} (${catLabel})`, apply: (newText) => setClaimText(selectedSetIndex, ci, newText) }); setTimeout(() => guidePanelInputRef?.current?.focus(), 50); }}
                     className="ml-auto flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
                   >
                     <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
@@ -2224,7 +2158,6 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
               <p className="text-xs2 text-gray-700 leading-relaxed whitespace-pre-wrap px-1">{claimText}</p>
             </div>
 
-            {/* 종속항 목록 */}
             <div className="p-2.5 space-y-1.5">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs2 font-semibold text-gray-500">
@@ -2233,8 +2166,8 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                 {!done && grp.generated && (
                   <button
                     onClick={() => {
-                      const isDevice = claim.category === 'machine';
-                      const suffix = isDevice ? '라이다 기반 객체 감지 장치.' : '라이다 기반 객체 감지 방법.';
+                      const isDevice = claim.category === 'MACHINE';
+                      const suffix = isDevice ? '데이터 처리 시스템.' : '데이터 처리 방법.';
                       const ref = `제${indepNum}`;
                       const newItems: DepItemState[] = [
                         { id: 1, sel: true,  text: `${ref}항에 있어서, 상기 처리부는 딥러닝 알고리즘을 포함하는, ${suffix}`, editing: false, editVal: '' },
@@ -2242,10 +2175,10 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                         { id: 3, sel: true,  text: `${ref}항에 있어서, 상기 출력부는 처리 결과를 시각화하여 표시하는, ${suffix}`, editing: false, editVal: '' },
                         { id: 4, sel: false, text: `${ref}항에 있어서, 상기 구성은 클라우드 환경에서 동작하는, ${suffix}`, editing: false, editVal: '' },
                       ];
-                      const next = { ...setGroups, [claimKey]: { ...grp, items: newItems } };
-                      const nextMap = { ...depGroupsMap, [selectedSetId!]: next };
+                      const next = { ...setGroups, [ci]: { ...grp, items: newItems } };
+                      const nextMap = { ...depGroupsMap, [selectedSetIndex]: next };
                       setDepGroupsMap(nextMap);
-                      syncUpdate(selectedSetId, nextMap);
+                      syncUpdate(selectedSetIndex, nextMap);
                     }}
                     className="text-xs2 text-blue-500 hover:underline"
                   >재생성</button>
@@ -2254,19 +2187,18 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
 
               {grp.items.map(dep => {
                 const depNum = ++globalClaimNum;
-                // UI 표시 시 임시 참조 번호(ci+1)를 실제 독립항 번호로 교정
                 const displayText = dep.text.replace(new RegExp(`제${ci + 1}항에 있어서`, 'g'), `제${indepNum}항에 있어서`);
                 return (
                   <div key={dep.id} className={clsx('rounded-lg border overflow-hidden', dep.sel ? 'border-zinc-200 bg-white' : 'border-zinc-100 bg-zinc-50 opacity-60')}>
                     <div className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer"
                       onClick={() => !done && onFocusContext?.({ text: displayText, label: `종속항 ${depNum}`, apply: (newText) => {
-                        const next = { ...setGroups, [claimKey]: { ...grp, items: grp.items.map(d => d.id === dep.id ? { ...d, text: newText } : d) } };
-                        const nextMap = { ...depGroupsMap, [selectedSetId!]: next };
+                        const next = { ...setGroups, [ci]: { ...grp, items: grp.items.map(d => d.id === dep.id ? { ...d, text: newText } : d) } };
+                        const nextMap = { ...depGroupsMap, [selectedSetIndex]: next };
                         setDepGroupsMap(nextMap);
-                        syncUpdate(selectedSetId, nextMap);
+                        syncUpdate(selectedSetIndex, nextMap);
                       } })}>
                       <button
-                        onClick={e => { e.stopPropagation(); toggleDep(claimKey, dep.id); }}
+                        onClick={e => { e.stopPropagation(); toggleDep(ci, dep.id); }}
                         className={clsx('w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all',
                           dep.sel ? 'bg-brand-400 border-blue-600 text-white' : 'border-gray-300 bg-white hover:border-blue-400')}
                       >
@@ -2275,7 +2207,7 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                       <span className="text-xs2 text-gray-500 font-medium shrink-0">종속항 {depNum}</span>
                       {!done && (
                         <button
-                          onClick={e => { e.stopPropagation(); removeDep(claimKey, dep.id); }}
+                          onClick={e => { e.stopPropagation(); removeDep(ci, dep.id); }}
                           className="ml-auto text-xs2 text-gray-300 hover:text-red-400 transition-colors"
                         >✕</button>
                       )}
@@ -2287,18 +2219,17 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                 );
               })}
 
-              {/* 새 종속항 추가 */}
               {!done && (
                 <div className="flex gap-1.5 pt-1">
                   <input
                     value={grp.newText}
-                    onChange={e => updateDepNewText(claimKey, e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && addDep(claimKey)}
+                    onChange={e => updateDepNewText(ci, e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addDep(ci)}
                     placeholder={`제${indepNum}항에 있어서, ...`}
                     className="flex-1 text-xs2 px-2.5 py-1.5 border border-zinc-200 rounded-lg bg-zinc-50 focus:outline-none focus:border-blue-400 focus:bg-white"
                   />
                   <button
-                    onClick={() => addDep(claimKey)}
+                    onClick={() => addDep(ci)}
                     disabled={!grp.newText.trim()}
                     className="px-2 py-1.5 text-xs2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 disabled:opacity-40"
                   >추가</button>
