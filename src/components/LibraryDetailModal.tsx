@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../store';
 import { useToast } from './Toast';
 import { Modal } from './Modal';
+import { Badge, Input } from './ui';
 
 export function LibraryDetailModal({ id, onClose }: { id: string | null; onClose: () => void }) {
   const { library, collections, libraryUpdate, libraryRemove, libraryToggleFavorite } = useStore();
@@ -48,7 +49,7 @@ export function LibraryDetailModal({ id, onClose }: { id: string | null; onClose
     >
       <div className="space-y-4">
         <div className="flex items-center gap-2">
-          <span className={`badge ${it.type === 'patent' ? 'badge-blue' : 'badge-amber'}`}>{it.type === 'patent' ? '특허' : '논문'}</span>
+          <Badge color={it.type === 'patent' ? 'brand' : 'amber'}>{it.type === 'patent' ? '특허' : '논문'}</Badge>
           <span className="font-mono text-md2 text-gray-700">{it.refNumber}</span>
           <button
             onClick={() => libraryToggleFavorite(it.id)}
@@ -86,7 +87,7 @@ export function LibraryDetailModal({ id, onClose }: { id: string | null; onClose
               <option value="">— 미분류 —</option>
               {collections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            {col && <span className="badge badge-gray text-xs2" style={{ background: `${col.color}22`, color: col.color }}>{col.name}</span>}
+            {col && <Badge color="neutral" className="text-xs2" style={{ background: `${col.color}22`, color: col.color }}>{col.name}</Badge>}
           </div>
 
           {/* 태그 */}
@@ -97,7 +98,7 @@ export function LibraryDetailModal({ id, onClose }: { id: string | null; onClose
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {it.tags.length === 0
                     ? <span className="text-md2 text-gray-400">태그 없음</span>
-                    : it.tags.map(t => <span key={t} className="badge badge-gray">#{t}</span>)}
+                    : it.tags.map(t => <Badge key={t} color="neutral">#{t}</Badge>)}
                   <button
                     onClick={() => { setTagsText(it.tags.join(', ')); setEditingTags(true); }}
                     className="btn-ghost text-xs2 px-2 py-0.5"
@@ -105,7 +106,7 @@ export function LibraryDetailModal({ id, onClose }: { id: string | null; onClose
                 </div>
               ) : (
                 <div className="flex gap-1.5">
-                  <input className="input py-1 text-md2 flex-1" value={tagsText} onChange={e => setTagsText(e.target.value)} placeholder="쉼표로 구분" autoFocus />
+                  <Input className="py-1 text-md2 flex-1" value={tagsText} onChange={e => setTagsText(e.target.value)} placeholder="쉼표로 구분" autoFocus />
                   <button className="btn-primary btn-sm" onClick={saveTags}>저장</button>
                   <button className="btn-outline btn-sm" onClick={() => setEditingTags(false)}>취소</button>
                 </div>

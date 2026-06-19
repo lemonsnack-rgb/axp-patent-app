@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { useToast } from './Toast';
 import { Modal } from './Modal';
 import { QuickNameModal } from './QuickNameModal';
+import { Input } from './ui';
 import type { LibraryItem } from '../types';
 
 interface SaveContext {
@@ -111,7 +112,7 @@ export function LibrarySaveModal({ open, context, onClose }: Props) {
         </div>
         <div>
           <label className="label">태그 (선택, 쉼표로 구분)</label>
-          <input className="input mt-1" value={tags} onChange={e => setTags(e.target.value)} placeholder="예: LiDAR, 자율주행, 딥러닝" />
+          <Input className="mt-1" value={tags} onChange={e => setTags(e.target.value)} placeholder="예: LiDAR, 자율주행, 딥러닝" />
         </div>
         <div>
           <label className="label">메모 (선택)</label>

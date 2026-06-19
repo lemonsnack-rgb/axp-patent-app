@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { useToast } from '../components/Toast';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
+import { Input } from '../components/ui';
 import clsx from 'clsx';
 import type { Project } from '../types';
 
@@ -33,8 +34,8 @@ export function HomeView() {
       <div className="flex items-center gap-2 mb-6 ml-auto justify-end">
         <div className="relative">
           <Icon name="search" size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            className="input pl-7 py-1.5 text-sm2 w-44"
+          <Input
+            className="pl-7 py-1.5 text-sm2 w-44"
             placeholder="프로젝트 검색..."
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -186,8 +187,8 @@ function NewProjectModal({ open, onClose }: { open: boolean; onClose: () => void
         {/* 이름 */}
         <div>
           <label className="label">프로젝트 이름 <span className="text-red-600">*</span></label>
-          <input
-            className="input mt-1"
+          <Input
+            className="mt-1"
             value={name}
             onChange={e => setName(e.target.value)}
             placeholder="예: 자율주행 LIDAR 분석"

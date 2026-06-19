@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Modal } from './Modal';
+import { Input } from './ui';
 
 export function QuickNameModal({ open, title, placeholder = '이름을 입력하세요', onSubmit, onClose }: {
   open: boolean;
@@ -28,8 +29,7 @@ export function QuickNameModal({ open, title, placeholder = '이름을 입력하
         <button className="btn-primary btn-sm" disabled={!value.trim()} onClick={handleSubmit}>확인</button>
       </>}
     >
-      <input
-        className="input w-full"
+      <Input
         placeholder={placeholder}
         value={value}
         onChange={e => setValue(e.target.value)}

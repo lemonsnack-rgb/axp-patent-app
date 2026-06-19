@@ -6,7 +6,8 @@ import { PATENT_FACET_GROUPS_BASE, PATENT_FACET_GROUPS_EXT } from '../data/facet
 import { Icon } from '../components/Icon';
 import { useStore } from '../store';
 import { useToast } from '../components/Toast';
-import { getPatentStatusBadgeClass } from '../utils/badgeUtils';
+import { getPatentStatusBadgeColor } from '../utils/badgeUtils';
+import { Badge } from '../components/ui';
 import type { PatentResult } from '../types';
 
 type SortKey = 'recent' | 'cited' | 'grade' | 'relevance';
@@ -146,7 +147,7 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery }: P
       {/* ── 1. sri-header ── */}
       <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 bg-white shrink-0 flex-wrap">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="badge badge-gray font-bold text-md2">{count.toLocaleString()}건</span>
+          <Badge color="neutral" className="font-bold text-md2">{count.toLocaleString()}건</Badge>
           {/* 적용된 검색식 칩 */}
           <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 border border-blue-100 rounded text-sm2 text-brand-400 font-mono truncate max-w-xs">
             {appliedQuery}
@@ -522,7 +523,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                 const absIdx = startIdx + i;
                 const rowNo = absIdx + 1;
                 const isSelected = selectedCard === absIdx;
-                const statusClass = getPatentStatusBadgeClass(d.status);
+                const statusColor = getPatentStatusBadgeColor(d.status);
                 return (
                   <tr
                     key={absIdx}
@@ -544,7 +545,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                     </td>
                     <td className="px-3 py-2 text-center text-xs2 text-gray-400">{rowNo}</td>
                     <td className="px-2 py-2 text-center">
-                      <span className={`badge text-xs2 ${statusClass}`}>{d.status}</span>
+                      <Badge color={statusColor} className="text-xs2">{d.status}</Badge>
                     </td>
                     <td className="px-2 py-2">
                       <div className="font-mono text-xs2 text-brand-400 leading-snug">{d.number}</div>
@@ -610,14 +611,14 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
 
 function InlineDetail({ d, onOpenDetail, onSave }: { d: PatentResult; onOpenDetail: () => void; onSave: () => void }) {
   if (!d) return null;
-  const statusClass = getPatentStatusBadgeClass(d.status);
+  const statusColor = getPatentStatusBadgeColor(d.status);
   return (
     <div className="space-y-3">
       <div className="font-bold text-base2 text-gray-800 leading-snug">{d.title}</div>
       <div className="flex gap-1.5 flex-wrap">
-        <span className={`badge ${statusClass}`}>{d.status}</span>
-        <span className="badge badge-blue">{d.country}</span>
-        {d.grade && <span className="badge badge-blue">평가 {d.grade}</span>}
+        <Badge color={statusColor}>{d.status}</Badge>
+        <Badge color="brand">{d.country}</Badge>
+        {d.grade && <Badge color="brand">평가 {d.grade}</Badge>}
       </div>
       <div className="space-y-1 text-sm2">
         <div><strong>출원인:</strong> {d.applicant}</div>
@@ -684,12 +685,12 @@ function SlidingView({ data, onOpenDetail, onSave, onBgPatent }: { data: PatentR
           <div
             key={i}
             data-sliding-idx={i}
-            className="card p-4"
+            className="bg-white rounded-xl border border-neutral-150 shadow-card p-4"
           >
             <div className="flex items-center gap-2 mb-2">
               <span className="font-mono text-md2 text-brand-400">{d.number}</span>
-              <span className={clsx('badge text-xs2', getPatentStatusBadgeClass(d.status))}>{d.status}</span>
-              {d.grade && <span className="badge badge-blue text-xs2">평가 {d.grade}</span>}
+              <Badge color={getPatentStatusBadgeColor(d.status)} className="text-xs2">{d.status}</Badge>
+              {d.grade && <Badge color="brand" className="text-xs2">평가 {d.grade}</Badge>}
               <div className="ml-auto flex gap-1.5">
                 <button onClick={() => onOpenDetail(i)} className="btn-outline btn-xs">전체 보기</button>
                 <button onClick={() => onSave(i)} className="btn-outline btn-xs"><Icon name="star" size={11} /> 저장</button>
@@ -788,7 +789,7 @@ function GalleryView({ data, onSave, onBgPatent }: { data: PatentResult[]; onSav
     <div className="flex-1 overflow-y-auto scroll-thin p-4 bg-gray-50">
       <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
         {data.map((d, i) => (
-          <div key={i} className="card p-3">
+          <div key={i} className="bg-white rounded-xl border border-neutral-150 shadow-card p-3">
             <div className="bg-gray-100 rounded h-40 flex items-center justify-center text-gray-400 mb-2">
               <div className="text-center">
                 <Icon name="image" size={32} className="mx-auto mb-1" />
@@ -797,7 +798,7 @@ function GalleryView({ data, onSave, onBgPatent }: { data: PatentResult[]; onSav
             </div>
             <div className="flex items-center gap-1.5 mb-1">
               <span className="font-mono text-sm2 text-brand-400">{d.number}</span>
-              <span className={clsx('badge text-xs2', getPatentStatusBadgeClass(d.status))}>{d.status}</span>
+              <Badge color={getPatentStatusBadgeColor(d.status)} className="text-xs2">{d.status}</Badge>
             </div>
             <div className="text-md2 font-semibold text-gray-800 line-clamp-2 mb-1">{d.title}</div>
             <div className="text-sm2 text-gray-500 truncate">{d.applicant}</div>

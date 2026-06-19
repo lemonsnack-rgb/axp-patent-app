@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import clsx from 'clsx';
 import { Icon } from './Icon';
+import { Badge, Input } from './ui';
 
 export type FinderType = 'keyword' | 'ipc' | 'cpc' | 'applicantCode' | 'applicantUniq' | 'numfmt';
 
@@ -125,9 +126,9 @@ export function FinderModal({ type, onApply, onClose }: Props) {
         <div className="px-4 py-2 border-b border-gray-100">
           <div className="relative">
             <Icon name="search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
+            <Input
               ref={inputRef}
-              className="input pl-8 py-2 text-sm2 w-full"
+              className="pl-8 py-2 text-sm2"
               placeholder={PLACEHOLDERS[type]}
               value={query}
               onChange={e => setQuery(e.target.value)}
@@ -316,7 +317,7 @@ function NumFormats({ query }: { query: string }) {
       {filtered.map(f => (
         <div key={f.country} className="border border-gray-200 rounded-lg p-3">
           <div className="flex items-center gap-2 mb-2">
-            <span className="badge badge-gray font-mono font-bold">{f.country}</span>
+            <Badge color="neutral" className="font-mono font-bold">{f.country}</Badge>
             <span className="text-sm2 font-semibold text-gray-700">{f.name}</span>
           </div>
           {f.patterns.map((p, i) => (

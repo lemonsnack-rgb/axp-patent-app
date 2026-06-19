@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
 import { EmptyState } from '../components/EmptyState';
+import { Badge, Card, Input } from '../components/ui';
 import { PROJECT_COLORS } from './HomeView';
 import type { TaskType } from '../types';
 
@@ -149,13 +150,14 @@ export function ProjectDetailView() {
               {projectTasks.map(t => {
                 const meta = taskTypeMeta(t.type);
                 return (
-                  <button
+                  <Card
                     key={t.id}
                     onClick={() => {
                       setActiveTaskId(t.id);
                       setMode(t.type === 'spec' ? 'spec' : 'search');
                     }}
-                    className="card p-3 text-left hover:border-blue-500 hover:shadow-card-hover active:scale-[0.98] transition-all"
+                    hoverable
+                    className="!p-3 text-left"
                   >
                     <div className="flex items-center gap-2 mb-1.5">
                       <span className={`text-${meta.color}-600`}><Icon name={meta.icon} size={14} /></span>
@@ -164,7 +166,7 @@ export function ProjectDetailView() {
                     </div>
                     <div className="text-md2 font-semibold text-gray-800 line-clamp-2 leading-snug">{t.name}</div>
                     {t.techField && <div className="text-xs2 text-gray-400 mt-1.5 truncate">{t.techField}</div>}
-                  </button>
+                  </Card>
                 );
               })}
             </div>
@@ -177,8 +179,8 @@ export function ProjectDetailView() {
             <div className="flex items-center gap-2 mb-3">
               <div className="relative">
                 <Icon name="search" size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  className="input pl-7 py-1.5 text-sm2 w-60"
+                <Input
+                  className="pl-7 py-1.5 text-sm2 w-60"
                   placeholder="제목·번호·출원인 검색..."
                   value={libSearch}
                   onChange={e => setLibSearch(e.target.value)}
@@ -201,7 +203,7 @@ export function ProjectDetailView() {
                 description="검색에서 [저장]을 누르면 여기 표시됩니다."
               />
             ) : (
-              <div className="card overflow-hidden">
+              <Card className="overflow-hidden !p-0">
                 <table className="w-full text-md2">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
@@ -216,7 +218,7 @@ export function ProjectDetailView() {
                     {libFiltered.map(l => (
                       <tr key={l.id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="px-3 py-2">
-                          <span className={`badge ${l.type === 'patent' ? 'badge-blue' : 'badge-amber'}`}>{l.type === 'patent' ? '특허' : '논문'}</span>
+                          <Badge color={l.type === 'patent' ? 'brand' : 'amber'}>{l.type === 'patent' ? '특허' : '논문'}</Badge>
                         </td>
                         <td className="px-3 py-2 font-mono text-sm2 text-blue-700">{l.refNumber}</td>
                         <td className="px-3 py-2 max-w-md truncate">{l.title}</td>
@@ -226,7 +228,7 @@ export function ProjectDetailView() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </Card>
             )}
           </>
         )}
@@ -349,11 +351,11 @@ function NewTaskInProjectModal({ open, onClose, projectId, projectName }: { open
           <>
             <div>
               <label className="label">작업 이름 (선택)</label>
-              <input className="input mt-1" value={name} onChange={e => setName(e.target.value)} maxLength={80} placeholder="비워두면 자동 설정됩니다" />
+              <Input className="mt-1" value={name} onChange={e => setName(e.target.value)} maxLength={80} placeholder="비워두면 자동 설정됩니다" />
             </div>
             <div>
               <label className="label">기술분야 (선택)</label>
-              <input className="input mt-1" value={techField} onChange={e => setTechField(e.target.value)} maxLength={60} placeholder="예: 자율주행 LIDAR" />
+              <Input className="mt-1" value={techField} onChange={e => setTechField(e.target.value)} maxLength={60} placeholder="예: 자율주행 LIDAR" />
             </div>
             <div>
               <label className="label">고객사 (선택)</label>

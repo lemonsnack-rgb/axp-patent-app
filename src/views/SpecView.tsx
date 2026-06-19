@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { SpecEditorView } from './SpecEditorView';
 import { useStore } from '../store';
 import { Icon } from '../components/Icon';
+import { Card, Input } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { PreviewModal } from '../components/PreviewModal';
 import type { PreviewSection } from '../components/PreviewModal';
@@ -465,7 +466,7 @@ export function SpecView() {
 
             {/* 직접입력 폼 — 원본: AI 분석 시작 후에도 계속 표시 (필드 잠금) */}
             {phase === 'direct' && (
-              <div className="card overflow-hidden">
+              <Card className="overflow-hidden !p-0">
                 <div className="flex items-center gap-3 p-4 border-b border-gray-100 bg-gray-50">
                   <Icon name="edit" size={20} className="text-brand-400" />
                   <div>
@@ -480,7 +481,7 @@ export function SpecView() {
                   ].map(f => (
                     <div key={f.label}>
                       <label className="block text-sm2 font-semibold text-gray-700 mb-1">{f.label}{f.req && <span className="text-red-500 ml-0.5">*</span>}</label>
-                      <input className="input py-2" placeholder={f.ph} value={f.val} onChange={e => f.set(e.target.value)} />
+                      <Input className="py-2" placeholder={f.ph} value={f.val} onChange={e => f.set(e.target.value)} />
                     </div>
                   ))}
                   <div>
@@ -493,7 +494,7 @@ export function SpecView() {
                   </div>
                   <div>
                     <label className="block text-sm2 font-semibold text-gray-700 mb-1">참고 키워드 / 선행기술</label>
-                    <input className="input py-2" placeholder="예: 트랜스포머, GPT, KR10-2023-0012345" value={diKeywords} onChange={e => setDiKeywords(e.target.value)} />
+                    <Input className="py-2" placeholder="예: 트랜스포머, GPT, KR10-2023-0012345" value={diKeywords} onChange={e => setDiKeywords(e.target.value)} />
                   </div>
                 </div>
                 {/* flow/done 상태에서는 버튼 숨김 (폼은 읽기전용으로 계속 표시) */}
@@ -514,7 +515,7 @@ export function SpecView() {
                     </button>
                   </div>
                 )}
-              </div>
+              </Card>
             )}
 
             {(phase === 'flow' || phase === 'done') && (
@@ -1750,7 +1751,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
         {/* 새 구성요소 추가 */}
         {!done && (
           <div className="flex gap-1 mt-3">
-            <input className="input text-xs2 py-1.5 flex-1" placeholder="새 구성요소 추가..." value={newText}
+            <Input className="text-xs2 py-1.5 flex-1" placeholder="새 구성요소 추가..." value={newText}
               onChange={e => setNewText(e.target.value)} onKeyDown={e => e.key==='Enter' && add()} />
             <button onClick={add} className="btn-outline btn-xs px-2"><Icon name="plus" size={12} /></button>
           </div>

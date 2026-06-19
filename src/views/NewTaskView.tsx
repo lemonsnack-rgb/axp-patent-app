@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../store';
 import type { TaskType } from '../types';
 import { Icon } from '../components/Icon';
+import { Card, Input } from '../components/ui';
 import clsx from 'clsx';
 
 const TYPES: { type: TaskType; title: string; desc: string; icon: 'doc' | 'search' | 'paper'; color: string }[] = [
@@ -95,10 +96,9 @@ export function NewTaskView() {
 
       {/* 입력 폼 */}
       {selectedType && (
-        <div className="card max-w-2xl w-full p-5 animate-fade-up">
+        <Card className="max-w-2xl w-full animate-fade-up">
           <Field label="작업 이름 (선택)">
-            <input
-              className="input"
+            <Input
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder={PLACEHOLDER[selectedType]}
@@ -113,8 +113,7 @@ export function NewTaskView() {
           </Field>
           {selectedType === 'spec' && (
             <Field label="기술분야 (선택)">
-              <input
-                className="input"
+              <Input
                 value={techField}
                 onChange={e => setTechField(e.target.value)}
                 placeholder="예: 자율주행 LIDAR, 무선통신, 의료영상"
@@ -126,7 +125,7 @@ export function NewTaskView() {
             <button className="btn-outline btn-sm" onClick={cancel}>취소</button>
             <button className="btn-primary btn-sm" onClick={submit}>작업 만들기</button>
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );

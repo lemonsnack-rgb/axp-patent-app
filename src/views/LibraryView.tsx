@@ -8,6 +8,7 @@ import { LibrarySaveModal } from '../components/LibrarySaveModal';
 import { LibraryDetailModal } from '../components/LibraryDetailModal';
 import clsx from 'clsx';
 import { EmptyState } from '../components/EmptyState';
+import { Badge, Card, Input } from '../components/ui';
 import type { LibraryItem, LibraryCollection } from '../types';
 
 type DrillFilter = { id: string };
@@ -34,13 +35,14 @@ export function LibraryView() {
     const isActive = drill?.id === c.id;
     const isUncat = c._system === 'uncat';
     return (
-      <div
+      <Card
         key={c.id}
         onClick={() => setDrill({ id: c.id })}
+        hoverable
+        selected={isActive}
         className={clsx(
-          'card p-4 flex items-start gap-3 cursor-pointer relative hover:border-blue-500 hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.98] transition-all min-h-[84px]',
+          '!p-4 flex items-start gap-3 relative min-h-[84px]',
           !isUncat && c.favorite && 'border-amber-300',
-          isActive && 'ring-2 ring-blue-500',
         )}
       >
         {!isUncat && (
@@ -74,7 +76,7 @@ export function LibraryView() {
             >삭제</button>
           )}
         </div>
-      </div>
+      </Card>
     );
   };
 
@@ -92,7 +94,7 @@ export function LibraryView() {
       <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
         <button
           onClick={() => setNewOpen(true)}
-          className="card border-dashed border-zinc-300 p-4 flex items-center gap-3 hover:border-blue-500 hover:bg-blue-50 hover:text-brand-400 active:scale-[0.98] min-h-[84px] text-zinc-500 transition-all"
+          className="bg-white rounded-xl border-2 border-dashed border-zinc-300 p-4 flex items-center gap-3 hover:border-blue-500 hover:bg-blue-50 hover:text-brand-400 active:scale-[0.98] min-h-[84px] text-zinc-500 transition-all"
         >
           <span className="w-8 h-8 bg-gray-100 rounded-md flex items-center justify-center">
             <Icon name="plus" size={18} />
@@ -154,10 +156,11 @@ function DrillDownItems({ filterId, sort, onSortChange, onOpenDetail }: {
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3">
           {items.map(it => (
-            <div
+            <Card
               key={it.id}
               onClick={() => onOpenDetail(it.id)}
-              className="card p-3 relative cursor-pointer hover:border-blue-500 hover:shadow-card-hover active:scale-[0.98] transition-all"
+              hoverable
+              className="!p-3 relative"
             >
               <button
                 onClick={e => { e.stopPropagation(); libraryToggleFavorite(it.id); }}
@@ -168,9 +171,9 @@ function DrillDownItems({ filterId, sort, onSortChange, onOpenDetail }: {
                 <Icon name={it.favorite ? 'star-filled' : 'star'} size={13} />
               </button>
               <div className="flex items-center gap-1.5 mb-1">
-                <span className={`badge ${it.type === 'patent' ? 'badge-blue' : 'badge-amber'}`}>
+                <Badge color={it.type === 'patent' ? 'brand' : 'amber'}>
                   {it.type === 'patent' ? '특허' : '논문'}
-                </span>
+                </Badge>
                 <span className="text-xs2 text-gray-500 font-mono">{it.refNumber}</span>
               </div>
               <div className="text-md2 font-semibold text-gray-800 mb-1 line-clamp-2 leading-snug pr-6">{it.title}</div>
@@ -188,7 +191,7 @@ function DrillDownItems({ filterId, sort, onSortChange, onOpenDetail }: {
               {it.note && (
                 <div className="text-xs2 text-gray-500 mt-2 line-clamp-2 italic">📝 {it.note}</div>
               )}
-            </div>
+            </Card>
           ))}
         </div>
       )}
@@ -212,8 +215,8 @@ function NewCollectionModal({ open, onClose, onCreate }: { open: boolean; onClos
     >
       <div>
         <label className="label">폴더 이름 <span className="text-red-600">*</span></label>
-        <input
-          className="input mt-1"
+        <Input
+          className="mt-1"
           value={name}
           onChange={e => setName(e.target.value)}
           placeholder="예: 자율주행 선행기술"

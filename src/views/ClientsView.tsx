@@ -4,6 +4,7 @@ import { useToast } from '../components/Toast';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
 import { EmptyState } from '../components/EmptyState';
+import { Card, Input } from '../components/ui';
 import type { Client, Contact } from '../types';
 
 interface ClientForm { name: string; industry: string; address: string }
@@ -103,7 +104,7 @@ export function ClientsView() {
       <div className="flex items-center gap-2 mb-6 ml-auto justify-end">
         <div className="relative">
           <Icon name="search" size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input className="input pl-7 py-1.5 text-sm2 w-52" placeholder="고객사 검색..." value={search} onChange={e => setSearch(e.target.value)} />
+          <Input className="pl-7 py-1.5 text-sm2 w-52" placeholder="고객사 검색..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <button className="btn-primary btn-sm" onClick={openNewClient}>
           <Icon name="plus" size={13} /> 새 고객사
@@ -120,7 +121,7 @@ export function ClientsView() {
           const cContacts = contactByClient(c.id);
           const cProjects = projects.filter(p => p.clientId === c.id).length;
           return (
-            <div key={c.id} className="card">
+            <Card key={c.id} className="!p-0">
               <div className="p-4 flex items-start gap-3 border-b border-zinc-100">
                 <span className="w-9 h-9 bg-blue-50 text-blue-700 rounded-md flex items-center justify-center shrink-0">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/></svg>
@@ -163,7 +164,7 @@ export function ClientsView() {
                   className="w-full text-sm2 text-gray-500 hover:bg-blue-50 hover:text-blue-700 py-1.5 border border-dashed border-gray-200 rounded transition-colors"
                 >+ 담당자 추가</button>
               </div>
-            </div>
+            </Card>
           );
         })}
       </div>
@@ -211,15 +212,15 @@ function ClientModal({ open, mode, form, setForm, onClose, onSubmit }: {
       <div className="space-y-3">
         <div>
           <label className="label">고객사명 <span className="text-red-600">*</span></label>
-          <input className="input mt-1" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="예: 현대자동차주식회사" maxLength={80} autoFocus />
+          <Input className="mt-1" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="예: 현대자동차주식회사" maxLength={80} autoFocus />
         </div>
         <div>
           <label className="label">업종 (선택)</label>
-          <input className="input mt-1" value={form.industry} onChange={e => setForm({ ...form, industry: e.target.value })} placeholder="예: 자동차 · 전기·전자 · IT" maxLength={40} />
+          <Input className="mt-1" value={form.industry} onChange={e => setForm({ ...form, industry: e.target.value })} placeholder="예: 자동차 · 전기·전자 · IT" maxLength={40} />
         </div>
         <div>
           <label className="label">주소 (선택)</label>
-          <input className="input mt-1" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="예: 서울 서초구 헌릉로 12" maxLength={120} />
+          <Input className="mt-1" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="예: 서울 서초구 헌릉로 12" maxLength={120} />
         </div>
       </div>
     </Modal>
@@ -249,19 +250,19 @@ function ContactModal({ open, mode, clientName, form, setForm, onClose, onSubmit
         </div>
         <div>
           <label className="label">담당자 이름 <span className="text-red-600">*</span></label>
-          <input className="input mt-1" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="예: 김OO 책임" maxLength={60} autoFocus />
+          <Input className="mt-1" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="예: 김OO 책임" maxLength={60} autoFocus />
         </div>
         <div>
           <label className="label">직책/역할 (선택)</label>
-          <input className="input mt-1" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} placeholder="예: 특허팀장 · 기획팀" maxLength={40} />
+          <Input className="mt-1" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} placeholder="예: 특허팀장 · 기획팀" maxLength={40} />
         </div>
         <div>
           <label className="label">이메일 (선택)</label>
-          <input type="email" className="input mt-1" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="name@company.com" maxLength={80} />
+          <Input type="email" className="mt-1" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="name@company.com" maxLength={80} />
         </div>
         <div>
           <label className="label">전화번호 (선택)</label>
-          <input className="input mt-1" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="02-1234-5678" maxLength={20} />
+          <Input className="mt-1" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="02-1234-5678" maxLength={20} />
         </div>
       </div>
     </Modal>
