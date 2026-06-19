@@ -12,6 +12,7 @@ import { loadSpecState, saveSpecState } from '../features/spec/specStore';
 import { PreviewModal } from '../components/PreviewModal';
 import type { PreviewSection } from '../components/PreviewModal';
 import { analyzePromptClarity, generateIntentOptions, generateMockModification } from '../features/ai/clarityAnalyzer';
+import { exportDocx } from '../utils/exportDocx';
 
 // ── KaTeX 유틸리티 ─────────────────────────────────────────────────────────
 function renderTeX(tex: string, displayMode = false): { html: string; error?: string } {
@@ -581,13 +582,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
             <span>미리보기</span>
           </button>
-          <button onClick={() => {
-            const fileName = `${task?.name || '명세서'}.docx`;
-            const blob = new Blob(['명세서 내용 (DOCX 내보내기 미구현)'], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
-            URL.revokeObjectURL(url);
-          }} title="DOCX 내보내기"
+          <button onClick={() => exportDocx(task?.name ?? '명세서', editorPreviewSections)} title="DOCX 내보내기"
             className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 transition-colors text-zinc-600 text-xs2 font-medium">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><path d="M9 2v4h4"/><path d="M5 9h6M5 11h4"/></svg>
             <span>내보내기</span>
