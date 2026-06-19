@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import clsx from 'clsx';
 import type { PatentResult } from '../types';
 import { Icon } from './Icon';
+import { Badge } from './ui';
 
 function parseKeywords(query: string): string[] {
   if (!query) return [];
@@ -35,10 +36,10 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
   searchQuery?: string;
 }) {
   const timeline = buildTimeline(data);
-  const statusClass = data.status === '등록' ? 'badge-green'
-    : data.status === '심사중' ? 'badge-amber'
-    : data.status === '소멸' || data.status === '거절' ? 'badge-gray'
-    : 'badge-blue';
+  const statusColor = data.status === '등록' ? 'green'
+    : data.status === '심사중' ? 'amber'
+    : data.status === '소멸' || data.status === '거절' ? 'neutral'
+    : 'brand';
 
   const [activeTab, setActiveTab] = useState('bib');
   const [claimMode, setClaimMode] = useState<'independent' | 'all'>('independent');
@@ -152,10 +153,10 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
             {/* 타이틀 */}
             <div className="mb-4 pb-3 border-b border-gray-100">
               <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                <span className={`badge ${statusClass}`}>● {data.status}</span>
-                <span className="badge badge-blue">{data.country}</span>
+                <Badge color={statusColor}>● {data.status}</Badge>
+                <Badge color="brand">{data.country}</Badge>
                 <span className="font-mono text-md2 font-semibold text-gray-600">{data.number}</span>
-                {data.grade && <span className="badge badge-blue">평가 {data.grade}</span>}
+                {data.grade && <Badge color="brand">평가 {data.grade}</Badge>}
               </div>
               <h2 className="text-xl font-bold text-gray-800 leading-snug">{data.title}</h2>
             </div>
@@ -337,7 +338,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                     <div className="text-sm2 font-semibold text-gray-500 mb-2">특허평가</div>
                     <div className="flex items-center gap-2 text-md2">
                       <span className="text-gray-500 w-24">평가등급</span>
-                      <span className="badge badge-blue">{data.grade}</span>
+                      <Badge color="brand">{data.grade}</Badge>
                     </div>
                   </div>
                 )}
@@ -503,7 +504,7 @@ function DrawingsPanel({ figures }: { figures?: { label: string; desc: string }[
   return (
     <div className="flex flex-col flex-1 overflow-y-auto scroll-thin p-3">
       {/* 메인 도면 */}
-      <div className="card h-44 flex flex-col items-center justify-center mb-2 shrink-0 p-2">
+      <div className="bg-white rounded-xl border border-neutral-150 shadow-card h-44 flex flex-col items-center justify-center mb-2 shrink-0 p-2">
         <Icon name="image" size={24} className="text-gray-300 mb-1" />
         <div className="text-xs2 font-semibold text-gray-500">{figs[selected]?.label}</div>
         <div className="text-xs2 text-gray-400 mt-0.5 px-2 text-center line-clamp-2">{figs[selected]?.desc}</div>

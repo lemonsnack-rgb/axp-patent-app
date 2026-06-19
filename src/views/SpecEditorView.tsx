@@ -7,6 +7,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import katex from 'katex';
 import { Icon } from '../components/Icon';
+import { Input } from '../components/ui';
 import type { InventionContext, MidspecSection, InventionSpecification } from '../features/spec/types';
 import { loadSpecState, saveSpecState } from '../features/spec/specStore';
 import { PreviewModal } from '../components/PreviewModal';
@@ -519,9 +520,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             <span className="font-semibold text-zinc-700">"{renamingComp.name}"</span>이
             일괄 변경됩니다.
           </p>
-          <input
+          <Input
             autoFocus
-            className="input w-full mb-3"
+            className="mb-3"
             value={renamingComp.draft}
             onChange={e => setRenamingComp(p => p ? { ...p, draft: e.target.value } : null)}
             onKeyDown={e => {
@@ -1003,9 +1004,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             <h3 className="text-base2 font-bold text-zinc-800 mb-4">표 삽입</h3>
             <div>
               <label className="text-xs2 font-semibold text-zinc-600 mb-1 block">행 수</label>
-              <input type="number" min={1} max={10} value={tableRows}
+              <Input type="number" min={1} max={10} value={tableRows}
                 onChange={e => setTableRows(Number(e.target.value))}
-                className="input py-1.5 w-full" />
+                className="py-1.5" />
             </div>
             <p className="text-xs2 text-zinc-400 mt-2">열 수: 3 (고정)</p>
             <div className="flex gap-2 mt-4 justify-end">

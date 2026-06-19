@@ -1,6 +1,7 @@
 // 논문 검색 입력 영역 — 원본 mockup srch-paper-section 정밀 포팅
 import { useState } from 'react';
 import { Icon } from '../components/Icon';
+import { Card, Input } from '../components/ui';
 import { FinderModal } from '../components/FinderModal';
 
 // 필드 옵션
@@ -54,7 +55,7 @@ export function PaperInput({ onRun }: Props) {
 
   return (
     <div className="flex-1 overflow-y-auto scroll-thin p-5">
-      <div className="card p-4">
+      <Card className="!p-4">
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-3">
           <div className="text-md2 font-semibold text-gray-700">
@@ -98,8 +99,8 @@ export function PaperInput({ onRun }: Props) {
               </select>
 
               {/* 입력 */}
-              <input
-                className="input py-1.5 text-sm2 flex-1 min-w-0"
+              <Input
+                className="py-1.5 text-sm2 flex-1 min-w-0"
                 value={row.value}
                 placeholder={
                   row.field === 'TI'  ? 'autonomous driving OR 자율주행*' :
@@ -154,7 +155,7 @@ export function PaperInput({ onRun }: Props) {
             </button>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* 검색 안내 */}
       <div className="flex items-center justify-center mt-12 text-gray-400">

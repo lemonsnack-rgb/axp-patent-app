@@ -1,12 +1,13 @@
 // components/ui/Badge.tsx — 작업 유형, 상태 표시용
 import clsx from 'clsx';
 
-type BadgeColor = 'brand' | 'violet' | 'amber' | 'green' | 'red' | 'neutral';
+export type BadgeColor = 'brand' | 'violet' | 'amber' | 'green' | 'red' | 'neutral';
 
 interface BadgeProps {
   color?: BadgeColor;
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 const colorClasses: Record<BadgeColor, string> = {
@@ -18,13 +19,13 @@ const colorClasses: Record<BadgeColor, string> = {
   neutral: 'bg-neutral-100 text-neutral-500',
 };
 
-export function Badge({ color = 'neutral', children, className }: BadgeProps) {
+export function Badge({ color = 'neutral', children, className, style }: BadgeProps) {
   return (
     <span className={clsx(
       'inline-flex items-center px-2 py-0.5 rounded-full text-xs2 font-medium',
       colorClasses[color],
       className,
-    )}>
+    )} style={style}>
       {children}
     </span>
   );

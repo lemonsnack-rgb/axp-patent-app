@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { PAPER_SEED } from '../data/patentSeed';
 import { PAPER_FACET_GROUPS } from '../data/facetGroups';
 import { Icon } from '../components/Icon';
+import { Badge, Card } from '../components/ui';
 import type { PaperResult } from '../types';
 
 type SortKey = 'match' | 'cited' | 'recent';
@@ -76,7 +77,7 @@ export function PaperResults({ onModify, onSave }: Props) {
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* ── sri-header ── */}
       <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 bg-white shrink-0 flex-wrap">
-        <span className="badge badge-gray font-bold text-md2">{count.toLocaleString()}건</span>
+        <Badge color="neutral" className="font-bold text-md2">{count.toLocaleString()}건</Badge>
         <span
           className="text-xs2 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-mono cursor-pointer hover:bg-blue-100 transition-colors max-w-xs truncate"
           title={appliedQuery}
@@ -125,7 +126,7 @@ export function PaperResults({ onModify, onSave }: Props) {
           >
             {g.title}
             {(pendingFilters[g.key] || []).length > 0 && (
-              <span className="ml-1 badge badge-blue text-xs2">{(pendingFilters[g.key] || []).length}</span>
+              <Badge color="brand" className="ml-1 text-xs2">{(pendingFilters[g.key] || []).length}</Badge>
             )}
           </button>
         ))}
@@ -233,13 +234,12 @@ function ListResults({
         selected && 'max-w-[55%]',
       )}>
         {data.map((p, i) => (
-          <div
+          <Card
             key={p.id}
             onClick={() => onSelect(i)}
-            className={clsx(
-              'card p-3 mb-2 cursor-pointer transition-all hover:shadow-sm',
-              selectedCard === i && 'ring-2 ring-blue-500 bg-blue-50/30',
-            )}
+            hoverable
+            selected={selectedCard === i}
+            className="!p-3 mb-2"
           >
             <div className="flex gap-3">
               <div className="flex-1 min-w-0">
@@ -274,7 +274,7 @@ function ListResults({
                 <Icon name="star" size={11} /> 저장
               </button>
             </div>
-          </div>
+          </Card>
         ))}
       </div>
 
@@ -394,11 +394,11 @@ function GalleryResults({
     <div className="flex-1 overflow-y-auto scroll-thin p-4 bg-gray-50">
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-3">
         {data.map(p => (
-          <div key={p.id} className="card p-3 flex flex-col gap-2 hover:shadow-sm transition-shadow cursor-pointer">
+          <Card key={p.id} hoverable className="!p-3 flex flex-col gap-2">
             {/* 상단: 저널 배지 */}
             <div className="flex items-center gap-2">
               {p.journal && (
-                <span className="badge badge-gray text-xs2 truncate max-w-[140px]">{p.journal}</span>
+                <Badge color="neutral" className="text-xs2 truncate max-w-[140px]">{p.journal}</Badge>
               )}
               {p.year && <span className="text-xs2 text-gray-400">{p.year}</span>}
               {p.citationCount != null && (
@@ -428,7 +428,7 @@ function GalleryResults({
               </button>
               <button className="btn-outline btn-xs text-xs2 text-red-400 hover:border-red-400">👎</button>
             </div>
-          </div>
+          </Card>
         ))}
       </div>
     </div>
