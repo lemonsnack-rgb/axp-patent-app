@@ -188,8 +188,13 @@ export function SpecView() {
   const confirm = (id: StepId) => {
     const val = gSel[id] || GUIDE_CANDS[id]?.[0] || '(확정)';
     setConfirmed(p => ({ ...p, [id]: val }));
-    // U5: 이전 확정 카드 자동 접기
-    setExpandedCards(new Set()); // 새 단계 확정 시 모두 접음
+    setExpandedCards(new Set());
+    // claims 확정 시 중간명세서 자동 로드
+    if (id === 'claims' && !midspec) {
+      import('../features/spec/mockAiService').then(({ MOCK_MIDSPEC }) => {
+        setMidspec(MOCK_MIDSPEC);
+      });
+    }
     const next = STEPS[si(id) + 1];
     if (next) { setCurStep(next.id); setGuideStep(next.id); }
     else setPhase('done');
@@ -601,6 +606,16 @@ export function SpecView() {
                                   onUpdate={v => setGSel(p => ({ ...p, claims: v }))}
                                   onFocusContext={setSpecFocusCtx}
                                   guidePanelInputRef={guidePanelInputRef}
+                                />
+                              )}
+                              {s.id === 'midspec' && (
+                                <MidspecPanel
+                                  done={false}
+                                  sections={midspec ?? []}
+                                  onUpdate={(next) => {
+                                    setMidspec(next);
+                                    setGSel(p => ({ ...p, midspec: next.map(s => `【${s.label}】\n${s.blocks.map(b => b.text).join('\n')}`).join('\n\n') }));
+                                  }}
                                 />
                               )}
                             </div>
@@ -2243,4 +2258,125 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
   );
 }
 
+// ── 중간명세서 패널 (#22) ─────────────────────────────────────────────────────
+function MidspecPanel({ done, sections, onUpdate }: {
+  done: boolean;
+  sections: MidspecSection[];
+  onUpdate: (next: MidspecSection[]) => void;
+}) {
+  const [editing, setEditing] = useState<{ sectionKey: string; blockIdx: number } | null>(null);
+  const [editVal, setEditVal] = useState('');
+  const [newTexts, setNewTexts] = useState<Record<string, string>>({});
 
+  if (sections.length === 0) {
+    return (
+      <div className="flex-1 p-4 text-center text-gray-400">
+        <p className="text-sm2">중간명세서를 생성 중입니다...</p>
+      </div>
+    );
+  }
+
+  const updateBlock = (sKey: string, bIdx: number, text: string) => {
+    const next = sections.map(s => s.key !== sKey ? s : {
+      ...s,
+      blocks: s.blocks.map((b, i) => i === bIdx ? { text } : b),
+    });
+    onUpdate(next);
+  };
+
+  const addBlock = (sKey: string) => {
+    const text = (newTexts[sKey] ?? '').trim();
+    if (!text) return;
+    const next = sections.map(s => s.key !== sKey ? s : { ...s, blocks: [...s.blocks, { text }] });
+    onUpdate(next);
+    setNewTexts(p => ({ ...p, [sKey]: '' }));
+  };
+
+  const removeBlock = (sKey: string, bIdx: number) => {
+    const next = sections.map(s => s.key !== sKey ? s : { ...s, blocks: s.blocks.filter((_, i) => i !== bIdx) });
+    onUpdate(next);
+  };
+
+  return (
+    <div className="flex-1 overflow-y-auto scroll-thin p-3 ml-1.5 space-y-3">
+      <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2">
+        <p className="text-xs2 text-brand-400 font-medium">AI가 중간명세서를 초안 작성했습니다.</p>
+        <p className="text-xs2 text-gray-500 mt-0.5">각 항목을 직접 편집하거나 블록을 추가·삭제할 수 있습니다.</p>
+      </div>
+
+      {sections.map(section => (
+        <div key={section.key} className="rounded-xl border border-zinc-200 overflow-hidden">
+          <div className="flex items-center px-3 py-2 bg-gray-50 border-b border-zinc-100">
+            <span className="text-xs2 font-bold text-gray-700">{section.label}</span>
+            <span className="text-xs2 text-gray-400 ml-2">({section.blocks.length}개 블록)</span>
+          </div>
+
+          <div className="p-2.5 space-y-2">
+            {section.blocks.map((block, bIdx) => {
+              const isEdit = editing?.sectionKey === section.key && editing.blockIdx === bIdx;
+              return (
+                <div key={bIdx} className="rounded-lg border border-zinc-100 bg-white overflow-hidden group">
+                  {isEdit ? (
+                    <div className="p-2">
+                      <textarea
+                        autoFocus
+                        className="w-full text-xs2 text-gray-800 leading-relaxed bg-transparent outline-none resize-none"
+                        value={editVal}
+                        rows={Math.max(3, Math.ceil(editVal.length / 46))}
+                        onChange={e => setEditVal(e.target.value)}
+                        ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                      />
+                      <div className="flex gap-1.5 mt-1.5 justify-end">
+                        <button
+                          onClick={() => setEditing(null)}
+                          className="text-xs2 px-2 py-1 rounded text-gray-500 hover:bg-gray-100"
+                        >취소</button>
+                        <button
+                          onClick={() => { updateBlock(section.key, bIdx, editVal); setEditing(null); }}
+                          className="text-xs2 px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
+                        >저장</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 px-3 py-2">
+                      <p className="flex-1 text-xs2 text-gray-700 leading-relaxed whitespace-pre-wrap">{block.text}</p>
+                      {!done && (
+                        <div className="flex flex-col gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => { setEditing({ sectionKey: section.key, blockIdx: bIdx }); setEditVal(block.text); }}
+                            className="text-xs2 text-blue-500 hover:text-blue-700"
+                          ><Icon name="edit" size={11} /></button>
+                          <button
+                            onClick={() => removeBlock(section.key, bIdx)}
+                            className="text-xs2 text-gray-300 hover:text-red-400"
+                          >✕</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {!done && (
+              <div className="flex gap-1.5">
+                <input
+                  value={newTexts[section.key] ?? ''}
+                  onChange={e => setNewTexts(p => ({ ...p, [section.key]: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && addBlock(section.key)}
+                  placeholder="블록 추가..."
+                  className="flex-1 text-xs2 px-2.5 py-1.5 border border-zinc-200 rounded-lg bg-zinc-50 focus:outline-none focus:border-blue-400 focus:bg-white"
+                />
+                <button
+                  onClick={() => addBlock(section.key)}
+                  disabled={!(newTexts[section.key] ?? '').trim()}
+                  className="px-2.5 py-1.5 text-xs2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 disabled:opacity-40"
+                >추가</button>
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
