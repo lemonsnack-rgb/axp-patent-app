@@ -51,6 +51,7 @@ const MOCK_SVGS = [
 
 export function DrawingEditorModal({ drawings, initialDrawingId, availableReferences, onSave, onClose, standalone = false }: Props) {
   const [activeId, setActiveId] = useState(initialDrawingId);
+  const [localDrawings, setLocalDrawings] = useState(drawings);
   const [workStageMap, setWorkStageMap] = useState<Record<string, WorkStage>>(() => {
     const m: Record<string, WorkStage> = {};
     drawings.forEach(d => {
@@ -148,8 +149,14 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const activeDraw = drawings.find(d => d.id === activeId);
+  const activeDraw = localDrawings.find(d => d.id === activeId);
   const workStage = workStageMap[activeId] || 'crop';
+
+  // 메타데이터(명칭/분류/캡션) 편집 — 내부 상태 갱신 + 부모로 전파
+  const handleSave = (id: string, updates: Partial<DrawingItem>) => {
+    setLocalDrawings(prev => prev.map(d => d.id === id ? { ...d, ...updates } : d));
+    onSave(id, updates);
+  };
 
   const goStage = useCallback((s: WorkStage) => {
     setWorkStageMap(m => ({ ...m, [activeId]: s }));
@@ -167,7 +174,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
       w: Math.round((cropBox.x2 - cropBox.x1) / 100 * imgW),
       h: Math.round((cropBox.y2 - cropBox.y1) / 100 * imgH),
     };
-    onSave(activeId, { adjustedBbox, stage: 'bbox-adjusted' });
+    handleSave(activeId, { adjustedBbox, stage: 'bbox-adjusted' });
 
     // ② 변환 시작
     goStage('converting');
@@ -201,7 +208,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
   const confirmVersion = () => {
     const selId = selectedMap[activeId];
     if (!selId) return;
-    onSave(activeId, { stage: 'editing', selectedCandidateId: selId });
+    handleSave(activeId, { stage: 'editing', selectedCandidateId: selId });
     goStage('editing');
   };
 
@@ -267,8 +274,6 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
           {activeDraw && (
             <>
               <span className="text-gray-300 mx-0.5">·</span>
-              <span className="text-sm2 text-gray-700 font-semibold">기호 {activeDraw.symbol}</span>
-              <span className="text-gray-300">·</span>
               {editingName ? (
                 <input
                   autoFocus
@@ -276,7 +281,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                   onChange={e => setNameDraft(e.target.value)}
                   onBlur={() => {
                     const v = nameDraft.trim();
-                    if (v && v !== activeDraw.name) onSave(activeId, { name: v });
+                    if (v && v !== activeDraw.name) handleSave(activeId, { name: v });
                     setEditingName(false);
                   }}
                   onKeyDown={e => {
@@ -306,7 +311,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                   onClick={() => {
                     const next = !isRepresentative;
                     setIsRepresentative(next);
-                    onSave(activeId, { isRepresentative: next });
+                    handleSave(activeId, { isRepresentative: next });
                   }}
                   className={clsx(
                     'flex items-center gap-1 px-2 py-0.5 rounded border text-xs2 font-semibold transition-all shrink-0',
@@ -364,11 +369,11 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
           <aside className="w-36 border-r border-ck-border bg-ck-bg shrink-0 flex flex-col overflow-hidden">
               <div className="px-2.5 pt-2.5 pb-1.5 border-b border-ck-border shrink-0">
                 <p className="text-xs2 font-semibold text-gray-500 uppercase tracking-wide">
-                  도면 목록 <span className="font-normal text-gray-400">({drawings.length})</span>
+                  도면 목록 <span className="font-normal text-gray-400">({localDrawings.length})</span>
                 </p>
               </div>
               <div className="flex-1 overflow-y-auto scroll-thin px-2 py-2 space-y-1.5">
-                {drawings.map(d => {
+                {localDrawings.map(d => {
                   const isActive = d.id === activeId;
                   const ws = workStageMap[d.id] || 'crop';
                   const statusBadge = d.stage === 'done'
@@ -387,8 +392,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                           ? <img src={d.exportedImageUrl} className="w-full h-full object-contain" alt="" />
                           : <Icon name="image" size={14} className="text-gray-300" />}
                       </div>
-                      <p className="text-xs2 font-semibold text-gray-700 truncate">기호 {d.symbol}</p>
-                      <p className="text-xs2 text-gray-500 truncate">{d.name}</p>
+                      <p className="text-xs2 font-semibold text-gray-700 truncate">{d.name || '(명칭 없음)'}</p>
                       <div className="mt-1">
                         {isActive
                           ? <span className="text-[9px] px-1.5 py-px rounded-full bg-blue-600 text-white font-semibold">▶ 진행 중</span>
@@ -462,24 +466,39 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                   <div className="w-48 shrink-0 border-l border-ck-border bg-ck-bg flex flex-col overflow-y-auto scroll-thin p-3 gap-3">
                     <div>
                       <p className="text-xs2 font-semibold text-gray-400 uppercase tracking-wide mb-1.5">도면 정보</p>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs2 text-gray-400 w-8 shrink-0">기호</span>
-                          <span className="text-xs2 font-bold text-gray-700">{activeDraw.symbol}</span>
+                      <div className="space-y-2">
+                        <div>
+                          <span className="text-xs2 text-gray-400 block mb-0.5">명칭</span>
+                          <input
+                            value={activeDraw.name}
+                            onChange={e => handleSave(activeId, { name: e.target.value })}
+                            placeholder="도면 명칭"
+                            className="w-full text-xs2 font-semibold text-gray-700 bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-400 transition-colors"
+                          />
                         </div>
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-xs2 text-gray-400 w-8 shrink-0">명칭</span>
-                          <span className="text-xs2 font-semibold text-gray-700 leading-relaxed">{activeDraw.name}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs2 text-gray-400 w-8 shrink-0">분류</span>
-                          <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', LABEL_COLORS[activeDraw.label] || 'bg-gray-100 text-gray-600')}>{activeDraw.label}</span>
+                        <div>
+                          <span className="text-xs2 text-gray-400 block mb-0.5">분류</span>
+                          <select
+                            value={activeDraw.label}
+                            onChange={e => handleSave(activeId, { label: e.target.value as DrawingItem['label'] })}
+                            className={clsx('w-full text-xs2 font-medium rounded px-2 py-1 border-0 outline-none cursor-pointer', LABEL_COLORS[activeDraw.label] || 'bg-gray-100 text-gray-600')}
+                          >
+                            <option value="제안기술">제안기술</option>
+                            <option value="종래기술">종래기술</option>
+                            <option value="AI생성">AI생성</option>
+                          </select>
                         </div>
                       </div>
                     </div>
                     <div>
-                      <p className="text-xs2 font-semibold text-gray-400 uppercase tracking-wide mb-1.5">직무발명서 캡션</p>
-                      <p className="text-xs2 text-gray-600 leading-relaxed">{activeDraw.description}</p>
+                      <p className="text-xs2 font-semibold text-gray-400 uppercase tracking-wide mb-1.5">캡션</p>
+                      <textarea
+                        value={activeDraw.description}
+                        onChange={e => handleSave(activeId, { description: e.target.value })}
+                        placeholder="도면 캡션·설명"
+                        rows={4}
+                        className="w-full text-xs2 text-gray-600 leading-relaxed bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-400 resize-none transition-colors"
+                      />
                     </div>
                   </div>
                 </div>

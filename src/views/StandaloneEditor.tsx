@@ -34,7 +34,7 @@ export function StandaloneEditor() {
     );
   }
 
-  const syncResult = (drawingId: string, stage: 'editing' | 'done', extra?: { editorJson?: string; exportedImageUrl?: string; adjustedBbox?: { x: number; y: number; w: number; h: number } }) => {
+  const syncResult = (drawingId: string, stage: 'editing' | 'done', extra?: { editorJson?: string; exportedImageUrl?: string; adjustedBbox?: { x: number; y: number; w: number; h: number }; detail?: { name?: string; label?: string; description?: string } }) => {
     writeEditorResult({ drawingId, stage, references: refs, ...extra, timestamp: Date.now() });
   };
 
@@ -69,10 +69,12 @@ export function StandaloneEditor() {
           onSave={(drawingId, updates) => {
             const stage = (updates.stage === 'done' || updates.stage === 'editing')
               ? updates.stage : 'editing';
+            const hasDetail = updates.name !== undefined || updates.label !== undefined || updates.description !== undefined;
             syncResult(drawingId, stage, {
               editorJson: updates.savedEditorJson,
               exportedImageUrl: updates.exportedImageUrl,
               adjustedBbox: updates.adjustedBbox,
+              detail: hasDetail ? { name: updates.name, label: updates.label, description: updates.description } : undefined,
             });
           }}
           onClose={() => {

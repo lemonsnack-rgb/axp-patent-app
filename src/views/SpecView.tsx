@@ -2052,14 +2052,33 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
   };
 
   useEffect(() => {
+    // 편집기 라벨(제안기술/종래기술/AI생성) → API 라벨 역매핑
+    const LABEL_TO_API: Record<string, Drawing['detail']['label']> = {
+      '제안기술': 'proposed_implementation',
+      '종래기술': 'previous_implementation',
+      'AI생성': 'proposed_implementation',
+    };
     return onEditorResult((result) => {
       const idx = parseInt(result.drawingId, 10);
-      if (!isNaN(idx) && result.adjustedBbox) {
-        const ab = result.adjustedBbox;
-        updateDrawings(drawings.map((d, i) =>
-          i === idx ? { ...d, image: { ...d.image, bbox: { x1: ab.x, y1: ab.y, x2: ab.x + ab.w, y2: ab.y + ab.h } } } : d
-        ));
-      }
+      if (isNaN(idx)) return;
+      updateDrawings(drawings.map((d, i) => {
+        if (i !== idx) return d;
+        let next = d;
+        if (result.adjustedBbox) {
+          const ab = result.adjustedBbox;
+          next = { ...next, image: { ...next.image, bbox: { x1: ab.x, y1: ab.y, x2: ab.x + ab.w, y2: ab.y + ab.h } } };
+        }
+        if (result.detail) {
+          const dt = result.detail;
+          next = { ...next, detail: {
+            ...next.detail,
+            ...(dt.name !== undefined ? { name: dt.name } : {}),
+            ...(dt.description !== undefined ? { description: dt.description } : {}),
+            ...(dt.label !== undefined ? { label: LABEL_TO_API[dt.label] ?? next.detail.label } : {}),
+          } };
+        }
+        return next;
+      }));
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawings]);

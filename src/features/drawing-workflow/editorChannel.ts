@@ -21,6 +21,7 @@ export interface EditorResult {
   editorJson?: string;
   exportedImageUrl?: string;
   adjustedBbox?: { x: number; y: number; w: number; h: number };
+  detail?: { name?: string; label?: string; description?: string }; // 명칭·분류·캡션 편집 전파
   stage: 'editing' | 'done';
   references: EditorReference[];
   timestamp: number;
