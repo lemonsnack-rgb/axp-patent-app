@@ -2206,9 +2206,21 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                   isRep && included ? 'border-blue-500 ring-2 ring-blue-200' : included ? 'border-blue-300' : 'border-zinc-200 opacity-60',
                   done && 'pointer-events-none',
                 )}>
-                  {renderThumbnail(d, isRep ? (
-                    <span className="absolute top-1.5 right-1.5 text-xs2 px-2 py-0.5 rounded-full font-semibold bg-blue-600 text-white">대표</span>
-                  ) : undefined)}
+                  {renderThumbnail(d, (
+                    <>
+                      {!done && (
+                        <button
+                          onClick={() => toggleIncluded(idx)}
+                          className={clsx(
+                            'absolute top-1.5 left-1.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all shadow-sm',
+                            included ? 'bg-brand-400 border-blue-600 text-white' : 'bg-white/90 border-gray-300',
+                          )}
+                          title={included ? '맥락에서 제외 (흐림)' : '맥락에 사용'}
+                        >{included && <Icon name="check" size={11} />}</button>
+                      )}
+                      {isRep && <span className="absolute top-1.5 right-1.5 text-xs2 px-2 py-0.5 rounded-full font-semibold bg-blue-600 text-white">대표</span>}
+                    </>
+                  ))}
                   <div className="px-2.5 pt-1.5 pb-1">
                     <div className="flex items-center gap-1 flex-wrap mb-0.5">
                       <span className="text-xs2 font-bold text-gray-700">{d.detail.symbol}</span>
@@ -2233,22 +2245,9 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                   {!done && (
                     <div className="flex border-t border-gray-100">
                       <button
-                        onClick={() => toggleIncluded(idx)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs2 font-semibold hover:bg-gray-50 transition-colors"
-                        title={included ? '맥락에서 제외 (흐림)' : '맥락에 사용'}
-                      >
-                        <span className={clsx(
-                          'w-4 h-4 rounded border-2 flex items-center justify-center transition-all shrink-0',
-                          included ? 'bg-brand-400 border-blue-600 text-white' : 'border-gray-300 bg-white',
-                        )}>
-                          {included && <Icon name="check" size={8} />}
-                        </span>
-                        <span className={included ? 'text-blue-700' : 'text-gray-400'}>사용</span>
-                      </button>
-                      <button
                         onClick={() => included && setRepresentative(idx)}
                         disabled={!included}
-                        className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 hover:bg-gray-50 disabled:opacity-30 transition-colors"
+                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs2 font-semibold hover:bg-gray-50 disabled:opacity-30 transition-colors"
                         title="대표 이미지 (1개만)"
                       >
                         <span className={clsx(
@@ -2310,10 +2309,24 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                   isForSpec ? (isRep ? 'border-blue-500 ring-2 ring-blue-200' : 'border-blue-300') : 'border-zinc-200 opacity-60',
                   done && 'pointer-events-none',
                 )}>
-                  {renderThumbnail(d, isForSpec ? (
-                    <span className="absolute top-1.5 left-1.5 text-xs2 px-2 py-0.5 rounded-full font-bold bg-blue-600 text-white">도 {myFig}{isRep ? ' · 대표' : ''}</span>
-                  ) : (
-                    <span className="absolute top-1.5 left-1.5 text-xs2 px-2 py-0.5 rounded-full font-medium bg-gray-200 text-gray-500">AI 참고용</span>
+                  {renderThumbnail(d, (
+                    <>
+                      {!done && (
+                        <button
+                          onClick={() => toggleUseForSpec(idx)}
+                          className={clsx(
+                            'absolute top-1.5 left-1.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all shadow-sm',
+                            isForSpec ? 'bg-brand-400 border-blue-600 text-white' : 'bg-white/90 border-gray-300',
+                          )}
+                          title={isForSpec ? '명세서에서 제외 (AI 참고용)' : '명세서 도면으로 채택'}
+                        >{isForSpec && <Icon name="check" size={11} />}</button>
+                      )}
+                      {isForSpec ? (
+                        <span className="absolute top-1.5 right-1.5 text-xs2 px-2 py-0.5 rounded-full font-bold bg-blue-600 text-white">도 {myFig}{isRep ? ' · 대표' : ''}</span>
+                      ) : (
+                        <span className="absolute top-1.5 right-1.5 text-xs2 px-2 py-0.5 rounded-full font-medium bg-gray-200 text-gray-500">AI 참고용</span>
+                      )}
+                    </>
                   ))}
                   <div className="px-2.5 pt-1.5 pb-1">
                     <div className="flex items-center gap-1 flex-wrap mb-0.5">
@@ -2335,37 +2348,23 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                     </div>
                     <p className="text-xs2 text-gray-700 font-semibold leading-snug line-clamp-1">{d.detail.name}</p>
                   </div>
-                  {!done && (
+                  {!done && isForSpec && (
                     <div className="flex border-t border-gray-100">
                       <button
-                        onClick={() => toggleUseForSpec(idx)}
+                        onClick={() => setRepresentative(idx)}
                         className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs2 font-semibold hover:bg-gray-50 transition-colors"
-                        title={isForSpec ? '명세서에서 제외(AI 참고용)' : '명세서 도면으로 채택'}
+                        title="대표도면 (1개만)"
                       >
-                        <span className={clsx('w-4 h-4 rounded border-2 flex items-center justify-center transition-all shrink-0', isForSpec ? 'bg-brand-400 border-blue-600 text-white' : 'border-gray-300 bg-white')}>
-                          {isForSpec && <Icon name="check" size={8} />}
+                        <span className={clsx('w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0', isRep ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white')}>
+                          {isRep && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                         </span>
-                        <span className={isForSpec ? 'text-blue-700' : 'text-gray-400'}>명세서 도면</span>
+                        <span className={isRep ? 'text-blue-700' : 'text-gray-400'}>대표</span>
                       </button>
-                      {isForSpec && (
-                        <>
-                          <button
-                            onClick={() => setRepresentative(idx)}
-                            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 hover:bg-gray-50 transition-colors"
-                            title="대표도면 (1개만)"
-                          >
-                            <span className={clsx('w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0', isRep ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white')}>
-                              {isRep && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-                            </span>
-                            <span className={isRep ? 'text-blue-700' : 'text-gray-400'}>대표</span>
-                          </button>
-                          <button
-                            onClick={() => openEditorTab({ drawingId: String(idx), drawings: drawings.map(toWorkflowDrawingItem), components: [], references: [], drawingName: d.detail.name, timestamp: Date.now() })}
-                            className="px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 text-blue-500 hover:bg-blue-50 transition-colors"
-                            title="범위 조정·CAD 변환"
-                          >변환</button>
-                        </>
-                      )}
+                      <button
+                        onClick={() => openEditorTab({ drawingId: String(idx), drawings: drawings.map(toWorkflowDrawingItem), components: [], references: [], drawingName: d.detail.name, timestamp: Date.now() })}
+                        className="px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 text-blue-500 hover:bg-blue-50 transition-colors"
+                        title="범위 조정·CAD 변환"
+                      >변환</button>
                     </div>
                   )}
                 </div>
