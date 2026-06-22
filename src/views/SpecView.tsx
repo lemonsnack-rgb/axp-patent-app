@@ -1511,19 +1511,19 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
 }
 
 // 구성요소 패널 (#20)
-interface CompItem { id: number; text: string; sel: boolean; num: string; depth: number; englishName?: string; definition?: string; parent?: string }
-const INIT_COMPS: CompItem[] = [
-  { id: 1, text: '데이터 수집부: 라이다 센서로부터 3D 포인트 클라우드 데이터를 수집', sel: true, num: '', depth: 0 },
-  { id: 2, text: '전처리부: 노이즈 제거 및 다운샘플링을 통해 데이터 전처리 수행', sel: true, num: '', depth: 0 },
-  { id: 3, text: '특징 추출부: PointNet++ 아키텍처를 적용하여 포인트 특징 추출', sel: true, num: '', depth: 0 },
-  { id: 4, text: '인식부: 딥러닝 모델을 이용하여 객체 분류 및 위치 추정', sel: true, num: '', depth: 0 },
-  { id: 5, text: '출력부: 인식된 객체의 3D 위치, 크기, 종류를 출력', sel: true, num: '', depth: 0 },
-];
-
-function extractCompName(text: string): string {
-  const colonIdx = text.indexOf(':');
-  return colonIdx > 0 ? text.slice(0, colonIdx).trim() : text.trim();
+interface CompItem {
+  id: number; num: string; depth: number; sel: boolean;
+  value_ko: string; value_en: string;          // 명칭 / 명칭 영문명
+  hypernym_ko: string; hypernym_en: string;     // 상위어 / 상위어 영문명
+  description: string;                          // 정의
 }
+const INIT_COMPS: CompItem[] = [
+  { id: 1, num: '', depth: 0, sel: true, value_ko: '데이터 수집부', value_en: 'Data Collector', hypernym_ko: '수집 장치', hypernym_en: 'Collecting Device', description: '라이다 센서로부터 3D 포인트 클라우드 데이터를 수집' },
+  { id: 2, num: '', depth: 0, sel: true, value_ko: '전처리부', value_en: 'Preprocessor', hypernym_ko: '처리 장치', hypernym_en: 'Processing Device', description: '노이즈 제거 및 다운샘플링을 통해 데이터 전처리 수행' },
+  { id: 3, num: '', depth: 0, sel: true, value_ko: '특징 추출부', value_en: 'Feature Extractor', hypernym_ko: '처리 장치', hypernym_en: 'Processing Device', description: 'PointNet++ 아키텍처를 적용하여 포인트 특징 추출' },
+  { id: 4, num: '', depth: 0, sel: true, value_ko: '인식부', value_en: 'Recognizer', hypernym_ko: '처리 장치', hypernym_en: 'Processing Device', description: '딥러닝 모델을 이용하여 객체 분류 및 위치 추정' },
+  { id: 5, num: '', depth: 0, sel: true, value_ko: '출력부', value_en: 'Output Unit', hypernym_ko: '출력 장치', hypernym_en: 'Output Device', description: '인식된 객체의 3D 위치, 크기, 종류를 출력' },
+];
 
 // depth+순서 기반 부호 자동 계산
 function calcAutoNums(items: CompItem[]): CompItem[] {
@@ -1551,26 +1551,21 @@ function calcAutoNums(items: CompItem[]): CompItem[] {
 
 function specItemToCompItem(el: SpecComponentItem): CompItem {
   return {
-    id: el.id,
-    text: el.value_ko + (el.description ? ': ' + el.description : ''),
-    sel: el.sel,
-    num: el.symbol,
-    depth: el.depth,
-    englishName: el.value_en,
-    definition: el.hypernym_ko,
-    parent: '',
+    id: el.id, num: el.symbol, depth: el.depth, sel: el.sel,
+    value_ko: el.value_ko, value_en: el.value_en,
+    hypernym_ko: el.hypernym_ko, hypernym_en: el.hypernym_en,
+    description: el.description,
   };
 }
 
-function compItemToSpecItem(item: CompItem, origMap: Map<number, SpecComponentItem>): SpecComponentItem {
-  const orig = origMap.get(item.id);
+function compItemToSpecItem(item: CompItem): SpecComponentItem {
   return {
     symbol: item.num,
-    value_ko: extractCompName(item.text),
-    value_en: item.englishName ?? orig?.value_en ?? '',
-    description: item.text.includes(':') ? item.text.split(':').slice(1).join(':').trim() : (orig?.description ?? ''),
-    hypernym_ko: item.definition ?? orig?.hypernym_ko ?? '',
-    hypernym_en: orig?.hypernym_en ?? '',
+    value_ko: item.value_ko,
+    value_en: item.value_en,
+    description: item.description,
+    hypernym_ko: item.hypernym_ko,
+    hypernym_en: item.hypernym_en,
     id: item.id,
     depth: item.depth,
     sel: item.sel,
@@ -1587,26 +1582,23 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
   const initData: CompItem[] = (initialItems && initialItems.length > 0)
     ? initialItems.map(specItemToCompItem)
     : INIT_COMPS;
-  const origMapRef = useRef(new Map<number, SpecComponentItem>(initialItems?.map(el => [el.id, el]) ?? []));
   const [items, setItems] = useState<CompItem[]>(initData);
   const [focusId, setFocusId] = useState<number | null>(null);
 
+  const serializeLine = (it: CompItem) => `${it.num || '—'} ${it.value_ko}${it.value_en ? ` (${it.value_en})` : ''}`;
+
   useEffect(() => {
     const selected = initData.filter(it => it.sel);
-    onUpdate(selected.map(it => `${it.num || '—'} ${it.text}`).join('\n'));
-    onComponentsChange?.(selected.map(it => compItemToSpecItem(it, origMapRef.current)));
+    onUpdate(selected.map(serializeLine).join('\n'));
+    onComponentsChange?.(selected.map(compItemToSpecItem));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const upd = (next: CompItem[]) => {
     setItems(next);
     const selected = next.filter(it => it.sel);
-    onUpdate(selected.map(it => {
-      let line = `${it.num || '—'} ${extractCompName(it.text)}`;
-      if (it.englishName) line += ` (${it.englishName})`;
-      return line;
-    }).join('\n'));
-    onComponentsChange?.(next.map(it => compItemToSpecItem(it, origMapRef.current)));
+    onUpdate(selected.map(serializeLine).join('\n'));
+    onComponentsChange?.(next.map(compItemToSpecItem));
   };
 
   const hasNums = (arr: CompItem[]) => arr.some(it => it.num);
@@ -1618,10 +1610,11 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
   const indent   = (id: number)  => { if (!done) applyUpd(items.map(it => it.id===id ? {...it, depth: Math.min(it.depth+1,2)} : it)); };
   const outdent  = (id: number)  => { if (!done) applyUpd(items.map(it => it.id===id ? {...it, depth: Math.max(it.depth-1,0)} : it)); };
   const autoAssign = () => { if (!done) upd(calcAutoNums(items)); };
+  const EMPTY_COMP = { num: '', depth: 0, sel: true, value_ko: '', value_en: '', hypernym_ko: '', hypernym_en: '', description: '' };
   const add = () => {
     if (done) return;
     const id = Date.now();
-    upd([...items, { id, text: '', sel: true, num: '', depth: 0, englishName: '', definition: '', parent: '' }]);
+    upd([...items, { id, ...EMPTY_COMP }]);
     setFocusId(id);
   };
   // AI 추가 — 자연어 지시로 새 구성요소를 추가 (mock). 기존 항목은 절대 건드리지 않아 손실 없음.
@@ -1632,12 +1625,9 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
     if (!instr || done) return;
     const id = Date.now();
     upd([...items, {
-      id,
-      text: instr.length > 24 ? instr.slice(0, 24) : instr,
-      sel: true, num: '', depth: 0,
-      englishName: '',
-      definition: `${instr} (AI 제안 — 상세 설명·영문명·상위어를 보완하세요)`,
-      parent: '',
+      id, ...EMPTY_COMP,
+      value_ko: instr.length > 24 ? instr.slice(0, 24) : instr,
+      description: `${instr} (AI 제안 — 영문명·상위어를 보완하세요)`,
     }]);
     setAiInput('');
     setAiOpen(false);
@@ -1743,7 +1733,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                 <div className="flex items-center gap-1">
                   {!done && (
                     <button
-                      onClick={() => upd(items.map(it => it.id===item.id ? {...it, sel: !it.sel} : it).filter(it => it.sel || it.text.trim()))}
+                      onClick={() => upd(items.map(it => it.id===item.id ? {...it, sel: !it.sel} : it).filter(it => it.sel || it.value_ko.trim()))}
                       className={clsx(
                         'shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-all',
                         item.sel
@@ -1785,60 +1775,80 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                   )}
                 </div>
 
-                {/* 필드 행 — 라벨 컬럼 정렬 (명칭/영문명/정의/상위어) */}
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs2 text-gray-400 w-11 shrink-0">명칭</span>
-                    {!done ? (
-                      <input
-                        ref={el => { if (el && item.id === focusId) { el.focus(); setFocusId(null); } }}
-                        className="flex-1 text-xs2 text-gray-800 font-medium bg-gray-50 border border-gray-200 rounded px-2 py-0.5 outline-none focus:border-blue-300 focus:bg-white transition-colors min-w-0"
-                        value={item.text}
-                        placeholder="구성요소 명칭..."
-                        onChange={e => upd(items.map(it => it.id===item.id ? {...it, text: e.target.value} : it))}
-                      />
-                    ) : (
-                      <span className="flex-1 text-xs2 text-gray-800 font-medium min-w-0 truncate">{item.text}</span>
-                    )}
+                {/* 필드 행 — 명칭/영문명 2단, 상위어/상위어영문명 2단, 정의 전체폭 */}
+                <div className="space-y-1.5">
+                  {/* 명칭 / 명칭 영문명 */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-xs2 text-gray-400 block mb-0.5">명칭</span>
+                      {!done ? (
+                        <input
+                          ref={el => { if (el && item.id === focusId) { el.focus(); setFocusId(null); } }}
+                          className="w-full text-xs2 text-gray-800 font-medium bg-gray-50 border border-gray-200 rounded px-2 py-0.5 outline-none focus:border-blue-300 focus:bg-white transition-colors min-w-0"
+                          value={item.value_ko}
+                          placeholder="구성요소 명칭"
+                          onChange={e => upd(items.map(it => it.id===item.id ? {...it, value_ko: e.target.value} : it))}
+                        />
+                      ) : (
+                        <span className="text-xs2 text-gray-800 font-medium truncate block">{item.value_ko || <span className="text-gray-300">—</span>}</span>
+                      )}
+                    </div>
+                    <div>
+                      <span className="text-xs2 text-gray-400 block mb-0.5">명칭 영문명</span>
+                      {!done ? (
+                        <input
+                          className="w-full text-xs2 text-gray-600 bg-gray-50 border border-gray-200 rounded px-2 py-0.5 outline-none focus:border-blue-300 focus:bg-white transition-colors min-w-0"
+                          value={item.value_en}
+                          placeholder="English name"
+                          onChange={e => upd(items.map(it => it.id===item.id ? {...it, value_en: e.target.value} : it))}
+                        />
+                      ) : (
+                        <span className="text-xs2 text-gray-500 truncate block">{item.value_en || <span className="text-gray-300">—</span>}</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs2 text-gray-400 w-11 shrink-0">영문명</span>
-                    {!done ? (
-                      <input
-                        className="flex-1 text-xs2 text-gray-600 bg-gray-50 border border-gray-200 rounded px-2 py-0.5 outline-none focus:border-blue-300 focus:bg-white transition-colors"
-                        value={item.englishName || ''}
-                        placeholder="English name"
-                        onChange={e => upd(items.map(it => it.id===item.id ? {...it, englishName: e.target.value} : it))}
-                      />
-                    ) : (
-                      <span className="flex-1 text-xs2 text-gray-500">{item.englishName || <span className="text-gray-300">—</span>}</span>
-                    )}
+                  {/* 상위어 / 상위어 영문명 */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-xs2 text-gray-400 block mb-0.5">상위어</span>
+                      {!done ? (
+                        <input
+                          className="w-full text-xs2 text-gray-600 bg-gray-50 border border-gray-200 rounded px-2 py-0.5 outline-none focus:border-blue-300 focus:bg-white transition-colors min-w-0"
+                          value={item.hypernym_ko}
+                          placeholder="상위 개념"
+                          onChange={e => upd(items.map(it => it.id===item.id ? {...it, hypernym_ko: e.target.value} : it))}
+                        />
+                      ) : (
+                        <span className="text-xs2 text-gray-500 truncate block">{item.hypernym_ko || <span className="text-gray-300">—</span>}</span>
+                      )}
+                    </div>
+                    <div>
+                      <span className="text-xs2 text-gray-400 block mb-0.5">상위어 영문명</span>
+                      {!done ? (
+                        <input
+                          className="w-full text-xs2 text-gray-600 bg-gray-50 border border-gray-200 rounded px-2 py-0.5 outline-none focus:border-blue-300 focus:bg-white transition-colors min-w-0"
+                          value={item.hypernym_en}
+                          placeholder="hypernym (English)"
+                          onChange={e => upd(items.map(it => it.id===item.id ? {...it, hypernym_en: e.target.value} : it))}
+                        />
+                      ) : (
+                        <span className="text-xs2 text-gray-500 truncate block">{item.hypernym_en || <span className="text-gray-300">—</span>}</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-start gap-1.5">
-                    <span className="text-xs2 text-gray-400 w-11 shrink-0 mt-0.5">정의</span>
+                  {/* 정의 (전체폭) */}
+                  <div>
+                    <span className="text-xs2 text-gray-400 block mb-0.5">정의</span>
                     {!done ? (
                       <Textarea
-                        className="flex-1 text-xs2 text-gray-600 bg-gray-50 px-2 py-0.5"
-                        value={item.definition || ''}
+                        className="w-full text-xs2 text-gray-600 bg-gray-50 px-2 py-0.5"
+                        value={item.description}
                         placeholder="구성요소의 기능·역할 설명"
                         rows={2}
-                        onChange={e => upd(items.map(it => it.id===item.id ? {...it, definition: e.target.value} : it))}
+                        onChange={e => upd(items.map(it => it.id===item.id ? {...it, description: e.target.value} : it))}
                       />
                     ) : (
-                      <span className="flex-1 text-xs2 text-gray-500 leading-relaxed">{item.definition || <span className="text-gray-300">—</span>}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs2 text-gray-400 w-11 shrink-0">상위어</span>
-                    {!done ? (
-                      <input
-                        className="flex-1 text-xs2 text-gray-600 bg-gray-50 border border-gray-200 rounded px-2 py-0.5 outline-none focus:border-blue-300 focus:bg-white transition-colors"
-                        value={item.parent || ''}
-                        placeholder="상위 개념 / hypernym"
-                        onChange={e => upd(items.map(it => it.id===item.id ? {...it, parent: e.target.value} : it))}
-                      />
-                    ) : (
-                      <span className="flex-1 text-xs2 text-gray-500">{item.parent || <span className="text-gray-300">—</span>}</span>
+                      <span className="text-xs2 text-gray-500 leading-relaxed block">{item.description || <span className="text-gray-300">—</span>}</span>
                     )}
                   </div>
                 </div>
