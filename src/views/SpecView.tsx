@@ -612,6 +612,8 @@ export function SpecView() {
                             {s.id === 'midspec' && (
                               <MidspecPanel
                                 done={isDone}
+                                onFocusContext={setSpecFocusCtx}
+                                guidePanelInputRef={guidePanelInputRef}
                                 sections={midspec ?? []}
                                 onUpdate={(next) => {
                                   setMidspec(next);
@@ -2008,6 +2010,12 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
     updateDrawings(next);
   };
 
+  const setDrawingLabel = (idx: number, label: Drawing['detail']['label']) => {
+    if (done) return;
+    const next = drawings.map((d, i) => i === idx ? { ...d, detail: { ...d.detail, label } } : d);
+    updateDrawings(next);
+  };
+
   const cloneDrawing = (idx: number) => {
     if (done) return;
     const orig = drawings[idx];
@@ -2089,7 +2097,21 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
                   <div className="px-2.5 pt-1.5 pb-1">
                     <div className="flex items-center gap-1 flex-wrap mb-0.5">
                       <span className="text-xs2 font-bold text-gray-700">{d.detail.symbol}</span>
-                      <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', labelInfo.cls)}>{labelInfo.text}</span>
+                      {done ? (
+                        <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', labelInfo.cls)}>{labelInfo.text}</span>
+                      ) : (
+                        <select
+                          value={d.detail.label}
+                          onChange={e => setDrawingLabel(idx, e.target.value as Drawing['detail']['label'])}
+                          className={clsx('text-xs2 px-1 py-px rounded-full font-medium border-0 outline-none cursor-pointer', labelInfo.cls)}
+                          title="도면 분류 변경"
+                        >
+                          <option value="proposed_implementation">제안기술</option>
+                          <option value="previous_implementation">종래기술</option>
+                          <option value="background">배경</option>
+                          <option value="effect">효과</option>
+                        </select>
+                      )}
                     </div>
                     <p className="text-xs2 text-gray-700 font-semibold leading-snug line-clamp-1">{d.detail.name}</p>
                   </div>
@@ -2179,7 +2201,21 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
                   <div className="px-2.5 pt-1.5 pb-1">
                     <div className="flex items-center gap-1 flex-wrap mb-0.5">
                       <span className="text-xs2 font-bold text-gray-700">{d.detail.symbol}</span>
-                      <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', labelInfo.cls)}>{labelInfo.text}</span>
+                      {done ? (
+                        <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', labelInfo.cls)}>{labelInfo.text}</span>
+                      ) : (
+                        <select
+                          value={d.detail.label}
+                          onChange={e => setDrawingLabel(idx, e.target.value as Drawing['detail']['label'])}
+                          className={clsx('text-xs2 px-1 py-px rounded-full font-medium border-0 outline-none cursor-pointer', labelInfo.cls)}
+                          title="도면 분류 변경"
+                        >
+                          <option value="proposed_implementation">제안기술</option>
+                          <option value="previous_implementation">종래기술</option>
+                          <option value="background">배경</option>
+                          <option value="effect">효과</option>
+                        </select>
+                      )}
                     </div>
                     <p className="text-xs2 text-gray-700 font-semibold leading-snug line-clamp-1">{d.detail.name}</p>
                   </div>
@@ -2826,11 +2862,13 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
 }
 
 // ── 중간명세서 패널 (#22) ─────────────────────────────────────────────────────
-function MidspecPanel({ done, sections, onUpdate, onGoToEditor }: {
+function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onFocusContext, guidePanelInputRef }: {
   done: boolean;
   sections: MidspecSection[];
   onUpdate: (next: MidspecSection[]) => void;
   onGoToEditor?: () => void;
+  onFocusContext?: (ctx: { text: string; label: string; apply: (t: string) => void }) => void;
+  guidePanelInputRef?: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const [editing, setEditing] = useState<{ sectionKey: string; blockIdx: number } | null>(null);
   const [editVal, setEditVal] = useState('');
@@ -2912,10 +2950,22 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor }: {
                         <div className="flex flex-col gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => { setEditing({ sectionKey: section.key, blockIdx: bIdx }); setEditVal(block.text); }}
+                            title="직접 편집"
                             className="text-xs2 text-blue-500 hover:text-blue-700"
                           ><Icon name="edit" size={11} /></button>
+                          {onFocusContext && (
+                            <button
+                              onClick={() => {
+                                onFocusContext({ text: block.text, label: `${section.label} 블록`, apply: (newText) => updateBlock(section.key, bIdx, newText) });
+                                setTimeout(() => guidePanelInputRef?.current?.focus(), 50);
+                              }}
+                              title="AI 수정 요청"
+                              className="text-xs2 text-violet-500 hover:text-violet-700"
+                            ><svg viewBox="0 0 16 16" fill="currentColor" width="11" height="11"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg></button>
+                          )}
                           <button
                             onClick={() => removeBlock(section.key, bIdx)}
+                            title="삭제"
                             className="text-xs2 text-gray-300 hover:text-red-400"
                           >✕</button>
                         </div>
