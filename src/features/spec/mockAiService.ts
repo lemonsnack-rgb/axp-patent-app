@@ -75,19 +75,24 @@ export function generateComponentCandidates(_input: InventionInput): SpecCompone
 
 // ── 도면 mock ─────────────────────────────────────────────────────────────────
 
+// 임의의 특허 도면 형태 SVG (ASCII만 — base64 인코딩용)
+const _FIG1 = `<svg xmlns='http://www.w3.org/2000/svg' width='640' height='400' viewBox='0 0 640 400'><rect width='640' height='400' fill='#ffffff'/><text x='320' y='36' font-family='sans-serif' font-size='20' text-anchor='middle' fill='#333'>FIG. 1</text><rect x='40' y='150' width='110' height='64' rx='4' fill='none' stroke='#333' stroke-width='2'/><text x='95' y='188' font-family='sans-serif' font-size='15' text-anchor='middle' fill='#333'>100</text><rect x='205' y='150' width='110' height='64' rx='4' fill='none' stroke='#333' stroke-width='2'/><text x='260' y='188' font-family='sans-serif' font-size='15' text-anchor='middle' fill='#333'>200</text><rect x='370' y='150' width='110' height='64' rx='4' fill='none' stroke='#333' stroke-width='2'/><text x='425' y='188' font-family='sans-serif' font-size='15' text-anchor='middle' fill='#333'>300</text><rect x='300' y='280' width='110' height='60' rx='4' fill='none' stroke='#333' stroke-width='2'/><text x='355' y='316' font-family='sans-serif' font-size='15' text-anchor='middle' fill='#333'>400</text><line x1='150' y1='182' x2='205' y2='182' stroke='#333' stroke-width='2'/><polygon points='205,182 196,177 196,187' fill='#333'/><line x1='315' y1='182' x2='370' y2='182' stroke='#333' stroke-width='2'/><polygon points='370,182 361,177 361,187' fill='#333'/><line x1='425' y1='214' x2='380' y2='280' stroke='#333' stroke-width='2'/></svg>`;
+const _FIG2 = `<svg xmlns='http://www.w3.org/2000/svg' width='640' height='400' viewBox='0 0 640 400'><rect width='640' height='400' fill='#ffffff'/><text x='320' y='36' font-family='sans-serif' font-size='20' text-anchor='middle' fill='#333'>FIG. 2 (Prior Art)</text><rect x='110' y='160' width='160' height='80' rx='4' fill='none' stroke='#555' stroke-width='2'/><text x='190' y='205' font-family='sans-serif' font-size='15' text-anchor='middle' fill='#555'>10</text><rect x='370' y='160' width='160' height='80' rx='4' fill='none' stroke='#555' stroke-width='2'/><text x='450' y='205' font-family='sans-serif' font-size='15' text-anchor='middle' fill='#555'>20</text><line x1='270' y1='200' x2='370' y2='200' stroke='#555' stroke-width='2'/><polygon points='370,200 361,195 361,205' fill='#555'/></svg>`;
+const _b64 = (s: string): string => { try { return typeof btoa !== 'undefined' ? btoa(s) : ''; } catch { return ''; } };
+
 export const MOCK_DRAWINGS: Drawing[] = [
   {
     image: {
-      file: { data: '', media_type: 'image/png' },
-      bbox: { x1: 0, y1: 53, x2: 1507, y2: 518 },
+      file: { data: _b64(_FIG1), media_type: 'image/svg+xml' },
+      bbox: { x1: 0, y1: 0, x2: 640, y2: 400 },
     },
     detail: { symbol: '도면1', name: '시스템 전체 구성도', description: '발명의 전체 구성을 나타내는 블록도', label: 'proposed_implementation' },
     included: true, useForSpec: false, isRepresentative: false,
   },
   {
     image: {
-      file: { data: '', media_type: 'image/png' },
-      bbox: { x1: 0, y1: 600, x2: 1507, y2: 900 },
+      file: { data: _b64(_FIG2), media_type: 'image/svg+xml' },
+      bbox: { x1: 0, y1: 0, x2: 640, y2: 400 },
     },
     detail: { symbol: '도면2', name: '종래 기술 구성도', description: '기존 기술 구조를 나타낸 도면', label: 'previous_implementation' },
     included: true, useForSpec: false, isRepresentative: false,
