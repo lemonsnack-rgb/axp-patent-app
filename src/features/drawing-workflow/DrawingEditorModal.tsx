@@ -485,7 +485,6 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                           >
                             <option value="제안기술">제안기술</option>
                             <option value="종래기술">종래기술</option>
-                            <option value="AI생성">AI생성</option>
                           </select>
                         </div>
                       </div>
@@ -529,8 +528,11 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                   /* 변환 중: 인라인 로딩 */
                   <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6">
                     <div className="flex items-center gap-6">
-                      <div className="w-28 aspect-[4/3] bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
-                        <Icon name="image" size={20} className="text-gray-300" />
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="w-28 aspect-[4/3] bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
+                          <Icon name="image" size={20} className="text-gray-300" />
+                        </div>
+                        <span className="text-xs2 text-gray-400">지정 영역</span>
                       </div>
                       <div className="text-gray-300 text-xl">→</div>
                       <div className="flex gap-3">
@@ -557,12 +559,12 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                     <div className="flex-1 min-h-0 flex gap-0 overflow-hidden">
                       <div className="flex-1 min-h-0 flex flex-col border-r border-ck-border overflow-hidden">
                         <div className="px-3 py-1.5 bg-ck-bg shrink-0 border-b border-ck-border">
-                          <p className="text-xs2 font-semibold text-gray-500">원본</p>
+                          <p className="text-xs2 font-semibold text-gray-500">원본 (지정 영역)</p>
                         </div>
                         <div className="flex-1 bg-gray-100 flex items-center justify-center overflow-hidden">
                           <div className="text-center text-gray-400 p-4">
                             <Icon name="image" size={36} className="mx-auto mb-2 text-gray-300" />
-                            <p className="text-sm2">원본 도면</p>
+                            <p className="text-sm2">지정한 영역의 원본</p>
                           </div>
                         </div>
                       </div>
