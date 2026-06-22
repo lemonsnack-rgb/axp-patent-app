@@ -155,6 +155,104 @@ function MarkdownTable({ text }: { text: string }) {
   );
 }
 
+// ── 청구항 구조 편집 (API ClaimSet 형태: {no, value, depends_on}) ──────────
+// 직렬화는 텍스트(blocks['claims'])로 유지 — 미리보기/DOCX/PDF 호환. 구조 출력은 실 API 연동 시.
+function parseClaimItems(blocks: string[]): { value: string }[] {
+  return blocks
+    .filter(b => /^청구항\s*\d+\./.test(b.trim()))
+    .map(b => ({ value: b.trim().replace(/^청구항\s*\d+\.\s*\n?/, '') }));
+}
+function claimDependsOn(value: string): number | null {
+  const m = value.match(/제\s*(\d+)\s*항/);
+  return m ? parseInt(m[1], 10) : null;
+}
+function serializeClaimItems(items: { value: string }[]): string[] {
+  const indep = items.filter(it => claimDependsOn(it.value) === null).length;
+  const header = `독립항 ${indep}개, 종속항 ${items.length - indep}개`;
+  return [header, ...items.map((it, i) => `청구항 ${i + 1}.\n${it.value}`)];
+}
+
+function ClaimsEditor({ blocks, onChange }: {
+  blocks: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const items = parseClaimItems(blocks);
+  const commit = (next: { value: string }[]) => onChange(serializeClaimItems(next));
+  const editVal = (idx: number, v: string) => commit(items.map((it, i) => i === idx ? { value: v } : it));
+  const move = (idx: number, dir: -1 | 1) => {
+    const j = idx + dir;
+    if (j < 0 || j >= items.length) return;
+    const a = [...items];
+    [a[idx], a[j]] = [a[j], a[idx]];
+    commit(a);
+  };
+  const remove = (idx: number) => commit(items.filter((_, i) => i !== idx));
+  const addIndep = () => commit([...items, { value: '새 독립 청구항 내용을 입력하세요.' }]);
+  const addDep = () => commit([...items, { value: `제1항에 있어서, ...인, 장치.` }]);
+
+  if (items.length === 0) {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs2 text-zinc-400 py-3 text-center">청구항이 없습니다. 아래에서 추가하세요.</p>
+        <div className="flex gap-2">
+          <button onClick={addIndep} className="flex-1 py-1.5 text-xs2 font-semibold text-blue-600 border border-dashed border-blue-300 rounded-lg hover:bg-blue-50 transition-colors">+ 독립항 추가</button>
+          <button onClick={addDep} className="flex-1 py-1.5 text-xs2 font-semibold text-amber-600 border border-dashed border-amber-300 rounded-lg hover:bg-amber-50 transition-colors">+ 종속항 추가</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs2 text-zinc-400 mb-1">
+        번호는 위치에 따라 자동 부여됩니다. <span className="text-amber-600 font-medium">본문의 "제N항" 참조는 자동 변경되지 않으니 직접 수정하세요.</span>
+      </p>
+      {items.map((it, idx) => {
+        const no = idx + 1;
+        const dep = claimDependsOn(it.value);
+        const isIndep = dep === null;
+        const mismatch = dep !== null && (dep < 1 || dep >= no);
+        return (
+          <div key={idx} className={clsx('rounded-lg border p-2', isIndep ? 'border-blue-300 bg-blue-50/30' : 'border-amber-200 bg-white ml-4')}>
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-xs2 font-bold text-zinc-700">청구항 {no}</span>
+              {isIndep ? (
+                <span className="text-xs2 px-1.5 py-px rounded-full bg-blue-100 text-blue-700 font-medium">독립항</span>
+              ) : (
+                <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', mismatch ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700')}>
+                  제{dep}항 종속{mismatch && ' ⚠ 번호 확인'}
+                </span>
+              )}
+              <div className="ml-auto flex gap-0.5">
+                <button onClick={() => move(idx, -1)} disabled={idx === 0} className="w-5 h-5 rounded flex items-center justify-center text-zinc-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-20 transition-all" title="위로">
+                  <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 7l3-4 3 4"/></svg>
+                </button>
+                <button onClick={() => move(idx, 1)} disabled={idx === items.length - 1} className="w-5 h-5 rounded flex items-center justify-center text-zinc-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-20 transition-all" title="아래로">
+                  <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 3l3 4 3-4"/></svg>
+                </button>
+                <button onClick={() => remove(idx)} className="w-5 h-5 rounded flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 transition-all" title="삭제">
+                  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" width="9" height="9"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>
+                </button>
+              </div>
+            </div>
+            <textarea
+              value={it.value}
+              onChange={e => editVal(idx, e.target.value)}
+              rows={Math.max(2, Math.ceil(it.value.length / 50))}
+              className="w-full text-sm text-zinc-800 leading-relaxed bg-transparent outline-none resize-none border border-transparent focus:border-blue-300 focus:bg-white rounded px-1.5 py-1 transition-colors"
+              ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+            />
+          </div>
+        );
+      })}
+      <div className="flex gap-2 pt-1">
+        <button onClick={addIndep} className="flex-1 py-1.5 text-xs2 font-semibold text-blue-600 border border-dashed border-blue-300 rounded-lg hover:bg-blue-50 transition-colors">+ 독립항 추가</button>
+        <button onClick={addDep} className="flex-1 py-1.5 text-xs2 font-semibold text-amber-600 border border-dashed border-amber-300 rounded-lg hover:bg-amber-50 transition-colors">+ 종속항 추가</button>
+      </div>
+    </div>
+  );
+}
+
 // ── SVG 아이콘 헬퍼 ──────────────────────────────────────────────────────
 const UndoIcon = () => (
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
@@ -845,6 +943,26 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                   </div>
                 )}
 
+                {/* 청구범위 — 구조 인식 편집기 */}
+                {sec.id === 'claims' && (
+                  <ClaimsEditor
+                    blocks={blocks['claims']}
+                    onChange={(next) => {
+                      setUndoStack(p => [...p.slice(-20), blocks]);
+                      setRedoStack([]);
+                      setBlocks(p => {
+                        const updated = { ...p, claims: next };
+                        if (task?.id) {
+                          if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+                          saveTimerRef.current = setTimeout(() => saveSpecState(task.id, { editorBlocks: updated as any }), 500);
+                        }
+                        return updated;
+                      });
+                    }}
+                  />
+                )}
+
+                {sec.id !== 'claims' && (
                 <div className="space-y-2">
                   {blocks[sec.id].map((blockText, blockIdx) => {
                     const isEditing = sel?.sid === sec.id && sel?.idx === blockIdx;
@@ -967,6 +1085,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                     + 단락 추가
                   </button>
                 </div>
+                )}
               </div>
             ))}
           </div>
