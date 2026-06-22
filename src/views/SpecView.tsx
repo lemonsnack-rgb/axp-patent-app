@@ -188,6 +188,8 @@ export function SpecView() {
   const confirm = (id: StepId) => {
     const val = gSel[id] || GUIDE_CANDS[id]?.[0] || '(확정)';
     setConfirmed(p => ({ ...p, [id]: val }));
+    // 확정 제목을 InventionContext 단일 원천에 역기록
+    if (id === 'title') setContext(p => ({ ...p, title: val }));
     // claims 확정 시 중간명세서 자동 로드
     if (id === 'claims' && !midspec) {
       import('../features/spec/mockAiService').then(({ MOCK_MIDSPEC }) => {
@@ -575,7 +577,17 @@ export function SpecView() {
                                 done={isDone}
                                 onConfirm={() => confirm('components')}
                                 onUpdate={v => setGSel(p => ({ ...p, components: v }))}
-                                onComponentsChange={setAiComponents}
+                                onComponentsChange={(comps) => {
+                                  setAiComponents(comps);
+                                  // 채택된 구성요소를 InventionContext.elements 단일 원천에 동기화 (InventionElement로 정제)
+                                  setContext(p => ({
+                                    ...p,
+                                    elements: comps.filter(c => c.sel).map(c => ({
+                                      symbol: c.symbol, value_ko: c.value_ko, value_en: c.value_en,
+                                      description: c.description, hypernym_ko: c.hypernym_ko, hypernym_en: c.hypernym_en,
+                                    })),
+                                  }));
+                                }}
                                 initialItems={aiComponents}
                                 onFocusContext={setSpecFocusCtx}
                                 guidePanelInputRef={guidePanelInputRef}
