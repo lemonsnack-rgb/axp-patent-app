@@ -2330,6 +2330,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                   ))}
                   <div className="px-2.5 pt-1.5 pb-1">
                     <div className="flex items-center gap-1 flex-wrap mb-0.5">
+                      <span className="text-xs2 font-bold text-gray-700">{d.detail.symbol}</span>
                       {done ? (
                         <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', labelInfo.cls)}>{labelInfo.text}</span>
                       ) : (
