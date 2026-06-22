@@ -682,7 +682,7 @@ export function SpecView() {
                             onClick={() => reselect(s.id)}
                             className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs2 text-blue-600 hover:bg-blue-50 border border-blue-200 transition-colors"
                           >
-                            <Icon name="edit" size={10} /> 수정
+                            <Icon name="edit" size={10} /> 다시 선택
                           </button>
                         </div>
                       )}
@@ -1750,7 +1750,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
               <button onClick={() => setAiOpen(o => !o)}
                 className={clsx(
                   'flex items-center gap-1 px-2 py-1 rounded text-xs2 font-semibold border transition-colors',
-                  aiOpen ? 'bg-violet-100 border-violet-300 text-violet-700' : 'bg-violet-50 border-violet-200 text-violet-600 hover:bg-violet-100',
+                  aiOpen ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100',
                 )}
                 title="자연어 지시로 AI가 구성요소를 추가">
                 <svg viewBox="0 0 16 16" fill="currentColor" width="10" height="10"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
@@ -1768,11 +1768,11 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
         </div>
         {/* AI 추가 입력 바 */}
         {!done && aiOpen && (
-          <div className="mb-2 rounded-lg border-2 border-violet-200 bg-violet-50/40 p-2">
+          <div className="mb-2 rounded-lg border-2 border-blue-200 bg-blue-50/40 p-2">
             <div className="flex gap-1.5 items-end">
               <textarea
                 autoFocus
-                className="flex-1 text-xs2 bg-white border border-violet-200 rounded px-2 py-1 outline-none focus:border-violet-400 resize-none min-h-[36px]"
+                className="flex-1 text-xs2 bg-white border border-blue-200 rounded px-2 py-1 outline-none focus:border-blue-400 resize-none min-h-[36px]"
                 placeholder="추가할 구성요소를 설명하세요. 예: 사용자 인증을 처리하는 보안 모듈 (Enter로 추가)"
                 rows={2}
                 value={aiInput}
@@ -1782,7 +1782,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
               <button
                 onClick={submitAiComponent}
                 disabled={!aiInput.trim()}
-                className="shrink-0 text-xs2 font-semibold px-2.5 py-1 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 transition-colors"
+                className="shrink-0 text-xs2 font-semibold px-2.5 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 transition-colors"
               >추가</button>
             </div>
           </div>
@@ -2151,9 +2151,9 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
 
   const removeDrawing = (idx: number) => {
     if (done) return;
-    const name = drawings[idx]?.detail.name || drawings[idx]?.detail.symbol || '이 도면';
+    const name = drawings[idx]?.detail.name || drawings[idx]?.detail.symbol || '이 이미지';
     openAlertDialog(
-      { title: '도면 삭제', description: `"${name}"을(를) 목록에서 삭제하시겠습니까?`, confirm: '삭제', cancel: '취소' },
+      { title: '이미지 삭제', description: `"${name}"을(를) 목록에서 삭제하시겠습니까?`, confirm: '삭제', cancel: '취소' },
       { theme: 'danger', onConfirm: (ctrl) => { updateDrawings(drawings.filter((_, i) => i !== idx)); ctrl.close(); } }
     );
   };
@@ -2245,7 +2245,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                           value={d.detail.label}
                           onChange={e => setDrawingLabel(idx, e.target.value as Drawing['detail']['label'])}
                           className={clsx('text-xs2 px-1 py-px rounded-full font-medium border-0 outline-none cursor-pointer', labelInfo.cls)}
-                          title="도면 분류 변경"
+                          title="분류 변경"
                         >
                           <option value="proposed_implementation">제안기술</option>
                           <option value="previous_implementation">종래기술</option>
@@ -2353,7 +2353,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                           value={d.detail.label}
                           onChange={e => setDrawingLabel(idx, e.target.value as Drawing['detail']['label'])}
                           className={clsx('text-xs2 px-1 py-px rounded-full font-medium border-0 outline-none cursor-pointer', labelInfo.cls)}
-                          title="도면 분류 변경"
+                          title="분류 변경"
                         >
                           <option value="proposed_implementation">제안기술</option>
                           <option value="previous_implementation">종래기술</option>
@@ -2605,7 +2605,7 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                   className={clsx(
                     'flex-1 py-1 text-xs2 font-semibold rounded-lg border transition-colors',
                     preference.abstraction === level
-                      ? 'bg-blue-600 text-white border-blue-600'
+                      ? 'bg-brand-400 text-white border-blue-600'
                       : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300',
                   )}
                 >
@@ -2712,7 +2712,7 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                             className="ml-auto flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
                           >
                             <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                            수정 요청
+                            AI 수정
                           </button>
                         )}
                       </div>
@@ -2833,7 +2833,7 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                     className="ml-auto flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
                   >
                     <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                    수정 요청
+                    AI 수정
                   </button>
                 )}
               </div>
@@ -3040,8 +3040,8 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onFocusContext, 
                                 onFocusContext({ text: block.text, label: `${section.label} 블록`, apply: (newText) => updateBlock(section.key, bIdx, newText) });
                                 setTimeout(() => guidePanelInputRef?.current?.focus(), 50);
                               }}
-                              title="AI 수정 요청"
-                              className="text-xs2 text-violet-500 hover:text-violet-700"
+                              title="AI 수정"
+                              className="text-xs2 text-blue-500 hover:text-blue-700"
                             ><svg viewBox="0 0 16 16" fill="currentColor" width="11" height="11"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg></button>
                           )}
                           <button

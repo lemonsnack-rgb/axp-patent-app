@@ -367,16 +367,18 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
 
   // 도면 데이터 (drawing_descriptions 인라인 카드용)
   const drawings = context?.drawings ?? [];
+  // SpecView의 DRAWING_LABEL_MAP과 동일하게 유지 (같은 도면이 화면 이동 시 배지가 바뀌지 않도록)
   const DRAWING_LABEL_MAP: Record<string, string> = {
     proposed_implementation: '제안기술',
     previous_implementation: '종래기술',
-    background:              '종래기술',
-    effect:                  '제안기술',
+    background:              '배경',
+    effect:                  '효과',
   };
   const DRAWING_LABEL_STYLES: Record<string, string> = {
-    '제안기술': 'bg-blue-100 text-blue-700',
-    '종래기술': 'bg-zinc-100 text-zinc-600',
-    'AI생성':   'bg-violet-100 text-violet-700',
+    '제안기술': 'bg-blue-100 text-brand-400',
+    '종래기술': 'bg-gray-100 text-gray-600',
+    '배경':     'bg-zinc-100 text-zinc-600',
+    '효과':     'bg-violet-100 text-violet-700',
   };
 
   const compNames = (context?.elements ?? [])
@@ -987,17 +989,13 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                           onClick={e => toggleSelSet(sec.id, blockIdx, e)}
                           title="여러 단락을 한번에 AI 수정하려면 체크하세요"
                           className={clsx(
-                            'absolute left-2 top-3 w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0',
+                            'absolute left-2 top-3 w-4 h-4 rounded border-2 flex items-center justify-center transition-all cursor-pointer shrink-0',
                             isChecked
-                              ? 'border-blue-500 bg-blue-500'
-                              : 'border-zinc-300 bg-white opacity-60 group-hover:opacity-100'
+                              ? 'bg-brand-400 border-blue-600 text-white'
+                              : 'border-gray-300 bg-white opacity-60 group-hover:opacity-100'
                           )}
                         >
-                          {isChecked && (
-                            <svg viewBox="0 0 10 10" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="9" height="9">
-                              <polyline points="1.5,5 4,7.5 8.5,2.5"/>
-                            </svg>
-                          )}
+                          {isChecked && <Icon name="check" size={8} />}
                         </div>
                         {/* 단락 이동 (위/아래) */}
                         {blocks[sec.id].length > 1 && (
