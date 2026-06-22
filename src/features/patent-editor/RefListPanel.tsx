@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { GripVertical } from 'lucide-react';
 import type { EditorReference, InventionComponent } from './types';
 import clsx from 'clsx';
-import { ConfirmModal } from '../../components/ConfirmModal';
+import { openAlertDialog, Textarea } from '@muhayu/axp-ui';
 
 interface Props {
   references: EditorReference[];
@@ -94,7 +94,6 @@ export function RefListPanel({
   // 번호 없는 항목 배치 시도 시 가이드 표시
   const [noNumGuide, setNoNumGuide] = useState<string | null>(null); // ref key
   const [pulseAutoAssign, setPulseAutoAssign] = useState(false);
-  const [delConfirm, setDelConfirm] = useState<{ open: boolean; number: string; name: string }>({ open: false, number: '', name: '' });
 
   const showNoNumGuide = (key: string) => {
     setNoNumGuide(key);
@@ -444,7 +443,10 @@ export function RefListPanel({
                   <span className="w-px h-3 bg-gray-200 mx-0.5" />
                   {/* 삭제 */}
                   <button
-                    onClick={() => setDelConfirm({ open: true, number: r.number, name: r.name || r.number })}
+                    onClick={() => openAlertDialog(
+                      { title: '확인', description: `"${r.name || r.number}" 부호를 삭제하시겠습니까?`, confirm: '삭제', cancel: '취소' },
+                      { theme: 'danger', onConfirm: (ctrl) => { onDelete(r.number); ctrl.close(); } }
+                    )}
                     className="rounded p-0.5 text-gray-400 hover:text-red-500" title="삭제">
                     <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 2l6 6M8 2l-6 6"/></svg>
                   </button>
@@ -501,21 +503,15 @@ export function RefListPanel({
           <p className="text-xs2 font-semibold uppercase tracking-wider text-gray-500">도면의 설명</p>
           <span className="text-xs2 text-gray-400">명세서 반영</span>
         </div>
-        <textarea
+        <Textarea
           value={drawingDescription}
           onChange={e => onDrawingDescriptionChange?.(e.target.value)}
           placeholder="도 N은 ___에 관한 사시도이다. ___부(100)는 ___하고, ___부(200)는 ___한다."
-          className="flex-1 resize-none px-2.5 py-2 text-sm2 leading-relaxed focus:outline-none bg-white placeholder-gray-300"
+          className="flex-1 px-2.5 py-2 text-sm2 leading-relaxed bg-white placeholder-gray-300"
           style={{ minHeight: 90 }}
         />
       </div>
     </aside>
-    <ConfirmModal
-      open={delConfirm.open}
-      message={`"${delConfirm.name}" 부호를 삭제하시겠습니까?`}
-      onConfirm={() => { onDelete(delConfirm.number); setDelConfirm({ open: false, number: '', name: '' }); }}
-      onCancel={() => setDelConfirm({ open: false, number: '', name: '' })}
-    />
     </>
   );
 }

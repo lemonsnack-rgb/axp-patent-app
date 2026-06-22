@@ -1,6 +1,7 @@
 // FinderModal — 외부 파인더 모달 (키워드추천 / IPC코드찾기 / 번호표기법 / 대표명화)
 import { useState, useEffect, useRef } from 'react';
 import clsx from 'clsx';
+import { Button } from '@muhayu/axp-ui';
 import { Icon } from './Icon';
 import { Badge, Input } from './ui';
 
@@ -160,15 +161,18 @@ export function FinderModal({ type, onApply, onClose }: Props) {
              type === 'numfmt' ? '국가별 번호 표기법 가이드' : '행 클릭으로 선택'}
           </span>
           <div className="flex gap-2">
-            <button onClick={onClose} className="btn-outline btn-xs">취소</button>
+            <Button variant="outlined" color="primary" size="xs" onClick={onClose}>취소</Button>
             {type !== 'numfmt' && (
-              <button
-                onClick={() => { if (selected) { onApply(selected); onClose(); } }}
-                className="btn-primary btn-sm text-xs2"
+              <Button
+                variant="filled"
+                color="primary"
+                size="sm"
+                className="text-xs2"
                 disabled={!selected.trim()}
+                onClick={() => { if (selected) { onApply(selected); onClose(); } }}
               >
                 선택 적용
-              </button>
+              </Button>
             )}
           </div>
         </div>

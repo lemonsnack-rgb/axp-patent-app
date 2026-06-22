@@ -2,9 +2,8 @@ import clsx from 'clsx';
 import { useEffect, useRef, useState } from 'react';
 import { useStore, taskTypeMeta } from '../store';
 import { TaskItemSkeleton } from './ui/Skeleton';
-import { useToast } from './Toast';
+import { toast, openAlertDialog } from '@muhayu/axp-ui';
 import { Icon } from './Icon';
-import { ConfirmModal } from './ConfirmModal';
 import { QuickNameModal } from './QuickNameModal';
 import { EmptyState } from './EmptyState';
 import type { Task } from '../types';
@@ -15,14 +14,12 @@ export function Sidebar() {
     tasks, activeTaskId, setActiveTaskId,
     taskToggleFavorite, taskUpdate, taskRemove, taskAdd,
   } = useStore();
-  const toast = useToast();
   const [taskFilter, setTaskFilter] = useState<'all' | 'fav'>('all');
   const [search, setSearch] = useState('');
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [renameState, setRenameState] = useState<{ open: boolean; taskId: string; current: string }>({ open: false, taskId: '', current: '' });
-  const [deleteState, setDeleteState] = useState<{ open: boolean; taskId: string; taskName: string }>({ open: false, taskId: '', taskName: '' });
 
-  // 단축키: Cmd/Ctrl+B 사이드바 토글
+  // 키보드 Cmd/Ctrl+B 사이드바 토글
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && (e.key === 'b' || e.key === 'B')) {
@@ -61,7 +58,7 @@ export function Sidebar() {
       )}
     >
       <nav className="p-2 flex flex-col gap-0.5">
-        <NavItem icon="edit"    label="새 작업"   active={isActive('newtask')} collapsed={sidebarCollapsed} onClick={() => setMode('newtask')} primary />
+        <NavItem icon="edit"    label="새 작업"    active={isActive('newtask')} collapsed={sidebarCollapsed} onClick={() => setMode('newtask')} primary />
         <NavItem icon="library" label="라이브러리" active={isActive('library')} collapsed={sidebarCollapsed} onClick={() => setMode('library')} />
       </nav>
 
@@ -86,7 +83,7 @@ export function Sidebar() {
               onClick={() => setTaskFilter(taskFilter === 'all' ? 'fav' : 'all')}
               className={clsx('w-7 h-7 flex items-center justify-center rounded',
                 taskFilter === 'fav' ? 'bg-amber-50 text-amber-500' : 'text-gray-400 hover:bg-gray-100')}
-              title={taskFilter === 'fav' ? '즐겨찾기만 표시 중' : '즐겨찾기만 보기'}
+              title={taskFilter === 'fav' ? '즐겨찾기만 보기 중' : '즐겨찾기 필터'}
             >
               <Icon name={taskFilter === 'fav' ? 'star-filled' : 'star'} size={13} />
             </button>
@@ -97,7 +94,7 @@ export function Sidebar() {
                 ? <EmptyState compact title="검색 결과 없음" />
                 : tasks.length === 0
                   ? <div className="space-y-1 px-1 py-2">{[0,1,2].map(i => <TaskItemSkeleton key={i} />)}</div>
-                  : <EmptyState compact title="작업이 없습니다." description="새 작업을 클릭하세요." />
+                  : <EmptyState compact title="작업이 없습니다." description="새 작업을 시작하세요" />
             ) : list.map(t => (
               <TaskRow
                 key={t.id}
@@ -105,7 +102,7 @@ export function Sidebar() {
                 active={t.id === activeTaskId}
                 onSelect={() => {
                   if (t.type === 'patent_search' || t.type === 'paper_search') {
-                    toast.show('준비 중입니다. 추후 오픈될 예정입니다.');
+                    toast('준비 중입니다. 추후 오픈될 예정입니다.');
                     return;
                   }
                   setActiveTaskId(t.id);
@@ -116,11 +113,17 @@ export function Sidebar() {
                 onMenuToggle={() => setMenuFor(menuFor === t.id ? null : t.id)}
                 onRename={() => { setRenameState({ open: true, taskId: t.id, current: t.name }); setMenuFor(null); }}
                 onDuplicate={() => {
-                  taskAdd({ type: t.type, name: t.name + ' 사본', folderId: t.folderId, clientId: t.clientId, contactId: t.contactId, techField: t.techField });
-                  toast.show('작업 복제됨');
+                  taskAdd({ type: t.type, name: t.name + ' 복사', folderId: t.folderId, clientId: t.clientId, contactId: t.contactId, techField: t.techField });
+                  toast('작업 복제됨');
                   setMenuFor(null);
                 }}
-                onDelete={() => { setDeleteState({ open: true, taskId: t.id, taskName: t.name }); setMenuFor(null); }}
+                onDelete={() => {
+                  setMenuFor(null);
+                  openAlertDialog(
+                    { title: '확인', description: `"${t.name}" 작업을 삭제합니까?`, confirm: '삭제', cancel: '취소' },
+                    { theme: 'danger', onConfirm: (ctrl) => { taskRemove(t.id); if (activeTaskId === t.id) setActiveTaskId(null); toast('작업 삭제됨'); ctrl.close(); } }
+                  );
+                }}
               />
             ))}
           </div>
@@ -139,16 +142,8 @@ export function Sidebar() {
         open={renameState.open}
         title="작업 이름 변경"
         placeholder={renameState.current}
-        onSubmit={name => { taskUpdate(renameState.taskId, { name }); toast.show('이름 변경 완료'); setRenameState(s => ({ ...s, open: false })); }}
+        onSubmit={name => { taskUpdate(renameState.taskId, { name }); toast('이름 변경 완료'); setRenameState(s => ({ ...s, open: false })); }}
         onClose={() => setRenameState(s => ({ ...s, open: false }))}
-      />
-      <ConfirmModal
-        open={deleteState.open}
-        message={`"${deleteState.taskName}" 작업을 삭제할까요?`}
-        confirmLabel="삭제"
-        danger
-        onConfirm={() => { taskRemove(deleteState.taskId); if (activeTaskId === deleteState.taskId) setActiveTaskId(null); toast.show('작업 삭제됨'); setDeleteState(s => ({ ...s, open: false })); }}
-        onCancel={() => setDeleteState(s => ({ ...s, open: false }))}
       />
     </aside>
   );
@@ -218,8 +213,8 @@ function TaskRow({ t, active, onSelect, onToggleFav, menuOpen, onMenuToggle, onR
           <span className={clsx('text-md2 font-medium leading-tight truncate', active ? 'text-brand-400' : 'text-zinc-800')}>
             {t.name}
           </span>
-          {(t.name === '직무발명서' || t.name === '새 명세서') && (
-            <span className="shrink-0 text-[10px] px-1 py-px bg-zinc-100 text-zinc-400 rounded font-medium">미지정</span>
+          {(t.name === '직무발명서' || t.name === '미지정') && (
+            <span className="shrink-0 text-[10px] px-1 py-px bg-zinc-100 text-zinc-400 rounded font-medium">샘플</span>
           )}
         </div>
         <div className="text-xs2 text-zinc-400 mt-0.5 truncate">

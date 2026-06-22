@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store';
-import { useToast } from '../components/Toast';
+import { toast, Button } from '@muhayu/axp-ui';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
 import { Input } from '../components/ui';
@@ -117,7 +117,6 @@ function ProjectCard({ p, count, onOpen, onToggleFav }: {
 
 function NewProjectModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { projects, projectAdd, clients, clientAdd, contactByClient, contactAdd, setActiveProjectId, setMode } = useStore();
-  const toast = useToast();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [clientId, setClientId] = useState('');
@@ -144,17 +143,17 @@ function NewProjectModal({ open, onClose }: { open: boolean; onClose: () => void
     const industry = prompt('업종 (선택):') || '';
     const c = clientAdd({ name: n.trim(), industry: industry || undefined });
     setClientId(c.id);
-    toast.show(`고객사 추가: ${c.name}`);
+    toast(`고객사 추가: ${c.name}`);
   };
   const quickAddContact = () => {
-    if (!clientId) { toast.show('먼저 고객사를 선택하세요'); return; }
+    if (!clientId) { toast('먼저 고객사를 선택하세요'); return; }
     const n = prompt('담당자 이름:');
     if (!n?.trim()) return;
     const role = prompt('직책/역할 (선택):') || '';
     const email = prompt('이메일 (선택):') || '';
     const c = contactAdd({ clientId, name: n.trim(), role: role || undefined, email: email || undefined });
     setContactId(c.id);
-    toast.show(`담당자 추가: ${c.name}`);
+    toast(`담당자 추가: ${c.name}`);
   };
 
   const submit = () => {
@@ -167,7 +166,7 @@ function NewProjectModal({ open, onClose }: { open: boolean; onClose: () => void
       contactId: contactId || null,
       favorite,
     });
-    toast.show(`프로젝트 만들기: ${p.name}`, 'success');
+    toast.success(`프로젝트 만들기: ${p.name}`);
     onClose();
     setActiveProjectId(p.id);
     setMode('project');
@@ -179,8 +178,8 @@ function NewProjectModal({ open, onClose }: { open: boolean; onClose: () => void
       onClose={onClose}
       title="새 프로젝트"
       footer={<>
-        <button className="btn-outline btn-sm" onClick={onClose}>취소</button>
-        <button className="btn-primary btn-sm" disabled={!name.trim()} onClick={submit}>프로젝트 만들기</button>
+        <Button variant="outlined" color="primary" size="sm" onClick={onClose}>취소</Button>
+        <Button variant="filled" color="primary" size="sm" disabled={!name.trim()} onClick={submit}>프로젝트 만들기</Button>
       </>}
     >
       <div className="space-y-3.5">
@@ -229,7 +228,7 @@ function NewProjectModal({ open, onClose }: { open: boolean; onClose: () => void
               <option value="">— 미지정 —</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}{c.industry ? ` · ${c.industry}` : ''}</option>)}
             </select>
-            <button className="btn-outline btn-sm whitespace-nowrap" onClick={quickAddClient}>+ 새로 추가</button>
+            <Button variant="outlined" color="primary" size="sm" className="whitespace-nowrap" onClick={quickAddClient}>+ 새로 추가</Button>
           </div>
         </div>
 
@@ -242,7 +241,7 @@ function NewProjectModal({ open, onClose }: { open: boolean; onClose: () => void
                 <option value="">— 미지정 —</option>
                 {contacts.map(c => <option key={c.id} value={c.id}>{c.name}{c.role ? ` · ${c.role}` : ''}</option>)}
               </select>
-              <button className="btn-outline btn-sm whitespace-nowrap" onClick={quickAddContact}>+ 새로 추가</button>
+              <Button variant="outlined" color="primary" size="sm" className="whitespace-nowrap" onClick={quickAddContact}>+ 새로 추가</Button>
             </div>
           </div>
         )}

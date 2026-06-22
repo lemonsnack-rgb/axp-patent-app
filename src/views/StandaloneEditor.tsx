@@ -1,7 +1,7 @@
 // StandaloneEditor — 새 탭에서 열리는 풀스크린 도면 편집 워크플로
 import { useEffect, useState } from 'react';
 import { DrawingEditorModal } from '../features/drawing-workflow/DrawingEditorModal';
-import { ConfirmModal } from '../components/ConfirmModal';
+import { openAlertDialog, Button } from '@muhayu/axp-ui';
 import {
   readEditorSession,
   writeEditorResult,
@@ -14,7 +14,6 @@ export function StandaloneEditor() {
 
   // 도면 부호 상태 — 구성요소 목록으로 초기화, 편집 중 변경 가능
   const [refs] = useState<EditorReference[]>(() => session?.references ?? []);
-  const [closeConfirm, setCloseConfirm] = useState(false);
 
   // 탭 타이틀 업데이트
   useEffect(() => {
@@ -29,13 +28,13 @@ export function StandaloneEditor() {
         <div>
           <p className="text-base2 font-semibold text-gray-700 mb-2">세션 데이터가 없습니다.</p>
           <p className="text-sm2 text-gray-500 mb-4">도면 목록에서 편집기를 다시 열어주세요.</p>
-          <button className="btn-outline btn-sm" onClick={() => window.close()}>탭 닫기</button>
+          <Button variant="outlined" color="primary" size="sm" onClick={() => window.close()}>탭 닫기</Button>
         </div>
       </div>
     );
   }
 
-  const syncResult = (drawingId: string, stage: 'editing' | 'done', extra?: { editorJson?: string; exportedImageUrl?: string }) => {
+  const syncResult = (drawingId: string, stage: 'editing' | 'done', extra?: { editorJson?: string; exportedImageUrl?: string; adjustedBbox?: { x: number; y: number; w: number; h: number } }) => {
     writeEditorResult({ drawingId, stage, references: refs, ...extra, timestamp: Date.now() });
   };
 
@@ -51,7 +50,10 @@ export function StandaloneEditor() {
         <div className="ml-auto">
           <button
             className="text-white/70 hover:text-white text-xs2 border border-white/30 rounded px-2 py-0.5"
-            onClick={() => setCloseConfirm(true)}>
+            onClick={() => openAlertDialog(
+              { title: '확인', description: '편집을 종료하고 탭을 닫으시겠습니까?', confirm: '닫기', cancel: '취소' },
+              { theme: 'danger', onConfirm: (ctrl) => { clearEditorChannel(); ctrl.close(); window.close(); } }
+            )}>
             ✕ 닫기
           </button>
         </div>
@@ -70,6 +72,7 @@ export function StandaloneEditor() {
             syncResult(drawingId, stage, {
               editorJson: updates.savedEditorJson,
               exportedImageUrl: updates.exportedImageUrl,
+              adjustedBbox: updates.adjustedBbox,
             });
           }}
           onClose={() => {
@@ -78,13 +81,6 @@ export function StandaloneEditor() {
           }}
         />
       </div>
-      <ConfirmModal
-        open={closeConfirm}
-        message="편집을 종료하고 탭을 닫으시겠습니까?"
-        confirmLabel="닫기"
-        onConfirm={() => { clearEditorChannel(); window.close(); }}
-        onCancel={() => setCloseConfirm(false)}
-      />
     </div>
   );
 }

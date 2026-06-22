@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from '@muhayu/axp-ui';
 import { Input } from './ui/Input';
 
 interface Props {
@@ -91,10 +92,12 @@ export function LoginView({ onLogin }: Props) {
               </p>
             )}
 
-            <button
+            <Button
+              variant="filled"
+              color="primary"
               type="submit"
               disabled={loading || !id.trim() || !pw.trim()}
-              className="btn-primary w-full mt-2 h-10 text-base2 font-semibold flex items-center justify-center gap-2"
+              className="w-full mt-2 h-10 text-base2 font-semibold flex items-center justify-center gap-2"
             >
               {loading && (
                 <svg className="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
@@ -103,7 +106,7 @@ export function LoginView({ onLogin }: Props) {
                 </svg>
               )}
               {loading ? '로그인 중...' : '로그인'}
-            </button>
+            </Button>
           </form>
 
           {/* 가입 안내 */}

@@ -1,7 +1,15 @@
-// components/ui/Badge.tsx — 작업 유형, 상태 표시용
-import clsx from 'clsx';
+import { Badge as AxpBadge, type BadgeProps as AxpBadgeProps } from '@muhayu/axp-ui';
 
 export type BadgeColor = 'brand' | 'violet' | 'amber' | 'green' | 'red' | 'neutral';
+
+const colorMap: Record<BadgeColor, AxpBadgeProps['color']> = {
+  brand:   'primary',
+  violet:  'tint',
+  amber:   'warning',
+  green:   'success',
+  red:     'danger',
+  neutral: 'secondary',
+};
 
 interface BadgeProps {
   color?: BadgeColor;
@@ -10,23 +18,17 @@ interface BadgeProps {
   style?: React.CSSProperties;
 }
 
-const colorClasses: Record<BadgeColor, string> = {
-  brand:   'bg-brand-50 text-brand-600',
-  violet:  'bg-violet-50 text-violet-600',
-  amber:   'bg-amber-50 text-amber-600',
-  green:   'bg-green-50 text-green-700',
-  red:     'bg-red-50 text-red-600',
-  neutral: 'bg-neutral-100 text-neutral-500',
-};
-
 export function Badge({ color = 'neutral', children, className, style }: BadgeProps) {
   return (
-    <span className={clsx(
-      'inline-flex items-center px-2 py-0.5 rounded-full text-xs2 font-medium',
-      colorClasses[color],
-      className,
-    )} style={style}>
+    <AxpBadge
+      color={colorMap[color]}
+      variant="filled"
+      rounded="full"
+      size="sm"
+      className={className}
+      style={style}
+    >
       {children}
-    </span>
+    </AxpBadge>
   );
 }

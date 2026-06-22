@@ -4,6 +4,7 @@ import type { TaskType } from '../types';
 import { Icon } from '../components/Icon';
 import { Card, Input } from '../components/ui';
 import clsx from 'clsx';
+import { Button } from '@muhayu/axp-ui';
 
 const TYPES: { type: TaskType; title: string; desc: string; icon: 'doc' | 'search' | 'paper'; color: string }[] = [
   { type: 'spec',          title: '명세서',   desc: '직무발명서를 분석해 특허 명세서 초안을 작성합니다.', icon: 'doc',    color: 'blue' },
@@ -122,8 +123,8 @@ export function NewTaskView() {
             </Field>
           )}
           <div className="flex justify-end gap-2 mt-3 pt-3.5 border-t border-zinc-100">
-            <button className="btn-outline btn-sm" onClick={cancel}>취소</button>
-            <button className="btn-primary btn-sm" onClick={submit}>작업 만들기</button>
+            <Button variant="outlined" color="primary" size="sm" onClick={cancel}>취소</Button>
+            <Button variant="filled" color="primary" size="sm" onClick={submit}>작업 만들기</Button>
           </div>
         </Card>
       )}

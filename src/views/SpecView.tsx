@@ -4,7 +4,7 @@ import { SpecEditorView } from './SpecEditorView';
 import { useStore } from '../store';
 import { Icon } from '../components/Icon';
 import { Card, Input } from '../components/ui';
-import { ConfirmModal } from '../components/ConfirmModal';
+import { openAlertDialog, Button, Textarea } from '@muhayu/axp-ui';
 import { PreviewModal } from '../components/PreviewModal';
 import type { PreviewSection } from '../components/PreviewModal';
 import clsx from 'clsx';
@@ -15,7 +15,10 @@ import {
   MOCK_DRAWINGS,
   MOCK_EMBODIMENT,
   getMockExtractResult,
+  mockPartialModify,
 } from '../features/spec/mockAiService';
+import type { DrawingItem as WorkflowDrawingItem } from '../features/drawing-workflow/types';
+import { openEditorTab, onEditorResult } from '../features/drawing-workflow/editorChannel';
 import type {
   SpecAnalysisState, SpecStepId, StepConfig,
   TitleCandidate, SpecComponentItem,
@@ -116,8 +119,10 @@ export function SpecView() {
   const flowRef = useRef<HTMLDivElement>(null);
   const flowSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [confirmState, setConfirmState] = useState<{ open: boolean; message: string; onConfirm: () => void }>({ open: false, message: '', onConfirm: () => {} });
-  const showConfirm = (message: string, onConfirm: () => void) => setConfirmState({ open: true, message, onConfirm });
+  const showConfirm = (message: string, onConfirm: () => void) => openAlertDialog(
+    { title: '확인', description: message, confirm: '확인', cancel: '취소' },
+    { theme: 'primary', onConfirm: (ctrl) => { onConfirm(); ctrl.close(); } }
+  );
 
   // 자동 저장 — 400ms 디바운스
   useEffect(() => {
@@ -499,19 +504,19 @@ export function SpecView() {
                 {/* flow/done 상태에서는 버튼 숨김 (폼은 읽기전용으로 계속 표시) */}
                 {phase === 'direct' && (
                   <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-100 bg-gray-50">
-                    <button className="btn-outline btn-sm" onClick={() => {
+                    <Button variant="outlined" color="primary" size="sm" onClick={() => {
                       if (diTitle || diContent) {
                         showConfirm('입력한 내용이 삭제됩니다. 계속할까요?', () => setPhase('upload'));
                       } else {
                         setPhase('upload');
                       }
-                    }}>취소</button>
-                    <button className="btn-primary btn-sm" onClick={() => startFlow()}
+                    }}>취소</Button>
+                    <Button variant="filled" color="primary" size="sm" onClick={() => startFlow()}
                       disabled={!diTitle.trim() || !diField.trim() || !diContent.trim() || analyzing}>
                       {analyzing
                         ? <><span className="inline-block animate-spin mr-1">↻</span>AI 분석 중...</>
                         : <><Icon name="star" size={13} /> AI 분석 시작</>}
-                    </button>
+                    </Button>
                   </div>
                 )}
               </Card>
@@ -566,6 +571,8 @@ export function SpecView() {
                                 ...p,
                                 [type]: p[type].filter((_, i) => i !== idx),
                               }))}
+                              setFocusCtx={setSpecFocusCtx}
+                              guidePanelInputRef={guidePanelInputRef}
                             />
                           )}
                           {/* 현재 단계 특수 패널 인라인 */}
@@ -713,11 +720,12 @@ export function SpecView() {
                     <Icon name="logo" size={40} className="text-brand-400 mx-auto mb-3" />
                     <h3 className="text-lg2 font-bold text-gray-800 mb-2">모든 분석 항목이 확정되었습니다</h3>
                     <p className="text-md2 text-gray-500 mb-5">확정된 내용을 바탕으로 명세서 초안을 편집하세요.</p>
-                    <button
+                    <Button
+                      variant="filled" color="primary" size="sm"
                       onClick={() => handleSetMainView('editor')}
-                      className="btn-primary btn-sm mx-auto flex items-center gap-1.5">
+                      className="mx-auto flex items-center gap-1.5">
                       <Icon name="doc" size={13} /> 명세서 초안 편집으로 이동 →
-                    </button>
+                    </Button>
                     {task?.id && sessionStorage.getItem(`axp_mainview_${task.id}`) === 'editor' && (
                       <p className="text-xs2 text-gray-400 mt-3">이미 진행 중인 편집 내용이 있습니다 — 이어서 편집할 수 있습니다.</p>
                     )}
@@ -794,12 +802,6 @@ export function SpecView() {
         )}
       </div>
       {previewOpen && <PreviewModal taskName={task?.name} sections={makePreviewSections()} onClose={() => setPreviewOpen(false)} />}
-      <ConfirmModal
-        open={confirmState.open}
-        message={confirmState.message}
-        onConfirm={() => { confirmState.onConfirm(); setConfirmState(s => ({ ...s, open: false })); }}
-        onCancel={() => setConfirmState(s => ({ ...s, open: false }))}
-      />
     </div>
   );
 }
@@ -828,6 +830,45 @@ type GuideChatMsg = {
   sourceFocusCtx?: FocusCtx;
   applied?: boolean;
 };
+
+// ── 텍스트 선택 AI 수정 팝오버 ──────────────────────────────────────────────
+type SelState = { start: number; end: number; originalValue: string; apply: (newText: string) => void; top: number; left: number } | null;
+
+function TextSelectionPopover({
+  position, preview, onApply, onClose,
+}: {
+  position: { top: number; left: number };
+  preview: string;
+  onApply: (instruction: string) => void;
+  onClose: () => void;
+}) {
+  const [instruction, setInstruction] = useState('');
+  return (
+    <div
+      style={{ position: 'fixed', top: position.top, left: position.left, zIndex: 9999 }}
+      className="bg-white border border-blue-200 rounded-xl shadow-xl px-3 py-2 flex items-center gap-2"
+      onMouseDown={e => e.preventDefault()}
+    >
+      <span className="text-xs2 text-gray-400 shrink-0 max-w-[80px] truncate">&ldquo;{preview}&rdquo;</span>
+      <input
+        autoFocus
+        className="text-xs2 border border-gray-200 rounded-lg px-2 py-1 outline-none w-32 focus:border-blue-400"
+        placeholder="수정 지시..."
+        value={instruction}
+        onChange={e => setInstruction(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { e.preventDefault(); onApply(instruction); }
+          if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+        }}
+      />
+      <button
+        onClick={() => onApply(instruction)}
+        className="shrink-0 text-xs2 px-2.5 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+      >적용</button>
+      <button onClick={onClose} className="shrink-0 text-xs2 text-gray-400 hover:text-gray-600">✕</button>
+    </div>
+  );
+}
 
 // ── 발명의 명칭 후보 카드 (title + abstract) ──────────────────────
 function TitleCandidateCards({
@@ -923,6 +964,13 @@ function TitleCandidateCards({
                 수정
               </button>
             </div>
+            {/* 추천 이유 행 */}
+            {c.reason && (
+              <div className="pt-1.5 border-t border-gray-100 mt-1">
+                <span className="text-xs2 text-gray-300 font-medium block mb-0.5">추천 이유</span>
+                <p className="text-xs2 text-gray-400 leading-relaxed italic">{c.reason}</p>
+              </div>
+            )}
           </div>
         );
       })}
@@ -959,7 +1007,7 @@ const DESC_LABEL_MAP: Record<string, string> = {
 };
 
 function DescriptionItemCards({
-  previous, proposed, onToggle, onChange, onAdd, onRemove,
+  previous, proposed, onToggle, onChange, onAdd, onRemove, setFocusCtx, guidePanelInputRef,
 }: {
   previous: InventionDescriptionItem[];
   proposed: InventionDescriptionItem[];
@@ -967,8 +1015,11 @@ function DescriptionItemCards({
   onChange: (type: 'previous' | 'proposed', idx: number, text: string) => void;
   onAdd: (type: 'previous' | 'proposed', text: string, label: InventionDescriptionItem['label']) => void;
   onRemove: (type: 'previous' | 'proposed', idx: number) => void;
+  setFocusCtx?: (ctx: FocusCtx | null) => void;
+  guidePanelInputRef?: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const [tab, setTab] = useState<'previous' | 'proposed'>('proposed');
+  const [selState, setSelState] = useState<SelState>(null);
   const [addLabel, setAddLabel] = useState<{ previous: InventionDescriptionItem['label']; proposed: InventionDescriptionItem['label'] }>({
     previous: 'background',
     proposed: 'objective',
@@ -1022,7 +1073,7 @@ function DescriptionItemCards({
                     <button
                       onClick={() => onToggle(type, idx)}
                       className={clsx(
-                        'ml-auto text-xs2 px-2 py-0.5 rounded-lg font-semibold border transition-colors',
+                        'text-xs2 px-2 py-0.5 rounded-lg font-semibold border transition-colors',
                         isAdopted
                           ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
                           : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100',
@@ -1033,8 +1084,20 @@ function DescriptionItemCards({
                   ) : (
                     <button
                       onClick={() => onRemove(type, idx)}
-                      className="ml-auto text-xs2 text-gray-300 hover:text-red-400 transition-colors"
+                      className="text-xs2 text-gray-300 hover:text-red-400 transition-colors"
                     >✕</button>
+                  )}
+                  {setFocusCtx && isAdopted && (
+                    <button
+                      onClick={() => {
+                        setFocusCtx({ text: item.text, label: sublabel, apply: (newText) => onChange(type, idx, newText) });
+                        setTimeout(() => guidePanelInputRef?.current?.focus(), 50);
+                      }}
+                      className="ml-auto flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
+                    >
+                      <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
+                      AI 수정
+                    </button>
                   )}
                 </div>
                 <textarea
@@ -1044,6 +1107,14 @@ function DescriptionItemCards({
                   rows={Math.max(2, Math.ceil(item.text.length / 42))}
                   onChange={e => onChange(type, idx, e.target.value)}
                   placeholder="항목 내용..."
+                  onMouseUp={e => {
+                    if (!isAdopted) return;
+                    const ta = e.currentTarget;
+                    if (ta.selectionStart !== ta.selectionEnd) {
+                      const rect = ta.getBoundingClientRect();
+                      setSelState({ start: ta.selectionStart, end: ta.selectionEnd, originalValue: ta.value, apply: (newText) => onChange(type, idx, newText), top: rect.bottom + 4, left: rect.left });
+                    }
+                  }}
                 />
               </div>
             );
@@ -1091,6 +1162,21 @@ function DescriptionItemCards({
   };
 
   return (
+    <>
+    {selState && (
+      <TextSelectionPopover
+        position={{ top: selState.top, left: selState.left }}
+        preview={selState.originalValue.slice(selState.start, selState.end).slice(0, 20)}
+        onApply={instruction => {
+          const before = selState.originalValue.slice(0, selState.start);
+          const selected = selState.originalValue.slice(selState.start, selState.end);
+          const after = selState.originalValue.slice(selState.end);
+          selState.apply(before + mockPartialModify(selected, instruction) + after);
+          setSelState(null);
+        }}
+        onClose={() => setSelState(null)}
+      />
+    )}
     <div className="mt-3">
       {/* lg+: 2컬럼 */}
       <div className="hidden lg:grid lg:grid-cols-2 lg:gap-4">
@@ -1120,6 +1206,7 @@ function DescriptionItemCards({
           : renderColumn('proposed', proposed)}
       </div>
     </div>
+    </>
   );
 }
 
@@ -1279,9 +1366,9 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
       <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-ck-border shrink-0 relative">
         <div className="w-8 h-1 bg-zinc-300 rounded-full absolute top-2 left-1/2 -translate-x-1/2" />
         <span className="font-semibold text-sm">AI 어시스턴트</span>
-        <button onClick={onMobileClose} className="btn-ghost p-1" aria-label="가이드 닫기">
+        <Button variant="text" size="icon-sm" onClick={onMobileClose} aria-label="가이드 닫기">
           <Icon name="close" size={16} />
-        </button>
+        </Button>
       </div>
 
       {/* 리사이즈 핸들 — 원본 artifact-resize-handle (데스크탑에서만) */}
@@ -1338,8 +1425,8 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
             </button>
           </div>
           {isEditingCtx ? (
-            <textarea
-              className="w-full text-sm2 text-gray-800 bg-blue-50 border border-blue-400 rounded-lg px-3 py-2 outline-none resize-none leading-relaxed transition-colors scroll-thin"
+            <Textarea
+              className="w-full text-sm2 text-gray-800 bg-blue-50 px-3 py-2 leading-relaxed scroll-thin"
               value={localText}
               rows={4}
               autoFocus
@@ -1451,10 +1538,10 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
         )}
         {/* 입력창 — 항상 표시 */}
         <div className="shrink-0 flex gap-2 items-end px-3 py-2">
-          <textarea
+          <Textarea
             ref={chatInputRef ?? localTextareaRef}
             rows={2}
-            className="flex-1 text-xs2 border border-zinc-300 rounded-xl px-3 py-2 outline-none resize-none focus:border-blue-400 transition-colors leading-relaxed overflow-y-auto"
+            className="flex-1 px-3 py-2"
             placeholder={focusCtx ? `"${focusCtx.label}" 수정 요청...` : 'AI에게 질문하세요...'}
             value={guideChatInput}
             onChange={e => setGuideChatInput(e.target.value)}
@@ -1583,9 +1670,14 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
   const moveDown = (idx: number) => { if (idx===items.length-1||done) return; const a=[...items]; [a[idx],a[idx+1]]=[a[idx+1],a[idx]]; applyUpd(a); };
   const indent   = (id: number)  => { if (!done) applyUpd(items.map(it => it.id===id ? {...it, depth: Math.min(it.depth+1,2)} : it)); };
   const outdent  = (id: number)  => { if (!done) applyUpd(items.map(it => it.id===id ? {...it, depth: Math.max(it.depth-1,0)} : it)); };
-  const [compConfirm, setCompConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null });
   const remove   = (id: number)  => {
-    if (!done) setCompConfirm({ open: true, id });
+    if (!done) {
+      const itemText = items.find(it => it.id === id)?.text?.slice(0, 30) ?? '이 구성요소';
+      openAlertDialog(
+        { title: '확인', description: `"${itemText}"를 삭제하시겠습니까?`, confirm: '삭제', cancel: '취소' },
+        { theme: 'danger', onConfirm: (ctrl) => { upd(items.filter(it => it.id !== id)); ctrl.close(); } }
+      );
+    }
   };
   const autoAssign = () => { if (!done) upd(calcAutoNums(items)); };
   const add = () => {
@@ -1746,8 +1838,8 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                   <div className="flex items-start gap-1.5">
                     <span className="text-xs2 text-gray-400 w-11 shrink-0 mt-0.5">정의</span>
                     {!done ? (
-                      <textarea
-                        className="flex-1 text-xs2 text-gray-600 bg-gray-50 border border-gray-200 rounded px-2 py-0.5 outline-none focus:border-blue-300 focus:bg-white transition-colors resize-none"
+                      <Textarea
+                        className="flex-1 text-xs2 text-gray-600 bg-gray-50 px-2 py-0.5"
                         value={item.definition || ''}
                         placeholder="구성요소의 기능·역할 설명"
                         rows={2}
@@ -1792,7 +1884,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
           <div className="flex gap-1 mt-3">
             <Input className="text-xs2 py-1.5 flex-1" placeholder="새 구성요소 추가..." value={newText}
               onChange={e => setNewText(e.target.value)} onKeyDown={e => e.key==='Enter' && add()} />
-            <button onClick={add} className="btn-outline btn-xs px-2"><Icon name="plus" size={12} /></button>
+            <Button variant="outlined" color="primary" size="xs" onClick={add}><Icon name="plus" size={12} /></Button>
           </div>
         )}
       </div>
@@ -1801,12 +1893,6 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
           <div className="flex items-center gap-1.5 text-sm2 text-green-700 font-medium"><Icon name="check" size={13} /> 구성요소 확정 완료</div>
         </div>
       )}
-      <ConfirmModal
-        open={compConfirm.open}
-        message={`"${items.find(it => it.id === compConfirm.id)?.text?.slice(0, 30) ?? '이 구성요소'}"를 삭제하시겠습니까?`}
-        onConfirm={() => { if (compConfirm.id !== null) upd(items.filter(it => it.id !== compConfirm.id)); setCompConfirm({ open: false, id: null }); }}
-        onCancel={() => setCompConfirm({ open: false, id: null })}
-      />
     </>
   );
 }
@@ -1820,6 +1906,74 @@ const DRAWING_LABEL_MAP: Record<string, { text: string; cls: string }> = {
   effect:                  { text: '효과',     cls: 'bg-violet-100 text-violet-700' },
 };
 
+function toWorkflowDrawingItem(drawing: Drawing, idx: number): WorkflowDrawingItem {
+  const bbox = drawing.image.bbox
+    ? { x: drawing.image.bbox.x1, y: drawing.image.bbox.y1, w: drawing.image.bbox.x2 - drawing.image.bbox.x1, h: drawing.image.bbox.y2 - drawing.image.bbox.y1 }
+    : { x: 0, y: 0, w: 0, h: 0 };
+  const labelMap: Record<string, WorkflowDrawingItem['label']> = {
+    proposed_implementation: '제안기술',
+    previous_implementation: '종래기술',
+    background: '종래기술',
+    effect: '제안기술',
+  };
+  return {
+    id: String(idx),
+    symbol: idx + 1,
+    label: labelMap[drawing.detail.label] ?? 'AI생성',
+    name: drawing.detail.name,
+    description: drawing.detail.description,
+    applied: drawing.useForSpec ?? false,
+    pageNumber: 1,
+    stage: 'bbox-adjusted',
+    originalImageUrl: drawing.image.file.data ? `data:${drawing.image.file.media_type};base64,${drawing.image.file.data}` : '',
+    bbox,
+  };
+}
+
+function openDrawingInNewTab(data: string, mediaType: string, bbox?: { x1: number; y1: number; x2: number; y2: number }) {
+  if (!data) return;
+  const img = new window.Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    if (bbox) {
+      const w = bbox.x2 - bbox.x1;
+      const h = bbox.y2 - bbox.y1;
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.drawImage(img, bbox.x1, bbox.y1, w, h, 0, 0, w, h);
+    } else {
+      canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.drawImage(img, 0, 0);
+    }
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }, 'image/png');
+  };
+  img.src = `data:${mediaType};base64,${data}`;
+}
+
+function CroppedCanvas({ data, mediaType, bbox }: { data: string; mediaType: string; bbox: { x1: number; y1: number; x2: number; y2: number } }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const img = new window.Image();
+    img.onload = () => {
+      const w = bbox.x2 - bbox.x1;
+      const h = bbox.y2 - bbox.y1;
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.drawImage(img, bbox.x1, bbox.y1, w, h, 0, 0, w, h);
+    };
+    img.src = `data:${mediaType};base64,${data}`;
+  }, [data, mediaType, bbox.x1, bbox.y1, bbox.x2, bbox.y2]);
+  return <canvas ref={canvasRef} className="w-full h-full object-contain" />;
+}
+
 function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawings }: {
   done: boolean;
   onConfirm: () => void;
@@ -1828,11 +1982,42 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
   onUpdateDrawings?: (next: Drawing[]) => void;
 }) {
   const [drawStage, setDrawStage] = useState<1 | 2 | 3>(1);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const drawings = propDrawings ?? MOCK_DRAWINGS;
 
   const updateDrawings = (next: Drawing[]) => {
     onUpdateDrawings?.(next);
     onUpdate(next.filter(d => d.useForSpec).map(d => `${d.detail.symbol} ${d.detail.name}: ${d.detail.description}`).join('\n\n'));
+  };
+
+  useEffect(() => {
+    return onEditorResult((result) => {
+      const idx = parseInt(result.drawingId, 10);
+      if (!isNaN(idx) && result.adjustedBbox) {
+        const ab = result.adjustedBbox;
+        updateDrawings(drawings.map((d, i) =>
+          i === idx ? { ...d, image: { ...d.image, bbox: { x1: ab.x, y1: ab.y, x2: ab.x + ab.w, y2: ab.y + ab.h } } } : d
+        ));
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawings]);
+
+  const handleFileAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const base64 = (ev.target?.result as string).split(',')[1] ?? '';
+      const newDrawing: Drawing = {
+        image: { file: { data: base64, media_type: file.type as 'image/png' }, bbox: undefined },
+        detail: { symbol: `도면${drawings.length + 1}`, name: file.name.replace(/\.[^.]+$/, ''), description: '', label: 'proposed_implementation' },
+        included: true, useForSpec: false, isRepresentative: false,
+      };
+      updateDrawings([...drawings, newDrawing]);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const toggleIncluded = (idx: number) => {
@@ -1866,14 +2051,27 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
 
   const STAGE_LABELS = ['포함 여부', '용도 분류', '대표도면'];
 
-  const renderThumbnail = (d: Drawing, extra?: React.ReactNode) => (
-    <div className="w-full aspect-[4/3] bg-gray-100 flex items-center justify-center overflow-hidden relative">
-      {d.image.file.data
-        ? <img src={`data:${d.image.file.media_type};base64,${d.image.file.data}`} className="w-full h-full object-contain" alt="" />
-        : <Icon name="image" size={28} className="text-gray-200" />}
-      {extra}
-    </div>
-  );
+  const renderThumbnail = (d: Drawing, extra?: React.ReactNode) => {
+    const hasData = !!d.image.file.data;
+    const bbox = d.image.bbox;
+    return (
+      <div className="w-full aspect-[4/3] bg-gray-100 flex items-center justify-center overflow-hidden relative group">
+        {hasData
+          ? (bbox
+            ? <CroppedCanvas data={d.image.file.data} mediaType={d.image.file.media_type} bbox={bbox} />
+            : <img src={`data:${d.image.file.media_type};base64,${d.image.file.data}`} className="w-full h-full object-contain" alt="" />)
+          : <Icon name="image" size={28} className="text-gray-200" />}
+        {hasData && (
+          <button
+            className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 bg-white/90 rounded text-gray-500 hover:text-blue-600 transition-opacity text-xs2 leading-none"
+            onClick={e => { e.stopPropagation(); openDrawingInNewTab(d.image.file.data, d.image.file.media_type, bbox); }}
+            title="새 탭에서 열기"
+          >↗</button>
+        )}
+        {extra}
+      </div>
+    );
+  };
 
   return (
     <div className="flex-1 overflow-y-auto scroll-thin px-3 py-3 ml-1.5">
@@ -1935,8 +2133,19 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
                         )}
                       >{included ? '✓ 포함' : '제외'}</button>
                       <button
+                        onClick={() => openEditorTab({
+                          drawingId: String(idx),
+                          drawings: drawings.map(toWorkflowDrawingItem),
+                          components: [],
+                          references: [],
+                          drawingName: d.detail.name,
+                          timestamp: Date.now(),
+                        })}
+                        className="px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 text-blue-500 hover:bg-blue-50 transition-colors"
+                      >범위 조정</button>
+                      <button
                         onClick={() => cloneDrawing(idx)}
-                        className="px-3 py-1.5 text-xs2 font-semibold border-l border-gray-100 text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-colors"
+                        className="px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-colors"
                       >복제</button>
                     </div>
                   )}
@@ -1945,10 +2154,20 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
             })}
           </div>
           {!done && (
-            <button
-              onClick={() => setDrawStage(2)}
-              className="mt-3 w-full py-2 text-xs2 font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition-colors"
-            >2단계: 용도 분류 →</button>
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs2 font-semibold text-gray-600 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors"
+              >
+                <Icon name="plus" size={11} />
+                이미지 추가
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileAdd} />
+              <button
+                onClick={() => setDrawStage(2)}
+                className="flex-1 py-2 text-xs2 font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition-colors"
+              >2단계: 용도 분류 →</button>
+            </div>
           )}
         </>
       )}
@@ -1973,10 +2192,19 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
                   isForSpec ? 'border-blue-300' : 'border-zinc-200',
                   done && 'pointer-events-none',
                 )}>
-                  <div className={clsx('w-full aspect-[4/3] bg-gray-100 flex items-center justify-center overflow-hidden relative', !isForSpec && 'grayscale opacity-60')}>
+                  <div className={clsx('w-full aspect-[4/3] bg-gray-100 flex items-center justify-center overflow-hidden relative group', !isForSpec && 'grayscale opacity-60')}>
                     {d.image.file.data
-                      ? <img src={`data:${d.image.file.media_type};base64,${d.image.file.data}`} className="w-full h-full object-contain" alt="" />
+                      ? (d.image.bbox
+                        ? <CroppedCanvas data={d.image.file.data} mediaType={d.image.file.media_type} bbox={d.image.bbox} />
+                        : <img src={`data:${d.image.file.media_type};base64,${d.image.file.data}`} className="w-full h-full object-contain" alt="" />)
                       : <Icon name="image" size={28} className="text-gray-200" />}
+                    {d.image.file.data && (
+                      <button
+                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 bg-white/90 rounded text-gray-500 hover:text-blue-600 transition-opacity text-xs2 leading-none"
+                        onClick={e => { e.stopPropagation(); openDrawingInNewTab(d.image.file.data, d.image.file.media_type, d.image.bbox); }}
+                        title="새 탭에서 열기"
+                      >↗</button>
+                    )}
                   </div>
                   <div className="px-2.5 pt-1.5 pb-1">
                     <div className="flex items-center gap-1 flex-wrap mb-0.5">
@@ -2065,6 +2293,7 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
           </div>
         </>
       )}
+
     </div>
   );
 }
@@ -2102,6 +2331,11 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
   const [claimsPhase, setClaimsPhase] = useState<'indep' | 'dep'>('indep');
   const [claimSets] = useState(MOCK_INDEPENDENT_CLAIM_SETS);
   const [selectedSetIndex, setSelectedSetIndex] = useState<number | null>(2); // 기본: INTERMEDIATE
+  const [claimSelState, setClaimSelState] = useState<SelState>(null);
+  const [preference, setPreference] = useState<{ abstraction: string; categories: string[] }>({
+    abstraction: 'INTERMEDIATE',
+    categories: ['MACHINE', 'PROCESS'],
+  });
   const [depGroupsMap, setDepGroupsMap] = useState<Record<number, DepGroupsForSet>>({});
   const [claimTexts, setClaimTexts] = useState<Record<number, Record<number, string>>>({}); // setIdx → claimIdx → text
 
@@ -2220,14 +2454,88 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
 
   // ── Phase A: 세트 단일 선택 (라디오) ───────────────────────────────────────
   if (claimsPhase === 'indep') {
+    const filteredSetIndices = claimSets
+      .map((_set, idx) => idx)
+      .filter(idx => {
+        const set = claimSets[idx];
+        const abstractMatch = preference.abstraction === 'ALL' || set.abstraction_level === preference.abstraction;
+        const categoryMatch = preference.categories.length === 0 || set.claims.some(c => preference.categories.includes(c.category));
+        return abstractMatch && categoryMatch;
+      });
+
     return (
+      <>
+      {claimSelState && (
+        <TextSelectionPopover
+          position={{ top: claimSelState.top, left: claimSelState.left }}
+          preview={claimSelState.originalValue.slice(claimSelState.start, claimSelState.end).slice(0, 20)}
+          onApply={instruction => {
+            const before = claimSelState.originalValue.slice(0, claimSelState.start);
+            const selected = claimSelState.originalValue.slice(claimSelState.start, claimSelState.end);
+            const after = claimSelState.originalValue.slice(claimSelState.end);
+            claimSelState.apply(before + mockPartialModify(selected, instruction) + after);
+            setClaimSelState(null);
+          }}
+          onClose={() => setClaimSelState(null)}
+        />
+      )}
       <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2.5 ml-1.5">
         <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2.5">
           <p className="text-xs2 text-brand-400 font-medium">AI가 권리범위별 독립항 세트를 생성했습니다.</p>
           <p className="text-xs2 text-gray-500 mt-0.5">각 세트는 장치항·방법항 쌍으로 구성됩니다. <strong className="text-gray-700">1개를 선택</strong>하면 종속항이 구성됩니다.</p>
         </div>
 
-        {claimSets.map((set, setIdx) => {
+        {/* Preference UI */}
+        <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 space-y-2">
+          <p className="text-xs2 font-semibold text-gray-600">권리범위 설정</p>
+          <div>
+            <p className="text-xs2 text-gray-400 mb-1">추상화 수준</p>
+            <div className="flex gap-1.5">
+              {(['BROAD', 'INTERMEDIATE', 'NARROW'] as const).map(level => (
+                <button
+                  key={level}
+                  onClick={() => !done && setPreference(p => ({ ...p, abstraction: level }))}
+                  className={clsx(
+                    'flex-1 py-1 text-xs2 font-semibold rounded-lg border transition-colors',
+                    preference.abstraction === level
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300',
+                  )}
+                >
+                  {SCOPE_LABELS[level]?.label.replace(' 권리범위', '') ?? level}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs2 text-gray-400 mb-1">카테고리 (복수 선택)</p>
+            <div className="flex gap-1.5 flex-wrap">
+              {(['MACHINE', 'PROCESS', 'MANUFACTURE', 'COMPOSITION'] as const).map(cat => {
+                const active = preference.categories.includes(cat);
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => !done && setPreference(p => ({
+                      ...p,
+                      categories: active ? p.categories.filter(c => c !== cat) : [...p.categories, cat],
+                    }))}
+                    className={clsx(
+                      'px-2 py-0.5 text-xs2 font-semibold rounded-lg border transition-colors',
+                      active ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-500 border-gray-200 hover:border-purple-300',
+                    )}
+                  >{CATEGORY_LABEL[cat]}</button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {filteredSetIndices.length === 0 && (
+          <div className="text-center py-6 text-gray-400 text-xs2">선택한 조건에 맞는 세트가 없습니다.</div>
+        )}
+
+        {filteredSetIndices.map(setIdx => {
+          const set = claimSets[setIdx];
           const isSelected = selectedSetIndex === setIdx;
           const scopeInfo = SCOPE_LABELS[set.abstraction_level] ?? { label: set.abstraction_level, sub: '' };
           return (
@@ -2292,6 +2600,7 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                           onClick={e => e.stopPropagation()}
                           onChange={e => { setClaimText(setIdx, ci, e.target.value); syncUpdate(setIdx, depGroupsMap); }}
                           onFocus={() => onFocusContext?.({ text, label: `${scopeInfo.label} — ${catLabel}`, apply: (newText) => setClaimText(setIdx, ci, newText) })}
+                          onMouseUp={e => { const ta = e.currentTarget; if (ta.selectionStart !== ta.selectionEnd) { const rect = ta.getBoundingClientRect(); setClaimSelState({ start: ta.selectionStart, end: ta.selectionEnd, originalValue: ta.value, apply: (newText) => { setClaimText(setIdx, ci, newText); syncUpdate(setIdx, depGroupsMap); }, top: rect.bottom + 4, left: rect.left }); } }}
                           ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                         />
                       ) : (
@@ -2317,6 +2626,7 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
           </button>
         )}
       </div>
+      </>
     );
   }
 
@@ -2329,6 +2639,21 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
   let globalClaimNum = 0;
 
   return (
+    <>
+    {claimSelState && (
+      <TextSelectionPopover
+        position={{ top: claimSelState.top, left: claimSelState.left }}
+        preview={claimSelState.originalValue.slice(claimSelState.start, claimSelState.end).slice(0, 20)}
+        onApply={instruction => {
+          const before = claimSelState.originalValue.slice(0, claimSelState.start);
+          const selected = claimSelState.originalValue.slice(claimSelState.start, claimSelState.end);
+          const after = claimSelState.originalValue.slice(claimSelState.end);
+          claimSelState.apply(before + mockPartialModify(selected, instruction) + after);
+          setClaimSelState(null);
+        }}
+        onClose={() => setClaimSelState(null)}
+      />
+    )}
     <div className="flex-1 overflow-y-auto scroll-thin p-3 ml-1.5 space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-xs2 font-semibold text-gray-600">
@@ -2424,7 +2749,23 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                       )}
                     </div>
                     <div className="px-2.5 pb-2">
-                      <p className="text-xs2 text-gray-700 leading-relaxed">{displayText}</p>
+                      {!done && dep.sel ? (
+                        <textarea
+                          className="w-full text-xs2 text-gray-700 leading-relaxed bg-transparent outline-none resize-none overflow-hidden"
+                          value={displayText}
+                          rows={Math.max(2, Math.ceil(displayText.length / 46))}
+                          onChange={e => {
+                            const next = { ...setGroups, [ci]: { ...grp, items: grp.items.map(d => d.id === dep.id ? { ...d, text: e.target.value } : d) } };
+                            const nextMap = { ...depGroupsMap, [selectedSetIndex]: next };
+                            setDepGroupsMap(nextMap);
+                            syncUpdate(selectedSetIndex, nextMap);
+                          }}
+                          onMouseUp={e => { const ta = e.currentTarget; if (ta.selectionStart !== ta.selectionEnd) { const rect = ta.getBoundingClientRect(); setClaimSelState({ start: ta.selectionStart, end: ta.selectionEnd, originalValue: ta.value, apply: (newText) => { const next = { ...setGroups, [ci]: { ...grp, items: grp.items.map(d => d.id === dep.id ? { ...d, text: newText } : d) } }; const nextMap = { ...depGroupsMap, [selectedSetIndex]: next }; setDepGroupsMap(nextMap); syncUpdate(selectedSetIndex, nextMap); }, top: rect.bottom + 4, left: rect.left }); } }}
+                          ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                        />
+                      ) : (
+                        <p className="text-xs2 text-gray-700 leading-relaxed">{displayText}</p>
+                      )}
                     </div>
                   </div>
                 );
@@ -2451,6 +2792,7 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
         );
       })}
     </div>
+    </>
   );
 }
 

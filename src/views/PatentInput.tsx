@@ -2,7 +2,7 @@
 // Config 2줄 압축 + 검색필드 그룹 탭 (텍스트/분류코드/인명/번호/일자)
 import { useState } from 'react';
 import clsx from 'clsx';
-import { useToast } from '../components/Toast';
+import { toast, Button } from '@muhayu/axp-ui';
 import { FinderModal, type FinderType } from '../components/FinderModal';
 import {
   COUNTRY_LIST, COUNTRY_ADDITIONAL, PATENT_PERIODS,
@@ -143,8 +143,6 @@ const KEY_TABS: { id: KeyTab; label: string }[] = [
 
 // ── Main ──────────────────────────────────────────────────────
 export function PatentInput({ onRun }: Props) {
-  const toast = useToast();
-
   // 국가
   const [countries, setCountries] = useState<Record<string, boolean>>({ KR: true, US: true });
   const [extraCountries, setExtraCountries] = useState<string[]>([]);
@@ -190,7 +188,7 @@ export function PatentInput({ onRun }: Props) {
     setExtraCountries(prev => Array.from(new Set([...prev, ...selected])));
     setCountryPickerOpen(false);
     setPickerSel({});
-    if (selected.length) toast.show(`추가 국가 ${selected.length}개 적용`);
+    if (selected.length) toast(`추가 국가 ${selected.length}개 적용`);
   };
 
   const toggleDocKind = (k: string) => setDocKinds(prev => prev.includes(k) ? prev.filter(x => x !== k) : [...prev, k]);
@@ -346,8 +344,8 @@ export function PatentInput({ onRun }: Props) {
               ))}
             </div>
             <div className="flex justify-end gap-1.5 pt-2 mt-2 border-t border-gray-100">
-              <button className="btn-outline btn-xs" onClick={() => setCountryPickerOpen(false)}>취소</button>
-              <button className="btn-primary btn-sm text-sm2" onClick={applyCountryPicker}>선택 추가</button>
+              <Button variant="outlined" color="primary" size="xs" onClick={() => setCountryPickerOpen(false)}>취소</Button>
+              <Button variant="filled" color="primary" size="sm" className="text-sm2" onClick={applyCountryPicker}>선택 추가</Button>
             </div>
           </div>
         )}
@@ -415,8 +413,8 @@ export function PatentInput({ onRun }: Props) {
 
         {/* 초기화 / 검색 */}
         <div className="flex justify-end gap-1.5">
-          <button className="btn-outline btn-xs" onClick={resetAll}>◇ 초기화</button>
-          <button className="btn-primary btn-sm text-sm2" onClick={handleSearch}>검색</button>
+          <Button variant="outlined" color="primary" size="xs" onClick={resetAll}>◇ 초기화</Button>
+          <Button variant="filled" color="primary" size="sm" className="text-sm2" onClick={handleSearch}>검색</Button>
         </div>
       </div>
 

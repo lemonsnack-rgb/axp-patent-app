@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store';
-import { useToast } from '../components/Toast';
+import { toast, openAlertDialog, Button } from '@muhayu/axp-ui';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
-import { ConfirmModal } from '../components/ConfirmModal';
 import { LibrarySaveModal } from '../components/LibrarySaveModal';
 import { LibraryDetailModal } from '../components/LibraryDetailModal';
 import clsx from 'clsx';
@@ -15,13 +14,10 @@ type DrillFilter = { id: string };
 
 export function LibraryView() {
   const { library, collections, collectionAdd, collectionToggleFavorite, collectionRemove, ensureUncategorized } = useStore();
-  const toast = useToast();
   const [drill, setDrill] = useState<DrillFilter | null>(null);
   const [sort, setSort] = useState<'recent' | 'title'>('recent');
   const [newOpen, setNewOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [confirmState, setConfirmState] = useState<{ open: boolean; message: string; onConfirm: () => void }>({ open: false, message: '', onConfirm: () => {} });
-  const showConfirm = (message: string, onConfirm: () => void) => setConfirmState({ open: true, message, onConfirm });
 
   useEffect(() => { ensureUncategorized(); }, []);
 
@@ -65,12 +61,15 @@ export function LibraryView() {
         </span>
         <div className="flex-1 min-w-0">
           <div className="font-semibold text-base2 text-zinc-800 truncate">{c.name}</div>
-          <div className="text-sm2 text-zinc-500">{cnt}건</div>
+          <div className="text-sm2 text-zinc-500">{cnt}개</div>
           {!isUncat && (
             <button
               onClick={e => {
                 e.stopPropagation();
-                showConfirm(`"${c.name}" 폴더를 삭제할까요?\n자료는 미분류로 이동됩니다.`, () => { collectionRemove(c.id); toast.show(`폴더 삭제: ${c.name}`); });
+                openAlertDialog(
+                  { title: '확인', description: `"${c.name}" 폴더를 삭제합니다.\n저장된 항목은 분류로 이동됩니다.`, confirm: '삭제', cancel: '취소' },
+                  { theme: 'danger', onConfirm: (ctrl) => { collectionRemove(c.id); toast(`폴더 삭제: ${c.name}`); ctrl.close(); } }
+                );
               }}
               className="opacity-0 group-hover:opacity-100 absolute bottom-1 right-1.5 text-xs2 text-red-500 hover:bg-red-50 px-1.5 py-0.5 rounded"
             >삭제</button>
@@ -85,9 +84,9 @@ export function LibraryView() {
       <div className="mb-4 flex items-center gap-2">
         <span className="text-md2 text-zinc-500">폴더 {userCols.length}개</span>
         {drill && (
-          <button className="ml-2 btn-ghost text-xs2 px-2 py-1" onClick={() => setDrill(null)}>
-            ← 폴더 목록
-          </button>
+          <Button variant="text" size="sm" className="ml-2 text-xs2 px-2 py-1" onClick={() => setDrill(null)}>
+            ← 전체 폴더
+          </Button>
         )}
       </div>
 
@@ -101,7 +100,7 @@ export function LibraryView() {
           </span>
           <div>
             <div className="font-semibold text-base2">새 폴더</div>
-            <div className="text-sm2">자료를 분류해 보세요</div>
+            <div className="text-sm2">폴더를 추가해 보세요</div>
           </div>
         </button>
         {userCols.map(c => renderFolder(c))}
@@ -119,12 +118,6 @@ export function LibraryView() {
 
       <NewCollectionModal open={newOpen} onClose={() => setNewOpen(false)} onCreate={name => { collectionAdd(name); setNewOpen(false); }} />
       <LibraryDetailModal id={detailId} onClose={() => setDetailId(null)} />
-      <ConfirmModal
-        open={confirmState.open}
-        message={confirmState.message}
-        onConfirm={() => { confirmState.onConfirm(); setConfirmState(s => ({ ...s, open: false })); }}
-        onCancel={() => setConfirmState(s => ({ ...s, open: false }))}
-      />
     </div>
   );
 }
@@ -145,14 +138,14 @@ function DrillDownItems({ filterId, sort, onSortChange, onOpenDetail }: {
     <section className="mt-6">
       <div className="flex items-center gap-2 mb-3">
         <span className="text-base2 font-semibold text-zinc-700">{col?.name || '폴더'}</span>
-        <span className="text-sm2 text-zinc-400">{items.length}건</span>
+        <span className="text-sm2 text-zinc-400">{items.length}개</span>
         <select className="input ml-auto py-1 px-2 text-sm2 w-auto" value={sort} onChange={e => onSortChange(e.target.value as 'recent' | 'title')}>
-          <option value="recent">최근 저장순</option>
+          <option value="recent">최근 저장</option>
           <option value="title">제목순</option>
         </select>
       </div>
       {items.length === 0 ? (
-        <EmptyState compact title="자료가 없습니다." />
+        <EmptyState compact title="저장이 없습니다." />
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3">
           {items.map(it => (
@@ -189,7 +182,7 @@ function DrillDownItems({ filterId, sort, onSortChange, onOpenDetail }: {
                 </div>
               )}
               {it.note && (
-                <div className="text-xs2 text-gray-500 mt-2 line-clamp-2 italic">📝 {it.note}</div>
+                <div className="text-xs2 text-gray-500 mt-2 line-clamp-2 italic">메모: {it.note}</div>
               )}
             </Card>
           ))}
@@ -201,7 +194,6 @@ function DrillDownItems({ filterId, sort, onSortChange, onOpenDetail }: {
 
 function NewCollectionModal({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (n: string) => void }) {
   const [name, setName] = useState('');
-  const toast = useToast();
 
   useEffect(() => { if (open) setName(''); }, [open]);
 
@@ -209,8 +201,8 @@ function NewCollectionModal({ open, onClose, onCreate }: { open: boolean; onClos
     <Modal
       open={open} onClose={onClose} title="새 폴더"
       footer={<>
-        <button className="btn-outline btn-sm" onClick={onClose}>취소</button>
-        <button className="btn-primary btn-sm" disabled={!name.trim()} onClick={() => { onCreate(name.trim()); toast.show(`폴더 추가: ${name.trim()}`); }}>만들기</button>
+        <Button variant="outlined" color="primary" size="sm" onClick={onClose}>취소</Button>
+        <Button variant="filled" color="primary" size="sm" disabled={!name.trim()} onClick={() => { if (name.trim()) { onCreate(name.trim()); toast(`폴더 추가: ${name.trim()}`); } }}>추가</Button>
       </>}
     >
       <div>
@@ -219,10 +211,10 @@ function NewCollectionModal({ open, onClose, onCreate }: { open: boolean; onClos
           className="mt-1"
           value={name}
           onChange={e => setName(e.target.value)}
-          placeholder="예: 자율주행 선행기술"
+          placeholder="예: 논문 자료, 프로젝트 참고"
           maxLength={40}
           autoFocus
-          onKeyDown={e => { if (e.key === 'Enter' && name.trim()) { onCreate(name.trim()); toast.show(`폴더 추가: ${name.trim()}`); } }}
+          onKeyDown={e => { if (e.key === 'Enter' && name.trim()) { onCreate(name.trim()); toast(`폴더 추가: ${name.trim()}`); } }}
         />
       </div>
     </Modal>

@@ -5,7 +5,7 @@ import { PATENT_SEED } from '../data/patentSeed';
 import { PATENT_FACET_GROUPS_BASE, PATENT_FACET_GROUPS_EXT } from '../data/facetGroups';
 import { Icon } from '../components/Icon';
 import { useStore } from '../store';
-import { useToast } from '../components/Toast';
+import { toast, Button } from '@muhayu/axp-ui';
 import { getPatentStatusBadgeColor } from '../utils/badgeUtils';
 import { Badge } from '../components/ui';
 import type { PatentResult } from '../types';
@@ -51,7 +51,6 @@ interface Props {
 
 export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery }: Props) {
   const { setMode, setBgPatentRef } = useStore();
-  const toast = useToast();
   const [sort, setSort] = useState<SortKey>('recent');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -152,9 +151,9 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery }: P
           <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 border border-blue-100 rounded text-sm2 text-brand-400 font-mono truncate max-w-xs">
             {appliedQuery}
           </span>
-          <button onClick={onModify} className="btn-outline btn-xs shrink-0">
+          <Button variant="outlined" color="primary" size="xs" className="shrink-0" onClick={onModify}>
             <Icon name="edit" size={11} /> 검색조건 수정
-          </button>
+          </Button>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <select
@@ -312,8 +311,8 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery }: P
           }}
         />
       )}
-      {viewMode === 'sliding' && <SlidingView data={data} onOpenDetail={onOpenDetail} onSave={onSave} onBgPatent={num => { setBgPatentRef(num); setMode('spec'); toast.show(`배경기술 추가: ${num}`); }} />}
-      {viewMode === 'gallery' && <GalleryView data={data} onSave={onSave} onBgPatent={num => { setBgPatentRef(num); setMode('spec'); toast.show(`배경기술 추가: ${num}`); }} />}
+      {viewMode === 'sliding' && <SlidingView data={data} onOpenDetail={onOpenDetail} onSave={onSave} onBgPatent={num => { setBgPatentRef(num); setMode('spec'); toast(`배경기술 추가: ${num}`); }} />}
+      {viewMode === 'gallery' && <GalleryView data={data} onSave={onSave} onBgPatent={num => { setBgPatentRef(num); setMode('spec'); toast(`배경기술 추가: ${num}`); }} />}
     </div>
   );
 }
@@ -408,8 +407,8 @@ function FilterDrawer({ pendingFilters, extFilterValues, onToggle, onExtChange, 
           {pendingCount > 0 ? `${pendingCount}개 선택됨 — [적용] 클릭 시 결과에 반영됩니다` : '선택한 필터는 [적용] 클릭 시 결과에 반영됩니다'}
         </span>
         <div className="flex gap-1.5">
-          <button className="btn-outline btn-xs" onClick={onCancel}>취소</button>
-          <button className="btn-primary btn-sm text-sm2" onClick={onApply}>적용</button>
+          <Button variant="outlined" color="primary" size="xs" onClick={onCancel}>취소</Button>
+          <Button variant="filled" color="primary" size="sm" className="text-sm2" onClick={onApply}>적용</Button>
         </div>
       </div>
     </div>
@@ -435,7 +434,6 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
   sortDir: 'asc' | 'desc';
   onSort: (col: 'applicationDate' | 'title') => void;
 }) {
-  const toast = useToast();
   const totalPages = Math.ceil(totalCount / perPage);
   const startIdx = (page - 1) * perPage;
   const pageData = data.slice(startIdx, startIdx + perPage);
@@ -453,19 +451,19 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
             <Pagination current={page} total={totalPages} onChange={onPageChange} />
           </div>
           <div className="flex gap-1.5">
-            <button
-              className="btn-outline btn-xs"
+            <Button
+              variant="outlined" color="primary" size="xs"
               disabled={selectedCard === null}
               title={selectedCard === null ? '특허를 선택하세요' : 'BibTeX 복사'}
               onClick={() => {
                 const d = selectedCard !== null ? data[selectedCard] : null;
                 if (!d) return;
                 const bib = `@patent{${d.number.replace(/\s/g,'_')},\n  title={${d.title}},\n  author={${d.applicant}},\n  number={${d.number}},\n  date={${d.applicationDate}},\n}`;
-                navigator.clipboard.writeText(bib).then(() => toast.show('BibTeX 복사됨'));
+                navigator.clipboard.writeText(bib).then(() => toast('BibTeX 복사됨'));
               }}
-            >BibTeX</button>
-            <button
-              className="btn-outline btn-xs"
+            >BibTeX</Button>
+            <Button
+              variant="outlined" color="primary" size="xs"
               disabled={checked.size === 0}
               title={checked.size === 0 ? '항목을 선택하세요' : `${checked.size}건 CSV 다운로드`}
               onClick={() => {
@@ -478,10 +476,10 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                 a.download = 'patents.csv';
                 a.click();
                 URL.revokeObjectURL(a.href);
-                toast.show(`${rows.length}건 CSV 다운로드`);
+                toast(`${rows.length}건 CSV 다운로드`);
               }}
-            >CSV 다운</button>
-            <button className="btn-outline btn-xs" title="컬럼 설정 (준비 중)" disabled>컬럼</button>
+            >CSV 다운</Button>
+            <Button variant="outlined" color="primary" size="xs" title="컬럼 설정 (준비 중)" disabled>컬럼</Button>
           </div>
         </div>
 
@@ -593,7 +591,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
           <>
             <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200 shrink-0">
               <span className="text-md2 font-bold text-gray-700 truncate">{data[selectedCard]?.number}</span>
-              <button onClick={() => onSelectCard(-1)} className="btn-ghost p-1"><Icon name="close" size={14} /></button>
+              <Button variant="text" size="icon-sm" onClick={() => onSelectCard(-1)}><Icon name="close" size={14} /></Button>
             </div>
             <div className="flex-1 overflow-y-auto scroll-thin p-3 text-md2">
               <InlineDetail
@@ -645,8 +643,8 @@ function InlineDetail({ d, onOpenDetail, onSave }: { d: PatentResult; onOpenDeta
         </div>
       )}
       <div className="flex gap-2 pt-1 border-t border-gray-100">
-        <button onClick={onOpenDetail} className="btn-outline btn-xs flex-1">전체 보기 ↗</button>
-        <button onClick={onSave} className="btn-outline btn-xs"><Icon name="star" size={11} /> 저장</button>
+        <Button variant="outlined" color="primary" size="xs" className="flex-1" onClick={onOpenDetail}>전체 보기 ↗</Button>
+        <Button variant="outlined" color="primary" size="xs" onClick={onSave}><Icon name="star" size={11} /> 저장</Button>
       </div>
     </div>
   );
@@ -692,9 +690,9 @@ function SlidingView({ data, onOpenDetail, onSave, onBgPatent }: { data: PatentR
               <Badge color={getPatentStatusBadgeColor(d.status)} className="text-xs2">{d.status}</Badge>
               {d.grade && <Badge color="brand" className="text-xs2">평가 {d.grade}</Badge>}
               <div className="ml-auto flex gap-1.5">
-                <button onClick={() => onOpenDetail(i)} className="btn-outline btn-xs">전체 보기</button>
-                <button onClick={() => onSave(i)} className="btn-outline btn-xs"><Icon name="star" size={11} /> 저장</button>
-                <button className="btn-primary btn-xs" onClick={() => onBgPatent(d.number)}>→ 배경기술</button>
+                <Button variant="outlined" color="primary" size="xs" onClick={() => onOpenDetail(i)}>전체 보기</Button>
+                <Button variant="outlined" color="primary" size="xs" onClick={() => onSave(i)}><Icon name="star" size={11} /> 저장</Button>
+                <Button variant="filled" color="primary" size="xs" onClick={() => onBgPatent(d.number)}>→ 배경기술</Button>
               </div>
             </div>
             <h3 className="text-base2 font-bold text-gray-800 mb-2 cursor-pointer hover:text-brand-400" onClick={() => onOpenDetail(i)}>{d.title}</h3>
@@ -803,9 +801,9 @@ function GalleryView({ data, onSave, onBgPatent }: { data: PatentResult[]; onSav
             <div className="text-md2 font-semibold text-gray-800 line-clamp-2 mb-1">{d.title}</div>
             <div className="text-sm2 text-gray-500 truncate">{d.applicant}</div>
             <div className="flex gap-1.5 mt-2 pt-2 border-t border-gray-100">
-              <button className="btn-primary btn-xs flex-1" onClick={() => onBgPatent(d.number)}>→ 배경기술</button>
-              <button onClick={() => onSave(i)} className="btn-outline btn-xs"><Icon name="star" size={11} /></button>
-              <button className="btn-outline btn-xs text-red-500">👎</button>
+              <Button variant="filled" color="primary" size="xs" className="flex-1" onClick={() => onBgPatent(d.number)}>→ 배경기술</Button>
+              <Button variant="outlined" color="primary" size="xs" onClick={() => onSave(i)}><Icon name="star" size={11} /></Button>
+              <Button variant="outlined" color="primary" size="xs" className="text-red-500">👎</Button>
             </div>
           </div>
         ))}

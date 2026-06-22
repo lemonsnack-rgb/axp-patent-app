@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import type { PatentResult } from '../types';
 import { Icon } from './Icon';
 import { Badge } from './ui';
+import { Button } from '@muhayu/axp-ui';
 
 function parseKeywords(query: string): string[] {
   if (!query) return [];
@@ -76,19 +77,19 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
 
       {/* ── 상단 액션 바 (기존 유지) ── */}
       <div className="px-6 py-3 border-b border-gray-200 flex items-center gap-2 shrink-0">
-        <button onClick={onBack} className="btn-outline btn-sm">
+        <Button variant="outlined" color="primary" size="sm" onClick={onBack}>
           <Icon name="arrow-left" size={13} /> 검색결과로
-        </button>
-        {onPrev && <button onClick={onPrev} className="btn-outline btn-sm" title="이전">◀</button>}
+        </Button>
+        {onPrev && <Button variant="outlined" color="primary" size="sm" onClick={onPrev} title="이전">◀</Button>}
         {posLabel && <span className="text-sm2 text-gray-500 font-mono">{posLabel}</span>}
-        {onNext && <button onClick={onNext} className="btn-outline btn-sm" title="다음">▶</button>}
+        {onNext && <Button variant="outlined" color="primary" size="sm" onClick={onNext} title="다음">▶</Button>}
         <div className="ml-auto flex items-center gap-1.5">
-          <button className="btn-primary btn-sm" onClick={() => alert('배경기술 참조 (mockup)')}>
+          <Button variant="filled" color="primary" size="sm" onClick={() => alert('배경기술 참조 (mockup)')}>
             <Icon name="link" size={12} /> 배경기술 참조
-          </button>
-          <button className="btn-outline btn-sm" onClick={onSave}>
+          </Button>
+          <Button variant="outlined" color="primary" size="sm" onClick={onSave}>
             <Icon name="star" size={11} /> 라이브러리 저장
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -402,7 +403,7 @@ function TextBlock({ children }: { children: React.ReactNode }) {
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
       <div className="flex justify-end mb-1.5">
-        <button className="btn-outline btn-xs" onClick={() => alert('🌐 자동번역 (mockup)')}>🌐 자동번역</button>
+        <Button variant="outlined" color="primary" size="xs" onClick={() => alert('🌐 자동번역 (mockup)')}>🌐 자동번역</Button>
       </div>
       <div className="text-base2 text-gray-700 leading-relaxed whitespace-pre-line">{children}</div>
     </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Button } from '@muhayu/axp-ui';
 import { Modal } from './Modal';
 import { Input } from './ui';
 
@@ -25,8 +26,8 @@ export function QuickNameModal({ open, title, placeholder = '이름을 입력하
       title={title}
       width="max-w-sm"
       footer={<>
-        <button className="btn-outline btn-sm" onClick={onClose}>취소</button>
-        <button className="btn-primary btn-sm" disabled={!value.trim()} onClick={handleSubmit}>확인</button>
+        <Button variant="outlined" color="primary" size="sm" onClick={onClose}>취소</Button>
+        <Button variant="filled" color="primary" size="sm" disabled={!value.trim()} onClick={handleSubmit}>확인</Button>
       </>}
     >
       <Input

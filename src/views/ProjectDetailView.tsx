@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useStore, taskTypeMeta } from '../store';
-import { useToast } from '../components/Toast';
+import { toast, Button } from '@muhayu/axp-ui';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
 import { EmptyState } from '../components/EmptyState';
@@ -22,7 +22,6 @@ export function ProjectDetailView() {
     projectUpdate, projectRemove, projectToggleFavorite,
     taskUpdate,
   } = useStore();
-  const toast = useToast();
   const [tab, setTab] = useState<'tasks' | 'library'>('tasks');
   const [menuOpen, setMenuOpen] = useState(false);
   const [newTaskOpen, setNewTaskOpen] = useState(false);
@@ -53,12 +52,12 @@ export function ProjectDetailView() {
     const name = prompt('프로젝트 이름 변경:', p.name);
     if (!name?.trim()) return;
     projectUpdate(p.id, { name: name.trim() });
-    toast.show(`프로젝트 이름 변경: ${name.trim()}`);
+    toast(`프로젝트 이름 변경: ${name.trim()}`);
     setMenuOpen(false);
   };
   const setColor = (c: string) => {
     projectUpdate(p.id, { color: c });
-    toast.show('색상 변경됨');
+    toast('색상 변경됨');
     setMenuOpen(false);
   };
   const remove = () => {
@@ -67,7 +66,7 @@ export function ProjectDetailView() {
     // 작업 folderId 제거
     projectTasks.forEach(t => taskUpdate(t.id, { folderId: undefined }));
     projectRemove(p.id);
-    toast.show('프로젝트 삭제됨');
+    toast('프로젝트 삭제됨');
     setMode('home');
   };
 
@@ -85,9 +84,9 @@ export function ProjectDetailView() {
     <div className="flex-1 flex flex-col overflow-hidden bg-ck-bg">
       {/* Header */}
       <div className="flex items-center gap-3 px-6 py-3 bg-white border-b border-ck-border shrink-0">
-        <button className="btn-outline btn-sm" onClick={() => setMode('home')} title="프로젝트 목록으로">
+        <Button variant="outlined" color="primary" size="sm" onClick={() => setMode('home')} title="프로젝트 목록으로">
           <Icon name="arrow-left" size={13} /> 프로젝트
-        </button>
+        </Button>
         <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: p.color || '#1e5fa6' }} />
         <h2 className="text-lg2 font-bold text-zinc-800 truncate">{p.name}</h2>
         <span className="text-sm2 text-zinc-500">
@@ -97,12 +96,12 @@ export function ProjectDetailView() {
         </span>
 
         <div className="ml-auto flex items-center gap-1.5 relative">
-          <button className="btn-outline btn-sm" onClick={() => setMenuOpen(!menuOpen)} title="프로젝트 설정">
+          <Button variant="outlined" color="primary" size="sm" onClick={() => setMenuOpen(!menuOpen)} title="프로젝트 설정">
             <Icon name="settings" size={13} /> 설정
-          </button>
-          <button className="btn-primary btn-sm" onClick={() => setNewTaskOpen(true)} title="이 프로젝트에 새 작업 추가">
+          </Button>
+          <Button variant="filled" color="primary" size="sm" onClick={() => setNewTaskOpen(true)} title="이 프로젝트에 새 작업 추가">
             <Icon name="plus" size={13} /> 이 프로젝트에 새 작업
-          </button>
+          </Button>
           {menuOpen && (
             <div ref={menuRef} className="absolute right-0 top-full mt-1 z-30 bg-white border border-zinc-200 rounded-xl shadow-card-deep py-1.5 min-w-[220px]">
               <MenuItem icon="edit" label="이름 변경" onClick={rename} />
@@ -191,9 +190,9 @@ export function ProjectDetailView() {
                 <option value="patent">특허만</option>
                 <option value="paper">논문만</option>
               </select>
-              <button className="btn-outline btn-sm text-sm2" onClick={() => toast.show('CSV 내보내기 (mockup)')}>
+              <Button variant="outlined" color="primary" size="sm" className="text-sm2" onClick={() => toast('CSV 내보내기 (mockup)')}>
                 ⬇ CSV 내보내기
-              </button>
+              </Button>
             </div>
 
             {/* 라이브러리 표 */}
@@ -275,7 +274,6 @@ function MenuItem({ icon, label, onClick, danger }: { icon: any; label: string; 
 
 function NewTaskInProjectModal({ open, onClose, projectId, projectName }: { open: boolean; onClose: () => void; projectId: string; projectName: string }) {
   const { projects, taskAdd, setActiveTaskId, setMode, clients, contactByClient } = useStore();
-  const toast = useToast();
   const [type, setType] = useState<TaskType | null>(null);
   const [name, setName] = useState('');
   const [techField, setTechField] = useState('');
@@ -305,7 +303,7 @@ function NewTaskInProjectModal({ open, onClose, projectId, projectName }: { open
       clientId: clientId || undefined,
       contactId: contactId || undefined,
     });
-    toast.show(`작업 추가: ${nt.name} (${projectName})`, 'success');
+    toast.success(`작업 추가: ${nt.name} (${projectName})`);
     onClose();
     setActiveTaskId(nt.id);
     setMode(nt.type === 'spec' ? 'spec' : 'search');
@@ -318,8 +316,8 @@ function NewTaskInProjectModal({ open, onClose, projectId, projectName }: { open
       title={`새 작업 — ${projectName}`}
       width="max-w-xl"
       footer={<>
-        <button className="btn-outline btn-sm" onClick={onClose}>취소</button>
-        <button className="btn-primary btn-sm" disabled={!type} onClick={submit}>작업 만들기</button>
+        <Button variant="outlined" color="primary" size="sm" onClick={onClose}>취소</Button>
+        <Button variant="filled" color="primary" size="sm" disabled={!type} onClick={submit}>작업 만들기</Button>
       </>}
     >
       <div className="space-y-3.5">

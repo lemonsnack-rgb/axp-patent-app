@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { StoreProvider, useStore } from './store';
-import { ToastProvider } from './components/Toast';
 import { TopBar } from './components/TopBar';
 import { Sidebar } from './components/Sidebar';
 import { NewTaskView } from './views/NewTaskView';
@@ -75,9 +74,7 @@ export default function App() {
 
   return (
     <StoreProvider>
-      <ToastProvider>
-        <Shell />
-      </ToastProvider>
+      <Shell />
     </StoreProvider>
   );
 }

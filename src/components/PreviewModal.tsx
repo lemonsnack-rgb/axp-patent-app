@@ -1,5 +1,6 @@
 // PreviewModal — 명세서 미리보기 (분석 결과 반영, B16/B17 fix)
 import { useState } from 'react';
+import { Button } from '@muhayu/axp-ui';
 import { Icon } from './Icon';
 import { exportDocx } from '../utils/exportDocx';
 import { exportPdf } from '../utils/exportPdf';
@@ -117,11 +118,14 @@ export function PreviewModal({ taskName, sections: propSections, onClose }: Prop
 
         {/* 푸터 */}
         <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-3 border-t border-gray-100 bg-gray-50 shrink-0">
-          <button onClick={onClose} className="btn-outline btn-sm">닫기</button>
-          <button
+          <Button variant="outlined" color="primary" size="sm" onClick={onClose}>닫기</Button>
+          <Button
+            variant="filled"
+            color="primary"
+            size="sm"
             onClick={handleDocx}
             disabled={exporting !== null}
-            className="btn-primary btn-sm flex items-center gap-1.5 disabled:opacity-60"
+            className="flex items-center gap-1.5 disabled:opacity-60"
             style={{ background: '#2563eb' }}
           >
             {exporting === 'docx' ? (
@@ -130,11 +134,14 @@ export function PreviewModal({ taskName, sections: propSections, onClose }: Prop
               </svg>
             ) : <Icon name="doc" size={12} />}
             DOCX 다운로드
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="filled"
+            color="primary"
+            size="sm"
             onClick={handlePdf}
             disabled={exporting !== null}
-            className="btn-primary btn-sm flex items-center gap-1.5 disabled:opacity-60"
+            className="flex items-center gap-1.5 disabled:opacity-60"
           >
             {exporting === 'pdf' ? (
               <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -142,7 +149,7 @@ export function PreviewModal({ taskName, sections: propSections, onClose }: Prop
               </svg>
             ) : <Icon name="doc" size={12} />}
             PDF 내보내기
-          </button>
+          </Button>
         </div>
       </div>
     </div>

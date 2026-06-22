@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store';
-import { useToast } from '../components/Toast';
+import { toast, Button } from '@muhayu/axp-ui';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
 import { EmptyState } from '../components/EmptyState';
@@ -12,7 +12,6 @@ interface ContactForm { name: string; role: string; email: string; phone: string
 
 export function ClientsView() {
   const { clients, projects, contacts, clientAdd, clientUpdate, clientRemove, contactAdd, contactUpdate, contactRemove, contactByClient } = useStore();
-  const toast = useToast();
   const [search, setSearch] = useState('');
 
   const [clientModal, setClientModal] = useState<{ mode: 'new' | 'edit'; id?: string } | null>(null);
@@ -43,14 +42,14 @@ export function ClientsView() {
         industry: clientForm.industry.trim() || undefined,
         address: clientForm.address.trim() || undefined,
       });
-      toast.show(`고객사 등록: ${c.name}`, 'success');
+      toast.success(`고객사 등록: ${c.name}`);
     } else if (clientModal?.id) {
       clientUpdate(clientModal.id, {
         name: clientForm.name.trim(),
         industry: clientForm.industry.trim() || undefined,
         address: clientForm.address.trim() || undefined,
       });
-      toast.show('고객사 정보 저장됨');
+      toast('고객사 정보 저장됨');
     }
     setClientModal(null);
   };
@@ -64,7 +63,7 @@ export function ClientsView() {
     // cascade: contacts 삭제 + 프로젝트의 clientId 제거
     contacts.filter(co => co.clientId === c.id).forEach(co => contactRemove(co.id));
     clientRemove(c.id);
-    toast.show('고객사 삭제됨');
+    toast('고객사 삭제됨');
   };
 
   // === Contact modal handlers ===
@@ -86,17 +85,17 @@ export function ClientsView() {
     };
     if (contactModal.mode === 'new') {
       const ct = contactAdd({ clientId: contactModal.clientId, ...data });
-      toast.show(`담당자 추가: ${ct.name}`, 'success');
+      toast.success(`담당자 추가: ${ct.name}`);
     } else if (contactModal.id) {
       contactUpdate(contactModal.id, data);
-      toast.show('담당자 정보 저장됨');
+      toast('담당자 정보 저장됨');
     }
     setContactModal(null);
   };
   const deleteContact = (ct: Contact) => {
     if (!confirm(`담당자 "${ct.name}"을(를) 삭제하시겠습니까?`)) return;
     contactRemove(ct.id);
-    toast.show('담당자 삭제됨');
+    toast('담당자 삭제됨');
   };
 
   return (
@@ -106,9 +105,9 @@ export function ClientsView() {
           <Icon name="search" size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <Input className="pl-7 py-1.5 text-sm2 w-52" placeholder="고객사 검색..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <button className="btn-primary btn-sm" onClick={openNewClient}>
+        <Button variant="filled" color="primary" size="sm" onClick={openNewClient}>
           <Icon name="plus" size={13} /> 새 고객사
-        </button>
+        </Button>
       </div>
 
       <div className="space-y-3">
@@ -136,8 +135,8 @@ export function ClientsView() {
                   </div>
                 </div>
                 <div className="flex gap-1.5 shrink-0">
-                  <button className="btn-outline btn-xs" onClick={() => openEditClient(c)} title="편집">편집</button>
-                  <button className="btn-outline btn-xs text-red-600 border-red-200 hover:bg-red-50" onClick={() => deleteClient(c)} title="삭제">삭제</button>
+                  <Button variant="outlined" color="primary" size="xs" onClick={() => openEditClient(c)} title="편집">편집</Button>
+                  <Button variant="outlined" color="primary" size="xs" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => deleteClient(c)} title="삭제">삭제</Button>
                 </div>
               </div>
 
@@ -152,7 +151,7 @@ export function ClientsView() {
                         {ct.email && <span className="text-blue-600 font-mono text-sm2 truncate">{ct.email}</span>}
                         {ct.phone && <span className="text-zinc-600 font-mono text-sm2">{ct.phone}</span>}
                         <div className="ml-auto flex gap-1">
-                          <button className="btn-ghost text-xs2 px-2 py-0.5" onClick={() => openEditContact(c.id, ct)}>편집</button>
+                          <Button variant="text" className="text-xs2 px-2 py-0.5" onClick={() => openEditContact(c.id, ct)}>편집</Button>
                           <button className="text-xs2 px-2 py-0.5 text-red-600 hover:bg-red-50 rounded" onClick={() => deleteContact(ct)}>삭제</button>
                         </div>
                       </div>
@@ -203,10 +202,10 @@ function ClientModal({ open, mode, form, setForm, onClose, onSubmit }: {
       onClose={onClose}
       title={mode === 'new' ? '새 고객사' : '고객사 편집'}
       footer={<>
-        <button className="btn-outline btn-sm" onClick={onClose}>취소</button>
-        <button className="btn-primary btn-sm" disabled={!form.name.trim()} onClick={onSubmit}>
+        <Button variant="outlined" color="primary" size="sm" onClick={onClose}>취소</Button>
+        <Button variant="filled" color="primary" size="sm" disabled={!form.name.trim()} onClick={onSubmit}>
           {mode === 'new' ? '고객사 등록' : '저장'}
-        </button>
+        </Button>
       </>}
     >
       <div className="space-y-3">
@@ -237,10 +236,10 @@ function ContactModal({ open, mode, clientName, form, setForm, onClose, onSubmit
       onClose={onClose}
       title={mode === 'new' ? '새 담당자' : '담당자 편집'}
       footer={<>
-        <button className="btn-outline btn-sm" onClick={onClose}>취소</button>
-        <button className="btn-primary btn-sm" disabled={!form.name.trim()} onClick={onSubmit}>
+        <Button variant="outlined" color="primary" size="sm" onClick={onClose}>취소</Button>
+        <Button variant="filled" color="primary" size="sm" disabled={!form.name.trim()} onClick={onSubmit}>
           {mode === 'new' ? '담당자 등록' : '저장'}
-        </button>
+        </Button>
       </>}
     >
       <div className="space-y-3">

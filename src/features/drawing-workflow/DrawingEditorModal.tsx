@@ -7,6 +7,7 @@ import { PatentEditor } from '../patent-editor';
 import { onEditorResult, writeEditorResult } from './editorChannel';
 import type { DrawingItem, CadCandidate } from './types';
 import type { EditorReference, PatentDrawing, InventionComponent } from '../patent-editor';
+import { Button } from '@muhayu/axp-ui';
 
 // availableReferences(구성요소)를 InventionComponent 형식으로 변환
 function refsToComponents(refs: EditorReference[]): InventionComponent[] {
@@ -321,9 +322,9 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
           {/* standalone 모드에서는 StandaloneEditor의 ✕ 버튼이 담당 */}
           {!standalone && (
             <div className="ml-auto flex items-center gap-2">
-              <button className="btn-outline btn-xs" onClick={onClose}>
+              <Button variant="outlined" color="primary" size="xs" onClick={onClose}>
                 <Icon name="close" size={12} /> 닫기
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -485,16 +486,18 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                 {/* 하단 버튼 */}
                 <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-t border-ck-border bg-white shrink-0">
                   <div className="flex items-center gap-2">
-                    <button className="btn-outline btn-sm" onClick={onClose}>취소</button>
-                    <button
-                      className="btn-outline btn-sm"
+                    <Button variant="outlined" color="primary" size="sm" onClick={onClose}>취소</Button>
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      size="sm"
                       onClick={() => setCropBoxMap(m => ({ ...m, [activeId]: { x1: 15, y1: 15, x2: 85, y2: 85 } }))}>
                       영역 초기화
-                    </button>
+                    </Button>
                   </div>
-                  <button className="btn-primary btn-sm flex items-center gap-1.5" onClick={startConvert}>
+                  <Button variant="filled" color="primary" size="sm" className="flex items-center gap-1.5" onClick={startConvert}>
                     <Icon name="check" size={13} /> 영역 확인 완료 — 변환 시작
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -609,14 +612,14 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                 {/* 하단 버튼 */}
                 <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-t border-ck-border bg-white shrink-0">
                   <div className="flex items-center gap-2">
-                    <button className="btn-outline btn-sm" onClick={() => goStage('crop')}>← 영역 확인</button>
+                    <Button variant="outlined" color="primary" size="sm" onClick={() => goStage('crop')}>← 영역 확인</Button>
                     {workStage === 'decide' && (showRegen ? (
                       <div className="flex items-center gap-1.5">
                         <input className="input py-1 text-xs2 w-32" placeholder="예: 더 단순하게"
                           value={regenPrompt} onChange={e => setRegenPrompt(e.target.value)}
                           onKeyDown={e => e.key === 'Enter' && doRegen()} autoFocus />
-                        <button className="btn-primary btn-xs bg-violet-600 border-violet-600" onClick={doRegen}>재변환</button>
-                        <button className="btn-outline btn-xs" onClick={() => setShowRegen(false)}>취소</button>
+                        <Button variant="filled" color="primary" size="xs" className="bg-violet-600 border-violet-600" onClick={doRegen}>재변환</Button>
+                        <Button variant="outlined" color="primary" size="xs" onClick={() => setShowRegen(false)}>취소</Button>
                       </div>
                     ) : (
                       <button className="text-xs2 text-gray-400 hover:text-violet-600 flex items-center gap-1" onClick={() => setShowRegen(true)}>
@@ -629,9 +632,9 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                     ))}
                   </div>
                   {workStage === 'decide' && (
-                    <button className="btn-primary btn-sm" onClick={confirmVersion} disabled={!selCandId}>
+                    <Button variant="filled" color="primary" size="sm" onClick={confirmVersion} disabled={!selCandId}>
                       이 버전으로 편집 시작 →
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -694,13 +697,13 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
             <div className="bg-white rounded-xl shadow-2xl p-4 w-full max-w-md" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-base2 font-bold">버전 {String.fromCharCode(65+idx)} — 확대</p>
-                <button className="btn-outline btn-xs" onClick={() => setZoomedCandId(null)}><Icon name="close" size={12} /> 닫기</button>
+                <Button variant="outlined" color="primary" size="xs" onClick={() => setZoomedCandId(null)}><Icon name="close" size={12} /> 닫기</Button>
               </div>
               <div className="bg-gray-50 rounded-lg border p-4 flex items-center justify-center" style={{ minHeight: 260 }}>
                 {cand?.svgDataUrl ? <img src={cand.svgDataUrl} className="max-w-full max-h-60 object-contain" alt="" /> : <Icon name="image" size={32} className="text-gray-300" />}
               </div>
               <div className="flex justify-between mt-4">
-                <button className="btn-primary btn-sm" onClick={() => { setSelectedMap(m => ({...m, [activeId]: zoomedCandId!})); setZoomedCandId(null); }}>이 버전 선택</button>
+                <Button variant="filled" color="primary" size="sm" onClick={() => { setSelectedMap(m => ({...m, [activeId]: zoomedCandId!})); setZoomedCandId(null); }}>이 버전 선택</Button>
                 <div className="flex gap-1.5">
                   {candidates.map((c,i) => (
                     <button key={c.id} onClick={() => setZoomedCandId(c.id)}

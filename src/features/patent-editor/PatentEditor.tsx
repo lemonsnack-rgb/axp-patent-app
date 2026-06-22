@@ -8,7 +8,7 @@ import { useEditorStore } from "./useEditorStore";
 import { isOverlay } from "./canvas/overlay";
 import { CUSTOM_PROPS, META, FIXED_FONT_FAMILY } from "./canvas/constants";
 import type { EditorReference, PatentEditorProps, ToolMode } from "./types";
-import { ConfirmModal } from "../../components/ConfirmModal";
+import { openAlertDialog, Textarea } from "@muhayu/axp-ui";
 
 const DEFAULT_WIDTH = 1000;
 const DEFAULT_HEIGHT = 700;
@@ -75,7 +75,6 @@ export function PatentEditor({
   const [zoom, setZoom] = useState(1);
   // 캔버스에 배치된 부호 번호 세트 (연결 상태 표시용)
   const [placedNums, setPlacedNums] = useState<Set<string>>(new Set());
-  const [refDelConfirm, setRefDelConfirm] = useState<{ open: boolean; refNumber: string }>({ open: false, refNumber: '' });
 
   // 캔버스 객체 변경 시 배치된 부호 목록 갱신
   const refreshPlacedNums = useCallback(() => {
@@ -412,9 +411,24 @@ export function PatentEditor({
 
   const handleReferenceDelete = useCallback(
     (refNumber: string) => {
-      setRefDelConfirm({ open: true, refNumber });
+      openAlertDialog(
+        {
+          title: '확인',
+          description: `'${refNumber}' 부호를 삭제합니다.\n이 부호를 사용한 캔버스의 모든 지시선·텍스트·원형부호가 함께 삭제됩니다.\n계속할까요?`,
+          confirm: '삭제',
+          cancel: '취소',
+        },
+        {
+          theme: 'danger',
+          onConfirm: (ctrl) => {
+            canvasHandleRef.current?.removeAllUsesOfRef(refNumber);
+            onReferenceDelete?.(refNumber);
+            ctrl.close();
+          },
+        },
+      );
     },
-    [],
+    [onReferenceDelete],
   );
 
   // 닫기 전 현재 도면 자동 저장 + 수락된 부호 일괄 갱신 콜백
@@ -500,11 +514,11 @@ export function PatentEditor({
               </div>
               <div>
                 <label htmlFor="patent-description" className="mb-0.5 block text-xs2 font-semibold uppercase tracking-wider text-gray-500">도면의 설명</label>
-                <textarea id="patent-description" value={descriptionDraft}
+                <Textarea id="patent-description" value={descriptionDraft}
                   onChange={(e) => setDescriptionDraft(e.target.value)}
                   onBlur={commitDescription} rows={2}
                   placeholder="예: 도 1은 본체의 외관을 도시한 사시도이다."
-                  className="w-full resize-y rounded border border-gray-300 px-2 py-1 text-md2 focus:border-blue-500 focus:outline-none"
+                  className="w-full resize-y px-2 py-1 text-md2"
                 />
               </div>
             </div>
@@ -589,16 +603,6 @@ export function PatentEditor({
       <div className="border-t border-ck-border bg-ck-bg px-3 py-1.5 text-sm2 text-gray-500">
         Fabric.js · 1-bit PNG 내보내기 · 도면 전환 시 자동 저장 · 지시선 더블클릭으로 부호 편집
       </div>
-      <ConfirmModal
-        open={refDelConfirm.open}
-        message={`'${refDelConfirm.refNumber}' 부호를 삭제합니다.\n이 부호를 사용한 캔버스의 모든 지시선·텍스트·원형부호가 함께 삭제됩니다.\n계속할까요?`}
-        onConfirm={() => {
-          canvasHandleRef.current?.removeAllUsesOfRef(refDelConfirm.refNumber);
-          onReferenceDelete?.(refDelConfirm.refNumber);
-          setRefDelConfirm({ open: false, refNumber: '' });
-        }}
-        onCancel={() => setRefDelConfirm({ open: false, refNumber: '' })}
-      />
     </div>
   );
 }

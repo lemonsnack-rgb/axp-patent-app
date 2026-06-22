@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { useStore } from '../store';
-import { useToast } from './Toast';
+import { toast, Button } from '@muhayu/axp-ui';
 import { Modal } from './Modal';
 import { Badge, Input } from './ui';
 
 export function LibraryDetailModal({ id, onClose }: { id: string | null; onClose: () => void }) {
   const { library, collections, libraryUpdate, libraryRemove, libraryToggleFavorite } = useStore();
-  const toast = useToast();
   const [editingNote, setEditingNote] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [editingTags, setEditingTags] = useState(false);
@@ -20,17 +19,17 @@ export function LibraryDetailModal({ id, onClose }: { id: string | null; onClose
   const saveNote = () => {
     libraryUpdate(it.id, { note: noteText.trim() || undefined });
     setEditingNote(false);
-    toast.show('메모 저장됨');
+    toast('메모 저장됨');
   };
   const saveTags = () => {
     const tags = tagsText.split(',').map(s => s.trim()).filter(Boolean);
     libraryUpdate(it.id, { tags });
     setEditingTags(false);
-    toast.show('태그 저장됨');
+    toast('태그 저장됨');
   };
   const setCollection = (cid: string) => {
     libraryUpdate(it.id, { collectionId: cid || null });
-    toast.show('폴더 이동됨');
+    toast('폴더 이동됨');
   };
 
   return (
@@ -40,11 +39,14 @@ export function LibraryDetailModal({ id, onClose }: { id: string | null; onClose
       title="자료 상세"
       width="max-w-2xl"
       footer={<>
-        <button
-          className="btn-outline btn-sm mr-auto text-red-600 border-red-200 hover:bg-red-50"
-          onClick={() => { if (confirm('이 자료를 삭제할까요?')) { libraryRemove(it.id); toast.show('자료 삭제됨'); onClose(); } }}
-        >삭제</button>
-        <button className="btn-outline btn-sm" onClick={onClose}>닫기</button>
+        <Button
+          variant="outlined"
+          color="primary"
+          size="sm"
+          className="mr-auto text-red-600 border-red-200 hover:bg-red-50"
+          onClick={() => { if (confirm('이 자료를 삭제할까요?')) { libraryRemove(it.id); toast('자료 삭제됨'); onClose(); } }}
+        >삭제</Button>
+        <Button variant="outlined" color="primary" size="sm" onClick={onClose}>닫기</Button>
       </>}
     >
       <div className="space-y-4">
@@ -99,16 +101,17 @@ export function LibraryDetailModal({ id, onClose }: { id: string | null; onClose
                   {it.tags.length === 0
                     ? <span className="text-md2 text-gray-400">태그 없음</span>
                     : it.tags.map(t => <Badge key={t} color="neutral">#{t}</Badge>)}
-                  <button
+                  <Button
+                    variant="text"
+                    className="text-xs2 px-2 py-0.5"
                     onClick={() => { setTagsText(it.tags.join(', ')); setEditingTags(true); }}
-                    className="btn-ghost text-xs2 px-2 py-0.5"
-                  >편집</button>
+                  >편집</Button>
                 </div>
               ) : (
                 <div className="flex gap-1.5">
                   <Input className="py-1 text-md2 flex-1" value={tagsText} onChange={e => setTagsText(e.target.value)} placeholder="쉼표로 구분" autoFocus />
-                  <button className="btn-primary btn-sm" onClick={saveTags}>저장</button>
-                  <button className="btn-outline btn-sm" onClick={() => setEditingTags(false)}>취소</button>
+                  <Button variant="filled" color="primary" size="sm" onClick={saveTags}>저장</Button>
+                  <Button variant="outlined" color="primary" size="sm" onClick={() => setEditingTags(false)}>취소</Button>
                 </div>
               )}
             </div>
@@ -121,17 +124,18 @@ export function LibraryDetailModal({ id, onClose }: { id: string | null; onClose
               {!editingNote ? (
                 <div className="flex items-start gap-2">
                   <div className="flex-1 text-md2 text-gray-700 italic min-h-[24px]">{it.note || '메모 없음'}</div>
-                  <button
+                  <Button
+                    variant="text"
+                    className="text-xs2 px-2 py-0.5"
                     onClick={() => { setNoteText(it.note || ''); setEditingNote(true); }}
-                    className="btn-ghost text-xs2 px-2 py-0.5"
-                  >편집</button>
+                  >편집</Button>
                 </div>
               ) : (
                 <div className="flex flex-col gap-1.5">
                   <textarea className="input py-1.5 text-md2 min-h-[80px]" value={noteText} onChange={e => setNoteText(e.target.value)} autoFocus />
                   <div className="flex gap-1.5 justify-end">
-                    <button className="btn-outline btn-sm" onClick={() => setEditingNote(false)}>취소</button>
-                    <button className="btn-primary btn-sm" onClick={saveNote}>저장</button>
+                    <Button variant="outlined" color="primary" size="sm" onClick={() => setEditingNote(false)}>취소</Button>
+                    <Button variant="filled" color="primary" size="sm" onClick={saveNote}>저장</Button>
                   </div>
                 </div>
               )}

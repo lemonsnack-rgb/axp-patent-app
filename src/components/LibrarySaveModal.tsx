@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store';
-import { useToast } from './Toast';
+import { toast, Button } from '@muhayu/axp-ui';
 import { Modal } from './Modal';
 import { QuickNameModal } from './QuickNameModal';
 import { Input } from './ui';
@@ -24,7 +24,6 @@ interface Props {
 
 export function LibrarySaveModal({ open, context, onClose }: Props) {
   const { collections, collectionAdd, ensureUncategorized, libraryAdd, activeTaskId, tasks } = useStore();
-  const toast = useToast();
   const [collectionId, setCollectionId] = useState('');
   const [tags, setTags] = useState('');
   const [note, setNote] = useState('');
@@ -65,7 +64,7 @@ export function LibrarySaveModal({ open, context, onClose }: Props) {
     };
     libraryAdd(li);
     const colName = collections.find(c => c.id === folderId)?.name || '미분류';
-    toast.show(`📚 라이브러리 저장: ${context.refNumber} (${colName})`, 'success');
+    toast.success(`📚 라이브러리 저장: ${context.refNumber} (${colName})`);
     onClose();
   };
 
@@ -78,7 +77,7 @@ export function LibrarySaveModal({ open, context, onClose }: Props) {
       onSubmit={name => {
         const c = collectionAdd(name);
         setCollectionId(c.id);
-        toast.show(`폴더 추가: ${c.name}`);
+        toast(`폴더 추가: ${c.name}`);
         setQuickFolderOpen(false);
       }}
       onClose={() => setQuickFolderOpen(false)}
@@ -88,8 +87,8 @@ export function LibrarySaveModal({ open, context, onClose }: Props) {
       onClose={onClose}
       title="라이브러리에 저장"
       footer={<>
-        <button className="btn-outline btn-sm" onClick={onClose}>취소</button>
-        <button className="btn-primary btn-sm" onClick={submit}>저장</button>
+        <Button variant="outlined" color="primary" size="sm" onClick={onClose}>취소</Button>
+        <Button variant="filled" color="primary" size="sm" onClick={submit}>저장</Button>
       </>}
     >
       <div className="space-y-3.5">
@@ -107,7 +106,7 @@ export function LibrarySaveModal({ open, context, onClose }: Props) {
               <option value="">— 미분류 —</option>
               {collections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            <button type="button" className="btn-outline btn-sm whitespace-nowrap" onClick={quickAddFolder}>+ 새 폴더</button>
+            <Button variant="outlined" color="primary" size="sm" type="button" className="whitespace-nowrap" onClick={quickAddFolder}>+ 새 폴더</Button>
           </div>
         </div>
         <div>

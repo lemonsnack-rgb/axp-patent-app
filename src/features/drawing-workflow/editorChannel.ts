@@ -20,6 +20,7 @@ export interface EditorResult {
   drawingId: string;
   editorJson?: string;
   exportedImageUrl?: string;
+  adjustedBbox?: { x: number; y: number; w: number; h: number };
   stage: 'editing' | 'done';
   references: EditorReference[];
   timestamp: number;

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Icon } from '../components/Icon';
 import { Card, Input } from '../components/ui';
 import { FinderModal } from '../components/FinderModal';
+import { Button } from '@muhayu/axp-ui';
 
 // 필드 옵션
 const FIELD_OPTIONS = [
@@ -149,10 +150,10 @@ export function PaperInput({ onRun }: Props) {
             필드 추가 (AND 결합)
           </button>
           <div className="flex gap-2">
-            <button className="btn-outline btn-sm" onClick={reset}>초기화</button>
-            <button className="btn-primary" style={{ padding: '8px 24px', fontSize: '13px' }} onClick={onRun}>
+            <Button variant="outlined" color="primary" size="sm" onClick={reset}>초기화</Button>
+            <Button variant="filled" color="primary" style={{ padding: '8px 24px', fontSize: '13px' }} onClick={onRun}>
               검색
-            </button>
+            </Button>
           </div>
         </div>
       </Card>

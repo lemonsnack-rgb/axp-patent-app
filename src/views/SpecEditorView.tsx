@@ -8,6 +8,7 @@ import clsx from 'clsx';
 import katex from 'katex';
 import { Icon } from '../components/Icon';
 import { Input } from '../components/ui';
+import { Button, Textarea } from '@muhayu/axp-ui';
 import type { InventionContext, MidspecSection, InventionSpecification } from '../features/spec/types';
 import { loadSpecState, saveSpecState } from '../features/spec/specStore';
 import { PreviewModal } from '../components/PreviewModal';
@@ -532,14 +533,14 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             }}
           />
           <div className="flex gap-2 justify-end">
-            <button className="btn-outline btn-sm" onClick={() => setRenamingComp(null)}>취소</button>
-            <button
-              className="btn-primary btn-sm"
+            <Button variant="outlined" color="primary" size="sm" onClick={() => setRenamingComp(null)}>취소</Button>
+            <Button
+              variant="filled" color="primary" size="sm"
               disabled={!renamingComp.draft.trim() || renamingComp.draft.trim() === renamingComp.name}
               onClick={() => { renameComp(renamingComp.name, renamingComp.draft); setRenamingComp(null); }}
             >
               전체 변경
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -949,9 +950,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           {/* 하단 채팅 입력창 */}
           <div className="border-t border-zinc-200 px-3 py-2.5 shrink-0 bg-white">
             <div className="flex gap-2 items-end">
-              <textarea
+              <Textarea
                 ref={chatTextareaRef}
-                className="flex-1 text-xs2 border border-zinc-300 rounded-xl px-3 py-2 outline-none resize-none focus:border-blue-400 transition-colors leading-relaxed overflow-y-auto"
+                className="flex-1 px-3 py-2"
                 placeholder={selSet.size > 0 ? `선택한 ${selSet.size}개 단락에 대해 명령하세요...` : "명령을 입력하세요... (Enter 전송)"}
                 value={chatInput}
                 rows={2}
@@ -1008,8 +1009,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             </div>
             <p className="text-xs2 text-zinc-400 mt-2">열 수: 3 (고정)</p>
             <div className="flex gap-2 mt-4 justify-end">
-              <button onClick={() => setTableModal(false)} className="btn-outline btn-sm">취소</button>
-              <button onClick={insertTable} className="btn-primary btn-sm">삽입</button>
+              <Button variant="outlined" color="primary" size="sm" onClick={() => setTableModal(false)}>취소</Button>
+              <Button variant="filled" color="primary" size="sm" onClick={insertTable}>삽입</Button>
             </div>
           </div>
         </div>
@@ -1096,12 +1097,13 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
               </div>
 
               <div className="flex gap-2 px-5 pb-5 justify-end">
-                <button onClick={() => { setFormulaModal(false); setFormulaVal(''); }} className="btn-outline btn-sm">취소</button>
-                <button onClick={insertFormula}
+                <Button variant="outlined" color="primary" size="sm" onClick={() => { setFormulaModal(false); setFormulaVal(''); }}>취소</Button>
+                <Button variant="filled" color="primary" size="sm"
                   disabled={!formulaVal.trim() || !!preview?.error}
-                  className="btn-primary btn-sm disabled:opacity-40">
+                  className="disabled:opacity-40"
+                  onClick={insertFormula}>
                   삽입
-                </button>
+                </Button>
               </div>
             </div>
           </div>

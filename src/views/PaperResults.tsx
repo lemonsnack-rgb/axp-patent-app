@@ -6,6 +6,7 @@ import { PAPER_FACET_GROUPS } from '../data/facetGroups';
 import { Icon } from '../components/Icon';
 import { Badge, Card } from '../components/ui';
 import type { PaperResult } from '../types';
+import { Button } from '@muhayu/axp-ui';
 
 type SortKey = 'match' | 'cited' | 'recent';
 type ViewMode = 'list' | 'gallery';
@@ -84,9 +85,9 @@ export function PaperResults({ onModify, onSave }: Props) {
         >
           {appliedQuery}
         </span>
-        <button onClick={onModify} className="btn-outline btn-xs">
+        <Button variant="outlined" color="primary" size="xs" onClick={onModify}>
           <Icon name="edit" size={11} /> 검색조건 수정
-        </button>
+        </Button>
         <span className="flex-1" />
         <select
           className="input py-1 text-sm2 w-28"
@@ -99,16 +100,16 @@ export function PaperResults({ onModify, onSave }: Props) {
         </select>
         {/* 뷰 토글 */}
         {(['list', 'gallery'] as ViewMode[]).map(v => (
-          <button
+          <Button
             key={v}
+            variant="outlined"
+            color="primary"
+            size="xs"
             onClick={() => setViewMode(v)}
-            className={clsx(
-              'btn-outline btn-xs',
-              viewMode === v && 'bg-blue-50 border-blue-400 text-blue-700',
-            )}
+            className={clsx(viewMode === v && 'bg-blue-50 border-blue-400 text-blue-700')}
           >
             {v === 'list' ? '리스트' : '갤러리(스크리닝)'}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -116,11 +117,14 @@ export function PaperResults({ onModify, onSave }: Props) {
       <div className="flex items-center gap-1.5 px-4 py-1.5 border-b border-gray-100 bg-gray-50 shrink-0 flex-wrap">
         <span className="text-xs2 text-gray-500 font-semibold mr-1">필터</span>
         {PAPER_FACET_GROUPS.map(g => (
-          <button
+          <Button
             key={g.key}
+            variant="outlined"
+            color="primary"
+            size="xs"
             onClick={() => setDrawerOpen(o => !o)}
             className={clsx(
-              'btn-outline btn-xs text-xs2',
+              'text-xs2',
               (pendingFilters[g.key] || []).length > 0 && 'border-blue-400 text-blue-700 bg-blue-50',
             )}
           >
@@ -128,19 +132,22 @@ export function PaperResults({ onModify, onSave }: Props) {
             {(pendingFilters[g.key] || []).length > 0 && (
               <Badge color="brand" className="ml-1 text-xs2">{(pendingFilters[g.key] || []).length}</Badge>
             )}
-          </button>
+          </Button>
         ))}
-        <button
+        <Button
+          variant="outlined"
+          color="primary"
+          size="xs"
           onClick={() => setDrawerOpen(o => !o)}
-          className={clsx('btn-outline btn-xs text-xs2', drawerOpen && 'border-blue-400 text-blue-700 bg-blue-50')}
+          className={clsx('text-xs2', drawerOpen && 'border-blue-400 text-blue-700 bg-blue-50')}
         >
           모든 필터
-        </button>
-        <button onClick={resetFilters} className="btn-outline btn-xs text-xs2 text-gray-400">필터 초기화</button>
+        </Button>
+        <Button variant="outlined" color="primary" size="xs" onClick={resetFilters} className="text-xs2 text-gray-400">필터 초기화</Button>
         <span className="flex-1" />
         <span className="text-xs2 text-gray-400">20개씩 보기</span>
-        <button className="btn-outline btn-xs text-xs2">BibTeX</button>
-        <button className="btn-outline btn-xs text-xs2">CSV 다운</button>
+        <Button variant="outlined" color="primary" size="xs" className="text-xs2">BibTeX</Button>
+        <Button variant="outlined" color="primary" size="xs" className="text-xs2">CSV 다운</Button>
       </div>
 
       {/* ── FilterDrawer ── */}
@@ -179,8 +186,8 @@ export function PaperResults({ onModify, onSave }: Props) {
           <div className="flex items-center justify-between px-4 py-2 border-t border-gray-100 bg-gray-50">
             <span className="text-xs2 text-gray-500">선택한 필터는 [적용] 클릭 시 결과에 반영됩니다</span>
             <div className="flex gap-2">
-              <button className="btn-outline btn-xs" onClick={cancelFilters}>취소</button>
-              <button className="btn-primary btn-sm text-xs2" onClick={applyFilters}>적용</button>
+              <Button variant="outlined" color="primary" size="xs" onClick={cancelFilters}>취소</Button>
+              <Button variant="filled" color="primary" size="sm" onClick={applyFilters} className="text-xs2">적용</Button>
             </div>
           </div>
         </div>
@@ -266,13 +273,16 @@ function ListResults({
                   <div className="text-xs2 text-blue-500 mt-1 font-mono">DOI: {p.doi}</div>
                 )}
               </div>
-              <button
+              <Button
+                variant="outlined"
+                color="primary"
+                size="xs"
                 onClick={e => { e.stopPropagation(); onSave(p); }}
-                className="btn-outline btn-xs h-fit shrink-0"
+                className="h-fit shrink-0"
                 title="라이브러리 저장"
               >
                 <Icon name="star" size={11} /> 저장
-              </button>
+              </Button>
             </div>
           </Card>
         ))}
@@ -308,23 +318,29 @@ function PaperInlineDetail({
     <aside className="w-[45%] min-w-[320px] max-w-[520px] border-l border-gray-200 bg-white flex flex-col overflow-hidden shrink-0">
       {/* 헤더 */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 shrink-0 bg-gray-50">
-        <button
+        <Button
+          variant="outlined"
+          color="primary"
+          size="xs"
           onClick={onPrev}
           disabled={!onPrev}
-          className="btn-outline btn-xs px-1.5 disabled:opacity-30"
+          className="px-1.5 disabled:opacity-30"
           title="이전 (←)"
-        >◀</button>
-        <button
+        >◀</Button>
+        <Button
+          variant="outlined"
+          color="primary"
+          size="xs"
           onClick={onNext}
           disabled={!onNext}
-          className="btn-outline btn-xs px-1.5 disabled:opacity-30"
+          className="px-1.5 disabled:opacity-30"
           title="다음 (→)"
-        >▶</button>
+        >▶</Button>
         <span className="text-xs2 text-gray-400 font-mono">{posLabel}</span>
         <span className="flex-1" />
-        <button onClick={onSave} className="btn-primary btn-xs">
+        <Button variant="filled" color="primary" size="xs" onClick={onSave}>
           <Icon name="star" size={11} /> 저장
-        </button>
+        </Button>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1">
           <Icon name="close" size={14} />
         </button>
@@ -368,15 +384,15 @@ function PaperInlineDetail({
 
         {/* 액션 */}
         <div className="flex gap-2 flex-wrap">
-          <button className="btn-outline btn-sm text-xs2">
+          <Button variant="outlined" color="primary" size="sm" className="text-xs2">
             <Icon name="link" size={11} /> 전체 보기 ↗
-          </button>
-          <button onClick={onSave} className="btn-outline btn-sm text-xs2">
+          </Button>
+          <Button variant="outlined" color="primary" size="sm" onClick={onSave} className="text-xs2">
             <Icon name="star" size={11} /> 라이브러리 저장
-          </button>
-          <button className="btn-outline btn-sm text-xs2">
+          </Button>
+          <Button variant="outlined" color="primary" size="sm" className="text-xs2">
             <Icon name="clipboard" size={11} /> 인용 복사
-          </button>
+          </Button>
         </div>
       </div>
     </aside>
@@ -419,14 +435,17 @@ function GalleryResults({
 
             {/* 액션 */}
             <div className="flex items-center gap-1.5 mt-1 pt-2 border-t border-gray-100">
-              <button className="btn-outline btn-xs text-xs2 flex-1">→ 인용사용</button>
-              <button
+              <Button variant="outlined" color="primary" size="xs" className="text-xs2 flex-1">→ 인용사용</Button>
+              <Button
+                variant="outlined"
+                color="primary"
+                size="xs"
                 onClick={e => { e.stopPropagation(); onSave(p); }}
-                className="btn-outline btn-xs text-xs2"
+                className="text-xs2"
               >
                 <Icon name="star" size={10} />
-              </button>
-              <button className="btn-outline btn-xs text-xs2 text-red-400 hover:border-red-400">👎</button>
+              </Button>
+              <Button variant="outlined" color="primary" size="xs" className="text-xs2 text-red-400 hover:border-red-400">👎</Button>
             </div>
           </Card>
         ))}

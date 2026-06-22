@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
+import { Button } from '@muhayu/axp-ui';
 import { Icon } from './Icon';
 
 // ★ 도움말 URL — 준비되면 아래 주소를 교체하세요
@@ -60,9 +61,9 @@ export function TopBar() {
             {!sidebarCollapsed && <span className="font-semibold text-base2 text-zinc-800">AXPlain.ai</span>}
           </button>
           {!sidebarCollapsed && (
-            <button onClick={() => setSidebarCollapsed(true)} className="btn-ghost p-1" title="사이드바 토글">
+            <Button variant="text" size="icon-sm" onClick={() => setSidebarCollapsed(true)} title="사이드바 토글">
               <Icon name="hamburger" size={16} />
-            </button>
+            </Button>
           )}
         </div>
         <span className="text-md2 text-zinc-500 ml-2">
@@ -101,10 +102,10 @@ export function TopBar() {
           href={HELP_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="btn-ghost hidden md:inline-flex items-center gap-1.5"
           title="도움말 (새 탭에서 열기)"
+          className="hidden md:inline-flex items-center gap-1.5 px-2 py-1 rounded text-zinc-600 hover:bg-zinc-100 text-sm2 transition-colors"
         ><Icon name="help" /><span className="text-sm2">도움말</span></a>
-        <button className="btn-ghost text-sm2 px-2 hidden md:inline-flex" title="언어 선택" aria-label="언어 선택 (현재: 한국어)">KR</button>
+        <Button variant="text" className="text-sm2 px-2 hidden md:inline-flex" title="언어 선택" aria-label="언어 선택 (현재: 한국어)">KR</Button>
       </div>
     </header>
   );

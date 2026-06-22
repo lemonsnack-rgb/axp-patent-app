@@ -1,8 +1,8 @@
-// components/ui/Input.tsx — DESIGN_GUIDE 2-2 기반
 import { forwardRef, useState } from 'react';
+import { Input as AxpInput } from '@muhayu/axp-ui';
 import clsx from 'clsx';
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
   error?: string;
   showPasswordToggle?: boolean;
 }
@@ -13,21 +13,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const inputType = showPasswordToggle ? (showPw ? 'text' : 'password') : type;
 
     return (
-      <div className="relative">
-        <input
+      <div className="relative w-full">
+        <AxpInput
           ref={ref}
           type={inputType}
-          className={clsx(
-            'w-full h-[42px] px-3.5 py-2.5 rounded-lg border text-base2 bg-white',
-            'placeholder:text-neutral-300 text-neutral-700',
-            'transition-all duration-150',
-            'focus:outline-none focus:ring-[3px] focus:ring-brand-400/15 focus:border-brand-400',
-            error
-              ? 'border-red-400 ring-[3px] ring-red-400/10'
-              : 'border-neutral-200 hover:border-neutral-300',
-            showPasswordToggle && 'pr-10',
-            className,
-          )}
+          invalid={!!error}
+          className={clsx('w-full', showPasswordToggle && 'pr-10', className)}
           {...props}
         />
         {showPasswordToggle && (
