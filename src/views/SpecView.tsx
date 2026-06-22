@@ -589,8 +589,6 @@ export function SpecView() {
                                   }));
                                 }}
                                 initialItems={aiComponents}
-                                onFocusContext={setSpecFocusCtx}
-                                guidePanelInputRef={guidePanelInputRef}
                               />
                             )}
                             {s.id === 'drawings' && (
@@ -1569,14 +1567,12 @@ function compItemToSpecItem(item: CompItem, origMap: Map<number, SpecComponentIt
   };
 }
 
-function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onFocusContext, guidePanelInputRef }: {
+function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
   done: boolean;
   onConfirm: () => void;
   onUpdate: (v: string) => void;
   onComponentsChange?: (comps: SpecComponentItem[]) => void;
   initialItems?: SpecComponentItem[];
-  onFocusContext?: (ctx: FocusCtx | null) => void;
-  guidePanelInputRef?: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const initData: CompItem[] = (initialItems && initialItems.length > 0)
     ? initialItems.map(specItemToCompItem)
@@ -1618,29 +1614,24 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onF
     upd([...items, { id, text: '', sel: true, num: '', depth: 0, englishName: '', definition: '', parent: '' }]);
     setFocusId(id);
   };
-  // 전체 구성요소를 텍스트로 직렬화 (AI 어시스턴트 컨텍스트용)
-  const serializeItems = () =>
-    items.map(it => `${it.num ? it.num + ' ' : ''}${extractCompName(it.text)}${it.englishName ? ` (${it.englishName})` : ''}`.trim()).join('\n');
-  // AI 수정안(텍스트)을 구성요소 목록으로 역파싱 — 기존 항목은 명칭으로 매칭해 보존
-  const rebuildFromText = (newText: string) => {
-    const lines = newText.split('\n').map(l => l.trim()).filter(Boolean);
-    const next: CompItem[] = lines.map((line, i) => {
-      const m = line.match(/^(\d+)?\s*(.+?)(?:\s*\(([^)]*)\))?$/);
-      const num = m?.[1] ?? '';
-      const name = (m?.[2] ?? line).trim();
-      const en = m?.[3] ?? '';
-      const existing = items.find(it => extractCompName(it.text) === name);
-      return existing
-        ? { ...existing, num: num || existing.num }
-        : { id: Date.now() + i, text: name, sel: true, num, depth: 0, englishName: en, definition: '', parent: '' };
-    });
-    upd(next);
-  };
-  // 구성요소 전체 영역을 어시스턴트 컨텍스트로 전달 → AI 추가·수정
-  const requestAiComponents = () => {
-    if (!onFocusContext) return;
-    onFocusContext({ text: serializeItems(), label: '구성요소 목록', apply: rebuildFromText });
-    setTimeout(() => guidePanelInputRef?.current?.focus(), 50);
+  // AI 추가 — 자연어 지시로 새 구성요소를 추가 (mock). 기존 항목은 절대 건드리지 않아 손실 없음.
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiInput, setAiInput] = useState('');
+  const submitAiComponent = () => {
+    const instr = aiInput.trim();
+    if (!instr || done) return;
+    const id = Date.now();
+    upd([...items, {
+      id,
+      text: instr.length > 24 ? instr.slice(0, 24) : instr,
+      sel: true, num: '', depth: 0,
+      englishName: '',
+      definition: `${instr} (AI 제안 — 상세 설명·영문명·상위어를 보완하세요)`,
+      parent: '',
+    }]);
+    setAiInput('');
+    setAiOpen(false);
+    setFocusId(id);
   };
 
   // → 활성 조건: idx>0이고 바로 위 항목이 유효한 부모(depth <= 현재 depth)
@@ -1673,14 +1664,15 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onF
           <span className="text-xs2 font-semibold text-gray-600">AI 추출 구성요소</span>
           {!done && (
             <div className="flex items-center gap-1">
-              {onFocusContext && (
-                <button onClick={requestAiComponents}
-                  className="flex items-center gap-1 px-2 py-1 rounded text-xs2 font-semibold bg-violet-50 border border-violet-200 text-violet-600 hover:bg-violet-100 transition-colors"
-                  title="구성요소 전체를 AI로 추가·수정">
-                  <svg viewBox="0 0 16 16" fill="currentColor" width="10" height="10"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                  AI로 추가·수정
-                </button>
-              )}
+              <button onClick={() => setAiOpen(o => !o)}
+                className={clsx(
+                  'flex items-center gap-1 px-2 py-1 rounded text-xs2 font-semibold border transition-colors',
+                  aiOpen ? 'bg-violet-100 border-violet-300 text-violet-700' : 'bg-violet-50 border-violet-200 text-violet-600 hover:bg-violet-100',
+                )}
+                title="자연어 지시로 AI가 구성요소를 추가">
+                <svg viewBox="0 0 16 16" fill="currentColor" width="10" height="10"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
+                AI 추가
+              </button>
               <button onClick={autoAssign}
                 className="flex items-center gap-1 px-2 py-1 rounded text-xs2 font-semibold bg-blue-50 border border-blue-200 text-brand-400 hover:bg-blue-100 transition-colors">
                 <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="10" height="10">
@@ -1691,6 +1683,27 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onF
             </div>
           )}
         </div>
+        {/* AI 추가 입력 바 */}
+        {!done && aiOpen && (
+          <div className="mb-2 rounded-lg border-2 border-violet-200 bg-violet-50/40 p-2">
+            <div className="flex gap-1.5 items-end">
+              <textarea
+                autoFocus
+                className="flex-1 text-xs2 bg-white border border-violet-200 rounded px-2 py-1 outline-none focus:border-violet-400 resize-none min-h-[36px]"
+                placeholder="추가할 구성요소를 설명하세요. 예: 사용자 인증을 처리하는 보안 모듈 (Enter로 추가)"
+                rows={2}
+                value={aiInput}
+                onChange={e => setAiInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitAiComponent(); } }}
+              />
+              <button
+                onClick={submitAiComponent}
+                disabled={!aiInput.trim()}
+                className="shrink-0 text-xs2 font-semibold px-2.5 py-1 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 transition-colors"
+              >추가</button>
+            </div>
+          </div>
+        )}
         {!done && (
           <p className="text-xs2 text-gray-400 mb-2">
             순서 조정 후 <strong className="text-blue-600">부호 자동 부여</strong>를 클릭하면 100, 200... 번호가 할당됩니다.
@@ -2289,12 +2302,14 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
   const [claimSets] = useState(MOCK_INDEPENDENT_CLAIM_SETS);
   const [selectedSetIndex, setSelectedSetIndex] = useState<number | null>(2); // 기본: INTERMEDIATE
   const [claimSelState, setClaimSelState] = useState<SelState>(null);
-  const [preference, setPreference] = useState<{ abstraction: string; categories: string[] }>({
+  const [preference, setPreference] = useState<{ abstraction: string; categories: string[]; descriptions: Record<string, string> }>({
     abstraction: 'INTERMEDIATE',
     categories: ['MACHINE', 'PROCESS'],
+    descriptions: {},
   });
   const [depGroupsMap, setDepGroupsMap] = useState<Record<number, DepGroupsForSet>>({});
   const [claimTexts, setClaimTexts] = useState<Record<number, Record<number, string>>>({}); // setIdx → claimIdx → text
+  const [depLevel, setDepLevel] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('MEDIUM'); // 종속항 개수 레벨 (API claim_count_level)
 
   const getClaimText = (setIdx: number, claimIdx: number): string => {
     return claimTexts[setIdx]?.[claimIdx] ?? claimSets[setIdx]?.claims[claimIdx]?.value ?? '';
@@ -2338,24 +2353,42 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 종속항 템플릿 풀 (개수 레벨에 따라 slice)
+  const depTemplates = (ref: string, suffix: string): string[] => [
+    `${ref}항에 있어서, 상기 처리부는 딥러닝 알고리즘을 포함하는, ${suffix}`,
+    `${ref}항에 있어서, 상기 입력부는 복수의 센서를 포함하는, ${suffix}`,
+    `${ref}항에 있어서, 상기 출력부는 처리 결과를 시각화하여 표시하는, ${suffix}`,
+    `${ref}항에 있어서, 상기 구성은 클라우드 환경에서 동작하는, ${suffix}`,
+    `${ref}항에 있어서, 상기 처리부는 결과를 저장하는 저장 모듈을 더 포함하는, ${suffix}`,
+    `${ref}항에 있어서, 상기 입력부는 사용자 인증 수단을 더 포함하는, ${suffix}`,
+  ];
+  const LEVEL_DEP_COUNT: Record<'LOW' | 'MEDIUM' | 'HIGH', number> = { LOW: 2, MEDIUM: 4, HIGH: 6 };
+  const genDepItems = (ci: number, claim: { category: string }, level: 'LOW' | 'MEDIUM' | 'HIGH'): DepItemState[] => {
+    const suffix = claim.category === 'MACHINE' ? '데이터 처리 시스템.' : '데이터 처리 방법.';
+    const ref = `제${ci + 1}`;
+    return depTemplates(ref, suffix).slice(0, LEVEL_DEP_COUNT[level]).map((text, i) => ({
+      id: i + 1, sel: true, text, editing: false, editVal: '',
+    }));
+  };
+  // 개수 레벨 변경 → 선택 세트 종속항 재생성
+  const applyDepLevel = (level: 'LOW' | 'MEDIUM' | 'HIGH') => {
+    setDepLevel(level);
+    if (selectedSetIndex === null || !selectedSet) return;
+    const groups: DepGroupsForSet = {};
+    selectedSet.claims.forEach((claim, ci) => {
+      groups[ci] = { generated: true, newText: '', items: genDepItems(ci, claim, level) };
+    });
+    const nextMap = { ...depGroupsMap, [selectedSetIndex]: groups };
+    setDepGroupsMap(nextMap);
+    syncUpdate(selectedSetIndex, nextMap);
+  };
+
   const confirmIndep = () => {
     if (selectedSetIndex === null || !selectedSet) return;
     const autoGroups: DepGroupsForSet = {};
     selectedSet.claims.forEach((claim, ci) => {
       if (!(depGroupsMap[selectedSetIndex]?.[ci]?.generated)) {
-        const isDevice = claim.category === 'MACHINE';
-        const suffix = isDevice ? '데이터 처리 시스템.' : '데이터 처리 방법.';
-        const ref = `제${ci + 1}`;
-        autoGroups[ci] = {
-          generated: true,
-          newText: '',
-          items: [
-            { id: 1, sel: true,  text: `${ref}항에 있어서, 상기 처리부는 딥러닝 알고리즘을 포함하는, ${suffix}`, editing: false, editVal: '' },
-            { id: 2, sel: true,  text: `${ref}항에 있어서, 상기 입력부는 복수의 센서를 포함하는, ${suffix}`, editing: false, editVal: '' },
-            { id: 3, sel: true,  text: `${ref}항에 있어서, 상기 출력부는 처리 결과를 시각화하여 표시하는, ${suffix}`, editing: false, editVal: '' },
-            { id: 4, sel: false, text: `${ref}항에 있어서, 상기 구성은 클라우드 환경에서 동작하는, ${suffix}`, editing: false, editVal: '' },
-          ],
-        };
+        autoGroups[ci] = { generated: true, newText: '', items: genDepItems(ci, claim, depLevel) };
       } else {
         autoGroups[ci] = depGroupsMap[selectedSetIndex]![ci];
       }
@@ -2484,6 +2517,23 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                 );
               })}
             </div>
+            {/* 카테고리별 설명(description) preference — API independent-claim/set preference.claims[].description */}
+            {preference.categories.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                {preference.categories.map(cat => (
+                  <div key={cat} className="flex items-center gap-1.5">
+                    <span className="text-xs2 font-semibold text-purple-600 w-14 shrink-0">{CATEGORY_LABEL[cat] ?? cat}</span>
+                    <input
+                      className="flex-1 text-xs2 bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-purple-300 transition-colors"
+                      placeholder="이 카테고리 청구항의 방향·강조점 (선택)"
+                      value={preference.descriptions[cat] ?? ''}
+                      disabled={done}
+                      onChange={e => setPreference(p => ({ ...p, descriptions: { ...p.descriptions, [cat]: e.target.value } }))}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -2623,6 +2673,28 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
           </button>
         )}
       </div>
+
+      {/* 종속항 개수 레벨 (API claim_count_level) */}
+      {!done && (
+        <div className="flex items-center gap-2 rounded-lg bg-gray-50 border border-gray-200 px-3 py-2">
+          <span className="text-xs2 font-semibold text-gray-500 shrink-0">종속항 분량</span>
+          <div className="flex gap-1">
+            {([['LOW', '적게'], ['MEDIUM', '보통'], ['HIGH', '많이']] as const).map(([lv, label]) => (
+              <button
+                key={lv}
+                onClick={() => applyDepLevel(lv)}
+                className={clsx(
+                  'px-2.5 py-1 rounded-lg text-xs2 font-semibold border transition-colors',
+                  depLevel === lv
+                    ? 'bg-brand-400 border-blue-600 text-white'
+                    : 'bg-white border-gray-200 text-gray-500 hover:border-blue-300',
+                )}
+              >{label}</button>
+            ))}
+          </div>
+          <span className="text-xs2 text-gray-400 ml-auto">레벨 변경 시 종속항이 재생성됩니다</span>
+        </div>
+      )}
 
       {selectedSet.claims.map((claim, ci) => {
         const indepNum = ++globalClaimNum;
