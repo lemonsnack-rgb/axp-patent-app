@@ -2032,6 +2032,15 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
     updateDrawings(next);
   };
 
+  const removeDrawing = (idx: number) => {
+    if (done) return;
+    const name = drawings[idx]?.detail.name || drawings[idx]?.detail.symbol || '이 도면';
+    openAlertDialog(
+      { title: '도면 삭제', description: `"${name}"을(를) 목록에서 삭제하시겠습니까?`, confirm: '삭제', cancel: '취소' },
+      { theme: 'danger', onConfirm: (ctrl) => { updateDrawings(drawings.filter((_, i) => i !== idx)); ctrl.close(); } }
+    );
+  };
+
   const includedDrawings = drawings.filter(d => d.included !== false);
   const specDrawings = includedDrawings.filter(d => d.useForSpec);
 
@@ -2147,6 +2156,11 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
                         onClick={() => cloneDrawing(idx)}
                         className="px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-colors"
                       >복제</button>
+                      <button
+                        onClick={() => removeDrawing(idx)}
+                        className="px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                        title="목록에서 삭제"
+                      >삭제</button>
                     </div>
                   )}
                 </div>
@@ -2160,7 +2174,7 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
                 className="flex items-center gap-1.5 px-3 py-2 text-xs2 font-semibold text-gray-600 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors"
               >
                 <Icon name="plus" size={11} />
-                이미지 추가
+                이미지 추가 (로컬 업로드)
               </button>
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileAdd} />
               <button
