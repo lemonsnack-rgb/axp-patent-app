@@ -255,6 +255,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
   };
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
   const [chatInput, setChatInput] = useState('');
+  const [aiThinking, setAiThinking] = useState(false);
   const chatTextareaRef = useRef<HTMLTextAreaElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const msgIdRef = useRef(0);
@@ -318,6 +319,11 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
 
   const [editorPreviewOpen, setEditorPreviewOpen] = useState(false);
 
+  // 찾기/바꾸기
+  const [findOpen, setFindOpen] = useState(false);
+  const [findText, setFindText] = useState('');
+  const [replaceText, setReplaceText] = useState('');
+
   // undo/redo
   const [undoStack, setUndoStack] = useState<Record<SectionId, string[]>[]>([]);
   const [redoStack, setRedoStack] = useState<Record<SectionId, string[]>[]>([]);
@@ -339,6 +345,28 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
         );
       }
       return next;
+    });
+  };
+
+  // ── 찾기/바꾸기 + 문서 통계 ────────────────────────────────────────────
+  const allText = Object.values(blocks).flat().join('\n');
+  const matchCount = findText ? allText.split(findText).length - 1 : 0;
+  const totalChars = Object.values(blocks).flat().join('').replace(/\s/g, '').length;
+  const totalBlocks = Object.values(blocks).flat().filter(b => b.trim()).length;
+  const replaceAll = () => {
+    if (!findText) return;
+    setUndoStack(p => [...p.slice(-20), blocks]);
+    setRedoStack([]);
+    setBlocks(p => {
+      const updated = {} as Record<SectionId, string[]>;
+      (Object.keys(p) as SectionId[]).forEach(sid => {
+        updated[sid] = p[sid].map(b => b.split(findText).join(replaceText));
+      });
+      if (task?.id) {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() => saveSpecState(task.id, { editorBlocks: updated as any }), 500);
+      }
+      return updated;
     });
   };
 
@@ -503,8 +531,10 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     });
 
     setChatMessages(prev => [...prev, { id: ++msgIdRef.current, role: 'user', text: msg }]);
+    setAiThinking(true);
 
     setTimeout(() => {
+      setAiThinking(false);
       if (refs.length === 0) {
         // 전체 문서 대상 Q&A 모드
         const aiText = generateWholeDocReply(msg);
@@ -678,6 +708,11 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             <span className="font-serif text-sm leading-none">∑</span><span>수식</span>
           </button>
           <div className="w-px h-5 bg-zinc-200 mx-1" />
+          <button onClick={() => setFindOpen(o => !o)} title="찾기/바꾸기"
+            className={clsx('flex items-center gap-1 px-2 py-1 rounded transition-colors text-xs2', findOpen ? 'bg-blue-50 text-blue-700' : 'hover:bg-zinc-100 text-zinc-500')}>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
+            <span>찾기</span>
+          </button>
           <button onClick={() => setEditorPreviewOpen(true)} title="미리보기"
             className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 transition-colors text-zinc-500 text-xs2">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
@@ -695,6 +730,32 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           </button>
         </div>
       </div>
+
+      {/* 찾기/바꾸기 바 (문서 통계 포함) */}
+      {findOpen && (
+        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-zinc-200 bg-zinc-50 shrink-0">
+          <input
+            value={findText}
+            onChange={e => setFindText(e.target.value)}
+            placeholder="찾기"
+            className="w-40 text-xs2 px-2 py-1 border border-zinc-200 rounded bg-white outline-none focus:border-blue-400"
+          />
+          <span className="text-xs2 text-zinc-400 w-10 shrink-0">{findText ? `${matchCount}건` : ''}</span>
+          <input
+            value={replaceText}
+            onChange={e => setReplaceText(e.target.value)}
+            placeholder="바꿀 내용"
+            className="w-40 text-xs2 px-2 py-1 border border-zinc-200 rounded bg-white outline-none focus:border-blue-400"
+          />
+          <button
+            onClick={replaceAll}
+            disabled={!findText || matchCount === 0}
+            className="text-xs2 font-semibold px-2.5 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 transition-colors"
+          >전체 바꾸기</button>
+          <span className="ml-auto text-xs2 text-zinc-400">{totalBlocks}단락 · {totalChars.toLocaleString()}자</span>
+          <button onClick={() => setFindOpen(false)} className="text-zinc-400 hover:text-zinc-600 text-xs2 px-1" title="닫기">✕</button>
+        </div>
+      )}
 
       {/* 서브헤더 Row 2: 섹션 탭 */}
       <div className="flex border-b border-zinc-200 bg-white shrink-0 overflow-x-auto scroll-thin [mask-image:linear-gradient(to_right,transparent_0,black_8px,black_calc(100%-32px),transparent_100%)]">
@@ -1074,6 +1135,20 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                     )}
                   </div>
                 ))}
+                {aiThinking && (
+                  <div className="flex gap-2 justify-start">
+                    <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="text-[9px] font-bold text-white">AI</span>
+                    </div>
+                    <div className="rounded-xl px-3 py-2 bg-zinc-100">
+                      <span className="inline-flex gap-1 items-center">
+                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </span>
+                    </div>
+                  </div>
+                )}
                 <div ref={chatEndRef} />
               </div>
           </div>
