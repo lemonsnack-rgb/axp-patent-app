@@ -1,7 +1,7 @@
 // src/features/spec/types.ts
 
 export type SpecStepId =
-  'upload' | 'description' | 'title' | 'components' | 'drawings' | 'claims' | 'midspec';
+  'upload' | 'description' | 'images' | 'title' | 'components' | 'claims' | 'drawings' | 'midspec';
 export type SpecPhase = 'upload' | 'direct' | 'flow' | 'done';
 
 // ── 핵심 데이터 구조 (API InventionContext V2) ────────────────────────────────

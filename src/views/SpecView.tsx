@@ -31,25 +31,27 @@ type StepId = SpecStepId;
 const STEPS: StepConfig[] = [
   { id: 'upload',      label: '업로드',      step: 1 },
   { id: 'description', label: '발명 설명',   step: 2 },
-  { id: 'title',       label: '제목·요약',   step: 3 },
-  { id: 'components',  label: '구성요소',    step: 4 },
-  { id: 'drawings',    label: '도면',        step: 5 },
+  { id: 'images',      label: '이미지 선별', step: 3 },
+  { id: 'title',       label: '제목·요약',   step: 4 },
+  { id: 'components',  label: '구성요소',    step: 5 },
   { id: 'claims',      label: '청구항',      step: 6 },
-  { id: 'midspec',     label: '중간명세서',  step: 7 },
+  { id: 'drawings',    label: '명세서 도면', step: 7 },
+  { id: 'midspec',     label: '중간명세서',  step: 8 },
 ];
 
 const STEP_LABEL: Partial<Record<StepId, string>> = {
-  title: '발명의 명칭', description: '발명의 설명', components: '구성요소',
-  drawings: '도면', claims: '청구항', midspec: '중간명세서',
+  title: '발명의 명칭', description: '발명의 설명', images: '이미지 선별', components: '구성요소',
+  drawings: '명세서 도면', claims: '청구항', midspec: '중간명세서',
 };
 
 const AI_NEXT: Record<StepId, string> = {
   upload:      '업로드하신 문서를 분석했습니다. 발명의 설명 항목을 분석합니다.',
-  description: '설명 항목을 확정했습니다. 발명의 명칭 후보를 생성합니다.',
+  description: '설명 항목을 확정했습니다. 추출된 이미지를 선별합니다.',
+  images:      '관련 이미지를 선별했습니다. 발명의 명칭 후보를 생성합니다.',
   title:       '발명 명칭을 확정했습니다. 발명의 구성요소를 추출합니다.',
-  components:  '구성요소를 확정했습니다. 업로드된 도면을 분석합니다.',
-  drawings:    '도면을 확정했습니다. 청구항을 생성합니다.',
-  claims:      '청구항을 확정했습니다. 중간명세서를 확인하고 편집하세요.',
+  components:  '구성요소를 확정했습니다. 청구항을 생성합니다.',
+  claims:      '청구항을 확정했습니다. 명세서에 넣을 도면을 처리합니다.',
+  drawings:    '명세서 도면을 확정했습니다. 중간명세서를 확인하고 편집하세요.',
   midspec:     '중간명세서를 확정했습니다. 명세서 에디터로 이동합니다.',
 };
 const GUIDE_CANDS: Record<string, string[]> = {
@@ -155,7 +157,7 @@ export function SpecView() {
 
   const si = (id: StepId) => STEPS.findIndex(s => s.id === id);
   const isSpecialStep = (id: StepId) =>
-    id === 'description' || id === 'components' || id === 'drawings' || id === 'claims' || id === 'midspec';
+    id === 'description' || id === 'images' || id === 'components' || id === 'drawings' || id === 'claims' || id === 'midspec';
   const isVisible = (id: StepId) => {
     if (id === 'upload') return true;
     if (phase === 'upload' || phase === 'direct') return false;
@@ -190,8 +192,8 @@ export function SpecView() {
     setConfirmed(p => ({ ...p, [id]: val }));
     // 확정 제목을 InventionContext 단일 원천에 역기록
     if (id === 'title') setContext(p => ({ ...p, title: val }));
-    // claims 확정 시 중간명세서 자동 로드 — 도면설명은 선별된 도면에서 생성
-    if (id === 'claims' && !midspec) {
+    // 명세서 도면 확정 시 중간명세서 자동 로드 — 도면설명은 명세서 도면에서 생성
+    if (id === 'drawings' && !midspec) {
       import('../features/spec/mockAiService').then(({ MOCK_MIDSPEC }) => {
         const specDrawings = context.drawings.filter(d => d.included !== false && d.useForSpec);
         const fallback = MOCK_MIDSPEC.find(s => s.key === 'drawing_descriptions')?.blocks ?? [];
@@ -594,8 +596,18 @@ export function SpecView() {
                             guidePanelInputRef={guidePanelInputRef}
                           />
                         )}
-                        {(s.id === 'components' || s.id === 'drawings' || s.id === 'claims' || s.id === 'midspec') && (
+                        {(s.id === 'images' || s.id === 'components' || s.id === 'drawings' || s.id === 'claims' || s.id === 'midspec') && (
                           <div className="mt-3">
+                            {s.id === 'images' && (
+                              <DrawingsPanel
+                                mode="select"
+                                done={isDone}
+                                onConfirm={() => confirm('images')}
+                                onUpdate={v => setGSel(p => ({ ...p, images: v }))}
+                                drawings={context.drawings}
+                                onUpdateDrawings={next => setContext(p => ({ ...p, drawings: next }))}
+                              />
+                            )}
                             {s.id === 'components' && (
                               <ComponentsPanel
                                 done={isDone}
@@ -617,6 +629,7 @@ export function SpecView() {
                             )}
                             {s.id === 'drawings' && (
                               <DrawingsPanel
+                                mode="spec"
                                 done={isDone}
                                 onConfirm={() => confirm('drawings')}
                                 onUpdate={v => setGSel(p => ({ ...p, drawings: v }))}
@@ -2035,14 +2048,14 @@ function CroppedCanvas({ data, mediaType, bbox }: { data: string; mediaType: str
   return <canvas ref={canvasRef} className="w-full h-full object-contain" />;
 }
 
-function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawings }: {
+function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateDrawings }: {
+  mode: 'select' | 'spec';
   done: boolean;
   onConfirm: () => void;
   onUpdate: (v: string) => void;
   drawings?: Drawing[];
   onUpdateDrawings?: (next: Drawing[]) => void;
 }) {
-  const [drawStage, setDrawStage] = useState<1 | 2 | 3>(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const drawings = propDrawings ?? MOCK_DRAWINGS;
 
@@ -2124,13 +2137,6 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
     updateDrawings(next);
   };
 
-  const cloneDrawing = (idx: number) => {
-    if (done) return;
-    const orig = drawings[idx];
-    const copy: Drawing = { ...orig, detail: { ...orig.detail, symbol: `${orig.detail.symbol}-복사` }, isRepresentative: false };
-    const next = [...drawings.slice(0, idx + 1), copy, ...drawings.slice(idx + 1)];
-    updateDrawings(next);
-  };
 
   const removeDrawing = (idx: number) => {
     if (done) return;
@@ -2143,8 +2149,6 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
 
   const includedDrawings = drawings.filter(d => d.included !== false);
   const specDrawings = includedDrawings.filter(d => d.useForSpec);
-
-  const STAGE_LABELS = ['포함 여부', '용도 분류', '대표도면'];
 
   const renderThumbnail = (d: Drawing, extra?: React.ReactNode) => {
     const hasData = !!d.image.file.data;
@@ -2170,47 +2174,30 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
 
   return (
     <div className="flex-1 overflow-y-auto scroll-thin px-3 py-3 ml-1.5">
-      {/* Stage 탭 */}
-      <div className="flex gap-1 mb-3">
-        {STAGE_LABELS.map((label, i) => {
-          const s = (i + 1) as 1 | 2 | 3;
-          return (
-            <button
-              key={s}
-              onClick={() => setDrawStage(s)}
-              className={clsx(
-                'flex-1 py-1.5 text-xs2 font-semibold rounded-lg border transition-colors',
-                drawStage === s
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300 hover:text-blue-600',
-              )}
-            >
-              {`${s}단계: ${label}`}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Stage 1: 포함 여부 */}
-      {drawStage === 1 && (
+      {/* 이미지 선별 (관련 선별 + 대표) */}
+      {mode === 'select' && (
         <>
-          <p className="text-xs2 text-gray-500 mb-2">
-            전체 도면 <span className="font-semibold">{drawings.length}개</span> · 포함 <span className="font-semibold">{includedDrawings.length}개</span>
+          <p className="text-xs2 text-gray-500 mb-1">
+            추출된 이미지 <span className="font-semibold">{drawings.length}개</span> · 관련 선별 <span className="font-semibold">{includedDrawings.length}개</span>
           </p>
+          <p className="text-xs2 text-gray-400 mb-2">관련 있는 이미지를 선별하세요. 미선택(흐림)은 맥락에서 제외됩니다. 대표 이미지 1개를 지정하면 이후 생성의 기준이 됩니다.</p>
           {drawings.length === 0 && (
-            <div className="text-center py-8 text-gray-400 text-sm2">도면이 없습니다.</div>
+            <div className="text-center py-8 text-gray-400 text-sm2">추출된 이미지가 없습니다.</div>
           )}
           <div className="grid grid-cols-2 gap-2">
             {drawings.map((d, idx) => {
               const included = d.included !== false;
+              const isRep = d.isRepresentative ?? false;
               const labelInfo = DRAWING_LABEL_MAP[d.detail.label] ?? { text: d.detail.label, cls: 'bg-gray-100 text-gray-600' };
               return (
                 <div key={idx} className={clsx(
                   'rounded-xl border-2 overflow-hidden flex flex-col bg-white transition-all',
-                  included ? 'border-blue-300' : 'border-zinc-200 opacity-60',
+                  isRep && included ? 'border-blue-500 ring-2 ring-blue-200' : included ? 'border-blue-300' : 'border-zinc-200 opacity-60',
                   done && 'pointer-events-none',
                 )}>
-                  {renderThumbnail(d)}
+                  {renderThumbnail(d, isRep ? (
+                    <span className="absolute top-1.5 right-1.5 text-xs2 px-2 py-0.5 rounded-full font-semibold bg-blue-600 text-white">대표</span>
+                  ) : undefined)}
                   <div className="px-2.5 pt-1.5 pb-1">
                     <div className="flex items-center gap-1 flex-wrap mb-0.5">
                       <span className="text-xs2 font-bold text-gray-700">{d.detail.symbol}</span>
@@ -2237,7 +2224,7 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
                       <button
                         onClick={() => toggleIncluded(idx)}
                         className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs2 font-semibold hover:bg-gray-50 transition-colors"
-                        title={included ? '클릭하여 제외' : '클릭하여 포함'}
+                        title={included ? '클릭하여 제외(흐림)' : '클릭하여 관련 선별'}
                       >
                         <span className={clsx(
                           'w-4 h-4 rounded border-2 flex items-center justify-center transition-all shrink-0',
@@ -2245,23 +2232,17 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
                         )}>
                           {included && <Icon name="check" size={8} />}
                         </span>
-                        <span className={included ? 'text-blue-700' : 'text-gray-400'}>포함</span>
+                        <span className={included ? 'text-blue-700' : 'text-gray-400'}>관련</span>
                       </button>
                       <button
-                        onClick={() => openEditorTab({
-                          drawingId: String(idx),
-                          drawings: drawings.map(toWorkflowDrawingItem),
-                          components: [],
-                          references: [],
-                          drawingName: d.detail.name,
-                          timestamp: Date.now(),
-                        })}
-                        className="px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 text-blue-500 hover:bg-blue-50 transition-colors"
-                      >범위 조정</button>
-                      <button
-                        onClick={() => cloneDrawing(idx)}
-                        className="px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-colors"
-                      >복제</button>
+                        onClick={() => included && setRepresentative(idx)}
+                        disabled={!included}
+                        className={clsx(
+                          'px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 transition-colors disabled:opacity-30',
+                          (d.isRepresentative ?? false) ? 'text-blue-600' : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50',
+                        )}
+                        title="대표 이미지로 지정"
+                      >{(d.isRepresentative ?? false) ? '★ 대표' : '대표'}</button>
                       <button
                         onClick={() => removeDrawing(idx)}
                         className="px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
@@ -2274,7 +2255,7 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
             })}
           </div>
           {!done && (
-            <div className="mt-3 flex gap-2">
+            <div className="mt-3">
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="flex items-center gap-1.5 px-3 py-2 text-xs2 font-semibold text-gray-600 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors"
@@ -2283,52 +2264,43 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
                 이미지 추가 (로컬 업로드)
               </button>
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileAdd} />
-              <button
-                onClick={() => setDrawStage(2)}
-                className="flex-1 py-2 text-xs2 font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition-colors"
-              >2단계: 용도 분류 →</button>
             </div>
           )}
         </>
       )}
 
-      {/* Stage 2: 용도 분류 */}
-      {drawStage === 2 && (
+      {/* 명세서 도면 처리 (명세서 채택 + 도면번호 + CAD) */}
+      {mode === 'spec' && (
         <>
-          <p className="text-xs2 text-gray-500 mb-2">
-            포함된 도면 <span className="font-semibold">{includedDrawings.length}개</span> · 명세서 포함 <span className="font-semibold">{specDrawings.length}개</span>
+          <p className="text-xs2 text-gray-500 mb-1">
+            관련 이미지 <span className="font-semibold">{includedDrawings.length}개</span> · 명세서 도면 <span className="font-semibold">{specDrawings.length}개</span>
           </p>
+          <p className="text-xs2 text-gray-400 mb-2">명세서에 넣을 이미지를 도면으로 채택하세요. 채택분은 "도 N" 번호가 붙고 CAD 변환 대상이 됩니다. 미채택은 AI 참고용(맥락만)입니다.</p>
           {includedDrawings.length === 0 && (
-            <div className="text-center py-8 text-gray-400 text-sm2">1단계에서 포함할 도면을 선택해주세요.</div>
+            <div className="text-center py-8 text-gray-400 text-sm2">이미지 선별 단계에서 관련 이미지를 먼저 선별하세요.</div>
           )}
+          {(() => { let figNo = 0; return (
           <div className="grid grid-cols-2 gap-2">
             {drawings.map((d, idx) => {
               if (d.included === false) return null;
               const isForSpec = d.useForSpec ?? false;
+              const isRep = d.isRepresentative ?? false;
+              if (isForSpec) figNo++;
+              const myFig = figNo;
               const labelInfo = DRAWING_LABEL_MAP[d.detail.label] ?? { text: d.detail.label, cls: 'bg-gray-100 text-gray-600' };
               return (
                 <div key={idx} className={clsx(
                   'rounded-xl border-2 overflow-hidden flex flex-col bg-white transition-all',
-                  isForSpec ? 'border-blue-300' : 'border-zinc-200',
+                  isForSpec ? (isRep ? 'border-blue-500 ring-2 ring-blue-200' : 'border-blue-300') : 'border-zinc-200 opacity-60',
                   done && 'pointer-events-none',
                 )}>
-                  <div className={clsx('w-full aspect-[4/3] bg-gray-100 flex items-center justify-center overflow-hidden relative group', !isForSpec && 'grayscale opacity-60')}>
-                    {d.image.file.data
-                      ? (d.image.bbox
-                        ? <CroppedCanvas data={d.image.file.data} mediaType={d.image.file.media_type} bbox={d.image.bbox} />
-                        : <img src={`data:${d.image.file.media_type};base64,${d.image.file.data}`} className="w-full h-full object-contain" alt="" />)
-                      : <Icon name="image" size={28} className="text-gray-200" />}
-                    {d.image.file.data && (
-                      <button
-                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 bg-white/90 rounded text-gray-500 hover:text-blue-600 transition-opacity text-xs2 leading-none"
-                        onClick={e => { e.stopPropagation(); openDrawingInNewTab(d.image.file.data, d.image.file.media_type, d.image.bbox); }}
-                        title="새 탭에서 열기"
-                      >↗</button>
-                    )}
-                  </div>
+                  {renderThumbnail(d, isForSpec ? (
+                    <span className="absolute top-1.5 left-1.5 text-xs2 px-2 py-0.5 rounded-full font-bold bg-blue-600 text-white">도 {myFig}{isRep ? ' · 대표' : ''}</span>
+                  ) : (
+                    <span className="absolute top-1.5 left-1.5 text-xs2 px-2 py-0.5 rounded-full font-medium bg-gray-200 text-gray-500">AI 참고용</span>
+                  ))}
                   <div className="px-2.5 pt-1.5 pb-1">
                     <div className="flex items-center gap-1 flex-wrap mb-0.5">
-                      <span className="text-xs2 font-bold text-gray-700">{d.detail.symbol}</span>
                       {done ? (
                         <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', labelInfo.cls)}>{labelInfo.text}</span>
                       ) : (
@@ -2351,80 +2323,35 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
                     <div className="flex border-t border-gray-100">
                       <button
                         onClick={() => toggleUseForSpec(idx)}
-                        className={clsx(
-                          'flex-1 py-1.5 text-xs2 font-semibold transition-colors',
-                          isForSpec ? 'bg-blue-50 text-blue-700' : 'text-gray-400 hover:bg-gray-50',
-                        )}
-                      >{isForSpec ? '✓ 명세서 포함' : 'AI 참고용'}</button>
+                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs2 font-semibold hover:bg-gray-50 transition-colors"
+                        title={isForSpec ? '명세서에서 제외(AI 참고용)' : '명세서 도면으로 채택'}
+                      >
+                        <span className={clsx('w-4 h-4 rounded border-2 flex items-center justify-center transition-all shrink-0', isForSpec ? 'bg-brand-400 border-blue-600 text-white' : 'border-gray-300 bg-white')}>
+                          {isForSpec && <Icon name="check" size={8} />}
+                        </span>
+                        <span className={isForSpec ? 'text-blue-700' : 'text-gray-400'}>명세서 도면</span>
+                      </button>
+                      {isForSpec && (
+                        <>
+                          <button
+                            onClick={() => setRepresentative(idx)}
+                            className={clsx('px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 transition-colors', isRep ? 'text-blue-600' : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50')}
+                            title="대표도면 지정"
+                          >{isRep ? '★ 대표' : '대표'}</button>
+                          <button
+                            onClick={() => openEditorTab({ drawingId: String(idx), drawings: drawings.map(toWorkflowDrawingItem), components: [], references: [], drawingName: d.detail.name, timestamp: Date.now() })}
+                            className="px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 text-blue-500 hover:bg-blue-50 transition-colors"
+                            title="범위 조정·CAD 변환"
+                          >변환</button>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
               );
             })}
           </div>
-          <div className="flex gap-2 mt-3">
-            <button
-              onClick={() => setDrawStage(1)}
-              className="flex-1 py-2 text-xs2 font-semibold text-gray-500 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors"
-            >← 1단계</button>
-            {!done && (
-              <button
-                onClick={() => setDrawStage(3)}
-                className="flex-1 py-2 text-xs2 font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition-colors"
-              >3단계: 대표도면 →</button>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* Stage 3: 대표도면 선택 */}
-      {drawStage === 3 && (
-        <>
-          <p className="text-xs2 text-gray-500 mb-2">
-            명세서 포함 도면 중 <span className="font-semibold">대표도면</span> 1개를 선택하세요.
-          </p>
-          {specDrawings.length === 0 && (
-            <div className="text-center py-8 text-gray-400 text-sm2">2단계에서 명세서 포함 도면을 선택해주세요.</div>
-          )}
-          <div className="grid grid-cols-2 gap-2">
-            {drawings.map((d, idx) => {
-              if (d.included === false || !d.useForSpec) return null;
-              const isRepresentative = d.isRepresentative ?? false;
-              return (
-                <button
-                  key={idx}
-                  onClick={() => !done && setRepresentative(idx)}
-                  className={clsx(
-                    'rounded-xl border-2 overflow-hidden flex flex-col bg-white transition-all text-left',
-                    isRepresentative ? 'border-blue-500 ring-2 ring-blue-200' : 'border-zinc-200 hover:border-blue-300',
-                    done && 'pointer-events-none',
-                  )}
-                >
-                  {renderThumbnail(d, isRepresentative ? (
-                    <span className="absolute top-1.5 right-1.5 text-xs2 px-2 py-0.5 rounded-full font-semibold bg-blue-600 text-white">대표도</span>
-                  ) : undefined)}
-                  <div className="px-2.5 pt-1.5 pb-2">
-                    <div className="flex items-center gap-1.5">
-                      <div className={clsx(
-                        'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0',
-                        isRepresentative ? 'border-blue-600 bg-blue-600' : 'border-gray-300',
-                      )}>
-                        {isRepresentative && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                      </div>
-                      <span className="text-xs2 font-bold text-gray-700">{d.detail.symbol}</span>
-                    </div>
-                    <p className="text-xs2 text-gray-700 font-semibold leading-snug line-clamp-1 mt-0.5">{d.detail.name}</p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex gap-2 mt-3">
-            <button
-              onClick={() => setDrawStage(2)}
-              className="flex-1 py-2 text-xs2 font-semibold text-gray-500 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors"
-            >← 2단계</button>
-          </div>
+          ); })()}
         </>
       )}
 
