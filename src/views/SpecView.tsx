@@ -2126,7 +2126,9 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
 
   const setRepresentative = (idx: number) => {
     if (done) return;
-    const next = drawings.map((d, i) => ({ ...d, isRepresentative: i === idx }));
+    const cur = drawings[idx]?.isRepresentative ?? false;
+    // 라디오 동작: 클릭한 것만 대표, 이미 대표면 해제
+    const next = drawings.map((d, i) => ({ ...d, isRepresentative: i === idx ? !cur : false }));
     updateDrawings(next);
   };
 
@@ -2223,7 +2225,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                       <button
                         onClick={() => toggleIncluded(idx)}
                         className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs2 font-semibold hover:bg-gray-50 transition-colors"
-                        title={included ? '클릭하여 제외(흐림)' : '클릭하여 관련 선별'}
+                        title={included ? '맥락에서 제외 (흐림)' : '맥락에 사용'}
                       >
                         <span className={clsx(
                           'w-4 h-4 rounded border-2 flex items-center justify-center transition-all shrink-0',
@@ -2231,17 +2233,22 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                         )}>
                           {included && <Icon name="check" size={8} />}
                         </span>
-                        <span className={included ? 'text-blue-700' : 'text-gray-400'}>관련</span>
+                        <span className={included ? 'text-blue-700' : 'text-gray-400'}>사용</span>
                       </button>
                       <button
                         onClick={() => included && setRepresentative(idx)}
                         disabled={!included}
-                        className={clsx(
-                          'px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 transition-colors disabled:opacity-30',
-                          (d.isRepresentative ?? false) ? 'text-blue-600' : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50',
-                        )}
-                        title="대표 이미지로 지정"
-                      >{(d.isRepresentative ?? false) ? '★ 대표' : '대표'}</button>
+                        className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 hover:bg-gray-50 disabled:opacity-30 transition-colors"
+                        title="대표 이미지 (1개만)"
+                      >
+                        <span className={clsx(
+                          'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0',
+                          isRep ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white',
+                        )}>
+                          {isRep && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </span>
+                        <span className={isRep ? 'text-blue-700' : 'text-gray-400'}>대표</span>
+                      </button>
                       <button
                         onClick={() => removeDrawing(idx)}
                         className="px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
@@ -2334,9 +2341,14 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                         <>
                           <button
                             onClick={() => setRepresentative(idx)}
-                            className={clsx('px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 transition-colors', isRep ? 'text-blue-600' : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50')}
-                            title="대표도면 지정"
-                          >{isRep ? '★ 대표' : '대표'}</button>
+                            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 hover:bg-gray-50 transition-colors"
+                            title="대표도면 (1개만)"
+                          >
+                            <span className={clsx('w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0', isRep ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white')}>
+                              {isRep && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                            </span>
+                            <span className={isRep ? 'text-blue-700' : 'text-gray-400'}>대표</span>
+                          </button>
                           <button
                             onClick={() => openEditorTab({ drawingId: String(idx), drawings: drawings.map(toWorkflowDrawingItem), components: [], references: [], drawingName: d.detail.name, timestamp: Date.now() })}
                             className="px-2.5 py-1.5 text-xs2 font-semibold border-l border-gray-100 text-blue-500 hover:bg-blue-50 transition-colors"
