@@ -944,11 +944,10 @@ function DescriptionItemCards({
 }) {
   const [tab, setTab] = useState<'previous' | 'proposed'>('proposed');
   const [selState, setSelState] = useState<SelState>(null);
-  const [addLabel, setAddLabel] = useState<{ previous: InventionDescriptionItem['label']; proposed: InventionDescriptionItem['label'] }>({
-    previous: 'background',
-    proposed: 'objective',
-  });
-  const [addTexts, setAddTexts] = useState({ previous: '', proposed: '' });
+  const [addingFor, setAddingFor] = useState<{ type: 'previous' | 'proposed'; label: InventionDescriptionItem['label'] } | null>(null);
+  const [addText, setAddText] = useState('');
+
+  const CATEGORIES: InventionDescriptionItem['label'][] = ['background', 'implementation', 'objective', 'effect'];
 
   if (previous.length === 0 && proposed.length === 0) {
     return (
@@ -958,129 +957,151 @@ function DescriptionItemCards({
     );
   }
 
-  const handleAdd = (type: 'previous' | 'proposed') => {
-    const text = addTexts[type].trim();
+  const commitAdd = (type: 'previous' | 'proposed', label: InventionDescriptionItem['label']) => {
+    const text = addText.trim();
     if (!text) return;
-    onAdd(type, text, addLabel[type]);
-    setAddTexts(p => ({ ...p, [type]: '' }));
+    onAdd(type, text, label);
+    setAddText('');
+    setAddingFor(null);
   };
 
   const renderColumn = (type: 'previous' | 'proposed', items: InventionDescriptionItem[]) => {
     const accent = type === 'proposed' ? 'blue' : 'amber';
     return (
       <div>
+        {/* 컬럼 헤더 */}
         <div className={clsx(
-          'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg mb-2 text-xs2 font-bold',
+          'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg mb-3 text-xs2 font-bold',
           accent === 'blue' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700',
         )}>
           <span>{type === 'proposed' ? '제안기술' : '종래기술'}</span>
           <span className="opacity-60 font-normal">{items.filter(i => i.adopted !== false).length}/{items.length} 채택</span>
         </div>
-        <div className="space-y-2">
-          {items.map((item, idx) => {
-            const isAdopted = item.adopted !== false;
-            const isAiItem = item.adopted !== undefined;
-            const sublabel = DESC_LABEL_MAP[item.label] ?? item.label;
+        {/* 카테고리별 그룹 */}
+        <div className="space-y-3">
+          {CATEGORIES.map(label => {
+            const categoryItems = items.map((item, idx) => ({ item, idx })).filter(({ item }) => item.label === label);
+            const isAdding = addingFor?.type === type && addingFor?.label === label;
             return (
-              <div
-                key={idx}
-                className={clsx(
-                  'rounded-xl border-2 p-3 bg-white transition-all',
-                  isAdopted
-                    ? (accent === 'blue' ? 'border-blue-300' : 'border-amber-300')
-                    : 'border-zinc-200 opacity-50',
-                )}
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-xs2 text-gray-400 font-medium">{sublabel}</span>
-                  {isAiItem ? (
-                    <button
-                      onClick={() => onToggle(type, idx)}
-                      className={clsx(
-                        'shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-all',
-                        isAdopted
-                          ? 'bg-brand-400 border-blue-600 text-white'
-                          : 'border-gray-300 bg-white hover:border-blue-400',
-                      )}
-                      title={isAdopted ? '미채택으로 변경' : '채택'}
-                    >
-                      {isAdopted && <Icon name="check" size={8} />}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => onRemove(type, idx)}
-                      className="text-xs2 text-gray-300 hover:text-red-400 transition-colors"
-                    >✕</button>
-                  )}
-                  {setFocusCtx && isAdopted && (
-                    <button
-                      onClick={() => {
-                        setFocusCtx({ text: item.text, label: sublabel, apply: (newText) => onChange(type, idx, newText) });
-                        setTimeout(() => guidePanelInputRef?.current?.focus(), 50);
-                      }}
-                      className="ml-auto flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
-                    >
-                      <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                      AI 수정
-                    </button>
+              <div key={label}>
+                {/* 카테고리 헤더 */}
+                <div className="flex items-center justify-between mb-1.5 px-0.5">
+                  <span className={clsx(
+                    'text-xs2 font-semibold',
+                    accent === 'blue' ? 'text-blue-600' : 'text-amber-600',
+                  )}>{DESC_LABEL_MAP[label]}</span>
+                  <button
+                    onClick={() => {
+                      if (isAdding) { setAddingFor(null); setAddText(''); }
+                      else { setAddingFor({ type, label }); setAddText(''); }
+                    }}
+                    className={clsx(
+                      'w-5 h-5 rounded-full flex items-center justify-center text-xs leading-none font-bold transition-colors',
+                      isAdding
+                        ? (accent === 'blue' ? 'bg-blue-100 text-blue-500' : 'bg-amber-100 text-amber-500')
+                        : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100',
+                    )}
+                    title={isAdding ? '취소' : '항목 추가'}
+                  >{isAdding ? '✕' : '+'}</button>
+                </div>
+                {/* 해당 카테고리 항목 목록 */}
+                <div className="space-y-2">
+                  {categoryItems.map(({ item, idx }) => {
+                    const isAdopted = item.adopted !== false;
+                    const isAiItem = item.adopted !== undefined;
+                    return (
+                      <div
+                        key={idx}
+                        className={clsx(
+                          'rounded-xl border-2 p-3 bg-white transition-all',
+                          isAdopted
+                            ? (accent === 'blue' ? 'border-blue-300' : 'border-amber-300')
+                            : 'border-zinc-200 opacity-50',
+                        )}
+                      >
+                        <div className="flex items-center gap-2 mb-1.5">
+                          {isAiItem ? (
+                            <button
+                              onClick={() => onToggle(type, idx)}
+                              className={clsx(
+                                'shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-all',
+                                isAdopted
+                                  ? 'bg-brand-400 border-blue-600 text-white'
+                                  : 'border-gray-300 bg-white hover:border-blue-400',
+                              )}
+                              title={isAdopted ? '미채택으로 변경' : '채택'}
+                            >
+                              {isAdopted && <Icon name="check" size={8} />}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => onRemove(type, idx)}
+                              className="text-xs2 text-gray-300 hover:text-red-400 transition-colors"
+                            >✕</button>
+                          )}
+                          {setFocusCtx && isAdopted && (
+                            <button
+                              onClick={() => {
+                                setFocusCtx({ text: item.text, label: DESC_LABEL_MAP[label] ?? label, apply: (newText) => onChange(type, idx, newText) });
+                                setTimeout(() => guidePanelInputRef?.current?.focus(), 50);
+                              }}
+                              className="ml-auto flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
+                            >
+                              <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
+                              AI 수정
+                            </button>
+                          )}
+                        </div>
+                        <textarea
+                          className="w-full text-sm2 text-gray-700 leading-relaxed bg-transparent outline-none resize-none min-h-[48px]"
+                          value={item.text}
+                          disabled={!isAdopted}
+                          rows={Math.max(2, Math.ceil(item.text.length / 42))}
+                          onChange={e => onChange(type, idx, e.target.value)}
+                          placeholder="항목 내용..."
+                          onMouseUp={e => {
+                            if (!isAdopted) return;
+                            const ta = e.currentTarget;
+                            if (ta.selectionStart !== ta.selectionEnd) {
+                              const rect = ta.getBoundingClientRect();
+                              setSelState({ start: ta.selectionStart, end: ta.selectionEnd, originalValue: ta.value, apply: (newText) => onChange(type, idx, newText), top: rect.bottom + 4, left: rect.left });
+                            }
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                  {/* 인라인 추가 폼 */}
+                  {isAdding && (
+                    <div className={clsx(
+                      'rounded-xl border-2 border-dashed p-2.5',
+                      accent === 'blue' ? 'border-blue-300 bg-blue-50/30' : 'border-amber-300 bg-amber-50/30',
+                    )}>
+                      <div className="flex gap-1.5 items-end">
+                        <textarea
+                          autoFocus
+                          className="flex-1 text-sm2 bg-transparent outline-none resize-none text-gray-700 placeholder-gray-400 min-h-[40px]"
+                          placeholder="내용 입력... (Enter로 추가)"
+                          rows={2}
+                          value={addText}
+                          onChange={e => setAddText(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitAdd(type, label); } }}
+                        />
+                        <button
+                          onClick={() => commitAdd(type, label)}
+                          disabled={!addText.trim()}
+                          className={clsx(
+                            'shrink-0 text-xs2 font-semibold px-2.5 py-1 rounded-lg transition-colors disabled:opacity-40',
+                            accent === 'blue' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : 'bg-amber-100 text-amber-700 hover:bg-amber-200',
+                          )}
+                        >추가</button>
+                      </div>
+                    </div>
                   )}
                 </div>
-                <textarea
-                  className="w-full text-sm2 text-gray-700 leading-relaxed bg-transparent outline-none resize-none min-h-[48px]"
-                  value={item.text}
-                  disabled={!isAdopted}
-                  rows={Math.max(2, Math.ceil(item.text.length / 42))}
-                  onChange={e => onChange(type, idx, e.target.value)}
-                  placeholder="항목 내용..."
-                  onMouseUp={e => {
-                    if (!isAdopted) return;
-                    const ta = e.currentTarget;
-                    if (ta.selectionStart !== ta.selectionEnd) {
-                      const rect = ta.getBoundingClientRect();
-                      setSelState({ start: ta.selectionStart, end: ta.selectionEnd, originalValue: ta.value, apply: (newText) => onChange(type, idx, newText), top: rect.bottom + 4, left: rect.left });
-                    }
-                  }}
-                />
               </div>
             );
           })}
-          {/* 항목 추가 행 */}
-          <div className={clsx(
-            'rounded-xl border-2 border-dashed p-2.5 transition-colors',
-            accent === 'blue' ? 'border-blue-200 focus-within:border-blue-400' : 'border-amber-200 focus-within:border-amber-400',
-          )}>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-xs2 text-gray-400">+ 항목 추가</span>
-              <select
-                value={addLabel[type]}
-                onChange={e => setAddLabel(p => ({ ...p, [type]: e.target.value as InventionDescriptionItem['label'] }))}
-                className="ml-auto text-xs2 border border-gray-200 rounded px-1.5 py-0.5 bg-white text-gray-600 outline-none"
-              >
-                <option value="background">배경기술</option>
-                <option value="implementation">구현방법</option>
-                <option value="objective">목적</option>
-                <option value="effect">효과</option>
-              </select>
-            </div>
-            <div className="flex gap-1.5 items-end">
-              <textarea
-                className="flex-1 text-sm2 bg-transparent outline-none resize-none text-gray-700 placeholder-gray-400 min-h-[40px]"
-                placeholder="내용 입력..."
-                rows={2}
-                value={addTexts[type]}
-                onChange={e => setAddTexts(p => ({ ...p, [type]: e.target.value }))}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAdd(type); } }}
-              />
-              <button
-                onClick={() => handleAdd(type)}
-                disabled={!addTexts[type].trim()}
-                className={clsx(
-                  'shrink-0 text-xs2 font-semibold px-2.5 py-1 rounded-lg transition-colors disabled:opacity-40',
-                  accent === 'blue' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : 'bg-amber-100 text-amber-700 hover:bg-amber-200',
-                )}
-              >추가</button>
-            </div>
-          </div>
         </div>
       </div>
     );
