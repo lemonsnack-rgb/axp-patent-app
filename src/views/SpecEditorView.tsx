@@ -211,8 +211,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     id: number;
     role: 'user' | 'ai';
     text: string;
-    proposed?: string;
-    blockRef?: { sid: SectionId; idx: number };
+    proposed?: string;                                       // 표시용 (단일/병합 미리보기)
+    refs?: { sid: SectionId; idx: number }[];                // AI 대상 단락 전체 (배치)
+    proposals?: { sid: SectionId; idx: number; text: string }[]; // 단락별 수정안 (적용 대상)
     intentOptions?: string[];       // 패턴 B: 방향 선택지
     selectedIntent?: string;        // 패턴 B: 선택된 방향
     sourceMsg?: string;             // 재생성용 원본 메시지
@@ -306,6 +307,26 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     });
   };
 
+  // ── 배치 수정안 일괄 적용 (단일 undo 단위) ────────────────────────────
+  const applyProposals = (proposals: { sid: SectionId; idx: number; text: string }[]) => {
+    if (!proposals.length) return;
+    setUndoStack(p => [...p.slice(-20), blocks]);
+    setRedoStack([]);
+    setBlocks(p => {
+      const next = { ...p } as Record<SectionId, string[]>;
+      proposals.forEach(pr => {
+        next[pr.sid] = next[pr.sid].map((b, i) => i === pr.idx ? pr.text : b);
+      });
+      if (task?.id) {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() =>
+          saveSpecState(task.id, { editorBlocks: next as any }), 500
+        );
+      }
+      return next;
+    });
+  };
+
   const undo = () => {
     if (!undoStack.length) return;
     setRedoStack(p => [blocks, ...p]);
@@ -330,6 +351,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
   const selectBlock = (sid: SectionId, idx: number) => {
     setSel({ sid, idx });
     setActiveSec(sid);
+    // 클릭한 단락을 AI 대상(selSet)으로도 단일 설정 → 직접 편집 + AI 요청이 같은 선택 공유
+    setSelSet(new Set([`${sid}-${idx}`]));
   };
 
   // ── AI 컨텍스트 다중 선택 toggle ───────────────────────────────────────
@@ -372,15 +395,25 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
   // ── AI 수정 실행 (방향 확정 후) ────────────────────────────────────────
   const runModification = (
     instruction: string,
-    curText: string,
-    blockRef: { sid: SectionId; idx: number } | undefined,
+    refs: { sid: SectionId; idx: number }[],
     sourceMsg: string,
     selectedIntent?: string,
   ) => {
-    const secLabel = blockRef ? (EDITOR_SECTIONS.find(s => s.id === blockRef.sid)?.label ?? '') : '';
-    const proposed = generateMockModification(curText, instruction);
-    const label = selectedIntent ? `[${selectedIntent}] 방향으로 수정했습니다.` : `${secLabel} 단락의 수정안입니다.`;
-    setChatMessages(prev => [...prev, { id: ++msgIdRef.current, role: 'ai', text: label, proposed, blockRef, sourceMsg, selectedIntent }]);
+    // 선택된 단락마다 개별 수정안 생성 (배치)
+    const proposals = refs.map(r => ({
+      sid: r.sid,
+      idx: r.idx,
+      text: generateMockModification(blocks[r.sid]?.[r.idx] || '', instruction),
+    }));
+    const secLabel = refs.length === 1
+      ? (EDITOR_SECTIONS.find(s => s.id === refs[0].sid)?.label ?? '') + ' 단락의'
+      : `${refs.length}개 단락의`;
+    const label = selectedIntent ? `[${selectedIntent}] 방향으로 수정했습니다.` : `${secLabel} 수정안입니다.`;
+    setChatMessages(prev => [...prev, {
+      id: ++msgIdRef.current, role: 'ai', text: label,
+      proposed: proposals.map(p => p.text).join('\n\n'),
+      proposals, refs, sourceMsg, selectedIntent,
+    }]);
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
   };
 
@@ -390,30 +423,19 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     if (!msg) return;
     if (!override) setChatInput('');
 
-    // selSet 기반 컨텍스트 결정 — selSet 선택만 섹션 컨텍스트, 미선택 시 전체 문서 Q&A
-    let cur = '';
-    let blockRef: { sid: SectionId; idx: number } | undefined;
-    if (selSet.size > 0) {
-      const texts: string[] = [];
-      selSet.forEach(key => {
-        const dashIdx = key.indexOf('-');
-        const sid = key.slice(0, dashIdx) as SectionId;
-        const idx = parseInt(key.slice(dashIdx + 1));
-        const t = blocks[sid]?.[idx];
-        if (t) texts.push(t);
-      });
-      cur = texts.join('\n\n');
-      if (selSet.size === 1) {
-        const key = [...selSet][0];
-        const dashIdx = key.indexOf('-');
-        blockRef = { sid: key.slice(0, dashIdx) as SectionId, idx: parseInt(key.slice(dashIdx + 1)) };
-      }
-    }
+    // selSet 기반 컨텍스트 결정 — 선택 단락 전체를 refs로 캡처, 미선택 시 전체 문서 Q&A
+    const refs: { sid: SectionId; idx: number }[] = [];
+    selSet.forEach(key => {
+      const dashIdx = key.indexOf('-');
+      const sid = key.slice(0, dashIdx) as SectionId;
+      const idx = parseInt(key.slice(dashIdx + 1));
+      if (blocks[sid]?.[idx] !== undefined) refs.push({ sid, idx });
+    });
 
     setChatMessages(prev => [...prev, { id: ++msgIdRef.current, role: 'user', text: msg }]);
 
     setTimeout(() => {
-      if (!cur) {
+      if (refs.length === 0) {
         // 전체 문서 대상 Q&A 모드
         const aiText = generateWholeDocReply(msg);
         setChatMessages(prev => [...prev, { id: ++msgIdRef.current, role: 'ai', text: aiText }]);
@@ -423,13 +445,13 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       // 명확도 판단 (TODO: API 교체)
       const clarity = analyzePromptClarity(msg);
       if (clarity === 'direct') {
-        runModification(msg, cur, blockRef, msg);
+        runModification(msg, refs, msg);
       } else {
         const options = generateIntentOptions(msg);
         setChatMessages(prev => [...prev, {
           id: ++msgIdRef.current, role: 'ai',
           text: '어떤 방향으로 수정할까요?',
-          intentOptions: options, blockRef, sourceMsg: msg,
+          intentOptions: options, refs, sourceMsg: msg,
         }]);
         setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
       }
@@ -439,22 +461,20 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
   // ── 방향 선택 (패턴 B) ─────────────────────────────────────────────────
   const selectIntent = (msgId: number, intent: string) => {
     const msg = chatMessages.find(m => m.id === msgId);
-    if (!msg?.blockRef) return;
-    const cur = blocks[msg.blockRef.sid]?.[msg.blockRef.idx] || '';
+    if (!msg?.refs?.length) return;
     // 선택지 메시지를 선택 완료 상태로 변경
     setChatMessages(prev => prev.map(m =>
       m.id === msgId ? { ...m, intentOptions: undefined, selectedIntent: intent, text: `[${intent}] 방향 선택됨` } : m
     ));
-    setTimeout(() => runModification(intent, cur, msg.blockRef, msg.sourceMsg || intent, intent), 400);
+    setTimeout(() => runModification(intent, msg.refs!, msg.sourceMsg || intent, intent), 400);
   };
 
   // ── 다시 생성 ──────────────────────────────────────────────────────────
   const regenerate = (msg: ChatMsg) => {
-    if (!msg.blockRef) return;
-    const cur = blocks[msg.blockRef.sid]?.[msg.blockRef.idx] || '';
+    if (!msg.refs?.length) return;
     const instruction = msg.selectedIntent || msg.sourceMsg || '다시 생성';
     setChatMessages(prev => prev.filter(m => m.id !== msg.id));
-    setTimeout(() => runModification(instruction, cur, msg.blockRef, instruction, msg.selectedIntent), 400);
+    setTimeout(() => runModification(instruction, msg.refs!, instruction, msg.selectedIntent), 400);
   };
 
   // ── 표 삽입 ─────────────────────────────────────────────────────────────
@@ -697,14 +717,15 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                                 : 'border-dashed border-zinc-200 bg-white hover:border-zinc-300 cursor-pointer'
                         )}
                       >
-                        {/* 체크박스 — 호버 시 표시, 선택 시 항상 표시 */}
+                        {/* 체크박스 — 상시 표시 (다중 선택용), 선택 시 강조 */}
                         <div
                           onClick={e => toggleSelSet(sec.id, blockIdx, e)}
+                          title="여러 단락을 한번에 AI 수정하려면 체크하세요"
                           className={clsx(
                             'absolute left-2 top-3 w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0',
                             isChecked
                               ? 'border-blue-500 bg-blue-500'
-                              : 'border-zinc-300 bg-white opacity-0 group-hover:opacity-100'
+                              : 'border-zinc-300 bg-white opacity-60 group-hover:opacity-100'
                           )}
                         >
                           {isChecked && (
@@ -914,22 +935,27 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             ))}
                           </div>
                         )}
-                        {/* 패턴 A / 패턴 B 결과: 수정안 */}
-                        {m.proposed && (
+                        {/* 패턴 A / 패턴 B 결과: 수정안 (단일/배치) */}
+                        {m.proposals && m.proposals.length > 0 && (
                           <>
-                            <div className="mx-2.5 mb-2 rounded-lg bg-white border border-zinc-200 p-2.5">
-                              <p className="text-xs2 font-semibold text-zinc-400 mb-1">수정안</p>
-                              <p className="text-xs2 text-zinc-800 leading-relaxed whitespace-pre-wrap">{m.proposed}</p>
+                            <div className="mx-2.5 mb-2 space-y-1.5">
+                              {m.proposals.map((p, pi) => {
+                                const secLabel = EDITOR_SECTIONS.find(s => s.id === p.sid)?.short ?? p.sid;
+                                return (
+                                  <div key={pi} className="rounded-lg bg-white border border-zinc-200 p-2.5">
+                                    <p className="text-xs2 font-semibold text-zinc-400 mb-1">
+                                      수정안{m.proposals!.length > 1 ? ` · ${secLabel} ${p.idx + 1}` : ''}
+                                    </p>
+                                    <p className="text-xs2 text-zinc-800 leading-relaxed whitespace-pre-wrap">{p.text}</p>
+                                  </div>
+                                );
+                              })}
                             </div>
                             <div className="flex gap-1.5 px-2.5 pb-2.5">
                               <button
-                                onClick={() => {
-                                  const ref = m.blockRef;
-                                  if (ref) updateBlock(ref.sid, ref.idx, m.proposed!);
-                                  else if (sel) updateBlock(sel.sid, sel.idx, m.proposed!);
-                                }}
+                                onClick={() => applyProposals(m.proposals!)}
                                 className="flex-1 py-1.5 text-xs2 font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                                ✓ 적용
+                                ✓ {m.proposals.length > 1 ? `${m.proposals.length}개 일괄 적용` : '적용'}
                               </button>
                               <button
                                 onClick={() => regenerate(m)}
