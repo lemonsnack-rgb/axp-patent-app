@@ -15,6 +15,7 @@ import { PreviewModal } from '../components/PreviewModal';
 import type { PreviewSection } from '../components/PreviewModal';
 import { analyzePromptClarity, generateIntentOptions, generateMockModification } from '../features/ai/clarityAnalyzer';
 import { exportDocx } from '../utils/exportDocx';
+import { exportPdf } from '../utils/exportPdf';
 
 // ── KaTeX 유틸리티 ─────────────────────────────────────────────────────────
 function renderTeX(tex: string, displayMode = false): { html: string; error?: string } {
@@ -118,6 +119,40 @@ type SectionId = typeof EDITOR_SECTIONS[number]['id'];
 function toBlocks(text: string): string[] {
   const b = text.split('\n\n').filter(s => s.trim());
   return b.length ? b : [''];
+}
+
+// 마크다운 표 감지 / 렌더 (구분선 행 + 파이프 구분)
+function isMarkdownTable(text: string): boolean {
+  const lines = text.trim().split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length < 2) return false;
+  const hasSep = lines.some(l => /-{3,}/.test(l) && /^[\s|:-]+$/.test(l));
+  const hasPipe = lines.filter(l => l.includes('|')).length >= 2;
+  return hasSep && hasPipe;
+}
+function parseRow(l: string): string[] {
+  let parts = l.split('|').map(c => c.trim());
+  if (parts[0] === '') parts = parts.slice(1);
+  if (parts.length && parts[parts.length - 1] === '') parts = parts.slice(0, -1);
+  return parts;
+}
+function MarkdownTable({ text }: { text: string }) {
+  const rows = text.trim().split('\n').map(l => l.trim())
+    .filter(l => l && !/^[\s|:-]+$/.test(l)) // 구분선 행 제거
+    .map(parseRow);
+  if (!rows.length) return null;
+  const [head, ...body] = rows;
+  return (
+    <table className="border-collapse text-sm w-full">
+      <thead>
+        <tr>{head.map((c, i) => <th key={i} className="border border-zinc-300 px-2 py-1 bg-zinc-50 font-semibold text-left text-zinc-700">{c}</th>)}</tr>
+      </thead>
+      <tbody>
+        {body.map((r, ri) => (
+          <tr key={ri}>{head.map((_, ci) => <td key={ci} className="border border-zinc-300 px-2 py-1 text-zinc-700">{r[ci] ?? ''}</td>)}</tr>
+        ))}
+      </tbody>
+    </table>
+  );
 }
 
 // ── SVG 아이콘 헬퍼 ──────────────────────────────────────────────────────
@@ -307,6 +342,26 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     });
   };
 
+  // ── 단락 이동 (위/아래) ────────────────────────────────────────────────
+  const moveBlock = (sid: SectionId, idx: number, dir: -1 | 1) => {
+    const arr = blocks[sid];
+    const j = idx + dir;
+    if (j < 0 || j >= arr.length) return;
+    setUndoStack(p => [...p.slice(-20), blocks]);
+    setRedoStack([]);
+    setBlocks(p => {
+      const next = [...p[sid]];
+      [next[idx], next[j]] = [next[j], next[idx]];
+      const updated = { ...p, [sid]: next };
+      if (task?.id) {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() => saveSpecState(task.id, { editorBlocks: updated as any }), 500);
+      }
+      return updated;
+    });
+    if (sel?.sid === sid && sel?.idx === idx) setSel({ sid, idx: j });
+  };
+
   // ── 배치 수정안 일괄 적용 (단일 undo 단위) ────────────────────────────
   const applyProposals = (proposals: { sid: SectionId; idx: number; text: string }[]) => {
     if (!proposals.length) return;
@@ -339,6 +394,21 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     setBlocks(redoStack[0]);
     setRedoStack(p => p.slice(1));
   };
+
+  // ── undo/redo 키보드 단축키 (입력 필드 포커스 시엔 네이티브 undo 우선) ──
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const tag = el?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+      else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  });
 
   // ── 섹션 앵커 이동 ─────────────────────────────────────────────────────
   const goToSection = (id: SectionId) => {
@@ -479,14 +549,25 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
 
   // ── 표 삽입 ─────────────────────────────────────────────────────────────
   const insertTable = () => {
-    if (!sel) return;
     const cols = 3;
     const header = Array(cols).fill('항목').map((_, i) => `항목 ${i + 1}`).join(' | ');
     const sep = Array(cols).fill('---').join(' | ');
     const row = Array(cols).fill('내용').join(' | ');
-    const tbl = `\n${header}\n${sep}\n${Array(tableRows).fill(row).join('\n')}\n`;
-    const cur = blocks[sel.sid][sel.idx] || '';
-    updateBlock(sel.sid, sel.idx, cur + tbl);
+    const tbl = `${header}\n${sep}\n${Array(tableRows).fill(row).join('\n')}`;
+    const sid = sel?.sid ?? activeSec;
+    setUndoStack(p => [...p.slice(-20), blocks]);
+    setRedoStack([]);
+    setBlocks(p => {
+      const arr = [...p[sid]];
+      const at = sel?.sid === sid ? sel.idx + 1 : arr.length;
+      arr.splice(at, 0, tbl);
+      const updated = { ...p, [sid]: arr };
+      if (task?.id) {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() => saveSpecState(task.id, { editorBlocks: updated as any }), 500);
+      }
+      return updated;
+    });
     setTableModal(false);
   };
 
@@ -605,7 +686,12 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           <button onClick={() => exportDocx(task?.name ?? '명세서', editorPreviewSections)} title="DOCX 내보내기"
             className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 transition-colors text-zinc-600 text-xs2 font-medium">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><path d="M9 2v4h4"/><path d="M5 9h6M5 11h4"/></svg>
-            <span>내보내기</span>
+            <span>DOCX</span>
+          </button>
+          <button onClick={() => exportPdf(task?.name ?? '명세서', editorPreviewSections)} title="PDF 내보내기 (인쇄)"
+            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 transition-colors text-zinc-600 text-xs2 font-medium">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><path d="M9 2v4h4"/><path d="M5.5 9.5h5M5.5 11.5h3"/></svg>
+            <span>PDF</span>
           </button>
         </div>
       </div>
@@ -734,6 +820,23 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             </svg>
                           )}
                         </div>
+                        {/* 단락 이동 (위/아래) */}
+                        {blocks[sec.id].length > 1 && (
+                          <div className="absolute top-1.5 right-7 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                            <button
+                              onClick={e => { e.stopPropagation(); moveBlock(sec.id, blockIdx, -1); }}
+                              disabled={blockIdx === 0}
+                              className="w-5 h-5 rounded flex items-center justify-center text-zinc-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-20 transition-all"
+                              title="위로 이동"
+                            ><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 7l3-4 3 4"/></svg></button>
+                            <button
+                              onClick={e => { e.stopPropagation(); moveBlock(sec.id, blockIdx, 1); }}
+                              disabled={blockIdx === blocks[sec.id].length - 1}
+                              className="w-5 h-5 rounded flex items-center justify-center text-zinc-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-20 transition-all"
+                              title="아래로 이동"
+                            ><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 3l3 4 3-4"/></svg></button>
+                          </div>
+                        )}
                         {/* 단락 삭제 버튼 */}
                         {blocks[sec.id].length > 1 && (
                           <button
@@ -771,6 +874,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                             onClick={e => e.stopPropagation()}
                           />
+                        ) : isMarkdownTable(blockText) ? (
+                          <div className="py-1.5 px-3 overflow-x-auto"><MarkdownTable text={blockText} /></div>
                         ) : blockText.includes('$') ? (
                           <p className="text-sm leading-relaxed text-zinc-800 py-1.5 px-3"
                             dangerouslySetInnerHTML={{ __html: renderBlockWithTeX(blockText) }} />
