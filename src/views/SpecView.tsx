@@ -577,6 +577,8 @@ export function SpecView() {
                                 onUpdate={v => setGSel(p => ({ ...p, components: v }))}
                                 onComponentsChange={setAiComponents}
                                 initialItems={aiComponents}
+                                onFocusContext={setSpecFocusCtx}
+                                guidePanelInputRef={guidePanelInputRef}
                               />
                             )}
                             {s.id === 'drawings' && (
@@ -1555,19 +1557,21 @@ function compItemToSpecItem(item: CompItem, origMap: Map<number, SpecComponentIt
   };
 }
 
-function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
+function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onFocusContext, guidePanelInputRef }: {
   done: boolean;
   onConfirm: () => void;
   onUpdate: (v: string) => void;
   onComponentsChange?: (comps: SpecComponentItem[]) => void;
   initialItems?: SpecComponentItem[];
+  onFocusContext?: (ctx: FocusCtx | null) => void;
+  guidePanelInputRef?: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const initData: CompItem[] = (initialItems && initialItems.length > 0)
     ? initialItems.map(specItemToCompItem)
     : INIT_COMPS;
   const origMapRef = useRef(new Map<number, SpecComponentItem>(initialItems?.map(el => [el.id, el]) ?? []));
   const [items, setItems] = useState<CompItem[]>(initData);
-  const [newText, setNewText] = useState('');
+  const [focusId, setFocusId] = useState<number | null>(null);
 
   useEffect(() => {
     const selected = initData.filter(it => it.sel);
@@ -1595,20 +1599,36 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
   const moveDown = (idx: number) => { if (idx===items.length-1||done) return; const a=[...items]; [a[idx],a[idx+1]]=[a[idx+1],a[idx]]; applyUpd(a); };
   const indent   = (id: number)  => { if (!done) applyUpd(items.map(it => it.id===id ? {...it, depth: Math.min(it.depth+1,2)} : it)); };
   const outdent  = (id: number)  => { if (!done) applyUpd(items.map(it => it.id===id ? {...it, depth: Math.max(it.depth-1,0)} : it)); };
-  const remove   = (id: number)  => {
-    if (!done) {
-      const itemText = items.find(it => it.id === id)?.text?.slice(0, 30) ?? '이 구성요소';
-      openAlertDialog(
-        { title: '확인', description: `"${itemText}"를 삭제하시겠습니까?`, confirm: '삭제', cancel: '취소' },
-        { theme: 'danger', onConfirm: (ctrl) => { upd(items.filter(it => it.id !== id)); ctrl.close(); } }
-      );
-    }
-  };
   const autoAssign = () => { if (!done) upd(calcAutoNums(items)); };
   const add = () => {
-    if (!newText.trim()||done) return;
-    upd([...items, { id: Date.now(), text: newText.trim(), sel: true, num: '', depth: 0, englishName: '', definition: '', parent: '' }]);
-    setNewText('');
+    if (done) return;
+    const id = Date.now();
+    upd([...items, { id, text: '', sel: true, num: '', depth: 0, englishName: '', definition: '', parent: '' }]);
+    setFocusId(id);
+  };
+  // 전체 구성요소를 텍스트로 직렬화 (AI 어시스턴트 컨텍스트용)
+  const serializeItems = () =>
+    items.map(it => `${it.num ? it.num + ' ' : ''}${extractCompName(it.text)}${it.englishName ? ` (${it.englishName})` : ''}`.trim()).join('\n');
+  // AI 수정안(텍스트)을 구성요소 목록으로 역파싱 — 기존 항목은 명칭으로 매칭해 보존
+  const rebuildFromText = (newText: string) => {
+    const lines = newText.split('\n').map(l => l.trim()).filter(Boolean);
+    const next: CompItem[] = lines.map((line, i) => {
+      const m = line.match(/^(\d+)?\s*(.+?)(?:\s*\(([^)]*)\))?$/);
+      const num = m?.[1] ?? '';
+      const name = (m?.[2] ?? line).trim();
+      const en = m?.[3] ?? '';
+      const existing = items.find(it => extractCompName(it.text) === name);
+      return existing
+        ? { ...existing, num: num || existing.num }
+        : { id: Date.now() + i, text: name, sel: true, num, depth: 0, englishName: en, definition: '', parent: '' };
+    });
+    upd(next);
+  };
+  // 구성요소 전체 영역을 어시스턴트 컨텍스트로 전달 → AI 추가·수정
+  const requestAiComponents = () => {
+    if (!onFocusContext) return;
+    onFocusContext({ text: serializeItems(), label: '구성요소 목록', apply: rebuildFromText });
+    setTimeout(() => guidePanelInputRef?.current?.focus(), 50);
   };
 
   // → 활성 조건: idx>0이고 바로 위 항목이 유효한 부모(depth <= 현재 depth)
@@ -1640,13 +1660,23 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs2 font-semibold text-gray-600">AI 추출 구성요소</span>
           {!done && (
-            <button onClick={autoAssign}
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs2 font-semibold bg-blue-50 border border-blue-200 text-brand-400 hover:bg-blue-100 transition-colors">
-              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="10" height="10">
-                <path d="M2 6h8M8 4l2 2-2 2"/>
-              </svg>
-              부호 자동 부여
-            </button>
+            <div className="flex items-center gap-1">
+              {onFocusContext && (
+                <button onClick={requestAiComponents}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-xs2 font-semibold bg-violet-50 border border-violet-200 text-violet-600 hover:bg-violet-100 transition-colors"
+                  title="구성요소 전체를 AI로 추가·수정">
+                  <svg viewBox="0 0 16 16" fill="currentColor" width="10" height="10"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
+                  AI로 추가·수정
+                </button>
+              )}
+              <button onClick={autoAssign}
+                className="flex items-center gap-1 px-2 py-1 rounded text-xs2 font-semibold bg-blue-50 border border-blue-200 text-brand-400 hover:bg-blue-100 transition-colors">
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="10" height="10">
+                  <path d="M2 6h8M8 4l2 2-2 2"/>
+                </svg>
+                부호 자동 부여
+              </button>
+            </div>
           )}
         </div>
         {!done && (
@@ -1674,11 +1704,11 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                 !item.sel ? 'bg-gray-50 border-dashed border-gray-200' : '',
                 done && item.sel ? 'bg-green-50 border-green-200' : ''
               )}>
-                {/* 명칭 row */}
+                {/* 컨트롤 행: 채택 + 드래그 + 부호 + 순서 조정 */}
                 <div className="flex items-center gap-1">
                   {!done && (
                     <button
-                      onClick={() => upd(items.map(it => it.id===item.id ? {...it, sel: !it.sel} : it))}
+                      onClick={() => upd(items.map(it => it.id===item.id ? {...it, sel: !it.sel} : it).filter(it => it.sel || it.text.trim()))}
                       className={clsx(
                         'shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-all',
                         item.sel
@@ -1697,18 +1727,8 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                   )}>
                     {item.num || '—'}
                   </span>
-                  {!done ? (
-                    <input
-                      className="text-xs2 text-gray-800 font-medium flex-1 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 outline-none focus:border-blue-300 focus:bg-white transition-colors min-w-0"
-                      value={item.text}
-                      placeholder="구성요소 명칭..."
-                      onChange={e => upd(items.map(it => it.id===item.id ? {...it, text: e.target.value} : it))}
-                    />
-                  ) : (
-                    <span className="text-xs2 text-gray-800 font-medium flex-1 min-w-0 truncate">{item.text}</span>
-                  )}
                   {!done && (
-                    <div className="flex items-center gap-px shrink-0">
+                    <div className="flex items-center gap-px shrink-0 ml-auto">
                       <button onClick={() => moveUp(idx)} disabled={idx===0}
                         className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20" title="위로">
                         <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 7l3-4 3 4"/></svg>
@@ -1726,32 +1746,26 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                         className="p-0.5 text-gray-400 hover:text-violet-500 disabled:opacity-20" title="상위로 (←)">
                         <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M8 5H2M4 3L2 5l2 2"/></svg>
                       </button>
-                      <span className="w-px h-3 bg-gray-200 mx-0.5" />
-                      <button onClick={() => remove(item.id)}
-                        className="p-0.5 text-gray-400 hover:text-red-500" title="삭제">
-                        <Icon name="close" size={9} />
-                      </button>
                     </div>
                   )}
                 </div>
 
-                {/* 연결 상태 배지
-                  TODO: 현재는 부호 배정·선택 여부를 기반으로 한 mock 표시.
-                  실제 구현 시 SpecComponentItem에 linkedDrawingNums(number[])와
-                  linkedClaimIds(number[]) 필드를 추가하고, 도면·청구항 확정 시
-                  해당 부호가 참조되는지 역추적해 여기에 렌더링할 것.
-                */}
-                {item.num && (
-                  <div className="pl-9 flex items-center gap-1.5 flex-wrap">
-                    <span className="inline-flex items-center gap-1 text-xs2 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-200">
-                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" width="8" height="8"><rect x="1" y="1" width="8" height="8" rx="1"/><path d="M3 5h4M5 3v4"/></svg>
-                      도면 부호 배정
-                    </span>
+                {/* 필드 행 — 라벨 컬럼 정렬 (명칭/영문명/정의/상위어) */}
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs2 text-gray-400 w-11 shrink-0">명칭</span>
+                    {!done ? (
+                      <input
+                        ref={el => { if (el && item.id === focusId) { el.focus(); setFocusId(null); } }}
+                        className="flex-1 text-xs2 text-gray-800 font-medium bg-gray-50 border border-gray-200 rounded px-2 py-0.5 outline-none focus:border-blue-300 focus:bg-white transition-colors min-w-0"
+                        value={item.text}
+                        placeholder="구성요소 명칭..."
+                        onChange={e => upd(items.map(it => it.id===item.id ? {...it, text: e.target.value} : it))}
+                      />
+                    ) : (
+                      <span className="flex-1 text-xs2 text-gray-800 font-medium min-w-0 truncate">{item.text}</span>
+                    )}
                   </div>
-                )}
-
-                {/* 추가 필드 (영문명, 정의, 상위어) */}
-                <div className="pl-9 space-y-1">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs2 text-gray-400 w-11 shrink-0">영문명</span>
                     {!done ? (
@@ -1762,7 +1776,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                         onChange={e => upd(items.map(it => it.id===item.id ? {...it, englishName: e.target.value} : it))}
                       />
                     ) : (
-                      <span className="text-xs2 text-gray-500">{item.englishName || <span className="text-gray-300">—</span>}</span>
+                      <span className="flex-1 text-xs2 text-gray-500">{item.englishName || <span className="text-gray-300">—</span>}</span>
                     )}
                   </div>
                   <div className="flex items-start gap-1.5">
@@ -1776,7 +1790,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                         onChange={e => upd(items.map(it => it.id===item.id ? {...it, definition: e.target.value} : it))}
                       />
                     ) : (
-                      <span className="text-xs2 text-gray-500 leading-relaxed">{item.definition || <span className="text-gray-300">—</span>}</span>
+                      <span className="flex-1 text-xs2 text-gray-500 leading-relaxed">{item.definition || <span className="text-gray-300">—</span>}</span>
                     )}
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -1789,7 +1803,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                         onChange={e => upd(items.map(it => it.id===item.id ? {...it, parent: e.target.value} : it))}
                       />
                     ) : (
-                      <span className="text-xs2 text-gray-500">{item.parent || <span className="text-gray-300">—</span>}</span>
+                      <span className="flex-1 text-xs2 text-gray-500">{item.parent || <span className="text-gray-300">—</span>}</span>
                     )}
                   </div>
                 </div>
@@ -1809,13 +1823,14 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
           )}
         </div>
 
-        {/* 새 구성요소 추가 */}
+        {/* 새 구성요소 추가 — 빈 카드 생성 후 인라인 편집 */}
         {!done && (
-          <div className="flex gap-1 mt-3">
-            <Input className="text-xs2 py-1.5 flex-1" placeholder="새 구성요소 추가..." value={newText}
-              onChange={e => setNewText(e.target.value)} onKeyDown={e => e.key==='Enter' && add()} />
-            <Button variant="outlined" color="primary" size="xs" onClick={add}><Icon name="plus" size={12} /></Button>
-          </div>
+          <button
+            onClick={add}
+            className="w-full mt-3 flex items-center justify-center gap-1 px-3 py-2 rounded-lg border-2 border-dashed border-gray-200 text-xs2 font-semibold text-gray-500 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50/30 transition-colors"
+          >
+            <Icon name="plus" size={12} /> 구성요소 추가
+          </button>
         )}
       </div>
       {done && (
