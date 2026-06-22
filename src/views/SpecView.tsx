@@ -2114,13 +2114,23 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
 
   const toggleIncluded = (idx: number) => {
     if (done) return;
-    const next = drawings.map((d, i) => i === idx ? { ...d, included: !(d.included ?? true) } : d);
+    const next = drawings.map((d, i) => {
+      if (i !== idx) return d;
+      const nowIncluded = !(d.included ?? true);
+      // 미사용 처리 시 대표 지정 자동 해제 (대표는 사용 이미지여야 함)
+      return nowIncluded ? { ...d, included: true } : { ...d, included: false, isRepresentative: false };
+    });
     updateDrawings(next);
   };
 
   const toggleUseForSpec = (idx: number) => {
     if (done) return;
-    const next = drawings.map((d, i) => i === idx ? { ...d, useForSpec: !(d.useForSpec ?? false) } : d);
+    const next = drawings.map((d, i) => {
+      if (i !== idx) return d;
+      const nowSpec = !(d.useForSpec ?? false);
+      // 명세서 미채택 시 대표도면 지정 자동 해제 (대표도면은 명세서 도면이어야 함)
+      return nowSpec ? { ...d, useForSpec: true } : { ...d, useForSpec: false, isRepresentative: false };
+    });
     updateDrawings(next);
   };
 
