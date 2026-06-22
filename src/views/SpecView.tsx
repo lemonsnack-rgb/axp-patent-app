@@ -190,10 +190,18 @@ export function SpecView() {
     setConfirmed(p => ({ ...p, [id]: val }));
     // 확정 제목을 InventionContext 단일 원천에 역기록
     if (id === 'title') setContext(p => ({ ...p, title: val }));
-    // claims 확정 시 중간명세서 자동 로드
+    // claims 확정 시 중간명세서 자동 로드 — 도면설명은 선별된 도면에서 생성
     if (id === 'claims' && !midspec) {
       import('../features/spec/mockAiService').then(({ MOCK_MIDSPEC }) => {
-        setMidspec(MOCK_MIDSPEC);
+        const specDrawings = context.drawings.filter(d => d.included !== false && d.useForSpec);
+        const fallback = MOCK_MIDSPEC.find(s => s.key === 'drawing_descriptions')?.blocks ?? [];
+        const drawingBlocks = specDrawings.length
+          ? specDrawings.map(d => ({
+              text: `도 ${d.detail.symbol}은(는) ${d.detail.name || '발명의 구성'}을(를) 나타낸 도면이다.${d.isRepresentative ? ' (대표도면)' : ''}`,
+            }))
+          : fallback;
+        const next = MOCK_MIDSPEC.map(s => s.key === 'drawing_descriptions' ? { ...s, blocks: drawingBlocks } : s);
+        setMidspec(next);
       });
     }
     const next = STEPS[si(id) + 1];
