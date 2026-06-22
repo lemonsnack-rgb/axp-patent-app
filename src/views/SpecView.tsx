@@ -574,6 +574,22 @@ export function SpecView() {
                               ...p,
                               [type]: p[type].filter((_, i) => i !== idx),
                             }))}
+                            onReorder={(type, from, to) => setContext(p => {
+                              const arr = [...p[type]];
+                              if (to < 0 || to >= arr.length) return p;
+                              const [m] = arr.splice(from, 1);
+                              arr.splice(to, 0, m);
+                              return { ...p, [type]: arr };
+                            })}
+                            onMoveAcross={(fromType, fromIdx, toIdx) => setContext(p => {
+                              const toType = fromType === 'previous' ? 'proposed' : 'previous';
+                              const src = [...p[fromType]];
+                              const [m] = src.splice(fromIdx, 1);
+                              if (!m) return p;
+                              const dst = [...p[toType]];
+                              dst.splice(toIdx ?? dst.length, 0, m);
+                              return { ...p, [fromType]: src, [toType]: dst };
+                            })}
                             setFocusCtx={setSpecFocusCtx}
                             guidePanelInputRef={guidePanelInputRef}
                           />
@@ -953,7 +969,7 @@ const DESC_LABEL_MAP: Record<string, string> = {
 };
 
 function DescriptionItemCards({
-  previous, proposed, onToggle, onChange, onAdd, onRemove, setFocusCtx, guidePanelInputRef,
+  previous, proposed, onToggle, onChange, onAdd, onRemove, onReorder, onMoveAcross, setFocusCtx, guidePanelInputRef,
 }: {
   previous: InventionDescriptionItem[];
   proposed: InventionDescriptionItem[];
@@ -961,11 +977,21 @@ function DescriptionItemCards({
   onChange: (type: 'previous' | 'proposed', idx: number, text: string) => void;
   onAdd: (type: 'previous' | 'proposed', text: string, label: InventionDescriptionItem['label']) => void;
   onRemove: (type: 'previous' | 'proposed', idx: number) => void;
+  onReorder: (type: 'previous' | 'proposed', from: number, to: number) => void;
+  onMoveAcross: (fromType: 'previous' | 'proposed', fromIdx: number, toIdx?: number) => void;
   setFocusCtx?: (ctx: FocusCtx | null) => void;
   guidePanelInputRef?: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const [tab, setTab] = useState<'previous' | 'proposed'>('proposed');
   const [selState, setSelState] = useState<SelState>(null);
+  const [dragSrc, setDragSrc] = useState<{ type: 'previous' | 'proposed'; idx: number } | null>(null);
+  const [dropHint, setDropHint] = useState<string | null>(null);
+  const handleDrop = (toType: 'previous' | 'proposed', toIdx: number) => {
+    if (!dragSrc) return;
+    if (dragSrc.type === toType) { if (dragSrc.idx !== toIdx) onReorder(toType, dragSrc.idx, toIdx); }
+    else onMoveAcross(dragSrc.type, dragSrc.idx, toIdx);
+    setDragSrc(null); setDropHint(null);
+  };
   const [addLabel, setAddLabel] = useState<{ previous: InventionDescriptionItem['label']; proposed: InventionDescriptionItem['label'] }>({
     previous: 'background',
     proposed: 'objective',
@@ -1006,14 +1032,25 @@ function DescriptionItemCards({
             return (
               <div
                 key={idx}
+                onDragOver={e => { if (dragSrc) { e.preventDefault(); setDropHint(`${type}-${idx}`); } }}
+                onDrop={() => handleDrop(type, idx)}
                 className={clsx(
                   'rounded-xl border-2 p-3 bg-white transition-all',
                   isAdopted
                     ? (accent === 'blue' ? 'border-blue-300' : 'border-amber-300')
                     : 'border-zinc-200 opacity-50',
+                  dragSrc && dropHint === `${type}-${idx}` && !(dragSrc.type === type && dragSrc.idx === idx) && 'ring-2 ring-blue-400 ring-offset-1',
+                  dragSrc && dragSrc.type === type && dragSrc.idx === idx && 'opacity-30',
                 )}
               >
                 <div className="flex items-center gap-2 mb-1.5">
+                  <span
+                    draggable
+                    onDragStart={() => setDragSrc({ type, idx })}
+                    onDragEnd={() => { setDragSrc(null); setDropHint(null); }}
+                    className="text-gray-300 cursor-grab active:cursor-grabbing shrink-0 select-none text-xs leading-none px-0.5"
+                    title="드래그하여 순서 변경 / 반대편으로 이동"
+                  >⠿</span>
                   <span className="text-xs2 text-gray-400 font-medium">{sublabel}</span>
                   {isAiItem ? (
                     <button
@@ -1034,18 +1071,32 @@ function DescriptionItemCards({
                       className="text-xs2 text-gray-300 hover:text-red-400 transition-colors"
                     >✕</button>
                   )}
-                  {setFocusCtx && isAdopted && (
-                    <button
-                      onClick={() => {
-                        setFocusCtx({ text: item.text, label: sublabel, apply: (newText) => onChange(type, idx, newText) });
-                        setTimeout(() => guidePanelInputRef?.current?.focus(), 50);
-                      }}
-                      className="ml-auto flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
-                    >
-                      <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                      AI 수정
+                  <div className="ml-auto flex items-center gap-0.5 shrink-0">
+                    <button onClick={() => onReorder(type, idx, idx - 1)} disabled={idx === 0}
+                      className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20 transition-colors" title="위로">
+                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 7l3-4 3 4"/></svg>
                     </button>
-                  )}
+                    <button onClick={() => onReorder(type, idx, idx + 1)} disabled={idx === items.length - 1}
+                      className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20 transition-colors" title="아래로">
+                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 3l3 4 3-4"/></svg>
+                    </button>
+                    <button onClick={() => onMoveAcross(type, idx)}
+                      className="p-0.5 text-gray-400 hover:text-violet-500 transition-colors" title={type === 'previous' ? '제안기술로 이동' : '종래기술로 이동'}>
+                      <svg viewBox="0 0 12 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="11" height="9"><path d="M8 1l3 2.5-3 2.5M11 3.5H4M4 9L1 6.5 4 4M1 6.5h7"/></svg>
+                    </button>
+                    {setFocusCtx && isAdopted && (
+                      <button
+                        onClick={() => {
+                          setFocusCtx({ text: item.text, label: sublabel, apply: (newText) => onChange(type, idx, newText) });
+                          setTimeout(() => guidePanelInputRef?.current?.focus(), 50);
+                        }}
+                        className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
+                      >
+                        <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
+                        AI 수정
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <textarea
                   className="w-full text-sm2 text-gray-700 leading-relaxed bg-transparent outline-none resize-none min-h-[48px]"
