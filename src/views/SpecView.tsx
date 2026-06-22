@@ -1048,17 +1048,7 @@ function DescriptionItemCards({
                 )}
               >
                 <div className="flex items-center gap-2 mb-1.5">
-                  <span
-                    draggable
-                    onDragStart={() => setDragSrc({ type, idx })}
-                    onDragEnd={() => { setDragSrc(null); setDropHint(null); }}
-                    className="flex items-center gap-0.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing shrink-0 select-none text-xs2 leading-none px-1 py-0.5 rounded border border-gray-200 hover:border-blue-300 transition-colors"
-                    title="드래그하여 순서 변경 / 반대편 기술로 이동"
-                  >
-                    <svg viewBox="0 0 10 10" width="9" height="9" fill="currentColor"><circle cx="3" cy="2" r="1"/><circle cx="7" cy="2" r="1"/><circle cx="3" cy="5" r="1"/><circle cx="7" cy="5" r="1"/><circle cx="3" cy="8" r="1"/><circle cx="7" cy="8" r="1"/></svg>
-                    이동
-                  </span>
-                  <span className="text-xs2 text-gray-400 font-medium">{sublabel}</span>
+                  {/* 채택 체크박스 — 카드 선두(항목 단위 선택), 구성요소 패널과 동일 */}
                   {isAiItem ? (
                     <button
                       onClick={() => onToggle(type, idx)}
@@ -1075,9 +1065,21 @@ function DescriptionItemCards({
                   ) : (
                     <button
                       onClick={() => onRemove(type, idx)}
-                      className="text-xs2 text-gray-300 hover:text-red-400 transition-colors"
+                      className="shrink-0 w-4 h-4 rounded flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                      title="삭제"
                     >✕</button>
                   )}
+                  <span
+                    draggable
+                    onDragStart={() => setDragSrc({ type, idx })}
+                    onDragEnd={() => { setDragSrc(null); setDropHint(null); }}
+                    className="flex items-center gap-0.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing shrink-0 select-none text-xs2 leading-none px-1 py-0.5 rounded border border-gray-200 hover:border-blue-300 transition-colors"
+                    title="드래그하여 순서 변경 / 반대편 기술로 이동"
+                  >
+                    <svg viewBox="0 0 10 10" width="9" height="9" fill="currentColor"><circle cx="3" cy="2" r="1"/><circle cx="7" cy="2" r="1"/><circle cx="3" cy="5" r="1"/><circle cx="7" cy="5" r="1"/><circle cx="3" cy="8" r="1"/><circle cx="7" cy="8" r="1"/></svg>
+                    이동
+                  </span>
+                  <span className="text-xs2 text-gray-400 font-medium">{sublabel}</span>
                   <div className="ml-auto flex items-center gap-0.5 shrink-0">
                     <button onClick={() => onReorder(type, idx, idx - 1)} disabled={idx === 0}
                       className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20 transition-colors" title="위로">
