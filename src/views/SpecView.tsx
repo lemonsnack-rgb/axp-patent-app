@@ -2211,12 +2211,14 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                       {!done && (
                         <button
                           onClick={() => toggleIncluded(idx)}
-                          className={clsx(
-                            'absolute top-1.5 left-1.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all shadow-sm',
-                            included ? 'bg-brand-400 border-blue-600 text-white' : 'bg-white/90 border-gray-300',
-                          )}
+                          className="absolute top-1.5 left-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-lg shadow-sm bg-white/95 border border-gray-200 transition-all"
                           title={included ? '맥락에서 제외 (흐림)' : '맥락에 사용'}
-                        >{included && <Icon name="check" size={11} />}</button>
+                        >
+                          <span className={clsx('w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all', included ? 'bg-brand-400 border-blue-600 text-white' : 'border-gray-300 bg-white')}>
+                            {included && <Icon name="check" size={8} />}
+                          </span>
+                          <span className={clsx('text-xs2 font-semibold', included ? 'text-blue-700' : 'text-gray-500')}>사용</span>
+                        </button>
                       )}
                       {isRep && <span className="absolute top-1.5 right-1.5 text-xs2 px-2 py-0.5 rounded-full font-semibold bg-blue-600 text-white">대표</span>}
                     </>
@@ -2314,12 +2316,14 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                       {!done && (
                         <button
                           onClick={() => toggleUseForSpec(idx)}
-                          className={clsx(
-                            'absolute top-1.5 left-1.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all shadow-sm',
-                            isForSpec ? 'bg-brand-400 border-blue-600 text-white' : 'bg-white/90 border-gray-300',
-                          )}
+                          className="absolute top-1.5 left-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-lg shadow-sm bg-white/95 border border-gray-200 transition-all"
                           title={isForSpec ? '명세서에서 제외 (AI 참고용)' : '명세서 도면으로 채택'}
-                        >{isForSpec && <Icon name="check" size={11} />}</button>
+                        >
+                          <span className={clsx('w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all', isForSpec ? 'bg-brand-400 border-blue-600 text-white' : 'border-gray-300 bg-white')}>
+                            {isForSpec && <Icon name="check" size={8} />}
+                          </span>
+                          <span className={clsx('text-xs2 font-semibold', isForSpec ? 'text-blue-700' : 'text-gray-500')}>명세서</span>
+                        </button>
                       )}
                       {isForSpec ? (
                         <span className="absolute top-1.5 right-1.5 text-xs2 px-2 py-0.5 rounded-full font-bold bg-blue-600 text-white">도 {myFig}{isRep ? ' · 대표' : ''}</span>
