@@ -2236,11 +2236,17 @@ function DrawingsPanel({ done, onUpdate, drawings: propDrawings, onUpdateDrawing
                     <div className="flex border-t border-gray-100">
                       <button
                         onClick={() => toggleIncluded(idx)}
-                        className={clsx(
-                          'flex-1 py-1.5 text-xs2 font-semibold transition-colors',
-                          included ? 'bg-blue-50 text-blue-700' : 'text-gray-400 hover:bg-gray-50',
-                        )}
-                      >{included ? '✓ 포함' : '제외'}</button>
+                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs2 font-semibold hover:bg-gray-50 transition-colors"
+                        title={included ? '클릭하여 제외' : '클릭하여 포함'}
+                      >
+                        <span className={clsx(
+                          'w-4 h-4 rounded border-2 flex items-center justify-center transition-all shrink-0',
+                          included ? 'bg-brand-400 border-blue-600 text-white' : 'border-gray-300 bg-white',
+                        )}>
+                          {included && <Icon name="check" size={8} />}
+                        </span>
+                        <span className={included ? 'text-blue-700' : 'text-gray-400'}>포함</span>
+                      </button>
                       <button
                         onClick={() => openEditorTab({
                           drawingId: String(idx),
