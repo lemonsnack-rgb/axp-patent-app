@@ -942,7 +942,7 @@ function TitleCandidateCards({
                 className="shrink-0 flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors mt-4"
               >
                 <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                수정
+                AI 수정
               </button>
             </div>
             {/* 개요 행 */}
@@ -961,7 +961,7 @@ function TitleCandidateCards({
                 className="shrink-0 flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors mt-4"
               >
                 <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                수정
+                AI 수정
               </button>
             </div>
             {/* 추천 이유 행 */}
@@ -1073,13 +1073,14 @@ function DescriptionItemCards({
                     <button
                       onClick={() => onToggle(type, idx)}
                       className={clsx(
-                        'text-xs2 px-2 py-0.5 rounded-lg font-semibold border transition-colors',
+                        'shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-all',
                         isAdopted
-                          ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
-                          : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100',
+                          ? 'bg-brand-400 border-blue-600 text-white'
+                          : 'border-gray-300 bg-white hover:border-blue-400',
                       )}
+                      title={isAdopted ? '미채택으로 변경' : '채택'}
                     >
-                      채택 {isAdopted ? 'ON' : 'OFF'}
+                      {isAdopted && <Icon name="check" size={8} />}
                     </button>
                   ) : (
                     <button
@@ -1752,13 +1753,18 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                 {/* 명칭 row */}
                 <div className="flex items-center gap-1">
                   {!done && (
-                    <input
-                      type="checkbox"
-                      checked={item.sel}
-                      onChange={() => upd(items.map(it => it.id===item.id ? {...it, sel: !it.sel} : it))}
-                      className="shrink-0 w-3.5 h-3.5 accent-blue-600 cursor-pointer"
+                    <button
+                      onClick={() => upd(items.map(it => it.id===item.id ? {...it, sel: !it.sel} : it))}
+                      className={clsx(
+                        'shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-all',
+                        item.sel
+                          ? 'bg-brand-400 border-blue-600 text-white'
+                          : 'border-gray-300 bg-white hover:border-blue-400',
+                      )}
                       title={item.sel ? '미채택으로 변경' : '채택'}
-                    />
+                    >
+                      {item.sel && <Icon name="check" size={8} />}
+                    </button>
                   )}
                   <span className="text-gray-300 cursor-grab active:cursor-grabbing shrink-0 select-none text-xs leading-none px-0.5">⠿</span>
                   <span className={clsx(
