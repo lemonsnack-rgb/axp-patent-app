@@ -42,11 +42,7 @@ const STEP_LABEL: Partial<Record<StepId, string>> = {
   title: '발명의 명칭', description: '발명의 설명', components: '구성요소',
   drawings: '도면', claims: '청구항', midspec: '중간명세서',
 };
-const CONFIRM_LABEL: Partial<Record<StepId, string>> = {
-  title: '발명의 명칭 선택 완료', description: '발명의 설명 선택 완료',
-  components: '구성요소 선택 완료', drawings: '도면 선택 완료',
-  claims: '청구항 선택 완료', midspec: '중간명세서 확정 완료',
-};
+
 const AI_NEXT: Record<StepId, string> = {
   upload:      '업로드하신 문서를 분석했습니다. 발명의 설명 항목을 분석합니다.',
   description: '설명 항목을 확정했습니다. 발명의 명칭 후보를 생성합니다.',
@@ -88,7 +84,6 @@ export function SpecView() {
   );
   const [midspec, setMidspec] = useState<MidspecSection[] | undefined>(savedSpec?.midspec);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [expandedCards, setExpandedCards] = useState<Set<SpecStepId>>(new Set());
   const [phase, setPhase] = useState<'upload' | 'direct' | 'flow' | 'done'>(savedSpec?.phase ?? 'upload');
   const [curStep, setCurStep] = useState<StepId>((savedSpec?.curStep as StepId) ?? 'upload');
   const [confirmed, setConfirmed] = useState<Partial<Record<StepId, string>>>((savedSpec?.confirmed as Partial<Record<StepId, string>>) ?? {});
@@ -193,7 +188,6 @@ export function SpecView() {
   const confirm = (id: StepId) => {
     const val = gSel[id] || GUIDE_CANDS[id]?.[0] || '(확정)';
     setConfirmed(p => ({ ...p, [id]: val }));
-    setExpandedCards(new Set());
     // claims 확정 시 중간명세서 자동 로드
     if (id === 'claims' && !midspec) {
       import('../features/spec/mockAiService').then(({ MOCK_MIDSPEC }) => {
@@ -530,188 +524,118 @@ export function SpecView() {
                   const isDone = si(s.id) < si(curStep) && (phase === 'flow' || phase === 'done');
                   return (
                     <div key={s.id} className="space-y-3">
-                      {(!isDone || expandedCards.has(s.id)) && (
-                        <>
-                          <AiMsg text={
-                            isSpecialStep(s.id) ? (
-                              <><strong>{STEP_LABEL[s.id]}</strong><br />
-                              업로드 내용을 기반으로 {STEP_LABEL[s.id]} 항목을 준비했습니다. 아래에서 확인하고 항목을 채우세요.</>
-                            ) : (
-                              <><strong>{STEP_LABEL[s.id]}</strong><br />
-                              업로드 내용을 기반으로 {STEP_LABEL[s.id]} 후보를 생성했습니다. 아래에서 선택하거나 직접 입력하세요.</>
-                            )
-                          } />
-                          {/* 현재 단계 후보 카드 인라인 */}
-                          {s.id === guideStep && !isDone && s.id === 'title' && (
-                            <TitleCandidateCards
-                              candidates={titleCandidates}
-                              gSel={gSel}
-                              setGSel={setGSel}
-                              setFocusCtx={setSpecFocusCtx}
-                              guidePanelInputRef={guidePanelInputRef}
-                            />
-                          )}
-                          {s.id === guideStep && !isDone && s.id === 'description' && (
-                            <DescriptionItemCards
-                              previous={context.previous}
-                              proposed={context.proposed}
-                              onToggle={(type, idx) => setContext(p => ({
-                                ...p,
-                                [type]: p[type].map((item, i) => i === idx ? { ...item, adopted: !item.adopted } : item),
-                              }))}
-                              onChange={(type, idx, text) => setContext(p => ({
-                                ...p,
-                                [type]: p[type].map((item, i) => i === idx ? { ...item, text } : item),
-                              }))}
-                              onAdd={(type, text, label) => setContext(p => ({
-                                ...p,
-                                [type]: [...p[type], { label, text }],
-                              }))}
-                              onRemove={(type, idx) => setContext(p => ({
-                                ...p,
-                                [type]: p[type].filter((_, i) => i !== idx),
-                              }))}
-                              setFocusCtx={setSpecFocusCtx}
-                              guidePanelInputRef={guidePanelInputRef}
-                            />
-                          )}
-                          {/* 현재 단계 특수 패널 인라인 */}
-                          {s.id === guideStep && !isDone && isSpecialStep(s.id) && (
-                            <div className="mt-3">
-                              {s.id === 'components' && (
-                                <ComponentsPanel
-                                  done={false}
-                                  onConfirm={() => confirm('components')}
-                                  onUpdate={v => setGSel(p => ({ ...p, components: v }))}
-                                  onComponentsChange={setAiComponents}
-                                  initialItems={aiComponents}
-                                />
-                              )}
-                              {s.id === 'drawings' && (
-                                <DrawingsPanel
-                                  done={false}
-                                  onConfirm={() => confirm('drawings')}
-                                  onUpdate={v => setGSel(p => ({ ...p, drawings: v }))}
-                                  drawings={context.drawings}
-                                  onUpdateDrawings={next => setContext(p => ({ ...p, drawings: next }))}
-                                />
-                              )}
-                              {s.id === 'claims' && (
-                                <ClaimsPanel
-                                  done={false}
-                                  onConfirm={() => confirm('claims')}
-                                  onUpdate={v => setGSel(p => ({ ...p, claims: v }))}
-                                  onFocusContext={setSpecFocusCtx}
-                                  guidePanelInputRef={guidePanelInputRef}
-                                />
-                              )}
-                              {s.id === 'midspec' && (
-                                <MidspecPanel
-                                  done={false}
-                                  sections={midspec ?? []}
-                                  onUpdate={(next) => {
-                                    setMidspec(next);
-                                    setGSel(p => ({ ...p, midspec: next.map(s => `【${s.label}】\n${s.blocks.map(b => b.text).join('\n')}`).join('\n\n') }));
-                                  }}
-                                  onGoToEditor={() => {
-                                    const embodimentSection: MidspecSection = {
-                                      key: 'embodiment_description',
-                                      label: '실시예 (구체적 내용)',
-                                      blocks: MOCK_EMBODIMENT,
-                                    };
-                                    const nextMidspec = [
-                                      ...(midspec ?? []).filter(s => s.key !== 'embodiment_description'),
-                                      embodimentSection,
-                                    ];
-                                    setMidspec(nextMidspec);
-                                    confirm('midspec');
-                                    handleSetMainView('editor');
-                                  }}
-                                />
-                              )}
-                            </div>
-                          )}
-                        </>
+                      <AiMsg text={
+                        isSpecialStep(s.id) ? (
+                          <><strong>{STEP_LABEL[s.id]}</strong><br />
+                          업로드 내용을 기반으로 {STEP_LABEL[s.id]} 항목을 준비했습니다. 아래에서 확인하고 항목을 채우세요.</>
+                        ) : (
+                          <><strong>{STEP_LABEL[s.id]}</strong><br />
+                          업로드 내용을 기반으로 {STEP_LABEL[s.id]} 후보를 생성했습니다. 아래에서 선택하거나 직접 입력하세요.</>
+                        )
+                      } />
+                      {/* 단계 콘텐츠 — isDone 시 전체 딤 처리 */}
+                      <div className={isDone ? 'opacity-60 pointer-events-none select-none' : ''}>
+                        {s.id === 'title' && (
+                          <TitleCandidateCards
+                            candidates={titleCandidates}
+                            gSel={gSel}
+                            setGSel={setGSel}
+                            setFocusCtx={setSpecFocusCtx}
+                            guidePanelInputRef={guidePanelInputRef}
+                          />
+                        )}
+                        {s.id === 'description' && (
+                          <DescriptionItemCards
+                            previous={context.previous}
+                            proposed={context.proposed}
+                            onToggle={(type, idx) => setContext(p => ({
+                              ...p,
+                              [type]: p[type].map((item, i) => i === idx ? { ...item, adopted: !item.adopted } : item),
+                            }))}
+                            onChange={(type, idx, text) => setContext(p => ({
+                              ...p,
+                              [type]: p[type].map((item, i) => i === idx ? { ...item, text } : item),
+                            }))}
+                            onAdd={(type, text, label) => setContext(p => ({
+                              ...p,
+                              [type]: [...p[type], { label, text }],
+                            }))}
+                            onRemove={(type, idx) => setContext(p => ({
+                              ...p,
+                              [type]: p[type].filter((_, i) => i !== idx),
+                            }))}
+                            setFocusCtx={setSpecFocusCtx}
+                            guidePanelInputRef={guidePanelInputRef}
+                          />
+                        )}
+                        {(s.id === 'components' || s.id === 'drawings' || s.id === 'claims' || s.id === 'midspec') && (
+                          <div className="mt-3">
+                            {s.id === 'components' && (
+                              <ComponentsPanel
+                                done={isDone}
+                                onConfirm={() => confirm('components')}
+                                onUpdate={v => setGSel(p => ({ ...p, components: v }))}
+                                onComponentsChange={setAiComponents}
+                                initialItems={aiComponents}
+                              />
+                            )}
+                            {s.id === 'drawings' && (
+                              <DrawingsPanel
+                                done={isDone}
+                                onConfirm={() => confirm('drawings')}
+                                onUpdate={v => setGSel(p => ({ ...p, drawings: v }))}
+                                drawings={context.drawings}
+                                onUpdateDrawings={next => setContext(p => ({ ...p, drawings: next }))}
+                              />
+                            )}
+                            {s.id === 'claims' && (
+                              <ClaimsPanel
+                                done={isDone}
+                                onConfirm={() => confirm('claims')}
+                                onUpdate={v => setGSel(p => ({ ...p, claims: v }))}
+                                onFocusContext={setSpecFocusCtx}
+                                guidePanelInputRef={guidePanelInputRef}
+                              />
+                            )}
+                            {s.id === 'midspec' && (
+                              <MidspecPanel
+                                done={isDone}
+                                sections={midspec ?? []}
+                                onUpdate={(next) => {
+                                  setMidspec(next);
+                                  setGSel(p => ({ ...p, midspec: next.map(s => `【${s.label}】\n${s.blocks.map(b => b.text).join('\n')}`).join('\n\n') }));
+                                }}
+                                onGoToEditor={() => {
+                                  const embodimentSection: MidspecSection = {
+                                    key: 'embodiment_description',
+                                    label: '실시예 (구체적 내용)',
+                                    blocks: MOCK_EMBODIMENT,
+                                  };
+                                  const nextMidspec = [
+                                    ...(midspec ?? []).filter(s => s.key !== 'embodiment_description'),
+                                    embodimentSection,
+                                  ];
+                                  setMidspec(nextMidspec);
+                                  confirm('midspec');
+                                  handleSetMainView('editor');
+                                }}
+                              />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {/* 수정 버튼 — 딤 영역 하단, 포인터 정상 */}
+                      {isDone && (
+                        <div className="flex justify-end mt-1">
+                          <button
+                            onClick={() => reselect(s.id)}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs2 text-blue-600 hover:bg-blue-50 border border-blue-200 transition-colors"
+                          >
+                            <Icon name="edit" size={10} /> 수정
+                          </button>
+                        </div>
                       )}
-                      {isDone && (() => {
-                        const confirmedVal = confirmed[s.id] || '';
-                        return (
-                          <>
-                            <div className="flex items-start gap-3 flex-row-reverse">
-                              <div className="w-8 h-8 rounded-full bg-green-600 text-white text-sm font-bold flex items-center justify-center shrink-0">✓</div>
-                              <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3 shadow-xs min-w-0 break-words max-w-[calc(100%-2.75rem)]">
-                                {/* 헤더 */}
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span className="w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center shrink-0"><Icon name="check" size={10} /></span>
-                                  <span className="text-sm2 font-semibold text-brand-400 flex-1 min-w-0">{CONFIRM_LABEL[s.id]}</span>
-                                </div>
-                                {/* 전체 내용 항상 표시 */}
-                                <div className={clsx(
-                                  'bg-white rounded-lg border border-blue-100 p-3 mb-2',
-                                  (s.id === 'description' || s.id === 'claims') && 'max-h-40 overflow-y-auto scroll-thin'
-                                )}>
-                                  {s.id === 'description' ? (
-                                    <div className="space-y-2">
-                                      {confirmedVal.split('\n\n').filter(Boolean).map((block, bi) => {
-                                        const lines = block.split('\n');
-                                        const label = lines[0]?.replace(/[【】]/g, '').trim();
-                                        const content = lines.slice(1).join('\n').trim();
-                                        return (
-                                          <div key={bi}>
-                                            <p className="text-xs2 font-bold text-brand-400 mb-0.5">{label}</p>
-                                            <p className="text-xs2 text-gray-700 leading-relaxed">{content}</p>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  ) : s.id === 'claims' ? (
-                                    <div className="space-y-2">
-                                      {confirmedVal.split('\n\n').filter(Boolean).map((block, bi) => {
-                                        if (bi === 0) return <p key={bi} className="text-xs2 font-bold text-green-700">{block}</p>;
-                                        const lines = block.split('\n');
-                                        const header = lines[0];
-                                        const content = lines.slice(1).join(' ').trim();
-                                        const isFirst = bi === 1;
-                                        return (
-                                          <div key={bi} className={clsx('pl-2 border-l-2', isFirst ? 'border-purple-400' : 'border-amber-300')}>
-                                            <p className={clsx('text-xs2 font-bold mb-0.5', isFirst ? 'text-purple-700' : 'text-amber-700')}>{header}</p>
-                                            <p className="text-xs2 text-gray-600 leading-relaxed">{content}</p>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  ) : s.id === 'components' ? (
-                                    <ul className="space-y-1">
-                                      {confirmedVal.split('\n').filter(Boolean).map((line, li) => {
-                                        const parenIdx = line.lastIndexOf(' (');
-                                        const hasEng = parenIdx > 0 && line.endsWith(')');
-                                        const base = hasEng ? line.slice(0, parenIdx) : line;
-                                        const eng = hasEng ? line.slice(parenIdx + 2, -1) : '';
-                                        const spaceIdx = base.indexOf(' ');
-                                        const num = spaceIdx > 0 ? base.slice(0, spaceIdx) : '';
-                                        const name = spaceIdx > 0 ? base.slice(spaceIdx + 1) : base;
-                                        return (
-                                          <li key={li} className="flex items-baseline gap-1.5">
-                                            <span className="text-xs2 font-bold text-blue-600 shrink-0 w-7 text-right">{num}</span>
-                                            <span className="text-xs2 text-gray-800">{name}</span>
-                                            {eng && <span className="text-xs2 text-gray-400">({eng})</span>}
-                                          </li>
-                                        );
-                                      })}
-                                    </ul>
-                                  ) : (
-                                    <p className="text-sm2 text-gray-700 leading-relaxed">{confirmedVal}</p>
-                                  )}
-                                </div>
-                                <button onClick={() => reselect(s.id)} className="text-xs2 text-blue-600 hover:text-blue-800 flex items-center gap-1">
-                                  <Icon name="edit" size={10} /> 수정
-                                </button>
-                              </div>
-                            </div>
-                            <AiMsg text={AI_NEXT[s.id]} />
-                          </>
-                        );
-                      })()}
+                      {isDone && <AiMsg text={AI_NEXT[s.id]} />}
                     </div>
                   );
                 })}
