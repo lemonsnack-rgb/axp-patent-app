@@ -34,8 +34,8 @@ const STEPS: StepConfig[] = [
   { id: 'images',      label: '이미지 선별', step: 3 },
   { id: 'title',       label: '제목·요약',   step: 4 },
   { id: 'components',  label: '구성요소',    step: 5 },
-  { id: 'claims',      label: '청구항',      step: 6 },
-  { id: 'drawings',    label: '명세서 도면', step: 7 },
+  { id: 'drawings',    label: '명세서 도면', step: 6 },
+  { id: 'claims',      label: '청구항',      step: 7 },
   { id: 'midspec',     label: '중간명세서',  step: 8 },
 ];
 
@@ -49,9 +49,9 @@ const AI_NEXT: Record<StepId, string> = {
   description: '설명 항목을 확정했습니다. 추출된 이미지를 선별합니다.',
   images:      '관련 이미지를 선별했습니다. 발명의 명칭 후보를 생성합니다.',
   title:       '발명 명칭을 확정했습니다. 발명의 구성요소를 추출합니다.',
-  components:  '구성요소를 확정했습니다. 청구항을 생성합니다.',
-  claims:      '청구항을 확정했습니다. 명세서에 넣을 도면을 처리합니다.',
-  drawings:    '명세서 도면을 확정했습니다. 중간명세서를 확인하고 편집하세요.',
+  components:  '구성요소를 확정했습니다. 명세서에 넣을 도면을 처리합니다.',
+  drawings:    '명세서 도면을 확정했습니다. 청구항을 생성합니다.',
+  claims:      '청구항을 확정했습니다. 중간명세서를 확인하고 편집하세요.',
   midspec:     '중간명세서를 확정했습니다. 명세서 에디터로 이동합니다.',
 };
 const GUIDE_CANDS: Record<string, string[]> = {
@@ -192,8 +192,8 @@ export function SpecView() {
     setConfirmed(p => ({ ...p, [id]: val }));
     // 확정 제목을 InventionContext 단일 원천에 역기록
     if (id === 'title') setContext(p => ({ ...p, title: val }));
-    // 명세서 도면 확정 시 중간명세서 자동 로드 — 도면설명은 명세서 도면에서 생성
-    if (id === 'drawings' && !midspec) {
+    // 청구항 확정 시 중간명세서 자동 로드 — 도면설명은 명세서 도면에서 생성 (도면은 직전 단계에서 확정됨)
+    if (id === 'claims' && !midspec) {
       import('../features/spec/mockAiService').then(({ MOCK_MIDSPEC }) => {
         const specDrawings = context.drawings.filter(d => d.included !== false && d.useForSpec);
         const fallback = MOCK_MIDSPEC.find(s => s.key === 'drawing_descriptions')?.blocks ?? [];
@@ -1156,11 +1156,10 @@ function DescriptionItemCards({
             accent === 'blue' ? 'border-blue-200 focus-within:border-blue-400' : 'border-amber-200 focus-within:border-amber-400',
           )}>
             <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-xs2 text-gray-400">+ 항목 추가</span>
               <select
                 value={addLabel[type]}
                 onChange={e => setAddLabel(p => ({ ...p, [type]: e.target.value as InventionDescriptionItem['label'] }))}
-                className="ml-auto text-xs2 border border-gray-200 rounded px-1.5 py-0.5 bg-white text-gray-600 outline-none"
+                className="text-xs2 border border-gray-200 rounded px-1.5 py-0.5 bg-white text-gray-600 outline-none"
               >
                 <option value="background">배경기술</option>
                 <option value="implementation">구현방법</option>
