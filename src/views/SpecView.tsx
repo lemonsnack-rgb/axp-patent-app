@@ -1024,6 +1024,10 @@ function DescriptionItemCards({
           <span>{type === 'proposed' ? '제안기술' : '종래기술'}</span>
           <span className="opacity-60 font-normal">{items.filter(i => i.adopted !== false).length}/{items.length} 채택</span>
         </div>
+        <p className="text-xs2 text-gray-400 mb-2 flex items-center gap-1">
+          <svg viewBox="0 0 10 10" width="9" height="9" fill="currentColor" className="text-gray-300"><circle cx="3" cy="2" r="1"/><circle cx="7" cy="2" r="1"/><circle cx="3" cy="5" r="1"/><circle cx="7" cy="5" r="1"/><circle cx="3" cy="8" r="1"/><circle cx="7" cy="8" r="1"/></svg>
+          카드를 끌어 순서 변경 · 아래 버튼으로 반대편 기술로 이동
+        </p>
         <div className="space-y-2">
           {items.map((item, idx) => {
             const isAdopted = item.adopted !== false;
@@ -1048,9 +1052,12 @@ function DescriptionItemCards({
                     draggable
                     onDragStart={() => setDragSrc({ type, idx })}
                     onDragEnd={() => { setDragSrc(null); setDropHint(null); }}
-                    className="text-gray-300 cursor-grab active:cursor-grabbing shrink-0 select-none text-xs leading-none px-0.5"
-                    title="드래그하여 순서 변경 / 반대편으로 이동"
-                  >⠿</span>
+                    className="flex items-center gap-0.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing shrink-0 select-none text-xs2 leading-none px-1 py-0.5 rounded border border-gray-200 hover:border-blue-300 transition-colors"
+                    title="드래그하여 순서 변경 / 반대편 기술로 이동"
+                  >
+                    <svg viewBox="0 0 10 10" width="9" height="9" fill="currentColor"><circle cx="3" cy="2" r="1"/><circle cx="7" cy="2" r="1"/><circle cx="3" cy="5" r="1"/><circle cx="7" cy="5" r="1"/><circle cx="3" cy="8" r="1"/><circle cx="7" cy="8" r="1"/></svg>
+                    이동
+                  </span>
                   <span className="text-xs2 text-gray-400 font-medium">{sublabel}</span>
                   {isAiItem ? (
                     <button
@@ -1079,10 +1086,6 @@ function DescriptionItemCards({
                     <button onClick={() => onReorder(type, idx, idx + 1)} disabled={idx === items.length - 1}
                       className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20 transition-colors" title="아래로">
                       <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 3l3 4 3-4"/></svg>
-                    </button>
-                    <button onClick={() => onMoveAcross(type, idx)}
-                      className="p-0.5 text-gray-400 hover:text-violet-500 transition-colors" title={type === 'previous' ? '제안기술로 이동' : '종래기술로 이동'}>
-                      <svg viewBox="0 0 12 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="11" height="9"><path d="M8 1l3 2.5-3 2.5M11 3.5H4M4 9L1 6.5 4 4M1 6.5h7"/></svg>
                     </button>
                     {setFocusCtx && isAdopted && (
                       <button
@@ -1114,6 +1117,21 @@ function DescriptionItemCards({
                     }
                   }}
                 />
+                {/* 종래↔제안 이동 — 방향·이름·목적지 색상으로 명확화 */}
+                <div className="flex justify-end mt-1.5">
+                  <button
+                    onClick={() => onMoveAcross(type, idx)}
+                    className={clsx(
+                      'flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs2 font-semibold border transition-colors',
+                      type === 'previous'
+                        ? 'text-blue-600 border-blue-200 hover:bg-blue-50'
+                        : 'text-amber-600 border-amber-200 hover:bg-amber-50',
+                    )}
+                    title={type === 'previous' ? '이 항목을 제안기술로 이동' : '이 항목을 종래기술로 이동'}
+                  >
+                    {type === 'previous' ? '← 제안기술로 이동' : '종래기술로 이동 →'}
+                  </button>
+                </div>
               </div>
             );
           })}
