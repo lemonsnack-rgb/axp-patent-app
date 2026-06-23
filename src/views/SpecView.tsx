@@ -891,8 +891,14 @@ function TitleCandidateCards({
               !isSelected && 'border-zinc-200 hover:border-blue-300 hover:bg-blue-50/30',
             )}
           >
-            {/* 카드 헤더 */}
+            {/* 카드 헤더 — 라디오(단일 선택) + 후보 글자 */}
             <div className="flex items-center gap-2 mb-2">
+              <span className={clsx(
+                'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0',
+                isSelected ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white',
+              )}>
+                {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+              </span>
               <span className={clsx(
                 'w-5 h-5 rounded-full text-xs2 font-bold flex items-center justify-center shrink-0',
                 isSelected ? 'bg-brand-400 text-white' : 'bg-gray-200 text-gray-500',
@@ -2226,7 +2232,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                           className="absolute top-1.5 right-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-lg shadow-sm bg-white/95 border border-gray-200 transition-all"
                           title="대표 이미지 (1개만)"
                         >
-                          <span className={clsx('w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center', isRep ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white')}>
+                          <span className={clsx('w-4 h-4 rounded-full border-2 flex items-center justify-center', isRep ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white')}>
                             {isRep && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                           </span>
                           <span className={clsx('text-xs2 font-semibold', isRep ? 'text-blue-700' : 'text-gray-500')}>대표</span>
@@ -2329,7 +2335,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                           className="absolute top-1.5 right-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-lg shadow-sm bg-white/95 border border-gray-200 transition-all"
                           title="대표도면 (1개만)"
                         >
-                          <span className={clsx('w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center', isRep ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white')}>
+                          <span className={clsx('w-4 h-4 rounded-full border-2 flex items-center justify-center', isRep ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white')}>
                             {isRep && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                           </span>
                           <span className={clsx('text-xs2 font-semibold', isRep ? 'text-blue-700' : 'text-gray-500')}>대표</span>
@@ -2677,12 +2683,11 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                 <button
                   onClick={e => { e.stopPropagation(); if (!done) { setSelectedSetIndex(setIdx); syncUpdate(setIdx, depGroupsMap); } }}
                   className={clsx(
-                    'w-4.5 h-4.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all',
+                    'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all',
                     isSelected ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white hover:border-blue-400'
                   )}
-                  style={{ width: '18px', height: '18px' }}
                 >
-                  {isSelected && <span className="w-2 h-2 rounded-full bg-white block" />}
+                  {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white block" />}
                 </button>
                 <div className="flex-1 min-w-0">
                   <span className={clsx('text-sm2 font-semibold', isSelected ? 'text-blue-700' : 'text-gray-700')}>

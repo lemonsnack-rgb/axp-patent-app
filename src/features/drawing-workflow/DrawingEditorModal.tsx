@@ -614,9 +614,9 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                                   : <Icon name="image" size={12} className="text-gray-300" />}
                               </div>
                               <div className="flex items-center justify-center gap-1">
-                                <span className={clsx('w-3 h-3 rounded-full border-2 flex items-center justify-center shrink-0',
+                                <span className={clsx('w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0',
                                   isSel ? 'border-blue-600 bg-blue-600' : 'border-gray-300')}>
-                                  {isSel && <span className="w-1 h-1 rounded-full bg-white" />}
+                                  {isSel && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                                 </span>
                                 <span className={clsx('font-bold', isSel ? 'text-blue-700' : 'text-gray-500')} style={{ fontSize: 10 }}>
                                   버전 {String.fromCharCode(65 + i)}
