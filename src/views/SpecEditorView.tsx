@@ -142,7 +142,7 @@ function MarkdownTable({ text }: { text: string }) {
   if (!rows.length) return null;
   const [head, ...body] = rows;
   return (
-    <table className="border-collapse text-sm w-full">
+    <table className="border-collapse text-base2 w-full">
       <thead>
         <tr>{head.map((c, i) => <th key={i} className="border border-zinc-300 px-2 py-1 bg-zinc-50 font-semibold text-left text-zinc-700">{c}</th>)}</tr>
       </thead>
@@ -239,7 +239,7 @@ function ClaimsEditor({ blocks, onChange }: {
               value={it.value}
               onChange={e => editVal(idx, e.target.value)}
               rows={Math.max(2, Math.ceil(it.value.length / 50))}
-              className="w-full text-sm text-zinc-800 leading-relaxed bg-transparent outline-none resize-none border border-transparent focus:border-blue-300 focus:bg-white rounded px-1.5 py-1 transition-colors"
+              className="w-full text-base2 text-zinc-800 leading-relaxed bg-transparent outline-none resize-none border border-transparent focus:border-blue-300 focus:bg-white rounded px-1.5 py-1 transition-colors"
               ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
             />
           </div>
@@ -744,7 +744,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           className="bg-white rounded-2xl shadow-card-deep w-80 p-5"
           onClick={e => e.stopPropagation()}
         >
-          <p className="text-sm font-bold text-zinc-800 mb-1">구성요소 이름 변경</p>
+          <p className="text-base2 font-bold text-zinc-800 mb-1">구성요소 이름 변경</p>
           <p className="text-xs2 text-zinc-500 mb-3 leading-relaxed">
             명세서 전체에서{' '}
             <span className="font-semibold text-zinc-700">"{renamingComp.name}"</span>이
@@ -805,7 +805,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           </button>
           <button onClick={() => setFormulaModal(true)} disabled={!sel} title="수식 입력"
             className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
-            <span className="font-serif text-sm leading-none">∑</span><span>수식</span>
+            <span className="font-serif text-base2 leading-none">∑</span><span>수식</span>
           </button>
           <div className="w-px h-5 bg-zinc-200 mx-1" />
           <button onClick={() => setFindOpen(o => !o)} title="찾기/바꾸기"
@@ -891,7 +891,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             {/* 섹션별 단락 */}
             {EDITOR_SECTIONS.map(sec => (
               <div key={sec.id} data-section={sec.id} className="mb-10">
-                <h2 className="text-sm font-bold text-zinc-800 mb-3 pb-1.5 border-b border-zinc-200">
+                <h2 className="text-base2 font-bold text-zinc-800 mb-3 pb-1.5 border-b border-zinc-200">
                   {sec.label}
                 </h2>
 
@@ -1037,7 +1037,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                         )}
                         {isEditing ? (
                           <textarea
-                            className="w-full text-sm text-zinc-800 bg-transparent outline-none border-0 resize-none leading-relaxed overflow-hidden py-1.5 px-3"
+                            className="w-full text-base2 text-zinc-800 bg-transparent outline-none border-0 resize-none leading-relaxed overflow-hidden py-1.5 px-3"
                             value={blockText}
                             autoFocus
                             rows={Math.max(2, Math.ceil(blockText.length / 55))}
@@ -1054,11 +1054,11 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                         ) : isMarkdownTable(blockText) ? (
                           <div className="py-1.5 px-3 overflow-x-auto"><MarkdownTable text={blockText} /></div>
                         ) : blockText.includes('$') ? (
-                          <p className="text-sm leading-relaxed text-zinc-800 py-1.5 px-3"
+                          <p className="text-base2 leading-relaxed text-zinc-800 py-1.5 px-3"
                             dangerouslySetInnerHTML={{ __html: renderBlockWithTeX(blockText) }} />
                         ) : (
                           <p className={clsx(
-                            'text-sm leading-relaxed whitespace-pre-wrap py-1.5 px-3',
+                            'text-base2 leading-relaxed whitespace-pre-wrap py-1.5 px-3',
                             blockText.trim() ? 'text-zinc-800' : 'text-zinc-400 italic'
                           )}>
                             {blockText.trim()
@@ -1123,7 +1123,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           <div className="hidden md:flex shrink-0 items-center gap-2 px-4 border-b border-zinc-200 bg-gray-50" style={{ height: 48 }}>
             <div className="w-5 h-5 rounded flex items-center justify-center text-white text-xs font-bold shrink-0"
               style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
-            <span className="text-sm font-bold text-gray-800">AI 어시스턴트</span>
+            <span className="text-base2 font-bold text-gray-800">AI 어시스턴트</span>
           </div>
 
           {/* 선택된 블록 컨텍스트 */}
@@ -1145,7 +1145,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                     </button>
                   </div>
                   <textarea
-                    className="flex-1 w-full px-4 py-2.5 text-sm text-zinc-800 bg-white outline-none resize-none leading-relaxed overflow-y-auto border-0"
+                    className="flex-1 w-full px-4 py-2.5 text-base2 text-zinc-800 bg-white outline-none resize-none leading-relaxed overflow-y-auto border-0"
                     value={blocks[sid]?.[idx] || ''}
                     onChange={e => updateBlock(sid, idx, e.target.value)}
                     placeholder="단락 내용을 입력하세요..."
@@ -1371,7 +1371,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                 <div>
                   <label className="block text-xs2 font-semibold text-zinc-600 mb-1">TeX 수식</label>
                   <textarea autoFocus
-                    className="w-full input py-2 font-mono text-sm resize-none"
+                    className="w-full input py-2 font-mono text-base2 resize-none"
                     rows={3}
                     placeholder="예: E = mc^{2}  또는  \frac{a}{b} = \sqrt{c^2 + d^2}"
                     value={formulaVal}

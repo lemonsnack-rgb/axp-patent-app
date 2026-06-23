@@ -245,7 +245,6 @@ export function SpecView() {
       setTimeout(() => flowRef.current?.scrollTo({ top: 99999, behavior: 'smooth' }), 50);
     }, 1500);
   };
-  const doneCount = Object.keys(confirmed).length;
 
   // 미리보기 섹션 구성 — 확정된 내용 기반 (B16 fix)
   const makePreviewSections = (): PreviewSection[] => {
@@ -727,15 +726,16 @@ export function SpecView() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                {guideStep === 'drawings' && !confirmed['drawings'] && (
+                {phase === 'flow' && guideStep === 'drawings' && !confirmed['drawings'] && (
                   <button onClick={() => confirm('drawings')} className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors">건너뛰기</button>
                 )}
-                {doneCount >= 5 ? (
-                  <button onClick={() => handleSetMainView('editor')} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 transition-colors">명세서 초안 편집 →</button>
-                ) : !isSpecialStep(guideStep) ? (
-                  <button onClick={() => { const cur = gSel[guideStep]; if (cur?.trim()) confirm(guideStep); }} disabled={!gSel[guideStep]?.trim()} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 disabled:opacity-40 transition-colors">다음 →</button>
-                ) : (
-                  <button onClick={() => confirm(guideStep)} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 transition-colors">다음 →</button>
+                {/* 진행(다음)은 flow 단계에서만. midspec은 패널의 '에디터로' 버튼이 마무리, done은 완료 화면 버튼이 진입 — 중복 제거 */}
+                {phase === 'flow' && guideStep !== 'midspec' && (
+                  !isSpecialStep(guideStep) ? (
+                    <button onClick={() => { const cur = gSel[guideStep]; if (cur?.trim()) confirm(guideStep); }} disabled={!gSel[guideStep]?.trim()} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 disabled:opacity-40 transition-colors">다음 →</button>
+                  ) : (
+                    <button onClick={() => confirm(guideStep)} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 transition-colors">다음 →</button>
+                  )
                 )}
               </div>
             </div>
@@ -1035,7 +1035,7 @@ function DescriptionItemCards({
           accent === 'blue' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700',
         )}>
           <span>{type === 'proposed' ? '제안기술' : '종래기술'}</span>
-          <span className="opacity-60 font-normal">{items.filter(i => i.adopted !== false).length}/{items.length} 채택</span>
+          <span className="opacity-60 font-normal">{items.filter(i => i.adopted !== false).length}/{items.length} 선택</span>
         </div>
         <p className="text-xs2 text-gray-400 mb-2 flex items-center gap-1">
           <svg viewBox="0 0 10 10" width="9" height="9" fill="currentColor" className="text-gray-300"><circle cx="3" cy="2" r="1"/><circle cx="7" cy="2" r="1"/><circle cx="3" cy="5" r="1"/><circle cx="7" cy="5" r="1"/><circle cx="3" cy="8" r="1"/><circle cx="7" cy="8" r="1"/></svg>
@@ -1071,7 +1071,7 @@ function DescriptionItemCards({
                           ? 'bg-brand-400 border-blue-600 text-white'
                           : 'border-gray-300 bg-white hover:border-blue-400',
                       )}
-                      title={isAdopted ? '미채택으로 변경' : '채택'}
+                      title={isAdopted ? '선택 해제' : '선택'}
                     >
                       {isAdopted && <Icon name="check" size={8} />}
                     </button>
@@ -1741,7 +1741,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
 
   return (
     <>
-      <div className="flex-1 overflow-y-auto scroll-thin p-3">
+      <div className="flex-1 overflow-y-auto scroll-thin p-3 ml-1.5">
         {/* 헤더 + 부호 자동 부여 */}
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs2 font-semibold text-gray-600">AI 추출 구성요소</span>
@@ -1823,7 +1823,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                           ? 'bg-brand-400 border-blue-600 text-white'
                           : 'border-gray-300 bg-white hover:border-blue-400',
                       )}
-                      title={item.sel ? '미채택으로 변경' : '채택'}
+                      title={item.sel ? '선택 해제' : '선택'}
                     >
                       {item.sel && <Icon name="check" size={8} />}
                     </button>
@@ -2189,9 +2189,9 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
       {mode === 'select' && (
         <>
           <p className="text-xs2 text-gray-500 mb-1">
-            추출된 이미지 <span className="font-semibold">{drawings.length}개</span> · 관련 선별 <span className="font-semibold">{includedDrawings.length}개</span>
+            추출된 이미지 <span className="font-semibold">{drawings.length}개</span> · 선택 <span className="font-semibold">{includedDrawings.length}개</span>
           </p>
-          <p className="text-xs2 text-gray-400 mb-2">관련 있는 이미지를 선별하세요. 미선택(흐림)은 맥락에서 제외됩니다. 대표 이미지 1개를 지정하면 이후 생성의 기준이 됩니다.</p>
+          <p className="text-xs2 text-gray-400 mb-2">관련 있는 이미지를 선택하세요. 미선택(흐림)은 맥락에서 제외됩니다. 대표 이미지 1개를 지정하면 이후 생성의 기준이 됩니다.</p>
           {drawings.length === 0 && (
             <div className="text-center py-8 text-gray-400 text-sm2">추출된 이미지가 없습니다.</div>
           )}
@@ -2212,12 +2212,12 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                         <button
                           onClick={() => toggleIncluded(idx)}
                           className="absolute top-1.5 left-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-lg shadow-sm bg-white/95 border border-gray-200 transition-all"
-                          title={included ? '맥락에서 제외 (흐림)' : '맥락에 사용'}
+                          title={included ? '선택 해제 (맥락에서 제외)' : '선택 (맥락에 사용)'}
                         >
                           <span className={clsx('w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all', included ? 'bg-brand-400 border-blue-600 text-white' : 'border-gray-300 bg-white')}>
                             {included && <Icon name="check" size={8} />}
                           </span>
-                          <span className={clsx('text-xs2 font-semibold', included ? 'text-blue-700' : 'text-gray-500')}>사용</span>
+                          <span className={clsx('text-xs2 font-semibold', included ? 'text-blue-700' : 'text-gray-500')}>선택</span>
                         </button>
                       )}
                       {!done && included && (
@@ -2290,7 +2290,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
           <p className="text-xs2 text-gray-500 mb-1">
             관련 이미지 <span className="font-semibold">{includedDrawings.length}개</span> · 명세서 도면 <span className="font-semibold">{specDrawings.length}개</span>
           </p>
-          <p className="text-xs2 text-gray-400 mb-2">명세서에 넣을 이미지를 도면으로 채택하세요. 채택분은 "도 N" 번호가 붙고 CAD 변환 대상이 됩니다. 미채택은 AI 참고용(맥락만)입니다.</p>
+          <p className="text-xs2 text-gray-400 mb-2">명세서에 넣을 이미지를 도면으로 선택하세요. 선택한 도면은 "도 N" 번호가 붙고 CAD 변환 대상이 됩니다. 미선택은 AI 참고용(맥락만)입니다.</p>
           {includedDrawings.length === 0 && (
             <div className="text-center py-8 text-gray-400 text-sm2">이미지 선별 단계에서 관련 이미지를 먼저 선별하세요.</div>
           )}
@@ -2315,12 +2315,12 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                         <button
                           onClick={() => toggleUseForSpec(idx)}
                           className="absolute top-1.5 left-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-lg shadow-sm bg-white/95 border border-gray-200 transition-all"
-                          title={isForSpec ? '명세서에서 제외 (AI 참고용)' : '명세서 도면으로 채택'}
+                          title={isForSpec ? '선택 해제 (AI 참고용)' : '명세서 도면으로 선택'}
                         >
                           <span className={clsx('w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all', isForSpec ? 'bg-brand-400 border-blue-600 text-white' : 'border-gray-300 bg-white')}>
                             {isForSpec && <Icon name="check" size={8} />}
                           </span>
-                          <span className={clsx('text-xs2 font-semibold', isForSpec ? 'text-blue-700' : 'text-gray-500')}>명세서</span>
+                          <span className={clsx('text-xs2 font-semibold', isForSpec ? 'text-blue-700' : 'text-gray-500')}>선택</span>
                         </button>
                       )}
                       {!done && isForSpec && (
