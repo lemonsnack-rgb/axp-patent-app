@@ -102,8 +102,15 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
     setSelectedCard(0);
   }, [searchQuery]);
 
-  // 결과 데이터 — 메타필터(검색어 채널) ∩ 패싯(좁히기 채널) → 정렬 [검색-154]
-  const metaScoped = applyMetaFilter(PATENT_SEED, meta);
+  // 결과 데이터 — 검색어 키워드 매칭 ∩ 메타필터 ∩ 패싯 → 정렬 [검색-90·100·154]
+  const queryKeywords = parseKeywords(searchQuery || '');
+  const queryScoped = queryKeywords.length === 0
+    ? PATENT_SEED
+    : PATENT_SEED.filter(p => {
+        const hay = `${p.title} ${p.abstract ?? ''} ${p.applicant} ${p.ipc} ${p.repClaim ?? ''} ${p.inventors ?? ''}`.toLowerCase();
+        return queryKeywords.every(k => hay.includes(k.toLowerCase()));
+      });
+  const metaScoped = applyMetaFilter(queryScoped, meta);
   const filtered = applyFacetFilters(metaScoped, appliedFilters);
   const data = [...filtered].sort((a, b) => {
     const va = (a[sortCol] ?? '');

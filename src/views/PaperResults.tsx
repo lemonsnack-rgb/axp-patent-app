@@ -32,8 +32,23 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
   const [appliedFilterRowVisible, setAppliedFilterRowVisible] = useState(false);
   const [refineTerm, setRefineTerm] = useState('');
 
-  const data = PAPER_SEED;
-  const count = 243;
+  // 검색어 키워드 + 패싯(발행연도/저널명)으로 실제 필터링 [검색-100·154]
+  const queryKeywords = parseKeywords(searchQuery || '');
+  const yearFilters = appliedFilters.filter(f => f.facetKey === 'pub_year').map(f => f.label);
+  const journalFilters = appliedFilters.filter(f => f.facetKey === 'journal').map(f => f.label);
+  const data = PAPER_SEED.filter(p => {
+    if (queryKeywords.length > 0) {
+      const hay = `${p.title} ${p.abstract ?? ''} ${p.authors} ${p.journal ?? ''}`.toLowerCase();
+      if (!queryKeywords.every(k => hay.includes(k.toLowerCase()))) return false;
+    }
+    if (yearFilters.length > 0) {
+      const ok = yearFilters.some(lbl => lbl === '2021 이전' ? !!(p.year && p.year <= 2021) : String(p.year ?? '') === lbl);
+      if (!ok) return false;
+    }
+    if (journalFilters.length > 0 && !journalFilters.some(lbl => (p.journal ?? '') === lbl)) return false;
+    return true;
+  });
+  const count = data.length;
   const appliedQuery = searchQuery && searchQuery.trim() ? searchQuery : '전체 검색';
 
   const togglePendingFilter = (groupKey: string, label: string) => {
@@ -235,7 +250,21 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
       )}
 
       {/* ── 본문 ── */}
-      {viewMode === 'list' ? (
+      {count === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-16 text-gray-400">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="mb-3 text-gray-300">
+            <circle cx="11" cy="11" r="7" /><line x1="20" y1="20" x2="16.5" y2="16.5" />
+          </svg>
+          <div className="text-base2 font-semibold text-gray-600 mb-1">결과 없음</div>
+          <div className="text-sm2 text-gray-400">
+            현재 검색식·필터 조건에 해당하는 논문이 없습니다.<br />
+            검색식을 수정하거나 적용된 필터를 해제해 보세요.
+          </div>
+          {appliedFilters.length > 0 && (
+            <Button variant="outlined" color="primary" size="sm" className="mt-3" onClick={resetFilters}>필터 초기화</Button>
+          )}
+        </div>
+      ) : viewMode === 'list' ? (
         <ListResults data={data} selectedCard={selectedCard} onSelect={setSelectedCard} onSave={onSave} />
       ) : (
         <GalleryResults data={data} onSave={onSave} />

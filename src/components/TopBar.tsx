@@ -18,12 +18,12 @@ const MODE_LABELS: Record<string, string> = {
 };
 
 export function TopBar() {
-  const { mode, sidebarCollapsed, setSidebarCollapsed, tasks, activeTaskId, taskUpdate } = useStore();
+  const { mode, searchKind, sidebarCollapsed, setSidebarCollapsed, tasks, activeTaskId, taskUpdate } = useStore();
   const active = activeTaskId ? tasks.find(t => t.id === activeTaskId) : null;
-  const label = mode === 'search' && active
-    ? (active.type === 'patent_search' ? '특허 검색' : active.type === 'paper_search' ? '논문 검색' : '선행기술 검색')
+  const label = mode === 'search'
+    ? (searchKind === 'paper' ? '논문 검색' : '특허 검색')
     : MODE_LABELS[mode] || '';
-  const showTaskName = (mode === 'spec' || mode === 'search') && active;
+  const showTaskName = mode === 'spec' && active;
 
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState('');

@@ -324,6 +324,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
         {/* Row 1: 국가 | 문헌종류 */}
         <div className="flex items-center gap-2 px-4 py-1.5 border-b border-gray-100 flex-wrap">
           <div className="flex items-center gap-1 flex-wrap">
+            <span className="text-xs2 font-semibold text-gray-500 shrink-0">국가</span>
             <Chip
               active={Object.values(countries).every(v => !v) && extraCountries.length === 0}
               onClick={() => { setCountries({}); setExtraCountries([]); }}
