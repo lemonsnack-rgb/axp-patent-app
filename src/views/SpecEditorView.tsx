@@ -9,7 +9,9 @@ import katex from 'katex';
 import { Icon } from '../components/Icon';
 import { Input } from '../components/ui';
 import { Button, Textarea } from '@muhayu/axp-ui';
-import type { InventionContext, MidspecSection, InventionSpecification } from '../features/spec/types';
+import type { InventionContext, MidspecSection, InventionSpecification, Drawing } from '../features/spec/types';
+import type { DrawingItem as WorkflowDrawingItem } from '../features/drawing-workflow/types';
+import { openEditorTab } from '../features/drawing-workflow/editorChannel';
 import { loadSpecState, saveSpecState } from '../features/spec/specStore';
 import { PreviewModal } from '../components/PreviewModal';
 import type { PreviewSection } from '../components/PreviewModal';
@@ -156,6 +158,31 @@ function MarkdownTable({ text }: { text: string }) {
 }
 
 // ── 청구항 구조 편집 (API ClaimSet 형태: {no, value, depends_on}) ──────────
+// 도면 → 편집기(새 탭) 세션 아이템 매핑 (SpecView의 toWorkflowDrawingItem과 동일 — 순환 import 회피 위해 복제)
+function toWorkflowDrawingItem(drawing: Drawing, idx: number): WorkflowDrawingItem {
+  const bbox = drawing.image.bbox
+    ? { x: drawing.image.bbox.x1, y: drawing.image.bbox.y1, w: drawing.image.bbox.x2 - drawing.image.bbox.x1, h: drawing.image.bbox.y2 - drawing.image.bbox.y1 }
+    : { x: 0, y: 0, w: 0, h: 0 };
+  const labelMap: Record<string, WorkflowDrawingItem['label']> = {
+    proposed_implementation: '제안기술',
+    previous_implementation: '종래기술',
+    background: '종래기술',
+    effect: '제안기술',
+  };
+  return {
+    id: String(idx),
+    symbol: idx + 1,
+    label: labelMap[drawing.detail.label] ?? 'AI생성',
+    name: drawing.detail.name,
+    description: drawing.detail.description,
+    applied: drawing.useForSpec ?? false,
+    pageNumber: 1,
+    stage: 'bbox-adjusted',
+    originalImageUrl: drawing.image.file.data ? `data:${drawing.image.file.media_type};base64,${drawing.image.file.data}` : '',
+    bbox,
+  };
+}
+
 // 직렬화는 텍스트(blocks['claims'])로 유지 — 미리보기/DOCX/PDF 호환. 구조 출력은 실 API 연동 시.
 function parseClaimItems(blocks: string[]): { value: string }[] {
   return blocks
@@ -330,6 +357,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
 
   // 편집 중인 블록 (textarea 활성화, 단일)
   const [sel, setSel] = useState<{ sid: SectionId; idx: number } | null>({ sid: 'technical_field', idx: 0 });
+  const [drawingRefMenuOpen, setDrawingRefMenuOpen] = useState(false); // 본문 툴바: 도면 참조 삽입 메뉴
+  const blockTaRef = useRef<HTMLTextAreaElement | null>(null);          // 현재 편집 중인 본문 textarea
+  const caretRef = useRef<{ sid: SectionId; idx: number; start: number; end: number } | null>(null); // 마지막 캐럿 위치
   // AI 컨텍스트용 다중 선택 — key: `${sid}-${idx}`
   const [selSet, setSelSet] = useState<Set<string>>(new Set());
 
@@ -716,6 +746,29 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     setFormulaMode('inline');
   };
 
+  // ── 도면 참조 삽입: 선택한 본문 블록의 커서 위치에 "(도 N 참조)" 삽입 ──────────
+  const insertDrawingRef = (symbol: string | number) => {
+    if (!sel) return;
+    const token = `(도 ${symbol} 참조)`;
+    const cur = blocks[sel.sid]?.[sel.idx] ?? '';
+    const c = caretRef.current;
+    let next: string;
+    let caret: number;
+    if (c && c.sid === sel.sid && c.idx === sel.idx && c.start <= cur.length) {
+      next = cur.slice(0, c.start) + token + cur.slice(c.end);
+      caret = c.start + token.length;
+    } else {
+      next = cur + (cur && !/\s$/.test(cur) ? ' ' : '') + token;
+      caret = next.length;
+    }
+    updateBlock(sel.sid, sel.idx, next);
+    setDrawingRefMenuOpen(false);
+    requestAnimationFrame(() => {
+      const ta = blockTaRef.current;
+      if (ta) { ta.focus(); ta.setSelectionRange(caret, caret); caretRef.current = { sid: sel.sid, idx: sel.idx, start: caret, end: caret }; }
+    });
+  };
+
 
   // ── 렌더 ────────────────────────────────────────────────────────────────
   // 에디터 미리보기 섹션 (#80 fix)
@@ -807,6 +860,32 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
             <span className="font-serif text-base2 leading-none">∑</span><span>수식</span>
           </button>
+          {/* 도면 참조 삽입 — 선택한 본문 블록의 커서 위치에 '(도 N 참조)' 삽입 */}
+          <div className="relative">
+            <button onClick={() => setDrawingRefMenuOpen(o => !o)} disabled={!sel || drawings.length === 0}
+              title={drawings.length === 0 ? '도면이 없습니다' : '본문에 도면 참조 (도 N 참조) 삽입'}
+              className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2.5 11l3.5-3 2.5 2 3-3.5 2 2"/></svg>
+              <span>도면 참조</span><span className="text-[9px] leading-none">▾</span>
+            </button>
+            {drawingRefMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setDrawingRefMenuOpen(false)} />
+                <div className="absolute left-0 top-full mt-1 z-20 w-60 max-h-64 overflow-y-auto scroll-thin rounded-lg border border-zinc-200 bg-white shadow-lg py-1">
+                  {drawings.map((d, i) => {
+                    const figNo = String(d.detail.symbol).replace(/\D/g, '') || String(i + 1);
+                    return (
+                      <button key={i} onClick={() => insertDrawingRef(figNo)}
+                        className="w-full text-left px-3 py-1.5 text-xs2 hover:bg-blue-50 flex items-center gap-2 transition-colors">
+                        <span className="font-bold text-zinc-700 shrink-0">도 {figNo}</span>
+                        <span className="text-zinc-500 truncate">{d.detail.name || '제목 없음'}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
           <div className="w-px h-5 bg-zinc-200 mx-1" />
           <button onClick={() => setFindOpen(o => !o)} title="찾기/바꾸기"
             className={clsx('flex items-center gap-1 px-2 py-1 rounded transition-colors text-xs2', findOpen ? 'bg-blue-50 text-blue-700' : 'hover:bg-zinc-100 text-zinc-500')}>
@@ -930,13 +1009,13 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                               </div>
                               <p className="text-xs2 text-zinc-600 leading-snug">{d.detail.name}</p>
                             </div>
-                            {/* 참조 삽입 */}
-                            <div className="border-t border-zinc-100 px-3 py-1.5">
+                            {/* 도면 수정모드(새 탭) — 참조 삽입은 본문 툴바의 '도면 참조'로 이동 */}
+                            <div className="border-t border-zinc-100 px-3 py-1.5 flex items-center justify-end">
                               <button
-                                onClick={() => { if (sel) { const cur = blocks[sel.sid]?.[sel.idx] || ''; updateBlock(sel.sid, sel.idx, `${cur}${cur ? ' ' : ''}(${d.detail.symbol} 참조)`); } }}
-                                disabled={!sel}
-                                className="text-xs2 font-semibold text-blue-500 hover:text-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                              >+ 참조 삽입</button>
+                                onClick={() => openEditorTab({ drawingId: String(idx), drawings: drawings.map(toWorkflowDrawingItem), components: [], references: [], drawingName: d.detail.name, timestamp: Date.now() })}
+                                title="도면 수정모드를 새 탭에서 엽니다 (범위 조정·CAD 변환)"
+                                className="inline-flex items-center gap-0.5 text-xs2 font-semibold text-zinc-500 hover:text-zinc-800 transition-colors shrink-0"
+                              >수정모드 <span className="text-[10px]">↗</span></button>
                             </div>
                           </div>
                         );
@@ -1043,12 +1122,14 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             rows={Math.max(2, Math.ceil(blockText.length / 55))}
                             onChange={e => {
                               updateBlock(sec.id, blockIdx, e.target.value);
+                              caretRef.current = { sid: sec.id, idx: blockIdx, start: e.target.selectionStart, end: e.target.selectionEnd };
                               // auto-height
                               const t = e.target;
                               t.style.height = 'auto';
                               t.style.height = t.scrollHeight + 'px';
                             }}
-                            ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                            onSelect={e => { caretRef.current = { sid: sec.id, idx: blockIdx, start: e.currentTarget.selectionStart, end: e.currentTarget.selectionEnd }; }}
+                            ref={el => { blockTaRef.current = el; if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                             onClick={e => e.stopPropagation()}
                           />
                         ) : isMarkdownTable(blockText) ? (
