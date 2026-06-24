@@ -23,6 +23,7 @@ export function taskTypeMeta(t: TaskType) { return TASK_TYPE_META[t]; }
 interface StoreCtx {
   // mode & active task
   mode: AppMode; setMode: (m: AppMode) => void;
+  searchKind: 'patent' | 'paper'; setSearchKind: (k: 'patent' | 'paper') => void;
   activeTaskId: string | null; setActiveTaskId: (id: string | null) => void;
   activeProjectId: string | null; setActiveProjectId: (id: string | null) => void;
   bgPatentRef: string | null; setBgPatentRef: (ref: string | null) => void;
@@ -109,6 +110,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   // app state (not persisted)
   const [mode, setMode] = useState<AppMode>('newtask');
+  const [searchKind, setSearchKind] = useState<'patent' | 'paper'>('patent');
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [bgPatentRef, setBgPatentRef] = useState<string | null>(null);
@@ -224,6 +226,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const value: StoreCtx = useMemo(() => ({
     mode, setMode,
+    searchKind, setSearchKind,
     activeTaskId, setActiveTaskId,
     activeProjectId, setActiveProjectId,
     bgPatentRef, setBgPatentRef,
@@ -236,7 +239,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     library, libraryAdd, libraryRemove, libraryToggleFavorite, libraryUpdate,
     collections, collectionAdd, collectionUpdate, collectionRemove, collectionToggleFavorite, ensureUncategorized,
   }), [
-    mode, activeTaskId, activeProjectId, bgPatentRef, sidebarCollapsed,
+    mode, searchKind, activeTaskId, activeProjectId, bgPatentRef, sidebarCollapsed,
     tasks, projects, clients, contacts, library, collections,
     taskAdd, taskUpdate, taskRemove, taskToggleFavorite,
     projectAdd, projectUpdate, projectRemove, projectToggleFavorite,

@@ -14,9 +14,8 @@ import type { MetaFilter } from '../features/search';
 type SearchType = 'patent' | 'paper';
 
 export function SearchView() {
-  const { tasks, activeTaskId } = useStore();
-  const activeTask = activeTaskId ? tasks.find(t => t.id === activeTaskId) : null;
-  const searchType: SearchType = activeTask?.type === 'paper_search' ? 'paper' : 'patent';
+  const { searchKind } = useStore();
+  const searchType: SearchType = searchKind;
 
   // 특허 검색 — 인라인 결과
   const [patentSearched, setPatentSearched] = useState(false);
@@ -31,11 +30,10 @@ export function SearchView() {
   const [saveCtx, setSaveCtx] = useState<{ type: 'patent' | 'paper'; data: PatentResult | PaperResult } | null>(null);
 
   useEffect(() => {
-    if (!activeTask) return;
     setPatentSearched(false);
     setPatentDetailOpen(false);
     setPaperStage('input');
-  }, [activeTask?.id, activeTask?.type]);
+  }, [searchKind]);
 
   const openSavePatent = (idx: number) => {
     setSaveCtx({ type: 'patent', data: PATENT_SEED[idx] });

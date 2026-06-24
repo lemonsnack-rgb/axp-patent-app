@@ -10,7 +10,7 @@ import type { Task } from '../types';
 
 export function Sidebar() {
   const {
-    mode, setMode, sidebarCollapsed, setSidebarCollapsed,
+    mode, setMode, searchKind, setSearchKind, sidebarCollapsed, setSidebarCollapsed,
     tasks, activeTaskId, setActiveTaskId,
     taskToggleFavorite, taskUpdate, taskRemove, taskAdd,
   } = useStore();
@@ -59,6 +59,8 @@ export function Sidebar() {
     >
       <nav className="p-2 flex flex-col gap-0.5">
         <NavItem icon="edit"    label="새 작업"    active={isActive('newtask')} collapsed={sidebarCollapsed} onClick={() => setMode('newtask')} primary />
+        <NavItem icon="search"  label="특허 검색"  active={mode === 'search' && searchKind === 'patent'} collapsed={sidebarCollapsed} onClick={() => { setSearchKind('patent'); setActiveTaskId(null); setMode('search'); }} />
+        <NavItem icon="paper"   label="논문 검색"  active={mode === 'search' && searchKind === 'paper'}  collapsed={sidebarCollapsed} onClick={() => { setSearchKind('paper');  setActiveTaskId(null); setMode('search'); }} />
         <NavItem icon="library" label="라이브러리" active={isActive('library')} collapsed={sidebarCollapsed} onClick={() => setMode('library')} />
       </nav>
 

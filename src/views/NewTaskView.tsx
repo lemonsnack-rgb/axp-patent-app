@@ -6,10 +6,9 @@ import { Card, Input } from '../components/ui';
 import clsx from 'clsx';
 import { Button } from '@muhayu/axp-ui';
 
+// 검색은 사이드바 메뉴(특허/논문 검색)로 진입하는 단일 워크스페이스가 되어 작업 유형에서 제외.
 const TYPES: { type: TaskType; title: string; desc: string; icon: 'doc' | 'search' | 'paper'; color: string }[] = [
-  { type: 'spec',          title: '명세서',   desc: '직무발명서를 분석해 특허 명세서 초안을 작성합니다.', icon: 'doc',    color: 'blue' },
-  { type: 'patent_search', title: '특허 검색', desc: '국내·해외 특허를 검색해 선행기술을 조사합니다.',   icon: 'search', color: 'violet' },
-  { type: 'paper_search',  title: '논문 검색', desc: '학술 논문·저널을 검색해 참고문헌을 수집합니다.',   icon: 'paper',  color: 'amber' },
+  { type: 'spec', title: '명세서', desc: '직무발명서를 분석해 특허 명세서 초안을 작성합니다.', icon: 'doc', color: 'blue' },
 ];
 
 const PLACEHOLDER: Record<TaskType, string> = {
@@ -62,7 +61,7 @@ export function NewTaskView() {
       </div>
 
       {/* 작업 유형 카드 */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl w-full mb-5">
+      <div className="grid grid-cols-1 gap-3 max-w-md w-full mb-5">
         {TYPES.map(t => {
           const isSelected = selectedType === t.type;
           return (
