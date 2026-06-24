@@ -6,7 +6,7 @@ import { Icon } from './Icon';
 import { Badge } from './ui';
 import { Button } from '@muhayu/axp-ui';
 
-function parseKeywords(query: string): string[] {
+export function parseKeywords(query: string): string[] {
   if (!query) return [];
   const cleaned = query
     .replace(/[A-Z_]+=\(/g, ' ')
@@ -20,7 +20,7 @@ function parseKeywords(query: string): string[] {
   )].slice(0, 10);
 }
 
-const KW_COLORS = [
+export const KW_COLORS = [
   { dot: '#ef4444', bg: '#fef2f2', text: '#dc2626', border: '#fecaca' },
   { dot: '#f59e0b', bg: '#fffbeb', text: '#d97706', border: '#fde68a' },
   { dot: '#10b981', bg: '#f0fdf4', text: '#059669', border: '#a7f3d0' },

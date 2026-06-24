@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import clsx from 'clsx';
 import { PATENT_SEED } from '../data/patentSeed';
 import { PATENT_FACET_GROUPS_BASE, PATENT_FACET_GROUPS_EXT, type FacetGroup } from '../data/facetGroups';
-import { PatentDetail } from '../components/PatentDetail';
+import { PatentDetail, parseKeywords, KW_COLORS } from '../components/PatentDetail';
 import { Icon } from '../components/Icon';
 import { useStore } from '../store';
 import { toast, Button } from '@muhayu/axp-ui';
@@ -771,20 +771,21 @@ function SlidingView({ data, onOpenDetail, onSave, onBgPatent }: { data: PatentR
 }
 
 // ── 키워드 하이라이트 ──
+// 검색식에서 키워드만 추출해(연산자·필드코드·괄호 제거) 키워드별 고유 색으로 하이라이트 (키워트식 다색)
 function highlightText(text: string, query?: string): React.ReactNode {
-  if (!query || !query.trim()) return text;
-  const words = query.trim().split(/\s+/).filter(w => w.length > 1);
-  if (!words.length) return text;
-  const escaped = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const kws = parseKeywords(query || '');
+  if (!kws.length) return text;
+  const escaped = kws.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   const pattern = new RegExp(`(${escaped.join('|')})`, 'gi');
   const parts = text.split(pattern);
   return (
     <>
-      {parts.map((p, i) =>
-        pattern.test(p)
-          ? <mark key={i} className="bg-yellow-100 text-yellow-900 rounded px-0.5">{p}</mark>
-          : p,
-      )}
+      {parts.map((p, i) => {
+        const idx = kws.findIndex(k => k.toLowerCase() === p.toLowerCase());
+        if (idx < 0) return p;
+        const c = KW_COLORS[idx % KW_COLORS.length];
+        return <mark key={i} className="rounded px-0.5" style={{ backgroundColor: c.bg, color: c.text }}>{p}</mark>;
+      })}
     </>
   );
 }
