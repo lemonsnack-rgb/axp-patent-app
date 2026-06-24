@@ -1,192 +1,258 @@
-// 논문 검색 입력 영역 — 원본 mockup srch-paper-section 정밀 포팅
-import { useState } from 'react';
-import { Icon } from '../components/Icon';
-import { Card, Input } from '../components/ui';
-import { FinderModal } from '../components/FinderModal';
+// 논문 검색 입력 — 특허(PatentInput)와 대칭: 단일 검색식 + 범위탭 + 검색필드 패널 + 검색 히스토리
+// 자체 구축 DB 기준(외부 PubMed/Scopus 아님). 필드: 제목/초록/키워드/전문/저자.
+import { useState, useRef, useImperativeHandle, forwardRef } from 'react';
+import clsx from 'clsx';
 import { Button } from '@muhayu/axp-ui';
+import { FinderModal } from '../components/FinderModal';
+import { accumulateQuery, applyScope, hasSearchInput, type SFieldInput } from '../features/search';
+import { useStore } from '../store';
 
-// 필드 옵션
-const FIELD_OPTIONS = [
-  { code: 'TI',  label: '제목' },
-  { code: 'AB',  label: '초록' },
-  { code: 'KW',  label: '키워드' },
-  { code: 'AU',  label: '저자' },
-  { code: 'SO',  label: '저널명' },
-  { code: 'DOI', label: 'DOI' },
-  { code: 'ALL', label: '전체' },
+interface PField { code: string; label: string; value: string; hint?: string }
+
+const DEFAULT_FIELDS: PField[] = [
+  { code: 'TI',  label: '제목',   value: '', hint: '예: 그래핀 and 배터리 | "신경망"' },
+  { code: 'AB',  label: '초록',   value: '', hint: '예: 그래핀 and 배터리' },
+  { code: 'KWD', label: '키워드', value: '', hint: '예: 리튬*' },
+  { code: 'DSC', label: '전문',   value: '', hint: '제목·초록·본문 전체' },
+  { code: 'AP',  label: '저자',   value: '', hint: '예: 김한국 | 이*' },
 ];
 
-type OpType = 'AND' | 'OR' | 'NOT';
+// 범위탭 — 데모 papers 기준
+type PaperScope = 'TI_AB' | 'TI_AB_FULL';
+const SCOPE_TABS: { id: PaperScope; label: string }[] = [
+  { id: 'TI_AB',      label: '제목+초록' },
+  { id: 'TI_AB_FULL', label: '제목+초록+전문' },
+];
 
-interface BuilderRow {
-  id: number;
-  op: OpType;
-  field: string;
-  value: string;
+const PERIODS = [
+  { id: 'all', label: '전체' },
+  { id: '1y',  label: '최근 1년' },
+  { id: '5y',  label: '최근 5년' },
+  { id: '10y', label: '최근 10년' },
+];
+
+interface Props { onRun: (execQuery: string) => void }
+export interface PaperInputHandle { refine: (term: string) => void }
+
+function histTime(ts: number): string {
+  const d = new Date(ts);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-let _rowId = 0;
-const mkRow = (field: string, value: string, op: OpType = 'AND'): BuilderRow =>
-  ({ id: ++_rowId, op, field, value });
+export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInput({ onRun }, ref) {
+  const { searchHistory, searchHistoryAdd, searchHistoryRemove, searchHistoryClear, searchHistoryTogglePin } = useStore();
+  const paperHistory = searchHistory
+    .filter(e => e.kind === 'paper')
+    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+  const [historyOpen, setHistoryOpen] = useState(true);
 
-const DEFAULT_ROWS: BuilderRow[] = [
-  mkRow('TI',  'autonomous driving OR 자율주행*'),
-  mkRow('AB',  '(lidar OR 라이다) AND object detection'),
-  mkRow('KW',  'lidar*'),
-];
+  const [scope, setScope] = useState<PaperScope>('TI_AB');
+  const [periodChip, setPeriodChip] = useState('all');
+  const [yearFrom, setYearFrom] = useState('');
+  const [yearTo, setYearTo] = useState('');
+  const [formulaText, setFormulaText] = useState('');
+  const [fieldsOpen, setFieldsOpen] = useState(false);
+  const [fields, setFields] = useState<PField[]>(DEFAULT_FIELDS);
+  const [finderOpen, setFinderOpen] = useState<{ fieldIdx: number } | null>(null);
 
-interface Props { onRun: () => void }
+  const updateField = (idx: number, value: string) =>
+    setFields(prev => prev.map((f, i) => i === idx ? { ...f, value } : f));
 
-export function PaperInput({ onRun }: Props) {
-  const [rows, setRows] = useState<BuilderRow[]>(DEFAULT_ROWS);
-  const [finderOpen, setFinderOpen] = useState<{ rowId: number } | null>(null);
+  const toFieldInputs = (): SFieldInput[] =>
+    fields.map(f => ({ code: f.code, type: 'text' as const, value: f.value }));
 
-  const updateRow = (id: number, patch: Partial<BuilderRow>) =>
-    setRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
+  const handleSearch = () => {
+    const fieldInputs = toFieldInputs();
+    if (!hasSearchInput(formulaText, fieldInputs)) return;
+    const accumulated = accumulateQuery(formulaText, fieldInputs);
+    setFormulaText(accumulated);
+    setFields(prev => prev.map(f => ({ ...f, value: '' })));
+    setFieldsOpen(false);
+    const execQuery = applyScope(accumulated, scope);
+    searchHistoryAdd('paper', execQuery);
+    onRun(execQuery);
+  };
 
-  const removeRow = (id: number) =>
-    setRows(prev => prev.filter(r => r.id !== id));
+  const canSearch = hasSearchInput(formulaText, toFieldInputs());
 
-  const addRow = () =>
-    setRows(prev => [...prev, mkRow('TI', '', 'AND')]);
+  const resetAll = () => {
+    setFormulaText('');
+    setFields(DEFAULT_FIELDS.map(f => ({ ...f, value: '' })));
+  };
 
-  const reset = () => setRows(DEFAULT_ROWS.map(r => mkRow(r.field, r.value, r.op)));
+  const rerun = (q: string) => {
+    setFormulaText(q);
+    setFields(prev => prev.map(f => ({ ...f, value: '' })));
+    setFieldsOpen(false);
+    searchHistoryAdd('paper', q);
+    onRun(q);
+  };
 
-  const summary = `${rows.length}개 필드 · AND/OR 결합`;
+  const live = useRef<{ formulaText: string; scope: PaperScope; add: typeof searchHistoryAdd; onRun: Props['onRun'] }>(null!);
+  live.current = { formulaText, scope, add: searchHistoryAdd, onRun };
+  useImperativeHandle(ref, () => ({
+    refine: (term: string) => {
+      const t = term.trim();
+      if (!t) return;
+      const s = live.current;
+      const accumulated = s.formulaText.trim() ? `${s.formulaText} AND (${t})` : `(${t})`;
+      setFormulaText(accumulated);
+      setFields(prev => prev.map(f => ({ ...f, value: '' })));
+      setFieldsOpen(false);
+      const execQuery = applyScope(accumulated, s.scope);
+      s.add('paper', execQuery);
+      s.onRun(execQuery);
+    },
+  }), []);
 
   return (
-    <div className="flex-1 overflow-y-auto scroll-thin p-5">
-      <Card className="!p-4">
-        {/* 헤더 */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-md2 font-semibold text-gray-700">
-            논문 검색식 빌더
-            <span className="ml-2 text-xs2 font-normal text-gray-400">
-              — 행 간 결합은 AND/OR/NOT, 각 입력란에 검색식 직접 입력 가능
-              (예: <code className="bg-gray-100 px-1 rounded text-gray-600">(lidar OR 라이다*) AND object</code>)
-            </span>
-          </div>
-          <span className="text-xs2 text-gray-400 whitespace-nowrap ml-3">{summary}</span>
-        </div>
-
-        {/* 필드 행 */}
-        <div className="space-y-2">
-          {rows.map((row, idx) => (
-            <div key={row.id} className="flex items-center gap-2">
-              {/* 행 간 연산자 (첫 행은 고정 레이블) */}
-              {idx === 0 ? (
-                <span className="text-xs2 font-semibold text-gray-400 w-12 text-right shrink-0">WHERE</span>
-              ) : (
-                <select
-                  className="input py-1.5 text-sm2 w-16 shrink-0 text-center font-semibold"
-                  value={row.op}
-                  onChange={e => updateRow(row.id, { op: e.target.value as OpType })}
-                >
-                  <option value="AND">AND</option>
-                  <option value="OR">OR</option>
-                  <option value="NOT">NOT</option>
-                </select>
-              )}
-
-              {/* 필드 선택 */}
-              <select
-                className="input py-1.5 text-sm2 w-28 shrink-0"
-                value={row.field}
-                onChange={e => updateRow(row.id, { field: e.target.value })}
-              >
-                {FIELD_OPTIONS.map(f => (
-                  <option key={f.code} value={f.code}>{f.label}</option>
-                ))}
-              </select>
-
-              {/* 입력 */}
-              <Input
-                className="py-1.5 text-sm2 flex-1 min-w-0"
-                value={row.value}
-                placeholder={
-                  row.field === 'TI'  ? 'autonomous driving OR 자율주행*' :
-                  row.field === 'AB'  ? '(lidar OR 라이다) AND object detection' :
-                  row.field === 'KW'  ? '예: lidar*' :
-                  row.field === 'AU'  ? '저자명 (예: Kim, J.)' :
-                  row.field === 'SO'  ? '저널명 (예: IEEE Trans*)' :
-                  row.field === 'DOI' ? '예: 10.1109/TITS.2024.*' :
-                  '검색어 입력'
-                }
-                onChange={e => updateRow(row.id, { value: e.target.value })}
-                onKeyDown={e => e.key === 'Enter' && onRun()}
-              />
-
-              {/* 키워드 추천 (TI/AB/KW 필드) */}
-              {(row.field === 'TI' || row.field === 'AB' || row.field === 'KW') && (
-                <button
-                  onClick={() => setFinderOpen({ rowId: row.id })}
-                  className="text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-blue-700 rounded hover:bg-blue-100 shrink-0"
-                >
-                  키워드추천
-                </button>
-              )}
-
-              {/* 삭제 (2행 이상일 때) */}
-              {rows.length > 1 && (
-                <button
-                  onClick={() => removeRow(row.id)}
-                  className="text-gray-400 hover:text-red-500 p-1 rounded transition-colors shrink-0"
-                  title="행 삭제"
-                >
-                  <Icon name="close" size={13} />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* 하단 */}
-        <div className="flex items-center justify-between mt-4">
-          <button
-            onClick={addRow}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-dashed border-gray-300 rounded-md text-sm2 text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
-          >
-            <Icon name="plus" size={12} />
-            필드 추가 (AND 결합)
-          </button>
-          <div className="flex gap-2">
-            <Button variant="outlined" color="primary" size="sm" onClick={reset}>초기화</Button>
-            <Button variant="filled" color="primary" style={{ padding: '8px 24px', fontSize: '13px' }} onClick={onRun}>
-              검색
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      {/* 검색 안내 */}
-      <div className="flex items-center justify-center mt-12 text-gray-400">
-        <div className="text-center max-w-lg">
-          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="mx-auto mb-4 text-gray-300">
-            <circle cx="11" cy="11" r="7"/>
-            <line x1="20" y1="20" x2="16.5" y2="16.5"/>
-          </svg>
-          <p className="text-sm2 font-medium mb-1">논문 검색식을 입력하고 [검색] 버튼을 누르세요</p>
-          <p className="text-xs2 text-gray-300">
-            PubMed · Scopus · Web of Science · arXiv · Google Scholar 통합 검색<br/>
-            불리언 연산자(AND/OR/NOT), 와일드카드(*), 인접검색(ADJ) 지원
-          </p>
+    <div className="bg-white">
+      {/* 기간 */}
+      <div className="flex items-center gap-2 px-4 py-1.5 border-b border-gray-200 flex-wrap">
+        <span className="text-xs2 font-semibold text-gray-500 shrink-0">발행연도</span>
+        {PERIODS.map(p => (
+          <Chip key={p.id} active={periodChip === p.id} onClick={() => { setPeriodChip(p.id); setYearFrom(''); setYearTo(''); }}>{p.label}</Chip>
+        ))}
+        <div className="flex items-center gap-1">
+          <input type="number" placeholder="YYYY" value={yearFrom} onChange={e => { setYearFrom(e.target.value); setPeriodChip(''); }}
+            className="w-20 px-1 py-0 border border-gray-200 rounded text-xs2 h-5" />
+          <span className="text-gray-400 text-xs2">~</span>
+          <input type="number" placeholder="YYYY" value={yearTo} onChange={e => { setYearTo(e.target.value); setPeriodChip(''); }}
+            className="w-20 px-1 py-0 border border-gray-200 rounded text-xs2 h-5" />
         </div>
       </div>
+
+      {/* 검색식 영역 */}
+      <div className="p-4 space-y-2">
+        {/* 범위탭 */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex border border-gray-200 rounded-md overflow-hidden">
+            {SCOPE_TABS.map(tab => (
+              <button key={tab.id} onClick={() => setScope(tab.id)}
+                className={clsx('px-3 py-1.5 text-sm2 font-medium border-r border-gray-200 last:border-r-0 transition-colors',
+                  scope === tab.id ? 'bg-brand-400 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 검색식 */}
+        <textarea
+          value={formulaText}
+          onChange={e => setFormulaText(e.target.value)}
+          rows={3}
+          spellCheck={false}
+          placeholder='예: 자율주행 and 라이다 | "object detection"'
+          className="w-full resize-y rounded border border-gray-300 p-2 font-mono text-sm leading-6 outline-none focus:border-blue-500 placeholder:text-gray-400"
+        />
+
+        <div className="flex justify-end gap-1.5">
+          <Button variant="outlined" color="primary" size="xs" onClick={resetAll}>◇ 초기화</Button>
+          <Button variant="filled" color="primary" size="sm" className="text-sm2" disabled={!canSearch} onClick={handleSearch}>검색</Button>
+        </div>
+      </div>
+
+      {/* 검색 히스토리 */}
+      {paperHistory.length > 0 && (
+        <div className="border-t border-gray-200">
+          <button onClick={() => setHistoryOpen(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-2 text-sm2 font-semibold text-gray-700 hover:bg-gray-50">
+            <span className="flex items-center gap-1.5">
+              <span className="text-gray-400 text-xs2">🕘</span>
+              검색 히스토리
+              <span className="text-xs2 font-medium text-brand-400 bg-blue-50 px-1.5 py-0 rounded-full leading-5">{paperHistory.length}</span>
+            </span>
+            <span className="text-gray-400 text-xs2">{historyOpen ? '▲' : '▼'}</span>
+          </button>
+          {historyOpen && (
+            <div className="px-4 pb-3">
+              <div className="flex justify-end mb-1">
+                <button onClick={() => searchHistoryClear('paper')} className="text-xs2 text-gray-400 hover:text-red-500">전체 삭제</button>
+              </div>
+              <div className="space-y-0.5 max-h-48 overflow-y-auto scroll-thin">
+                {paperHistory.map(e => (
+                  <div key={e.id} className={clsx('group flex items-center gap-2 py-1 px-2 rounded hover:bg-gray-50', e.pinned && 'bg-amber-50/40')}>
+                    <button onClick={() => searchHistoryTogglePin(e.id)}
+                      className={clsx('shrink-0 leading-none', e.pinned ? 'text-amber-500' : 'text-gray-300 hover:text-amber-400')}
+                      title={e.pinned ? '저장 해제' : '검색 저장 (★)'}>★</button>
+                    <button onClick={() => rerun(e.query)} className="flex-1 min-w-0 text-left" title="이 검색 재실행">
+                      <div className="font-mono text-xs2 text-brand-400 truncate">{e.query}</div>
+                      <div className="text-xs2 text-gray-400">{histTime(e.at)}{e.pinned && ' · 저장됨'}</div>
+                    </button>
+                    <button onClick={() => rerun(e.query)} className="text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 shrink-0">재실행</button>
+                    <button onClick={() => searchHistoryRemove(e.id)} className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-500 rounded shrink-0 opacity-0 group-hover:opacity-100" title="삭제">×</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 검색필드 패널 */}
+      <div className="border-t border-gray-200">
+        <button onClick={() => setFieldsOpen(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-2 text-sm2 font-semibold text-gray-700 hover:bg-gray-50">
+          <span className="flex items-center gap-1.5">
+            <span className="text-gray-400 text-xs2">≡</span>
+            검색필드
+            <span className="text-xs2 font-medium text-brand-400 bg-blue-50 px-1.5 py-0 rounded-full leading-5">{fields.length}</span>
+          </span>
+          <span className="text-gray-400 text-xs2">{fieldsOpen ? '▲' : '▼'}</span>
+        </button>
+        {fieldsOpen && (
+          <div className="px-4 pb-3 pt-1 space-y-px">
+            {fields.map((f, idx) => (
+              <div key={f.code} className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-gray-50 group">
+                <span className="text-xs2 font-mono font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded shrink-0 min-w-[40px] text-center">{f.code}</span>
+                <span className="text-sm2 text-gray-700 shrink-0 w-[72px]">{f.label}</span>
+                <input type="text" value={f.value} onChange={e => updateField(idx, e.target.value)} placeholder={f.hint || ''}
+                  className="flex-1 min-w-0 px-2 py-1 border border-gray-200 rounded text-sm2 outline-none focus:border-blue-400" />
+                {(f.code === 'TI' || f.code === 'AB' || f.code === 'KWD') && (
+                  <button onClick={() => setFinderOpen({ fieldIdx: idx })}
+                    className="text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 shrink-0">키워드추천</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 안내 */}
+      {paperHistory.length === 0 && (
+        <div className="flex items-center justify-center py-10 text-gray-400">
+          <div className="text-center max-w-lg">
+            <p className="text-sm2 font-medium mb-1">논문 검색식을 입력하고 [검색] 버튼을 누르세요</p>
+            <p className="text-xs2 text-gray-300">
+              자체 구축 논문 DB 검색 · 불리언 연산자(AND/OR/NOT), 와일드카드(*) 지원
+            </p>
+          </div>
+        </div>
+      )}
 
       {finderOpen && (
         <FinderModal
           type="keyword"
           onApply={val => {
-            const row = rows.find(r => r.id === finderOpen.rowId);
-            if (row) {
-              const newVal = row.value ? `${row.value} OR ${val}` : val;
-              updateRow(finderOpen.rowId, { value: newVal });
-            }
+            const idx = finderOpen.fieldIdx;
+            updateField(idx, fields[idx].value ? `${fields[idx].value} OR ${val}` : val);
             setFinderOpen(null);
           }}
           onClose={() => setFinderOpen(null)}
         />
       )}
     </div>
+  );
+});
+
+function Chip({ active, onClick, children }: { active?: boolean; onClick?: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick}
+      className={clsx('rounded-full border transition-colors font-medium px-2 py-0 text-xs2',
+        active ? 'bg-brand-400 text-white border-brand-400' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-brand-400')}>
+      {children}
+    </button>
   );
 }

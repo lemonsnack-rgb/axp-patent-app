@@ -16,9 +16,11 @@ interface AppliedFilter { facetKey: string; title: string; label: string }
 interface Props {
   onModify: () => void;
   onSave: (p: PaperResult) => void;
+  searchQuery?: string;
+  onRefine?: (term: string) => void;
 }
 
-export function PaperResults({ onModify, onSave }: Props) {
+export function PaperResults({ onModify, onSave, searchQuery, onRefine }: Props) {
   const [sort, setSort] = useState<SortKey>('match');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -26,10 +28,11 @@ export function PaperResults({ onModify, onSave }: Props) {
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilter[]>([]);
   const [selectedCard, setSelectedCard] = useState<number | null>(0);
   const [appliedFilterRowVisible, setAppliedFilterRowVisible] = useState(false);
+  const [refineTerm, setRefineTerm] = useState('');
 
   const data = PAPER_SEED;
   const count = 243;
-  const appliedQuery = 'TI=(autonomous driving) AND AB=(lidar OR 라이다)';
+  const appliedQuery = searchQuery && searchQuery.trim() ? searchQuery : '전체 검색';
 
   const togglePendingFilter = (groupKey: string, label: string) => {
     setPendingFilters(prev => {
@@ -88,6 +91,16 @@ export function PaperResults({ onModify, onSave }: Props) {
         <Button variant="outlined" color="primary" size="xs" onClick={onModify}>
           <Icon name="edit" size={11} /> 검색조건 수정
         </Button>
+        {onRefine && (
+          <input
+            value={refineTerm}
+            onChange={e => setRefineTerm(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && refineTerm.trim()) { onRefine(refineTerm.trim()); setRefineTerm(''); } }}
+            placeholder="결과 내 검색 + (Enter)"
+            title="현재 검색식에 AND로 추가해 결과를 좁힙니다"
+            className="shrink-0 w-44 px-2 py-1 border border-gray-200 rounded text-sm2 outline-none focus:border-blue-400"
+          />
+        )}
         <span className="flex-1" />
         <select
           className="input py-1 text-sm2 w-28"

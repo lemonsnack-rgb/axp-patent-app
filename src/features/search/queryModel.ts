@@ -51,7 +51,8 @@ function startsWithFieldOperator(query: string): boolean {
 
 // 검색 범위(모드)를 선두 자유검색어에만 적용 [검색-20~22].
 // 사용자가 필드 지정 전문가 검색식을 쓴 경우 건드리지 않는다 [검색-22].
-export function applyScope(query: string, scope: ScopeTab): string {
+// scope는 특허(ScopeTab) 또는 논문(예: 'TI_AB') 범위코드 문자열.
+export function applyScope(query: string, scope: ScopeTab | string): string {
   if (query.trim() === '') return query;
   if (startsWithFieldOperator(query)) return query;
 
