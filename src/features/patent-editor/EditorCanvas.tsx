@@ -44,6 +44,8 @@ export interface EditorCanvasHandle {
   removeAllUsesOfRef: (refNumber: string) => number;
   /** AI 추천 위치에 참조 부호를 자동 배치 */
   placeInitialRefs: (refs: EditorReference[]) => void;
+  /** 로컬 이미지를 도면 배경으로 불러오기 (불러온 도면 위에 편집) */
+  loadBackgroundImage: (dataUrl: string) => void;
   /** 줌 제어 */
   zoomIn: () => void;
   zoomOut: () => void;
@@ -943,6 +945,26 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
 
     useImperativeHandle(ref, () => ({
       getCanvas: () => fabricRef.current,
+      loadBackgroundImage: async (dataUrl: string) => {
+        const fc = fabricRef.current;
+        if (!fc) return;
+        try {
+          const img = await fabric.FabricImage.fromURL(dataUrl, { crossOrigin: "anonymous" });
+          const imgW = img.width ?? width;
+          const imgH = img.height ?? height;
+          const scale = Math.min(width / imgW, height / imgH, 1);
+          const drawnW = imgW * scale, drawnH = imgH * scale;
+          img.set({
+            originX: "left", originY: "top", scaleX: scale, scaleY: scale,
+            left: (width - drawnW) / 2, top: (height - drawnH) / 2,
+            selectable: false, evented: false, hoverCursor: "default",
+          });
+          fc.backgroundImage = img;
+          fc.requestRenderAll();
+        } catch (err) {
+          console.warn("[PatentEditor] loadBackgroundImage failed:", err);
+        }
+      },
       getZoom: () => fabricRef.current?.getZoom() ?? 1,
       zoomIn: () => {
         const fc = fabricRef.current;

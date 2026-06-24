@@ -30,6 +30,9 @@ interface Props {
   // B-8: 해상도
   exportScale: 1|2|3|4;
   onExportScale: (v: 1|2|3|4) => void;
+  exportFormat: 'png'|'jpeg'|'tiff';
+  onExportFormat: (v: 'png'|'jpeg'|'tiff') => void;
+  onLoadImage: () => void;
   // 실행 취소 / 다시 실행
   onUndo: () => void;
   onRedo: () => void;
@@ -172,7 +175,7 @@ export function EditorToolbar({
   onSave, onExport, onClose, onToggleHatch, busy, standalone,
   showUnderlayer, underlayerOpacity, onToggleUnderlayer, onUnderlayerOpacity,
   onAlign, onInsertDrawingTitle,
-  exportScale, onExportScale,
+  exportScale, onExportScale, exportFormat, onExportFormat, onLoadImage,
   onUndo, onRedo, canUndo, canRedo,
 }: Props) {
   const tool          = useEditorStore(s => s.tool);
@@ -403,11 +406,23 @@ export function EditorToolbar({
         {/* ── 작업 (우측 정렬) ── */}
         <div className="flex-1 min-w-[16px]" />
         <div className="flex items-center gap-1.5 pb-4">
+          <button type="button" onClick={onLoadImage} title="이미지 불러오기 (도면을 배경으로 불러와 편집)"
+            className="inline-flex items-center gap-1.5 h-8 px-3 border border-zinc-300 rounded-md bg-white text-sm2 text-zinc-700 hover:bg-zinc-50 active:scale-[0.98] transition-all">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"/><circle cx="5.5" cy="6.5" r="1.2"/><path d="M3 12l3.5-3 2.5 2 3-3.5L14 11"/></svg>
+            <span>이미지</span>
+          </button>
           <button type="button" onClick={onSave} title="저장 (Ctrl+S)"
             className="inline-flex items-center gap-1.5 h-8 px-3 border border-zinc-300 rounded-md bg-white text-sm2 text-zinc-700 hover:bg-zinc-50 active:scale-[0.98] transition-all">
             <Save size={13} />
             <span>저장</span>
           </button>
+          {/* 내보내기 포맷 선택 (PNG/JPEG/TIFF) */}
+          <select value={exportFormat} onChange={e => onExportFormat(e.target.value as 'png'|'jpeg'|'tiff')}
+            className="h-8 border border-zinc-300 rounded px-1.5 text-xs2 bg-white text-zinc-600" title="내보내기 포맷">
+            <option value="png">PNG</option>
+            <option value="jpeg">JPEG</option>
+            <option value="tiff">TIFF (특허 제출용)</option>
+          </select>
           {/* B-8: 해상도 선택 */}
           <select value={exportScale} onChange={e => onExportScale(Number(e.target.value) as 1|2|3|4)}
             className="h-8 border border-zinc-300 rounded px-1.5 text-xs2 bg-white text-zinc-600" title="내보내기 해상도">
@@ -417,7 +432,7 @@ export function EditorToolbar({
             <option value={4}>×4 · 288dpi</option>
           </select>
           <button type="button" onClick={onExport} disabled={busy}
-            title="PNG 내보내기"
+            title={`${exportFormat.toUpperCase()} 내보내기 (파일 저장)`}
             className="inline-flex items-center gap-1.5 h-8 px-3 border border-blue-600 rounded-md bg-blue-600 text-sm2 text-white hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 transition-all">
             <Download size={13} />
             <span>{busy ? '처리 중…' : '내보내기'}</span>

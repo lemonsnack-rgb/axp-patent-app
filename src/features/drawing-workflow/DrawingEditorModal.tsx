@@ -682,12 +682,12 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                     onReferenceDelete={num => setLocalRefs(p => p.filter(r => r.number !== num && r.name !== num))}
                     onSaveProject={(id, json) => {
                       onSave(id, { savedEditorJson: json, stage: 'editing' });
-                      if (standalone) writeEditorResult({ drawingId: id, editorJson: json, stage: 'editing', references: [], timestamp: Date.now() });
+                      if (standalone) writeEditorResult({ drawingId: id, editorJson: json, stage: 'editing', references: localRefs, timestamp: Date.now() });
                     }}
                     onExportComplete={(id, blob) => {
                       const url = URL.createObjectURL(blob);
                       onSave(id, { exportedImageUrl: url, stage: 'done' });
-                      if (standalone) writeEditorResult({ drawingId: id, exportedImageUrl: url, stage: 'done', references: [], timestamp: Date.now() });
+                      if (standalone) writeEditorResult({ drawingId: id, exportedImageUrl: url, stage: 'done', references: localRefs, timestamp: Date.now() });
                     }}
                     onComponentsSync={(refs) => {
                       setSyncNotice(`구성요소 갱신: ${refs.map(r => `${r.number} ${r.name}`).join(', ')}`);

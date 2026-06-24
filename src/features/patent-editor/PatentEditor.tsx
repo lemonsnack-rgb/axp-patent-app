@@ -9,6 +9,8 @@ import { isOverlay } from "./canvas/overlay";
 import { CUSTOM_PROPS, META, FIXED_FONT_FAMILY } from "./canvas/constants";
 import type { EditorReference, PatentEditorProps, ToolMode } from "./types";
 import { openAlertDialog, Textarea } from "@muhayu/axp-ui";
+import { saveAs } from "file-saver";
+import { encodeTiff } from "../../utils/encodeTiff";
 
 const DEFAULT_WIDTH = 1000;
 const DEFAULT_HEIGHT = 700;
@@ -68,8 +70,11 @@ export function PatentEditor({
   const [underlayerOpacity, setUnderlayerOpacity] = useState(30);
   // B-5: 클립보드
   const clipboardRef = useRef<fabric.Object | null>(null);
-  // B-8: 내보내기 해상도
+  // B-8: 내보내기 해상도 + 포맷
   const [exportScale, setExportScale] = useState<1|2|3|4>(2);
+  const [exportFormat, setExportFormat] = useState<'png'|'jpeg'|'tiff'>('png');
+  // 로컬 이미지 불러오기 (불러온 도면 위에 편집)
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [captionDraft, setCaptionDraft] = useState("");
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [zoom, setZoom] = useState(1);
@@ -259,20 +264,38 @@ export function PatentEditor({
     if (!fc) return;
     try {
       setBusy(true);
-      // overlay 임시 숨김
+      // overlay(격자·가이드 등) 임시 숨김 → 최종 도면(배경 이미지 + 부호·지시선)만 합성
       const overlayObjs = fc.getObjects().filter(o => isOverlay(o));
       overlayObjs.forEach(o => o.set({ visible: false }));
       fc.renderAll();
-      const dataUrl = fc.toDataURL({ format: 'png', multiplier: exportScale, quality: 1 });
+
+      let blob: Blob;
+      let ext: string;
+      if (exportFormat === 'tiff') {
+        // 브라우저 toDataURL은 TIFF 미지원 → 캔버스 픽셀을 직접 인코딩 (특허 제출용)
+        const el = fc.toCanvasElement(exportScale) as HTMLCanvasElement;
+        const ctx = el.getContext('2d');
+        if (!ctx) throw new Error('2d context 없음');
+        const imgData = ctx.getImageData(0, 0, el.width, el.height);
+        blob = new Blob([encodeTiff(imgData, 72 * exportScale)], { type: 'image/tiff' });
+        ext = 'tiff';
+      } else {
+        const fmt = exportFormat === 'jpeg' ? 'jpeg' : 'png';
+        const dataUrl = fc.toDataURL({ format: fmt, multiplier: exportScale, quality: 1 });
+        const [header, body] = dataUrl.split(',');
+        const mime = header.match(/:(.*?);/)?.[1] ?? `image/${fmt}`;
+        const binary = atob(body);
+        const u8 = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) u8[i] = binary.charCodeAt(i);
+        blob = new Blob([u8], { type: mime });
+        ext = fmt === 'jpeg' ? 'jpg' : 'png';
+      }
+
       overlayObjs.forEach(o => o.set({ visible: true }));
       fc.renderAll();
-      // dataUrl → Blob
-      const [header, body] = dataUrl.split(',');
-      const mime = header.match(/:(.*?);/)?.[1] ?? 'image/png';
-      const binary = atob(body);
-      const u8 = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) u8[i] = binary.charCodeAt(i);
-      const blob = new Blob([u8], { type: mime });
+
+      // ① 파일로 저장(다운로드)  ② 스펙(중간 결과)에도 반영
+      saveAs(blob, `도면-${activeDrawingId}.${ext}`);
       onExportComplete(activeDrawingId, blob);
     } catch (err) {
       console.error("[PatentEditor] export failed:", err);
@@ -281,7 +304,18 @@ export function PatentEditor({
     } finally {
       setBusy(false);
     }
-  }, [activeDrawingId, onExportComplete, exportScale]);
+  }, [activeDrawingId, onExportComplete, exportScale, exportFormat]);
+
+  // 로컬 이미지를 도면 배경으로 불러오기
+  const handleLoadImage = useCallback(() => imageInputRef.current?.click(), []);
+  const onImageFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => canvasHandleRef.current?.loadBackgroundImage(String(reader.result));
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }, []);
 
   // B-5: 정렬
   const alignObjects = useCallback((dir: 'left'|'right'|'top'|'bottom'|'centerH'|'centerV') => {
@@ -486,11 +520,15 @@ export function PatentEditor({
         onInsertDrawingTitle={insertDrawingTitle}
         exportScale={exportScale}
         onExportScale={setExportScale}
+        exportFormat={exportFormat}
+        onExportFormat={setExportFormat}
+        onLoadImage={handleLoadImage}
         onUndo={handleUndo}
         onRedo={handleRedo}
         canUndo={canUndo}
         canRedo={canRedo}
       />
+      <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={onImageFileChange} />
       <div className="flex-1 min-h-0 flex">
         {/* 단일 도면 모드에서는 도면 목록 패널 숨김 */}
         {!singleDrawingMode && (
@@ -628,7 +666,7 @@ export function PatentEditor({
         </div>
       </div>
       <div className="border-t border-ck-border bg-ck-bg px-3 py-1.5 text-sm2 text-gray-500">
-        Fabric.js · 1-bit PNG 내보내기 · 도면 전환 시 자동 저장 · 지시선 더블클릭으로 부호 편집
+        Fabric.js · PNG/JPEG/TIFF 내보내기 · 이미지 불러와 편집 · 도면 전환 시 자동 저장 · 지시선 더블클릭으로 부호 편집
       </div>
     </div>
   );
