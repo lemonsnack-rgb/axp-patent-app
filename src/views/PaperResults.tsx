@@ -1,10 +1,10 @@
 // 논문 검색 결과 — sri-header + filter-bar + FilterDrawer + 적용필터칩 + 2-Column
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import clsx from 'clsx';
 import { PAPER_SEED } from '../data/patentSeed';
 import { PAPER_FACET_GROUPS } from '../data/facetGroups';
 import { Icon } from '../components/Icon';
-import { parseKeywords } from '../components/PatentDetail';
+import { parseKeywords, KW_COLORS } from '../components/PatentDetail';
 import { Badge, Card } from '../components/ui';
 import type { PaperResult } from '../types';
 import { Button } from '@muhayu/axp-ui';
@@ -265,7 +265,7 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
           )}
         </div>
       ) : viewMode === 'list' ? (
-        <ListResults data={data} selectedCard={selectedCard} onSelect={setSelectedCard} onSave={onSave} />
+        <ListResults data={data} selectedCard={selectedCard} onSelect={setSelectedCard} onSave={onSave} searchQuery={searchQuery} />
       ) : (
         <GalleryResults data={data} onSave={onSave} />
       )}
@@ -273,14 +273,34 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
   );
 }
 
+// 검색식 키워드를 다색 하이라이트 (특허 결과와 동일) [검색-100]
+function highlightText(text: string, query?: string): ReactNode {
+  const kws = parseKeywords(query || '');
+  if (!kws.length) return text;
+  const escaped = kws.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const pattern = new RegExp(`(${escaped.join('|')})`, 'gi');
+  const parts = text.split(pattern);
+  return (
+    <>
+      {parts.map((p, i) => {
+        const idx = kws.findIndex(k => k.toLowerCase() === p.toLowerCase());
+        if (idx < 0) return p;
+        const c = KW_COLORS[idx % KW_COLORS.length];
+        return <mark key={i} className="rounded px-0.5" style={{ backgroundColor: c.bg, color: c.text }}>{p}</mark>;
+      })}
+    </>
+  );
+}
+
 // ── 2-Column 리스트 + 상세 패널 ──
 function ListResults({
-  data, selectedCard, onSelect, onSave,
+  data, selectedCard, onSelect, onSave, searchQuery,
 }: {
   data: PaperResult[];
   selectedCard: number | null;
   onSelect: (i: number) => void;
   onSave: (p: PaperResult) => void;
+  searchQuery?: string;
 }) {
   const selected = selectedCard != null ? data[selectedCard] : null;
 
@@ -305,7 +325,7 @@ function ListResults({
                   'text-base2 font-semibold leading-snug mb-1',
                   selectedCard === i ? 'text-blue-700' : 'text-gray-800 hover:text-blue-700',
                 )}>
-                  {p.title}
+                  {highlightText(p.title, searchQuery)}
                 </div>
                 <div className="text-sm2 text-gray-500 mb-1">
                   {p.authors}
@@ -318,7 +338,7 @@ function ListResults({
                   )}
                 </div>
                 {p.abstract && (
-                  <div className="text-sm2 text-gray-600 line-clamp-2">{p.abstract}</div>
+                  <div className="text-sm2 text-gray-600 line-clamp-2">{highlightText(p.abstract, searchQuery)}</div>
                 )}
                 {p.doi && (
                   <div className="text-xs2 text-blue-500 mt-1 font-mono">DOI: {p.doi}</div>

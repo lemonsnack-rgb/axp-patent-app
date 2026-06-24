@@ -60,7 +60,27 @@ type TokenType = 'field' | 'operator' | 'colon' | 'paren' | 'keyword' | 'space';
 interface Token { type: TokenType; text: string }
 
 const FIELD_RE = /^(TI|AB|CL[AI1]?|DSC|KEY|WPS|AP[D]?|INV|AG|AN|PN|RN|AD|PD|RD|IPC[RM]?|CPC[RM]?|TI_AB_CLI|TI_AB_CLA|DOCN|IDX)$/i;
+// 진단용 — 위 필드 + 범위코드(KEY_CLI/KEY_CLA) 포함
+const KNOWN_FIELD_RE = /^(TI|AB|CL[AI1]?|DSC|KEY(_CLI|_CLA)?|WPS|AP[D]?|INV|AG|AN|PN|RN|AD|PD|RD|IPC[RM]?|CPC[RM]?|TI_AB_CLI|TI_AB_CLA|DOCN|IDX)$/i;
 const OP_RE    = /^(and|or|not|adj\d*|near\d*)$/i;
+
+// 편집기모드 실시간 진단 — 경고만, 실행은 막지 않는다 [검색-11·12]
+function diagnose(text: string): string[] {
+  const w: string[] = [];
+  let depth = 0, parenBad = false;
+  for (const ch of text) {
+    if (ch === '(') depth++;
+    else if (ch === ')') { depth--; if (depth < 0) { parenBad = true; break; } }
+  }
+  if (parenBad || depth !== 0) w.push('괄호 ( ) 짝이 맞지 않습니다.');
+  const unknown = new Set<string>();
+  for (const m of text.match(/([A-Za-z_][A-Za-z0-9_]*)\s*[:=]/g) || []) {
+    const code = m.replace(/\s*[:=]$/, '');
+    if (!KNOWN_FIELD_RE.test(code)) unknown.add(code);
+  }
+  if (unknown.size) w.push(`알 수 없는 필드: ${[...unknown].join(', ')}`);
+  return w;
+}
 
 function tokenize(text: string): Token[] {
   const tokens: Token[] = [];
@@ -486,6 +506,18 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
                 </button>
               );
             })}
+          </div>
+        )}
+
+        {/* 편집기모드 실시간 진단 (경고만, 실행은 막지 않음) [검색-11·12] */}
+        {mode === 'editor' && formulaText.trim() && diagnose(formulaText).length > 0 && (
+          <div className="flex flex-col gap-0.5">
+            {diagnose(formulaText).map((msg, i) => (
+              <div key={i} className="flex items-center gap-1.5 text-xs2 text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                <span>⚠</span>{msg}
+              </div>
+            ))}
+            <div className="text-xs2 text-gray-400 px-2">경고가 있어도 그대로 검색할 수 있습니다.</div>
           </div>
         )}
 
