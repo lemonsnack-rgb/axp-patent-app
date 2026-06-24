@@ -2423,13 +2423,22 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
 }) {
   const [claimsPhase, setClaimsPhase] = useState<'indep' | 'dep'>('indep');
   const [claimSets] = useState(MOCK_INDEPENDENT_CLAIM_SETS);
-  const [selectedSetIndex, setSelectedSetIndex] = useState<number | null>(2); // 기본: INTERMEDIATE
+  // 생성 전에는 세트를 미리 선택하지 않는다 (C1: preference 설정 → 생성 순서 강제)
+  const [selectedSetIndex, setSelectedSetIndex] = useState<number | null>(done ? 2 : null);
+  const [generated, setGenerated] = useState(done); // 독립항 세트 생성 여부 — 생성 후에만 후보 표시
   const [claimSelState, setClaimSelState] = useState<SelState>(null);
-  const [preference, setPreference] = useState<{ abstraction: string; categories: string[]; descriptions: Record<string, string> }>({
+  // preference.slots = API independent-claim/set 의 preference.claims[] (각 슬롯 = category + description, 2~3개) (C2)
+  const [preference, setPreference] = useState<{ abstraction: string; slots: { category: string; description: string }[] }>({
     abstraction: 'INTERMEDIATE',
-    categories: ['MACHINE', 'PROCESS'],
-    descriptions: {},
+    slots: [{ category: 'MACHINE', description: '' }, { category: 'PROCESS', description: '' }],
   });
+  // preference 변경 시 생성 결과·선택 초기화 — 설정이 바뀌면 다시 생성하도록 (C1)
+  const resetGen = () => { setGenerated(false); setSelectedSetIndex(null); };
+  const CLAIM_CATEGORIES = ['MACHINE', 'PROCESS', 'MANUFACTURE', 'COMPOSITION'] as const;
+  const addSlot = () => { if (done || preference.slots.length >= 3) return; setPreference(p => ({ ...p, slots: [...p.slots, { category: 'MACHINE', description: '' }] })); resetGen(); };
+  const removeSlot = (i: number) => { if (done || preference.slots.length <= 2) return; setPreference(p => ({ ...p, slots: p.slots.filter((_, idx) => idx !== i) })); resetGen(); };
+  const updateSlotCategory = (i: number, category: string) => { if (done) return; setPreference(p => ({ ...p, slots: p.slots.map((s, idx) => idx === i ? { ...s, category } : s) })); resetGen(); };
+  const updateSlotDescription = (i: number, description: string) => { if (done) return; setPreference(p => ({ ...p, slots: p.slots.map((s, idx) => idx === i ? { ...s, description } : s) })); };
   const [depGroupsMap, setDepGroupsMap] = useState<Record<number, DepGroupsForSet>>({});
   const [claimTexts, setClaimTexts] = useState<Record<number, Record<number, string>>>({}); // setIdx → claimIdx → text
   const [depLevel, setDepLevel] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('MEDIUM'); // 종속항 개수 레벨 (API claim_count_level)
@@ -2572,7 +2581,8 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
       .filter(idx => {
         const set = claimSets[idx];
         const abstractMatch = preference.abstraction === 'ALL' || set.abstraction_level === preference.abstraction;
-        const categoryMatch = preference.categories.length === 0 || set.claims.some(c => preference.categories.includes(c.category));
+        const slotCats = preference.slots.map(s => s.category);
+        const categoryMatch = slotCats.length === 0 || set.claims.some(c => slotCats.includes(c.category));
         return abstractMatch && categoryMatch;
       });
 
@@ -2594,12 +2604,21 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
       )}
       <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2.5 ml-1.5">
         <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2.5">
-          <p className="text-xs2 text-brand-400 font-medium">AI가 권리범위별 독립항 세트를 생성했습니다.</p>
-          <p className="text-xs2 text-gray-500 mt-0.5">각 세트는 장치항·방법항 쌍으로 구성됩니다. <strong className="text-gray-700">1개를 선택</strong>하면 종속항이 구성됩니다.</p>
+          {generated ? (
+            <>
+              <p className="text-xs2 text-brand-400 font-medium">설정한 권리범위·구성으로 독립항 세트를 생성했습니다.</p>
+              <p className="text-xs2 text-gray-500 mt-0.5"><strong className="text-gray-700">1개를 선택</strong>하면 종속항을 구성합니다. 설정을 바꾸면 다시 생성됩니다.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-xs2 text-brand-400 font-medium">권리범위와 청구항 구성을 설정한 뒤 독립항 세트를 생성하세요.</p>
+              <p className="text-xs2 text-gray-500 mt-0.5">추상화 수준과 청구항 슬롯(장치/방법 등)을 정하면 그에 맞춰 세트 후보가 생성됩니다.</p>
+            </>
+          )}
         </div>
 
-        {/* Preference UI */}
-        <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 space-y-2">
+        {/* Preference UI — API independent-claim/set 의 preference (abstraction_level + claims[]) */}
+        <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 space-y-2.5">
           <p className="text-xs2 font-semibold text-gray-600">권리범위 설정</p>
           <div>
             <p className="text-xs2 text-gray-400 mb-1">추상화 수준</p>
@@ -2607,7 +2626,7 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
               {(['BROAD', 'INTERMEDIATE', 'NARROW'] as const).map(level => (
                 <button
                   key={level}
-                  onClick={() => !done && setPreference(p => ({ ...p, abstraction: level }))}
+                  onClick={() => { if (!done) { setPreference(p => ({ ...p, abstraction: level })); resetGen(); } }}
                   className={clsx(
                     'flex-1 py-1 text-xs2 font-semibold rounded-lg border transition-colors',
                     preference.abstraction === level
@@ -2620,46 +2639,57 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
               ))}
             </div>
           </div>
+          {/* 청구항 구성(슬롯) — 사용자가 장치/방법 등 카테고리 슬롯을 직접 추가·설정 (2~3개) */}
           <div>
-            <p className="text-xs2 text-gray-400 mb-1">카테고리 (복수 선택)</p>
-            <div className="flex gap-1.5 flex-wrap">
-              {(['MACHINE', 'PROCESS', 'MANUFACTURE', 'COMPOSITION'] as const).map(cat => {
-                const active = preference.categories.includes(cat);
-                return (
-                  <button
-                    key={cat}
-                    onClick={() => !done && setPreference(p => ({
-                      ...p,
-                      categories: active ? p.categories.filter(c => c !== cat) : [...p.categories, cat],
-                    }))}
-                    className={clsx(
-                      'px-2 py-0.5 text-xs2 font-semibold rounded-lg border transition-colors',
-                      active ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-500 border-gray-200 hover:border-purple-300',
-                    )}
-                  >{CATEGORY_LABEL[cat]}</button>
-                );
-              })}
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs2 text-gray-400">청구항 구성 <span className="text-gray-300">({preference.slots.length}/3)</span></p>
+              <button
+                onClick={addSlot}
+                disabled={done || preference.slots.length >= 3}
+                className="text-xs2 font-semibold text-purple-600 hover:text-purple-700 disabled:opacity-30 disabled:cursor-not-allowed"
+              >+ 청구항 추가</button>
             </div>
-            {/* 카테고리별 설명(description) preference — API independent-claim/set preference.claims[].description */}
-            {preference.categories.length > 0 && (
-              <div className="mt-2 space-y-1.5">
-                {preference.categories.map(cat => (
-                  <div key={cat} className="flex items-center gap-1.5">
-                    <span className="text-xs2 font-semibold text-purple-600 w-14 shrink-0">{CATEGORY_LABEL[cat] ?? cat}</span>
-                    <input
-                      className="flex-1 text-xs2 bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-purple-300 transition-colors"
-                      placeholder="이 카테고리 청구항의 방향·강조점 (선택)"
-                      value={preference.descriptions[cat] ?? ''}
-                      disabled={done}
-                      onChange={e => setPreference(p => ({ ...p, descriptions: { ...p.descriptions, [cat]: e.target.value } }))}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="space-y-1.5">
+              {preference.slots.map((slot, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <span className="text-xs2 text-gray-300 w-4 shrink-0 text-right">{i + 1}</span>
+                  <select
+                    className="text-xs2 font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded px-1.5 py-1 outline-none focus:border-purple-400 transition-colors shrink-0 disabled:opacity-60"
+                    value={slot.category}
+                    disabled={done}
+                    onChange={e => updateSlotCategory(i, e.target.value)}
+                  >
+                    {CLAIM_CATEGORIES.map(cat => (
+                      <option key={cat} value={cat}>{CATEGORY_LABEL[cat] ?? cat}</option>
+                    ))}
+                  </select>
+                  <input
+                    className="flex-1 min-w-0 text-xs2 bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-purple-300 transition-colors disabled:bg-gray-50"
+                    placeholder="이 청구항의 방향·강조점 (선택)"
+                    value={slot.description}
+                    disabled={done}
+                    onChange={e => updateSlotDescription(i, e.target.value)}
+                  />
+                  <button
+                    onClick={() => removeSlot(i)}
+                    disabled={done || preference.slots.length <= 2}
+                    title={preference.slots.length <= 2 ? '최소 2개' : '삭제'}
+                    className="text-gray-300 hover:text-red-500 disabled:opacity-30 disabled:hover:text-gray-300 shrink-0 px-1"
+                  >✕</button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
+        {!generated && !done && (
+          <button
+            onClick={() => { setGenerated(true); setSelectedSetIndex(null); }}
+            className="w-full py-2.5 bg-brand-400 text-white rounded-lg text-sm2 font-semibold hover:bg-brand-500 transition-colors"
+          >독립항 세트 생성 →</button>
+        )}
+
+        {generated && (<>
         {filteredSetIndices.length === 0 && (
           <div className="text-center py-6 text-gray-400 text-xs2">선택한 조건에 맞는 세트가 없습니다.</div>
         )}
@@ -2754,6 +2784,7 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
               : '세트를 선택하세요'}
           </button>
         )}
+        </>)}
       </div>
       </>
     );
