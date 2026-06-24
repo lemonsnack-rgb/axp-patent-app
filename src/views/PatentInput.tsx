@@ -8,6 +8,7 @@ import {
   COUNTRY_LIST, COUNTRY_ADDITIONAL, PATENT_PERIODS,
   PATENT_DOC_KINDS, PATENT_STATUS_ACTIVE, PATENT_STATUS_INACTIVE,
 } from '../data/patentFields';
+import { accumulateQuery, applyScope, hasSearchInput, type ScopeTab, type SFieldInput, type MetaFilter } from '../features/search';
 
 // ── 검색필드 타입 ──────────────────────────────────────────────
 interface SField {
@@ -131,11 +132,10 @@ function FormulaEditor({ value, onChange, rows = 3, placeholder = '' }: {
 }
 
 // ── Props ─────────────────────────────────────────────────────
-interface Props { onRun: (query: string) => void }
+interface Props { onRun: (execQuery: string, meta: MetaFilter) => void }
 
 // ── 스코프 탭 ────────────────────────────────────────────────
-type KeyTab = 'KEY_CLI' | 'KEY_CLA' | 'DSC';
-const KEY_TABS: { id: KeyTab; label: string }[] = [
+const KEY_TABS: { id: ScopeTab; label: string }[] = [
   { id: 'KEY_CLI', label: '명칭+요약+독립청구항' },
   { id: 'KEY_CLA', label: '명칭+요약+전체청구항' },
   { id: 'DSC',     label: '상세설명' },
@@ -163,7 +163,7 @@ export function PatentInput({ onRun }: Props) {
   const [statusInactive, setStatusInactive] = useState<string[]>([]);
 
   // 스코프 탭
-  const [keyTab, setKeyTab] = useState<KeyTab>('KEY_CLI');
+  const [keyTab, setKeyTab] = useState<ScopeTab>('KEY_CLI');
 
   // 입력모드
   const [mode, setMode] = useState<'normal' | 'editor'>('normal');
@@ -214,18 +214,40 @@ export function PatentInput({ onRun }: Props) {
     setFields(prev => prev.map((f, i) => i === idx ? { ...f, ...patch } : f));
 
   const handleSearch = () => {
-    const parts: string[] = [];
-    if (formulaText.trim()) parts.push(formulaText.trim());
-    fields.forEach(f => {
-      if ((f.type === 'text' || f.type === 'ipc') && f.value.trim()) {
-        parts.push(`${f.code}=(${f.value.trim()})`);
-      } else if (f.type === 'date-range' && (f.dateFrom || f.dateTo)) {
-        parts.push(`${f.code}=[${f.dateFrom || ''} ~ ${f.dateTo || ''}]`);
-      }
-    });
+    // [검색-51] 검색식·필드 모두 비면 실행하지 않음 (버튼도 disabled)
+    const fieldInputs: SFieldInput[] = fields.map(f => ({
+      code: f.code, type: f.type, value: f.value, dateFrom: f.dateFrom, dateTo: f.dateTo,
+    }));
+    if (!hasSearchInput(formulaText, fieldInputs)) return;
+
+    // [검색-60~63] 필드 절을 기존 검색식에 AND 누적 → 입력창에 반영
+    const accumulated = accumulateQuery(formulaText, fieldInputs);
+    setFormulaText(accumulated);
+
+    // [검색-62] 검색 후 필드 입력값만 비움 (필드 구성은 유지 [검색-70])
+    setFields(prev => prev.map(f => ({ ...f, value: '', dateFrom: '', dateTo: '' })));
+
+    // [검색-72] 검색 후 검색필드 패널 자동 접힘
     setFieldsOpen(false);
-    onRun(parts.join(' AND ') || '전체 검색');
+
+    // [검색-20~22] 범위탭을 선두 자유검색어에만 적용한 "실행 검색식"
+    const execQuery = applyScope(accumulated, keyTab);
+
+    // [검색-40·41] 메타필터를 독립 채널로 함께 전달
+    const meta: MetaFilter = {
+      countries: Object.keys(countries).filter(k => countries[k]),
+      docKinds,
+      statusAll, statusActive, statusInactive,
+      periodChip, periodFrom, periodTo,
+    };
+
+    onRun(execQuery, meta);
   };
+
+  const canSearch = hasSearchInput(
+    formulaText,
+    fields.map(f => ({ code: f.code, type: f.type, value: f.value, dateFrom: f.dateFrom, dateTo: f.dateTo })),
+  );
 
   const resetAll = () => {
     setFormulaText('');
@@ -414,7 +436,7 @@ export function PatentInput({ onRun }: Props) {
         {/* 초기화 / 검색 */}
         <div className="flex justify-end gap-1.5">
           <Button variant="outlined" color="primary" size="xs" onClick={resetAll}>◇ 초기화</Button>
-          <Button variant="filled" color="primary" size="sm" className="text-sm2" onClick={handleSearch}>검색</Button>
+          <Button variant="filled" color="primary" size="sm" className="text-sm2" disabled={!canSearch} onClick={handleSearch}>검색</Button>
         </div>
       </div>
 

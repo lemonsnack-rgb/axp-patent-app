@@ -1,5 +1,5 @@
 // 특허 검색 결과 — sri-header + filter-bar(7그룹) + 모든 필터 드로어(Sheet 4) + 적용필터 칩 + 2-Column
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import clsx from 'clsx';
 import { PATENT_SEED } from '../data/patentSeed';
 import { PATENT_FACET_GROUPS_BASE, PATENT_FACET_GROUPS_EXT } from '../data/facetGroups';
@@ -9,11 +9,31 @@ import { toast, Button } from '@muhayu/axp-ui';
 import { getPatentStatusBadgeColor } from '../utils/badgeUtils';
 import { Badge } from '../components/ui';
 import type { PatentResult } from '../types';
+import type { MetaFilter } from '../features/search';
 
 type SortKey = 'recent' | 'cited' | 'grade' | 'relevance';
 type ViewMode = 'list' | 'sliding' | 'gallery';
 
 interface AppliedFilter { facetKey: string; title: string; label: string }
+
+// 메타필터(국가·문헌종류·상태·기간)를 결과에 적용 [검색-41].
+function applyMetaFilter(items: PatentResult[], meta?: MetaFilter | null): PatentResult[] {
+  if (!meta) return items;
+  return items.filter(p => {
+    // 국가: 선택된 국가가 있으면 그 중 하나여야 함
+    if (meta.countries.length > 0 && !meta.countries.includes(p.country)) return false;
+    // 상태: 전체가 아니면 active/inactive 선택값에 포함되어야 함
+    if (!meta.statusAll) {
+      const picked = [...meta.statusActive, ...meta.statusInactive];
+      if (picked.length > 0 && !picked.includes(p.status)) return false;
+    }
+    // 기간(custom from~to, YYYYMMDD): 출원일 기준
+    const yyyymmdd = (p.applicationDate || '').replace(/\D/g, '');
+    if (meta.periodFrom && yyyymmdd && yyyymmdd < meta.periodFrom.replace(/\D/g, '')) return false;
+    if (meta.periodTo && yyyymmdd && yyyymmdd > meta.periodTo.replace(/\D/g, '')) return false;
+    return true;
+  });
+}
 
 function applyFacetFilters(items: PatentResult[], filters: AppliedFilter[]): PatentResult[] {
   if (!filters.length) return items;
@@ -47,9 +67,10 @@ interface Props {
   onOpenDetail: (idx: number) => void;
   onSave: (idx: number) => void;
   searchQuery?: string;
+  meta?: MetaFilter | null;
 }
 
-export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery }: Props) {
+export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, meta }: Props) {
   const { setMode, setBgPatentRef } = useStore();
   const [sort, setSort] = useState<SortKey>('recent');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -66,8 +87,19 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery }: P
   const [sortCol, setSortCol] = useState<'applicationDate' | 'title'>('applicationDate');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
-  // 결과 데이터 — 필터링 → 정렬
-  const filtered = applyFacetFilters(PATENT_SEED, appliedFilters);
+  // [검색-121·155] 새 검색(searchQuery 변경) 시 패싯 해제 + 첫 페이지
+  useEffect(() => {
+    setPendingFilters({});
+    setAppliedFilters([]);
+    setAppliedFilterRowVisible(false);
+    setExtFilterValues({});
+    setPage(1);
+    setSelectedCard(0);
+  }, [searchQuery]);
+
+  // 결과 데이터 — 메타필터(검색어 채널) ∩ 패싯(좁히기 채널) → 정렬 [검색-154]
+  const metaScoped = applyMetaFilter(PATENT_SEED, meta);
+  const filtered = applyFacetFilters(metaScoped, appliedFilters);
   const data = [...filtered].sort((a, b) => {
     const va = (a[sortCol] ?? '');
     const vb = (b[sortCol] ?? '');
@@ -75,8 +107,8 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery }: P
   });
   const count = data.length;
 
-  // 검색식 칩 (mockup)
-  const appliedQuery = 'TI=(자율주행* OR autonomous driving) AND IPCM=G01S*';
+  // 적용된 실제 실행 검색식 칩
+  const appliedQuery = searchQuery && searchQuery.trim() ? searchQuery : '전체 검색';
 
   const togglePendingFilter = (groupKey: string, label: string) => {
     setPendingFilters(prev => {

@@ -9,6 +9,7 @@ import { PaperInput } from './PaperInput';
 import { PaperResults } from './PaperResults';
 import { useStore } from '../store';
 import type { PatentResult, PaperResult } from '../types';
+import type { MetaFilter } from '../features/search';
 
 type SearchType = 'patent' | 'paper';
 
@@ -22,6 +23,7 @@ export function SearchView() {
   const [patentDetailOpen, setPatentDetailOpen] = useState(false);
   const [detailIdx, setDetailIdx] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [committedMeta, setCommittedMeta] = useState<MetaFilter | null>(null);
 
   // 논문 검색 — 기존 stage 방식 유지
   const [paperStage, setPaperStage] = useState<'input' | 'results'>('input');
@@ -69,7 +71,7 @@ export function SearchView() {
               : 'flex-1'
           )}>
             <PatentInput
-              onRun={q => { setSearchQuery(q); setPatentSearched(true); }}
+              onRun={(q, meta) => { setSearchQuery(q); setCommittedMeta(meta); setPatentSearched(true); }}
             />
           </div>
 
@@ -80,6 +82,7 @@ export function SearchView() {
               onOpenDetail={i => { setDetailIdx(i); setPatentDetailOpen(true); }}
               onSave={openSavePatent}
               searchQuery={searchQuery}
+              meta={committedMeta}
             />
           )}
         </>
