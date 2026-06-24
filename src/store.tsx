@@ -10,6 +10,14 @@ const K_CONTACTS = 'axp_contacts_v1';
 const K_LIBRARY  = 'axp_library_v1';
 const K_COLLECTIONS = 'axp_library_collections_v1';
 const K_SIDEBAR_COLLAPSED = 'axp_sidebar_collapsed_v1';
+const K_SEARCH_HISTORY = 'axp_search_history_v1';
+
+export interface SearchHistoryEntry {
+  id: string;
+  kind: 'patent' | 'paper';
+  query: string;   // 실행된 검색식(결과 칩과 동일)
+  at: number;
+}
 
 const TASK_TYPE_META: Record<TaskType, { label: string; color: string; icon: 'doc'|'search'|'paper' }> = {
   spec:          { label: '명세서',    color: 'blue',   icon: 'doc' },
@@ -24,6 +32,11 @@ interface StoreCtx {
   // mode & active task
   mode: AppMode; setMode: (m: AppMode) => void;
   searchKind: 'patent' | 'paper'; setSearchKind: (k: 'patent' | 'paper') => void;
+  // 검색 히스토리
+  searchHistory: SearchHistoryEntry[];
+  searchHistoryAdd: (kind: 'patent' | 'paper', query: string) => void;
+  searchHistoryRemove: (id: string) => void;
+  searchHistoryClear: (kind: 'patent' | 'paper') => void;
   activeTaskId: string | null; setActiveTaskId: (id: string | null) => void;
   activeProjectId: string | null; setActiveProjectId: (id: string | null) => void;
   bgPatentRef: string | null; setBgPatentRef: (ref: string | null) => void;
@@ -107,6 +120,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [library, setLibrary] = useLocalStorage<LibraryItem[]>(K_LIBRARY, []);
   const [collections, setCollections] = useLocalStorage<LibraryCollection[]>(K_COLLECTIONS, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage<boolean>(K_SIDEBAR_COLLAPSED, false);
+  const [searchHistory, setSearchHistory] = useLocalStorage<SearchHistoryEntry[]>(K_SEARCH_HISTORY, []);
 
   // app state (not persisted)
   const [mode, setMode] = useState<AppMode>('newtask');
@@ -117,6 +131,25 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   // 진입 시 디폴트 = 새 작업 (사용자 결정)
   // activeTaskId는 사이드바에서 task 클릭 시 설정됨
+
+  // === search history ops ===
+  const searchHistoryAdd = useCallback((kind: 'patent' | 'paper', query: string) => {
+    const q = query.trim();
+    if (!q) return;
+    setSearchHistory(prev => {
+      // 같은 종류의 직전 항목과 동일하면 중복 누적 방지
+      const lastSameKind = prev.find(e => e.kind === kind);
+      if (lastSameKind && lastSameKind.query === q) return prev;
+      const entry: SearchHistoryEntry = { id: 'sh_' + Date.now(), kind, query: q, at: Date.now() };
+      return [entry, ...prev].slice(0, 100);
+    });
+  }, [setSearchHistory]);
+  const searchHistoryRemove = useCallback((id: string) => {
+    setSearchHistory(prev => prev.filter(e => e.id !== id));
+  }, [setSearchHistory]);
+  const searchHistoryClear = useCallback((kind: 'patent' | 'paper') => {
+    setSearchHistory(prev => prev.filter(e => e.kind !== kind));
+  }, [setSearchHistory]);
 
   // === task ops ===
   const taskAdd: StoreCtx['taskAdd'] = useCallback((t) => {
@@ -227,6 +260,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const value: StoreCtx = useMemo(() => ({
     mode, setMode,
     searchKind, setSearchKind,
+    searchHistory, searchHistoryAdd, searchHistoryRemove, searchHistoryClear,
     activeTaskId, setActiveTaskId,
     activeProjectId, setActiveProjectId,
     bgPatentRef, setBgPatentRef,
@@ -239,7 +273,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     library, libraryAdd, libraryRemove, libraryToggleFavorite, libraryUpdate,
     collections, collectionAdd, collectionUpdate, collectionRemove, collectionToggleFavorite, ensureUncategorized,
   }), [
-    mode, searchKind, activeTaskId, activeProjectId, bgPatentRef, sidebarCollapsed,
+    mode, searchKind, searchHistory, activeTaskId, activeProjectId, bgPatentRef, sidebarCollapsed,
+    searchHistoryAdd, searchHistoryRemove, searchHistoryClear,
     tasks, projects, clients, contacts, library, collections,
     taskAdd, taskUpdate, taskRemove, taskToggleFavorite,
     projectAdd, projectUpdate, projectRemove, projectToggleFavorite,

@@ -9,6 +9,7 @@ import {
   PATENT_DOC_KINDS, PATENT_STATUS_ACTIVE, PATENT_STATUS_INACTIVE,
 } from '../data/patentFields';
 import { accumulateQuery, applyScope, hasSearchInput, type ScopeTab, type SFieldInput, type MetaFilter } from '../features/search';
+import { useStore } from '../store';
 
 // ── 검색필드 타입 ──────────────────────────────────────────────
 interface SField {
@@ -143,6 +144,10 @@ const KEY_TABS: { id: ScopeTab; label: string }[] = [
 
 // ── Main ──────────────────────────────────────────────────────
 export function PatentInput({ onRun }: Props) {
+  const { searchHistory, searchHistoryAdd, searchHistoryRemove, searchHistoryClear } = useStore();
+  const patentHistory = searchHistory.filter(e => e.kind === 'patent');
+  const [historyOpen, setHistoryOpen] = useState(true);
+
   // 국가
   const [countries, setCountries] = useState<Record<string, boolean>>({ KR: true, US: true });
   const [extraCountries, setExtraCountries] = useState<string[]>([]);
@@ -213,6 +218,14 @@ export function PatentInput({ onRun }: Props) {
   const updateField = (idx: number, patch: Partial<SField>) =>
     setFields(prev => prev.map((f, i) => i === idx ? { ...f, ...patch } : f));
 
+  // [검색-40·41] 현재 메타필터 선택값 묶음
+  const buildMeta = (): MetaFilter => ({
+    countries: Object.keys(countries).filter(k => countries[k]),
+    docKinds,
+    statusAll, statusActive, statusInactive,
+    periodChip, periodFrom, periodTo,
+  });
+
   const handleSearch = () => {
     // [검색-51] 검색식·필드 모두 비면 실행하지 않음 (버튼도 disabled)
     const fieldInputs: SFieldInput[] = fields.map(f => ({
@@ -233,15 +246,17 @@ export function PatentInput({ onRun }: Props) {
     // [검색-20~22] 범위탭을 선두 자유검색어에만 적용한 "실행 검색식"
     const execQuery = applyScope(accumulated, keyTab);
 
-    // [검색-40·41] 메타필터를 독립 채널로 함께 전달
-    const meta: MetaFilter = {
-      countries: Object.keys(countries).filter(k => countries[k]),
-      docKinds,
-      statusAll, statusActive, statusInactive,
-      periodChip, periodFrom, periodTo,
-    };
+    searchHistoryAdd('patent', execQuery);
+    onRun(execQuery, buildMeta());
+  };
 
-    onRun(execQuery, meta);
+  // 검색 히스토리 항목 재실행 — 저장된 실행 검색식을 그대로 다시 조회
+  const rerun = (q: string) => {
+    setFormulaText(q);
+    setFields(prev => prev.map(f => ({ ...f, value: '', dateFrom: '', dateTo: '' })));
+    setFieldsOpen(false);
+    searchHistoryAdd('patent', q);
+    onRun(q, buildMeta());
   };
 
   const canSearch = hasSearchInput(
@@ -440,6 +455,42 @@ export function PatentInput({ onRun }: Props) {
         </div>
       </div>
 
+      {/* ── 검색 히스토리 ─────────────────────────── */}
+      {patentHistory.length > 0 && (
+        <div className="border-t border-gray-200">
+          <button
+            onClick={() => setHistoryOpen(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-2 text-sm2 font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <span className="flex items-center gap-1.5">
+              <span className="text-gray-400 text-xs2">🕘</span>
+              검색 히스토리
+              <span className="text-xs2 font-medium text-brand-400 bg-blue-50 px-1.5 py-0 rounded-full leading-5">{patentHistory.length}</span>
+            </span>
+            <span className="text-gray-400 text-xs2">{historyOpen ? '▲' : '▼'}</span>
+          </button>
+          {historyOpen && (
+            <div className="px-4 pb-3">
+              <div className="flex justify-end mb-1">
+                <button onClick={() => searchHistoryClear('patent')} className="text-xs2 text-gray-400 hover:text-red-500">전체 삭제</button>
+              </div>
+              <div className="space-y-0.5 max-h-48 overflow-y-auto scroll-thin">
+                {patentHistory.map(e => (
+                  <div key={e.id} className="group flex items-center gap-2 py-1 px-2 rounded hover:bg-gray-50">
+                    <button onClick={() => rerun(e.query)} className="flex-1 min-w-0 text-left" title="이 검색 재실행">
+                      <div className="font-mono text-xs2 text-brand-400 truncate">{e.query}</div>
+                      <div className="text-xs2 text-gray-400">{histTime(e.at)}</div>
+                    </button>
+                    <button onClick={() => rerun(e.query)} className="text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 shrink-0">재실행</button>
+                    <button onClick={() => searchHistoryRemove(e.id)} className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-500 rounded shrink-0 opacity-0 group-hover:opacity-100" title="삭제">×</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── 검색필드 섹션 (그룹 탭) ─────────────────────────── */}
       <div className="border-t border-gray-200">
 
@@ -609,6 +660,12 @@ export function PatentInput({ onRun }: Props) {
 }
 
 // ── Helper Components ─────────────────────────────────────────
+
+function histTime(ts: number): string {
+  const d = new Date(ts);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 
 function Chip({ active, onClick, children, size = 'sm' }: {
   active?: boolean;
