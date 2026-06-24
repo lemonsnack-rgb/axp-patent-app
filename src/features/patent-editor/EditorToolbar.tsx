@@ -6,7 +6,7 @@ import {
   Brush, Circle, CircleDot, Download, Eraser,
   Frame, Grid3x3, Minus, MousePointer2,
   Save, Slash, Spline, Square, Triangle, X, Diamond,
-  ChevronDown,
+  ChevronDown, Undo2, Redo2,
 } from "lucide-react";
 import { useEditorStore } from "./useEditorStore";
 import type { LineEnd, LineStyle, LineWeight } from "./types";
@@ -30,6 +30,11 @@ interface Props {
   // B-8: 해상도
   exportScale: 1|2|3|4;
   onExportScale: (v: 1|2|3|4) => void;
+  // 실행 취소 / 다시 실행
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 // ── 공통 버튼 크기: 모든 버튼 h-8 기준 ────────────────────
@@ -168,6 +173,7 @@ export function EditorToolbar({
   showUnderlayer, underlayerOpacity, onToggleUnderlayer, onUnderlayerOpacity,
   onAlign, onInsertDrawingTitle,
   exportScale, onExportScale,
+  onUndo, onRedo, canUndo, canRedo,
 }: Props) {
   const tool          = useEditorStore(s => s.tool);
   const lineStyle     = useEditorStore(s => s.lineStyle);
@@ -189,6 +195,15 @@ export function EditorToolbar({
   return (
     <div className="border-b border-ck-border bg-ck-bg shrink-0 overflow-x-auto scroll-thin">
       <div className="flex items-end gap-0 px-2 py-1 min-w-max">
+
+        {/* ── 작업 취소 ── */}
+        <Group label="작업 취소">
+          <ToolBtn onClick={onUndo} disabled={!canUndo}
+            title="실행 취소 (Ctrl+Z)" icon={<Undo2 size={14} />} label="취소" />
+          <ToolBtn onClick={onRedo} disabled={!canRedo}
+            title="다시 실행 (Ctrl+Y)" icon={<Redo2 size={14} />} label="다시" />
+        </Group>
+        <div className={DIVIDER} />
 
         {/* ── 기본 도구 ── */}
         <Group label="기본 도구">

@@ -10,6 +10,7 @@ import * as fabric from "fabric";
 import { useEditorStore } from "./useEditorStore";
 import {
   BRUSH_WIDTH,
+  CUSTOM_PROPS,
   FIXED_FONT_FAMILY,
   LINE_DASH_PATTERNS,
   META,
@@ -57,6 +58,11 @@ export interface EditorCanvasHandle {
   acceptAiMarker: (recId: string, ref: EditorReference) => void;
   /** AI 추천 마커 거절 → 마커 삭제 */
   rejectAiMarker: (recId: string) => void;
+  /** 실행 취소 / 다시 실행 */
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
 }
 
 interface Props {
@@ -912,6 +918,14 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
     const selectedRefRef = useRef<EditorReference | null>(null);
     // 외부(배치 버튼)에서 툴 변경과 동시에 전달된 부호 (툴 변경 effect 이후에 복원)
     const pendingPlacementRef = useRef<EditorReference | null>(null);
+    // 실행 취소/다시 실행: 콘텐츠 스냅샷 스택 (오버레이·핸들은 excludeFromExport라 제외됨)
+    const historyRef = useRef<string[]>([]);
+    const historyIdxRef = useRef(-1);
+    const restoringRef = useRef(false);
+    const recordRafRef = useRef<number | null>(null);
+    // 히스토리 로직은 캔버스 init effect 내부에서 정의되어 ref로 노출됨
+    const undoFnRef = useRef<() => void>(() => {});
+    const redoFnRef = useRef<() => void>(() => {});
     const [picker, setPicker] = useState<PickerState | null>(null);
     const [selectedObj, setSelectedObj] = useState<fabric.Object | null>(null);
     const [shapeNameInput, setShapeNameInput] = useState("");
@@ -1072,6 +1086,10 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
         const marker = fc.getObjects().find(o => getMeta(o, META.aiRecId) === recId);
         if (marker) { fc.remove(marker); fc.requestRenderAll(); }
       },
+      undo: () => undoFnRef.current(),
+      redo: () => redoFnRef.current(),
+      canUndo: () => historyIdxRef.current > 0,
+      canRedo: () => historyIdxRef.current < historyRef.current.length - 1,
       removeAllUsesOfRef: (refNumber: string) => {
         const fc = fabricRef.current;
         if (!fc) return 0;
@@ -1731,7 +1749,56 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
       fc.on("selection:updated", syncSelectionFromCanvas);
       fc.on("selection:cleared", syncSelectionFromCanvas);
 
+      // ── 실행 취소/다시 실행: 콘텐츠 스냅샷 히스토리 ──
+      // toObject(CUSTOM_PROPS)는 excludeFromExport(오버레이·핸들)를 제외하므로
+      // 선택/핸들 표시로 인한 변화는 스냅샷에 잡히지 않아 히스토리가 오염되지 않는다.
+      const snapshot = () => JSON.stringify(fc.toObject(CUSTOM_PROPS));
+      const recordHistory = () => {
+        if (restoringRef.current) return;
+        if (recordRafRef.current != null) cancelAnimationFrame(recordRafRef.current);
+        recordRafRef.current = requestAnimationFrame(() => {
+          recordRafRef.current = null;
+          const snap = snapshot();
+          const hist = historyRef.current;
+          if (hist[historyIdxRef.current] === snap) return; // 콘텐츠 변화 없음 → 무시
+          const base = hist.slice(0, historyIdxRef.current + 1);
+          base.push(snap);
+          const MAX = 60;
+          historyRef.current = base.length > MAX ? base.slice(base.length - MAX) : base;
+          historyIdxRef.current = historyRef.current.length - 1;
+        });
+      };
+      const restore = (snap: string) => {
+        restoringRef.current = true;
+        fc.loadFromJSON(JSON.parse(snap))
+          .then(() => {
+            reapplyHatchAfterLoad(fc);
+            addOverlays(fc, width, height);
+            const st = useEditorStore.getState();
+            setOverlayVisibility(fc, st.showGrid, st.showMarginGuide);
+            fc.discardActiveObject();
+            fc.requestRenderAll();
+          })
+          .catch((err) => console.warn("[PatentEditor] undo/redo restore failed:", err))
+          .finally(() => { restoringRef.current = false; });
+      };
+      undoFnRef.current = () => {
+        if (historyIdxRef.current <= 0) return;
+        historyIdxRef.current -= 1;
+        restore(historyRef.current[historyIdxRef.current]);
+      };
+      redoFnRef.current = () => {
+        if (historyIdxRef.current >= historyRef.current.length - 1) return;
+        historyIdxRef.current += 1;
+        restore(historyRef.current[historyIdxRef.current]);
+      };
+      fc.on("object:added", recordHistory);
+      fc.on("object:removed", recordHistory);
+      fc.on("object:modified", recordHistory);
+
       const init = async () => {
+        // 초기 로드 중에는 히스토리를 기록하지 않고, 완료 후 baseline 1개만 캡처
+        restoringRef.current = true;
         if (savedEditorDataJson) {
           try {
             await fc.loadFromJSON(JSON.parse(savedEditorDataJson));
@@ -1768,6 +1835,10 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
         } catch (err) {
           console.warn("[PatentEditor] background image load failed:", err);
         }
+        // baseline 스냅샷 1개 캡처 후 기록 재개
+        historyRef.current = [snapshot()];
+        historyIdxRef.current = 0;
+        restoringRef.current = false;
       };
       void init();
 
@@ -1782,6 +1853,10 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(
         fc.off("selection:created", syncSelectionFromCanvas);
         fc.off("selection:updated", syncSelectionFromCanvas);
         fc.off("selection:cleared", syncSelectionFromCanvas);
+        fc.off("object:added", recordHistory);
+        fc.off("object:removed", recordHistory);
+        fc.off("object:modified", recordHistory);
+        if (recordRafRef.current != null) cancelAnimationFrame(recordRafRef.current);
         fc.dispose();
         fabricRef.current = null;
       };

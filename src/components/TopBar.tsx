@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import { Button } from '@muhayu/axp-ui';
 import { Icon } from './Icon';
+import { CK_WORDMARK, CK_SYMBOL } from '../assets/ckLogo';
 
 // ★ 도움말 URL — 준비되면 아래 주소를 교체하세요
 const HELP_URL = 'https://axplain.ai/help'; // TODO: 실제 URL로 교체
@@ -54,11 +55,14 @@ export function TopBar() {
         >
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="flex items-center gap-2 cursor-pointer hover:opacity-80 active:scale-[0.98] transition-all"
+            className="flex items-center cursor-pointer hover:opacity-80 active:scale-[0.98] transition-all"
             title="사이드바 토글"
           >
-            <span className="w-5 h-5 text-blue-600"><Icon name="logo" size={20} /></span>
-            {!sidebarCollapsed && <span className="font-semibold text-base2 text-zinc-800">AXPlain.ai</span>}
+            {sidebarCollapsed ? (
+              <img src={CK_SYMBOL} alt="CK.Patent" className="w-7 h-7 object-contain" />
+            ) : (
+              <img src={CK_WORDMARK} alt="CK.Patent" className="h-7 w-auto object-contain" />
+            )}
           </button>
           {!sidebarCollapsed && (
             <Button variant="text" size="icon-sm" onClick={() => setSidebarCollapsed(true)} title="사이드바 토글">

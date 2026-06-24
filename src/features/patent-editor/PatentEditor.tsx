@@ -75,6 +75,9 @@ export function PatentEditor({
   const [zoom, setZoom] = useState(1);
   // 캔버스에 배치된 부호 번호 세트 (연결 상태 표시용)
   const [placedNums, setPlacedNums] = useState<Set<string>>(new Set());
+  // undo/redo 버튼 활성 상태 (캔버스 변경 시 갱신)
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
 
   // 캔버스 객체 변경 시 배치된 부호 목록 갱신
   const refreshPlacedNums = useCallback(() => {
@@ -167,10 +170,15 @@ export function PatentEditor({
       const fc = canvasHandleRef.current?.getCanvas();
       if (!fc) return;
       refreshPlacedNums();
-      const handler = () => refreshPlacedNums();
+      const handler = () => {
+        refreshPlacedNums();
+        setCanUndo(canvasHandleRef.current?.canUndo() ?? false);
+        setCanRedo(canvasHandleRef.current?.canRedo() ?? false);
+      };
       fc.on('object:added', handler);
       fc.on('object:removed', handler);
-      return () => { fc.off('object:added', handler); fc.off('object:removed', handler); };
+      fc.on('object:modified', handler);
+      return () => { fc.off('object:added', handler); fc.off('object:removed', handler); fc.off('object:modified', handler); };
     }, 400);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -353,6 +361,18 @@ export function PatentEditor({
 
       // Ctrl 단축키
       if (e.metaKey || e.ctrlKey) {
+        const k = e.key.toLowerCase();
+        if (k === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) canvasHandleRef.current?.redo();
+          else canvasHandleRef.current?.undo();
+          return;
+        }
+        if (k === 'y') {
+          e.preventDefault();
+          canvasHandleRef.current?.redo();
+          return;
+        }
         if (e.key === 'c') {
           const active = fc.getActiveObject();
           if (active) active.clone().then((cloned: fabric.Object) => { clipboardRef.current = cloned; }).catch(() => {});
@@ -385,6 +405,9 @@ export function PatentEditor({
   const handleToggleHatch = useCallback(() => {
     canvasHandleRef.current?.toggleHatchOnSelection();
   }, []);
+
+  const handleUndo = useCallback(() => canvasHandleRef.current?.undo(), []);
+  const handleRedo = useCallback(() => canvasHandleRef.current?.redo(), []);
 
   // Task 4: 배치 중인 부호 상태
   const [activePlacingRef, setActivePlacingRef] = useState<EditorReference | null>(null);
@@ -463,6 +486,10 @@ export function PatentEditor({
         onInsertDrawingTitle={insertDrawingTitle}
         exportScale={exportScale}
         onExportScale={setExportScale}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={canUndo}
+        canRedo={canRedo}
       />
       <div className="flex-1 min-h-0 flex">
         {/* 단일 도면 모드에서는 도면 목록 패널 숨김 */}
