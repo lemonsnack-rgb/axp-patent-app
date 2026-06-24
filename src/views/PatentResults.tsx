@@ -340,7 +340,21 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
       )}
 
       {/* ── 5. 결과 본문 ── */}
-      {viewMode === 'list' && (
+      {count === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-16 text-gray-400">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="mb-3 text-gray-300">
+            <circle cx="11" cy="11" r="7" /><line x1="20" y1="20" x2="16.5" y2="16.5" />
+          </svg>
+          <div className="text-base2 font-semibold text-gray-600 mb-1">결과 없음</div>
+          <div className="text-sm2 text-gray-400">
+            현재 검색식·필터 조건에 해당하는 문헌이 없습니다.<br />
+            검색식을 수정하거나 적용된 필터를 해제해 보세요.
+          </div>
+          {appliedFilters.length > 0 && (
+            <Button variant="outlined" color="primary" size="sm" className="mt-3" onClick={resetFilters}>필터 초기화</Button>
+          )}
+        </div>
+      ) : viewMode === 'list' ? (
         <TableResults
           data={data}
           selectedCard={selectedCard}
@@ -376,9 +390,11 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
             else { setSortCol(col); setSortDir('desc'); }
           }}
         />
+      ) : viewMode === 'sliding' ? (
+        <SlidingView data={data} onOpenDetail={onOpenDetail} onSave={onSave} onBgPatent={num => { setBgPatentRef(num); setMode('spec'); toast(`배경기술 추가: ${num}`); }} />
+      ) : (
+        <GalleryView data={data} onSave={onSave} onBgPatent={num => { setBgPatentRef(num); setMode('spec'); toast(`배경기술 추가: ${num}`); }} />
       )}
-      {viewMode === 'sliding' && <SlidingView data={data} onOpenDetail={onOpenDetail} onSave={onSave} onBgPatent={num => { setBgPatentRef(num); setMode('spec'); toast(`배경기술 추가: ${num}`); }} />}
-      {viewMode === 'gallery' && <GalleryView data={data} onSave={onSave} onBgPatent={num => { setBgPatentRef(num); setMode('spec'); toast(`배경기술 추가: ${num}`); }} />}
     </div>
   );
 }
