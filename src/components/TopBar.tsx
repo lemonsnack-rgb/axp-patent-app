@@ -8,7 +8,7 @@ import { CK_WORDMARK, CK_SYMBOL } from '../assets/ckLogo';
 const HELP_URL = 'https://axplain.ai/help'; // TODO: 실제 URL로 교체
 
 const MODE_LABELS: Record<string, string> = {
-  newtask: '새 작업',
+  newtask: '새 명세서',
   home:    '프로젝트',
   project: '프로젝트',
   library: '라이브러리',
