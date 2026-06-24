@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@muhayu/axp-ui": "^0.1.0",
+    "@muhayu/axp-ui": "^0.2.0",
     "docx": "^9.7.1",
     "fabric": "^7.4.0",
     "file-saver": "^2.0.5",

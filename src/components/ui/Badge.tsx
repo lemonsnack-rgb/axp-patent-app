@@ -4,7 +4,7 @@ export type BadgeColor = 'brand' | 'violet' | 'amber' | 'green' | 'red' | 'neutr
 
 const colorMap: Record<BadgeColor, AxpBadgeProps['color']> = {
   brand:   'primary',
-  violet:  'tint',
+  violet:  'info',
   amber:   'warning',
   green:   'success',
   red:     'danger',
