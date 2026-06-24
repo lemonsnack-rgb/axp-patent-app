@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@muhayu/axp-ui':
-        specifier: ^0.1.0
-        version: 0.1.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(tailwindcss@4.3.1)
+        specifier: ^0.2.0
+        version: 0.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(tailwindcss@4.3.1)
       docx:
         specifier: ^9.7.1
         version: 9.7.1
@@ -299,8 +299,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@muhayu/axp-ui@0.1.0':
-    resolution: {integrity: sha512-EoowtjsfzSkH/VjmZBY5AHI250Qhmv59C3j5MX6d56IMeVrvMWoN88Fc4uiyqhRmnsdlKmwsMcBJ5qTA+EsQpw==, tarball: https://npm.pkg.github.com/download/@muhayu/axp-ui/0.1.0/9553dd16bf1cedfa697333106a4cbceccd1c2e34}
+  '@muhayu/axp-ui@0.2.0':
+    resolution: {integrity: sha512-6O+v7vGSlYsM92LwpD60b1+m39Bz5LhXeDbVCAQH1Ap5Ikbl5ck6284MRF4vxQw8TjvhhdayggJP8yGremlajQ==, tarball: https://npm.pkg.github.com/download/@muhayu/axp-ui/0.2.0/b08ced3ac8533d97a44995c47ee62b9eafe28555}
     peerDependencies:
       react: '>=18.0.0'
       react-dom: '>=18.0.0'
@@ -2563,7 +2563,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@muhayu/axp-ui@0.1.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(tailwindcss@4.3.1)':
+  '@muhayu/axp-ui@0.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(tailwindcss@4.3.1)':
     dependencies:
       class-variance-authority: 0.7.1
       clsx: 2.1.1
