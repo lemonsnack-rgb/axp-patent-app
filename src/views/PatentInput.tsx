@@ -1,6 +1,6 @@
 // 특허 검색 입력 영역 — 데모(http://10.77.0.244:8010/patents) 방식
 // Config 2줄 압축 + 검색필드 그룹 탭 (텍스트/분류코드/인명/번호/일자)
-import { useState } from 'react';
+import { useState, useRef, useImperativeHandle, forwardRef } from 'react';
 import clsx from 'clsx';
 import { toast, Button } from '@muhayu/axp-ui';
 import { FinderModal, type FinderType } from '../components/FinderModal';
@@ -135,6 +135,9 @@ function FormulaEditor({ value, onChange, rows = 3, placeholder = '' }: {
 // ── Props ─────────────────────────────────────────────────────
 interface Props { onRun: (execQuery: string, meta: MetaFilter) => void }
 
+// 결과 화면의 "결과 내 검색"이 호출할 수 있도록 노출하는 핸들
+export interface PatentInputHandle { refine: (term: string) => void }
+
 // ── 스코프 탭 ────────────────────────────────────────────────
 const KEY_TABS: { id: ScopeTab; label: string }[] = [
   { id: 'KEY_CLI', label: '명칭+요약+독립청구항' },
@@ -143,9 +146,12 @@ const KEY_TABS: { id: ScopeTab; label: string }[] = [
 ];
 
 // ── Main ──────────────────────────────────────────────────────
-export function PatentInput({ onRun }: Props) {
-  const { searchHistory, searchHistoryAdd, searchHistoryRemove, searchHistoryClear } = useStore();
-  const patentHistory = searchHistory.filter(e => e.kind === 'patent');
+export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentInput({ onRun }, ref) {
+  const { searchHistory, searchHistoryAdd, searchHistoryRemove, searchHistoryClear, searchHistoryTogglePin } = useStore();
+  // 저장(pinned)된 검색을 상단에, 나머지는 최신순(삽입순) 유지
+  const patentHistory = searchHistory
+    .filter(e => e.kind === 'patent')
+    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
   const [historyOpen, setHistoryOpen] = useState(true);
 
   // 국가
@@ -258,6 +264,24 @@ export function PatentInput({ onRun }: Props) {
     searchHistoryAdd('patent', q);
     onRun(q, buildMeta());
   };
+
+  // 결과 내 검색 — 현재 검색식에 (term)을 AND로 덧붙여 다시 조회
+  const live = useRef<{ formulaText: string; keyTab: ScopeTab; buildMeta: () => MetaFilter; onRun: Props['onRun']; add: typeof searchHistoryAdd }>(null!);
+  live.current = { formulaText, keyTab, buildMeta, onRun, add: searchHistoryAdd };
+  useImperativeHandle(ref, () => ({
+    refine: (term: string) => {
+      const t = term.trim();
+      if (!t) return;
+      const s = live.current;
+      const accumulated = s.formulaText.trim() ? `${s.formulaText} AND (${t})` : `(${t})`;
+      setFormulaText(accumulated);
+      setFields(prev => prev.map(f => ({ ...f, value: '', dateFrom: '', dateTo: '' })));
+      setFieldsOpen(false);
+      const execQuery = applyScope(accumulated, s.keyTab);
+      s.add('patent', execQuery);
+      s.onRun(execQuery, s.buildMeta());
+    },
+  }), []);
 
   const canSearch = hasSearchInput(
     formulaText,
@@ -476,10 +500,15 @@ export function PatentInput({ onRun }: Props) {
               </div>
               <div className="space-y-0.5 max-h-48 overflow-y-auto scroll-thin">
                 {patentHistory.map(e => (
-                  <div key={e.id} className="group flex items-center gap-2 py-1 px-2 rounded hover:bg-gray-50">
+                  <div key={e.id} className={clsx('group flex items-center gap-2 py-1 px-2 rounded hover:bg-gray-50', e.pinned && 'bg-amber-50/40')}>
+                    <button
+                      onClick={() => searchHistoryTogglePin(e.id)}
+                      className={clsx('shrink-0 leading-none', e.pinned ? 'text-amber-500' : 'text-gray-300 hover:text-amber-400')}
+                      title={e.pinned ? '저장 해제' : '검색 저장 (★)'}
+                    >★</button>
                     <button onClick={() => rerun(e.query)} className="flex-1 min-w-0 text-left" title="이 검색 재실행">
                       <div className="font-mono text-xs2 text-brand-400 truncate">{e.query}</div>
-                      <div className="text-xs2 text-gray-400">{histTime(e.at)}</div>
+                      <div className="text-xs2 text-gray-400">{histTime(e.at)}{e.pinned && ' · 저장됨'}</div>
                     </button>
                     <button onClick={() => rerun(e.query)} className="text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 shrink-0">재실행</button>
                     <button onClick={() => searchHistoryRemove(e.id)} className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-500 rounded shrink-0 opacity-0 group-hover:opacity-100" title="삭제">×</button>
@@ -657,7 +686,7 @@ export function PatentInput({ onRun }: Props) {
       )}
     </div>
   );
-}
+});
 
 // ── Helper Components ─────────────────────────────────────────
 

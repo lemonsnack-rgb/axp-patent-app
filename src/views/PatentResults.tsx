@@ -69,9 +69,11 @@ interface Props {
   onSave: (idx: number) => void;
   searchQuery?: string;
   meta?: MetaFilter | null;
+  onRefine?: (term: string) => void;   // 결과 내 검색
 }
 
-export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, meta }: Props) {
+export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, meta, onRefine }: Props) {
+  const [refineTerm, setRefineTerm] = useState('');
   const { setMode, setBgPatentRef } = useStore();
   const [sort, setSort] = useState<SortKey>('recent');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -190,6 +192,18 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
           <Button variant="outlined" color="primary" size="xs" className="shrink-0" onClick={onModify}>
             <Icon name="edit" size={11} /> 검색조건 수정
           </Button>
+          {onRefine && (
+            <input
+              value={refineTerm}
+              onChange={e => setRefineTerm(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && refineTerm.trim()) { onRefine(refineTerm.trim()); setRefineTerm(''); }
+              }}
+              placeholder="결과 내 검색 + (Enter)"
+              title="현재 검색식에 AND로 추가해 결과를 좁힙니다"
+              className="shrink-0 w-44 px-2 py-1 border border-gray-200 rounded text-sm2 outline-none focus:border-blue-400"
+            />
+          )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <select

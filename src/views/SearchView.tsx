@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { PATENT_SEED } from '../data/patentSeed';
 import { PatentDetail } from '../components/PatentDetail';
 import { LibrarySaveModal } from '../components/LibrarySaveModal';
-import { PatentInput } from './PatentInput';
+import { PatentInput, type PatentInputHandle } from './PatentInput';
 import { PatentResults } from './PatentResults';
 import { PaperInput } from './PaperInput';
 import { PaperResults } from './PaperResults';
@@ -23,6 +23,7 @@ export function SearchView() {
   const [detailIdx, setDetailIdx] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [committedMeta, setCommittedMeta] = useState<MetaFilter | null>(null);
+  const patentInputRef = useRef<PatentInputHandle>(null);
 
   // 논문 검색 — 기존 stage 방식 유지
   const [paperStage, setPaperStage] = useState<'input' | 'results'>('input');
@@ -69,6 +70,7 @@ export function SearchView() {
               : 'flex-1'
           )}>
             <PatentInput
+              ref={patentInputRef}
               onRun={(q, meta) => { setSearchQuery(q); setCommittedMeta(meta); setPatentSearched(true); }}
             />
           </div>
@@ -81,6 +83,7 @@ export function SearchView() {
               onSave={openSavePatent}
               searchQuery={searchQuery}
               meta={committedMeta}
+              onRefine={term => patentInputRef.current?.refine(term)}
             />
           )}
         </>

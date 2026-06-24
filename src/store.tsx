@@ -17,6 +17,7 @@ export interface SearchHistoryEntry {
   kind: 'patent' | 'paper';
   query: string;   // 실행된 검색식(결과 칩과 동일)
   at: number;
+  pinned?: boolean;   // ★ 저장된 검색 — 전체삭제로 지워지지 않고 상단 고정
 }
 
 const TASK_TYPE_META: Record<TaskType, { label: string; color: string; icon: 'doc'|'search'|'paper' }> = {
@@ -37,6 +38,7 @@ interface StoreCtx {
   searchHistoryAdd: (kind: 'patent' | 'paper', query: string) => void;
   searchHistoryRemove: (id: string) => void;
   searchHistoryClear: (kind: 'patent' | 'paper') => void;
+  searchHistoryTogglePin: (id: string) => void;
   activeTaskId: string | null; setActiveTaskId: (id: string | null) => void;
   activeProjectId: string | null; setActiveProjectId: (id: string | null) => void;
   bgPatentRef: string | null; setBgPatentRef: (ref: string | null) => void;
@@ -148,7 +150,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setSearchHistory(prev => prev.filter(e => e.id !== id));
   }, [setSearchHistory]);
   const searchHistoryClear = useCallback((kind: 'patent' | 'paper') => {
-    setSearchHistory(prev => prev.filter(e => e.kind !== kind));
+    // 저장(pinned)된 검색은 보존
+    setSearchHistory(prev => prev.filter(e => e.kind !== kind || e.pinned));
+  }, [setSearchHistory]);
+  const searchHistoryTogglePin = useCallback((id: string) => {
+    setSearchHistory(prev => prev.map(e => e.id === id ? { ...e, pinned: !e.pinned } : e));
   }, [setSearchHistory]);
 
   // === task ops ===
@@ -260,7 +266,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const value: StoreCtx = useMemo(() => ({
     mode, setMode,
     searchKind, setSearchKind,
-    searchHistory, searchHistoryAdd, searchHistoryRemove, searchHistoryClear,
+    searchHistory, searchHistoryAdd, searchHistoryRemove, searchHistoryClear, searchHistoryTogglePin,
     activeTaskId, setActiveTaskId,
     activeProjectId, setActiveProjectId,
     bgPatentRef, setBgPatentRef,
@@ -274,7 +280,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     collections, collectionAdd, collectionUpdate, collectionRemove, collectionToggleFavorite, ensureUncategorized,
   }), [
     mode, searchKind, searchHistory, activeTaskId, activeProjectId, bgPatentRef, sidebarCollapsed,
-    searchHistoryAdd, searchHistoryRemove, searchHistoryClear,
+    searchHistoryAdd, searchHistoryRemove, searchHistoryClear, searchHistoryTogglePin,
     tasks, projects, clients, contacts, library, collections,
     taskAdd, taskUpdate, taskRemove, taskToggleFavorite,
     projectAdd, projectUpdate, projectRemove, projectToggleFavorite,
