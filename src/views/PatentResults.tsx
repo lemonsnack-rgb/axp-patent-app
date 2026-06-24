@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import clsx from 'clsx';
 import { PATENT_SEED } from '../data/patentSeed';
 import { PATENT_FACET_GROUPS_BASE, PATENT_FACET_GROUPS_EXT, type FacetGroup } from '../data/facetGroups';
+import { PatentDetail } from '../components/PatentDetail';
 import { Icon } from '../components/Icon';
 import { useStore } from '../store';
 import { toast, Button } from '@muhayu/axp-ui';
@@ -687,66 +688,28 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
         </div>
       </div>
 
-      {/* 우측 인라인 미리보기 (기존 InlineDetail 그대로 사용) */}
-      <div className={clsx('flex flex-col overflow-hidden transition-all', selectedCard !== null ? 'w-80 min-w-80' : 'w-0 min-w-0')}>
-        {selectedCard !== null && (
+      {/* 우측 사이드 리더 (분할) — 풀 상세를 embedded PatentDetail로 표시 */}
+      <div className={clsx('flex flex-col overflow-hidden transition-all border-l border-gray-200', selectedCard !== null ? 'w-[460px] min-w-[460px]' : 'w-0 min-w-0')}>
+        {selectedCard !== null && data[selectedCard] && (
           <>
-            <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200 shrink-0">
-              <span className="text-md2 font-bold text-gray-700 truncate">{data[selectedCard]?.number}</span>
-              <Button variant="text" size="icon-sm" onClick={() => onSelectCard(-1)}><Icon name="close" size={14} /></Button>
+            <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 border-b border-gray-200 shrink-0">
+              <Button variant="outlined" color="primary" size="xs" className="px-1.5 disabled:opacity-30" disabled={selectedCard <= 0} onClick={() => onSelectCard(selectedCard - 1)} title="이전">◀</Button>
+              <Button variant="outlined" color="primary" size="xs" className="px-1.5 disabled:opacity-30" disabled={selectedCard >= data.length - 1} onClick={() => onSelectCard(selectedCard + 1)} title="다음">▶</Button>
+              <span className="text-xs2 text-gray-400 font-mono">{selectedCard + 1} / {data.length}</span>
+              <span className="font-mono text-sm2 text-brand-400 truncate ml-1">{data[selectedCard]?.number}</span>
+              <span className="flex-1" />
+              <Button variant="outlined" color="primary" size="xs" onClick={() => onOpenDetail(selectedCard)} title="새 탭에서 전체 보기">전체 보기 ↗</Button>
+              <button onClick={() => onSelectCard(-1)} className="text-gray-400 hover:text-gray-700 p-1 shrink-0" title="닫기"><Icon name="close" size={14} /></button>
             </div>
-            <div className="flex-1 overflow-y-auto scroll-thin p-3 text-md2">
-              <InlineDetail
-                d={data[selectedCard]}
-                onOpenDetail={() => onOpenDetail(selectedCard)}
-                onSave={() => onSave(selectedCard)}
-              />
-            </div>
+            <PatentDetail
+              embedded
+              data={data[selectedCard]}
+              searchQuery={searchQuery}
+              onBack={() => onSelectCard(-1)}
+              onSave={() => onSave(selectedCard)}
+            />
           </>
         )}
-      </div>
-    </div>
-  );
-}
-
-function InlineDetail({ d, onOpenDetail, onSave }: { d: PatentResult; onOpenDetail: () => void; onSave: () => void }) {
-  if (!d) return null;
-  const statusColor = getPatentStatusBadgeColor(d.status);
-  return (
-    <div className="space-y-3">
-      <div className="font-bold text-base2 text-gray-800 leading-snug">{d.title}</div>
-      <div className="flex gap-1.5 flex-wrap">
-        <Badge color={statusColor}>{d.status}</Badge>
-        <Badge color="brand">{d.country}</Badge>
-        {d.grade && <Badge color="brand">평가 {d.grade}</Badge>}
-      </div>
-      <div className="space-y-1 text-sm2">
-        <div><strong>출원인:</strong> {d.applicant}</div>
-        {d.inventors && <div><strong>발명자:</strong> {d.inventors}</div>}
-        <div><strong>출원번호:</strong> <span className="font-mono">{d.applicationNo}</span> ({d.applicationDate})</div>
-        {d.publicationNo && <div><strong>공개번호:</strong> <span className="font-mono">{d.publicationNo}</span></div>}
-        {d.registerNo && d.registerNo !== '-' && <div><strong>등록번호:</strong> <span className="font-mono">{d.registerNo}</span></div>}
-        <div><strong>IPC:</strong> <span className="font-mono">{d.ipc}</span></div>
-      </div>
-      <div>
-        <div className="text-xs2 font-bold text-gray-500 mb-1">요약</div>
-        <div className="text-sm2 text-gray-700 leading-relaxed">{d.abstract}</div>
-      </div>
-      {d.repClaim && (
-        <div>
-          <div className="text-xs2 font-bold text-gray-500 mb-1">대표 청구항</div>
-          <div className="text-sm2 bg-blue-50 px-3 py-2 rounded border-l-4 border-blue-500 text-gray-700 leading-relaxed">{d.repClaim.slice(0, 200)}…</div>
-        </div>
-      )}
-      {d.aiPurpose && (
-        <div className="bg-violet-50 border border-violet-200 rounded p-2.5 text-sm2">
-          <div className="font-bold text-violet-700 mb-1">🧠 AI 요약</div>
-          <div className="text-gray-700">{d.aiPurpose}</div>
-        </div>
-      )}
-      <div className="flex gap-2 pt-1 border-t border-gray-100">
-        <Button variant="outlined" color="primary" size="xs" className="flex-1" onClick={onOpenDetail}>전체 보기 ↗</Button>
-        <Button variant="outlined" color="primary" size="xs" onClick={onSave}><Icon name="star" size={11} /> 저장</Button>
       </div>
     </div>
   );

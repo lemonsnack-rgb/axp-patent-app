@@ -31,10 +31,11 @@ const KW_COLORS = [
   { dot: '#84cc16', bg: '#f7fee7', text: '#65a30d', border: '#d9f99d' },
 ];
 
-export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, searchQuery }: {
+export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, searchQuery, embedded = false }: {
   data: PatentResult; onBack: () => void; posLabel?: string;
   onSave?: () => void; onPrev?: () => void; onNext?: () => void;
   searchQuery?: string;
+  embedded?: boolean; // 사이드 리더(분할) 모드 — 상단 액션바 숨김, 단일 컬럼(도면은 본문 내)
 }) {
   const timeline = buildTimeline(data);
   const statusColor = data.status === '등록' ? 'green'
@@ -75,7 +76,8 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
   return (
     <div className="flex-1 flex flex-col bg-white overflow-hidden">
 
-      {/* ── 상단 액션 바 (기존 유지) ── */}
+      {/* ── 상단 액션 바 (전체화면 전용) ── */}
+      {!embedded && (
       <div className="px-6 py-3 border-b border-gray-200 flex items-center gap-2 shrink-0">
         <Button variant="outlined" color="primary" size="sm" onClick={onBack}>
           <Icon name="arrow-left" size={13} /> 검색결과로
@@ -92,6 +94,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
           </Button>
         </div>
       </div>
+      )}
 
       {/* ── 키워드 하이라이터 바 (keywert 참고) ── */}
       {searchQuery && parseKeywords(searchQuery).length > 0 && (
@@ -161,6 +164,16 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               </div>
               <h2 className="text-xl font-bold text-gray-800 leading-snug">{data.title}</h2>
             </div>
+
+            {/* 도면 (분할 리더 전용 — 본문 내) */}
+            {embedded && (data.figures || []).length > 0 && (
+              <div className="mb-4">
+                <div className="text-xs2 font-semibold text-gray-500 mb-1.5">도면 ({(data.figures || []).length})</div>
+                <div className="border border-gray-200 rounded-lg bg-gray-50 overflow-hidden" style={{ height: 220 }}>
+                  <DrawingsPanel figures={data.figures} />
+                </div>
+              </div>
+            )}
 
             {/* 서지사항 */}
             <div ref={secBib}>
@@ -349,7 +362,8 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
           </div>
         </div>
 
-        {/* 우: 도면 패널 */}
+        {/* 우: 도면 패널 (전체화면 전용 — 분할 리더에선 본문 내 표시) */}
+        {!embedded && (
         <div className="w-56 shrink-0 border-l border-gray-200 bg-gray-50 flex flex-col overflow-hidden">
           <div className="px-3 py-2 border-b border-gray-200 bg-white shrink-0">
             <span className="text-sm2 font-bold text-gray-600">도면</span>
@@ -357,6 +371,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
           </div>
           <DrawingsPanel figures={data.figures} />
         </div>
+        )}
 
       </div>
     </div>
