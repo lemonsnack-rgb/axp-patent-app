@@ -95,7 +95,7 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex flex-col">
       {/* ── sri-header ── */}
       <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 bg-white shrink-0 flex-wrap">
         <Badge color="neutral" className="font-bold text-md2">{count.toLocaleString()}건</Badge>
@@ -285,10 +285,10 @@ function ListResults({
   const selected = selectedCard != null ? data[selectedCard] : null;
 
   return (
-    <div className="flex-1 flex overflow-hidden min-h-0">
-      {/* 목록 컬럼 */}
+    <div className="flex items-start">
+      {/* 목록 컬럼 (페이지 전체 스크롤) */}
       <div className={clsx(
-        'flex-1 overflow-y-auto scroll-thin p-3 bg-gray-50 min-w-0',
+        'p-3 bg-gray-50 min-w-0 flex-1',
         selected && 'max-w-[55%]',
       )}>
         {data.map((p, i) => (
@@ -366,7 +366,7 @@ function PaperInlineDetail({
   onNext?: () => void;
 }) {
   return (
-    <aside className="w-[45%] min-w-[320px] max-w-[520px] border-l border-gray-200 bg-white flex flex-col overflow-hidden shrink-0">
+    <aside className="w-[45%] min-w-[320px] max-w-[520px] border-l border-gray-200 bg-white flex flex-col overflow-hidden shrink-0 sticky top-0 self-start h-[calc(100vh-52px)]">
       {/* 헤더 */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 shrink-0 bg-gray-50">
         <Button
@@ -458,7 +458,7 @@ function GalleryResults({
   onSave: (p: PaperResult) => void;
 }) {
   return (
-    <div className="flex-1 overflow-y-auto scroll-thin p-4 bg-gray-50">
+    <div className="p-4 bg-gray-50">
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-3">
         {data.map(p => (
           <Card key={p.id} hoverable className="!p-3 flex flex-col gap-2">

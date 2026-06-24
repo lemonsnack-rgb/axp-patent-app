@@ -188,7 +188,7 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
   const pendingCount = Object.values(pendingFilters).flat().length + Object.values(extFilterValues).filter(v => v?.trim()).length;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex flex-col">
       {/* ── 1. sri-header ── */}
       <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 bg-white shrink-0 flex-wrap">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -587,9 +587,9 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
   const pageData = data.slice(startIdx, startIdx + perPage);
 
   return (
-    <div className="flex-1 flex min-h-0 overflow-hidden">
+    <div className="flex items-start">
       {/* 결과 테이블 영역 */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden border-r border-gray-200">
+      <div className="flex-1 flex flex-col min-w-0 border-r border-gray-200">
         {/* 테이블 상단 바 */}
         <div className="flex items-center justify-between px-4 py-1.5 bg-white border-b border-gray-200 shrink-0">
           <div className="flex items-center gap-3">
@@ -631,8 +631,8 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
           </div>
         </div>
 
-        {/* 테이블 */}
-        <div className="flex-1 overflow-y-auto scroll-thin bg-white">
+        {/* 테이블 (페이지 전체 스크롤 — 내부 스크롤 박스 없음 [검색-92]) */}
+        <div className="bg-white">
           <table className="w-full text-sm2 border-collapse">
             <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
               <tr>
@@ -733,8 +733,8 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
         </div>
       </div>
 
-      {/* 우측 사이드 리더 (분할) — 풀 상세를 embedded PatentDetail로 표시 */}
-      <div className={clsx('flex flex-col overflow-hidden transition-all border-l border-gray-200', selectedCard !== null ? 'w-[460px] min-w-[460px]' : 'w-0 min-w-0')}>
+      {/* 우측 사이드 리더 (분할) — 풀 상세. sticky로 목록 스크롤 중에도 고정 */}
+      <div className={clsx('flex flex-col transition-all border-l border-gray-200 sticky top-0 self-start', selectedCard !== null ? 'w-[460px] min-w-[460px] h-[calc(100vh-52px)] overflow-hidden' : 'w-0 min-w-0')}>
         {selectedCard !== null && data[selectedCard] && (
           <>
             <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 border-b border-gray-200 shrink-0">

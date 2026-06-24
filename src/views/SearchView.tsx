@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import clsx from 'clsx';
 import { PATENT_SEED } from '../data/patentSeed';
 import { PatentDetail } from '../components/PatentDetail';
 import { LibrarySaveModal } from '../components/LibrarySaveModal';
@@ -31,11 +30,25 @@ export function SearchView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [committedMeta, setCommittedMeta] = useState<MetaFilter | null>(null);
   const patentInputRef = useRef<PatentInputHandle>(null);
+  const patentResultsRef = useRef<HTMLDivElement>(null);
 
   // 논문 검색 — 특허와 대칭(인라인)
   const [paperSearched, setPaperSearched] = useState(false);
   const [paperSearchQuery, setPaperSearchQuery] = useState('');
   const paperInputRef = useRef<PaperInputHandle>(null);
+  const paperResultsRef = useRef<HTMLDivElement>(null);
+
+  // 검색 실행 시 결과 영역으로 부드럽게 스크롤 (접지 않고 페이지 스크롤 이동) [검색-92]
+  useEffect(() => {
+    if (patentSearched && searchType === 'patent') {
+      requestAnimationFrame(() => patentResultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+  }, [patentSearched, searchQuery, searchType]);
+  useEffect(() => {
+    if (paperSearched && searchType === 'paper') {
+      requestAnimationFrame(() => paperResultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+  }, [paperSearched, paperSearchQuery, searchType]);
 
   const [saveCtx, setSaveCtx] = useState<{ type: 'patent' | 'paper'; data: PatentResult | PaperResult } | null>(null);
 
@@ -68,63 +81,52 @@ export function SearchView() {
         />
       )}
 
-      {/* 특허 검색 — 입력 + 인라인 결과 */}
+      {/* 특허 검색 — 입력 + 인라인 결과 (단일 페이지 스크롤) */}
       {searchType === 'patent' && !patentDetailOpen && (
-        <>
-          {/* 검색 입력: 검색 전 전체 높이, 검색 후 상단 고정 */}
-          <div className={clsx(
-            'overflow-y-auto scroll-thin',
-            patentSearched
-              ? 'shrink-0 max-h-[280px] border-b border-gray-100'
-              : 'flex-1'
-          )}>
-            <PatentInput
-              ref={patentInputRef}
-              onRun={(q, meta) => { setSearchQuery(q); setCommittedMeta(meta); setPatentSearched(true); }}
-              carryQuery={searchType === 'patent' ? carryQuery : null}
-              onCarryConsumed={() => setCarryQuery(null)}
-            />
-          </div>
-
-          {/* 인라인 검색 결과 */}
+        <div className="flex-1 overflow-y-auto scroll-thin flex flex-col">
+          <PatentInput
+            ref={patentInputRef}
+            onRun={(q, meta) => { setSearchQuery(q); setCommittedMeta(meta); setPatentSearched(true); }}
+            carryQuery={searchType === 'patent' ? carryQuery : null}
+            onCarryConsumed={() => setCarryQuery(null)}
+          />
           {patentSearched && (
-            <PatentResults
-              onModify={() => setPatentSearched(false)}
-              onOpenDetail={i => { setDetailIdx(i); setPatentDetailOpen(true); }}
-              onSave={openSavePatent}
-              searchQuery={searchQuery}
-              meta={committedMeta}
-              onRefine={term => patentInputRef.current?.refine(term)}
-              onCrossSearch={kws => crossSearch('paper', kws)}
-            />
+            <div ref={patentResultsRef} className="flex flex-col">
+              <PatentResults
+                onModify={() => setPatentSearched(false)}
+                onOpenDetail={i => { setDetailIdx(i); setPatentDetailOpen(true); }}
+                onSave={openSavePatent}
+                searchQuery={searchQuery}
+                meta={committedMeta}
+                onRefine={term => patentInputRef.current?.refine(term)}
+                onCrossSearch={kws => crossSearch('paper', kws)}
+              />
+            </div>
           )}
-        </>
+        </div>
       )}
 
-      {/* 논문 검색 — 입력 + 인라인 결과 (특허와 대칭) */}
+      {/* 논문 검색 — 입력 + 인라인 결과 (단일 페이지 스크롤) */}
       {searchType === 'paper' && (
-        <>
-          <div className={clsx(
-            'overflow-y-auto scroll-thin',
-            paperSearched ? 'shrink-0 max-h-[280px] border-b border-gray-100' : 'flex-1'
-          )}>
-            <PaperInput
-              ref={paperInputRef}
-              onRun={q => { setPaperSearchQuery(q); setPaperSearched(true); }}
-              carryQuery={searchType === 'paper' ? carryQuery : null}
-              onCarryConsumed={() => setCarryQuery(null)}
-            />
-          </div>
+        <div className="flex-1 overflow-y-auto scroll-thin flex flex-col">
+          <PaperInput
+            ref={paperInputRef}
+            onRun={q => { setPaperSearchQuery(q); setPaperSearched(true); }}
+            carryQuery={searchType === 'paper' ? carryQuery : null}
+            onCarryConsumed={() => setCarryQuery(null)}
+          />
           {paperSearched && (
-            <PaperResults
-              onModify={() => setPaperSearched(false)}
-              onSave={openSavePaper}
-              searchQuery={paperSearchQuery}
-              onRefine={term => paperInputRef.current?.refine(term)}
-              onCrossSearch={kws => crossSearch('patent', kws)}
-            />
+            <div ref={paperResultsRef} className="flex flex-col">
+              <PaperResults
+                onModify={() => setPaperSearched(false)}
+                onSave={openSavePaper}
+                searchQuery={paperSearchQuery}
+                onRefine={term => paperInputRef.current?.refine(term)}
+                onCrossSearch={kws => crossSearch('patent', kws)}
+              />
+            </div>
           )}
-        </>
+        </div>
       )}
 
       <LibrarySaveModal
