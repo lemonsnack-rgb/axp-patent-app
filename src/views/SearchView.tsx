@@ -14,8 +14,15 @@ import type { MetaFilter } from '../features/search';
 type SearchType = 'patent' | 'paper';
 
 export function SearchView() {
-  const { searchKind } = useStore();
+  const { searchKind, setSearchKind } = useStore();
   const searchType: SearchType = searchKind;
+  // 검색식 이월 — 특허↔논문 교차 시 키워드 이월 [검색-212]
+  const [carryQuery, setCarryQuery] = useState<string | null>(null);
+  const crossSearch = (toKind: 'patent' | 'paper', keywords: string) => {
+    if (!keywords.trim()) return;
+    setCarryQuery(keywords.trim());
+    setSearchKind(toKind);
+  };
 
   // 특허 검색 — 인라인 결과
   const [patentSearched, setPatentSearched] = useState(false);
@@ -74,6 +81,8 @@ export function SearchView() {
             <PatentInput
               ref={patentInputRef}
               onRun={(q, meta) => { setSearchQuery(q); setCommittedMeta(meta); setPatentSearched(true); }}
+              carryQuery={searchType === 'patent' ? carryQuery : null}
+              onCarryConsumed={() => setCarryQuery(null)}
             />
           </div>
 
@@ -86,6 +95,7 @@ export function SearchView() {
               searchQuery={searchQuery}
               meta={committedMeta}
               onRefine={term => patentInputRef.current?.refine(term)}
+              onCrossSearch={kws => crossSearch('paper', kws)}
             />
           )}
         </>
@@ -101,6 +111,8 @@ export function SearchView() {
             <PaperInput
               ref={paperInputRef}
               onRun={q => { setPaperSearchQuery(q); setPaperSearched(true); }}
+              carryQuery={searchType === 'paper' ? carryQuery : null}
+              onCarryConsumed={() => setCarryQuery(null)}
             />
           </div>
           {paperSearched && (
@@ -109,6 +121,7 @@ export function SearchView() {
               onSave={openSavePaper}
               searchQuery={paperSearchQuery}
               onRefine={term => paperInputRef.current?.refine(term)}
+              onCrossSearch={kws => crossSearch('patent', kws)}
             />
           )}
         </>

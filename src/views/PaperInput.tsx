@@ -1,6 +1,6 @@
 // 논문 검색 입력 — 특허(PatentInput)와 대칭: 단일 검색식 + 범위탭 + 검색필드 패널 + 검색 히스토리
 // 자체 구축 DB 기준(외부 PubMed/Scopus 아님). 필드: 제목/초록/키워드/전문/저자.
-import { useState, useRef, useImperativeHandle, forwardRef } from 'react';
+import { useState, useRef, useImperativeHandle, useEffect, forwardRef } from 'react';
 import clsx from 'clsx';
 import { Button } from '@muhayu/axp-ui';
 import { FinderModal } from '../components/FinderModal';
@@ -31,7 +31,11 @@ const PERIODS = [
   { id: '10y', label: '최근 10년' },
 ];
 
-interface Props { onRun: (execQuery: string) => void }
+interface Props {
+  onRun: (execQuery: string) => void;
+  carryQuery?: string | null;   // 특허→논문 검색식 이월 [검색-212]
+  onCarryConsumed?: () => void;
+}
 export interface PaperInputHandle { refine: (term: string) => void }
 
 function histTime(ts: number): string {
@@ -40,7 +44,7 @@ function histTime(ts: number): string {
   return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInput({ onRun }, ref) {
+export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInput({ onRun, carryQuery, onCarryConsumed }, ref) {
   const { searchHistory, searchHistoryAdd, searchHistoryRemove, searchHistoryClear, searchHistoryTogglePin } = useStore();
   const paperHistory = searchHistory
     .filter(e => e.kind === 'paper')
@@ -105,6 +109,18 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
       s.onRun(execQuery);
     },
   }), []);
+
+  // 검색식 이월 수신 — 특허에서 넘어온 키워드로 즉시 검색 [검색-212]
+  useEffect(() => {
+    if (!carryQuery) return;
+    setFormulaText(carryQuery);
+    setFields(prev => prev.map(f => ({ ...f, value: '' })));
+    const execQuery = applyScope(carryQuery, scope);
+    searchHistoryAdd('paper', execQuery);
+    onRun(execQuery);
+    onCarryConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carryQuery]);
 
   return (
     <div className="bg-white">

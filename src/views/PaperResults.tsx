@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { PAPER_SEED } from '../data/patentSeed';
 import { PAPER_FACET_GROUPS } from '../data/facetGroups';
 import { Icon } from '../components/Icon';
+import { parseKeywords } from '../components/PatentDetail';
 import { Badge, Card } from '../components/ui';
 import type { PaperResult } from '../types';
 import { Button } from '@muhayu/axp-ui';
@@ -18,9 +19,10 @@ interface Props {
   onSave: (p: PaperResult) => void;
   searchQuery?: string;
   onRefine?: (term: string) => void;
+  onCrossSearch?: (keywords: string) => void;   // 검색식 이월 → 특허 [검색-212]
 }
 
-export function PaperResults({ onModify, onSave, searchQuery, onRefine }: Props) {
+export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossSearch }: Props) {
   const [sort, setSort] = useState<SortKey>('match');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -100,6 +102,13 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine }: Props)
             title="현재 검색식에 AND로 추가해 결과를 좁힙니다"
             className="shrink-0 w-44 px-2 py-1 border border-gray-200 rounded text-sm2 outline-none focus:border-blue-400"
           />
+        )}
+        {onCrossSearch && searchQuery && (
+          <Button variant="text" color="primary" size="xs" className="shrink-0 text-amber-600"
+            title="이 검색 키워드로 특허 검색 (검색식 이월)"
+            onClick={() => onCrossSearch(parseKeywords(searchQuery).join(' '))}>
+            → 특허로
+          </Button>
         )}
         <span className="flex-1" />
         <select

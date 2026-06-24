@@ -70,9 +70,10 @@ interface Props {
   searchQuery?: string;
   meta?: MetaFilter | null;
   onRefine?: (term: string) => void;   // 결과 내 검색
+  onCrossSearch?: (keywords: string) => void;   // 검색식 이월 → 논문 [검색-212]
 }
 
-export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, meta, onRefine }: Props) {
+export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, meta, onRefine, onCrossSearch }: Props) {
   const [refineTerm, setRefineTerm] = useState('');
   const { setMode, setBgPatentRef } = useStore();
   const [sort, setSort] = useState<SortKey>('recent');
@@ -203,6 +204,13 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
               title="현재 검색식에 AND로 추가해 결과를 좁힙니다"
               className="shrink-0 w-44 px-2 py-1 border border-gray-200 rounded text-sm2 outline-none focus:border-blue-400"
             />
+          )}
+          {onCrossSearch && searchQuery && (
+            <Button variant="text" color="primary" size="xs" className="shrink-0 text-amber-600"
+              title="이 검색 키워드로 논문 검색 (검색식 이월)"
+              onClick={() => onCrossSearch(parseKeywords(searchQuery).join(' '))}>
+              → 논문으로
+            </Button>
           )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">

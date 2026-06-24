@@ -1,6 +1,6 @@
 // 특허 검색 입력 영역 — 데모(http://10.77.0.244:8010/patents) 방식
 // Config 2줄 압축 + 검색필드 그룹 탭 (텍스트/분류코드/인명/번호/일자)
-import { useState, useRef, useImperativeHandle, forwardRef } from 'react';
+import { useState, useRef, useImperativeHandle, useEffect, forwardRef } from 'react';
 import clsx from 'clsx';
 import { toast, Button } from '@muhayu/axp-ui';
 import { FinderModal, type FinderType } from '../components/FinderModal';
@@ -133,7 +133,11 @@ function FormulaEditor({ value, onChange, rows = 3, placeholder = '' }: {
 }
 
 // ── Props ─────────────────────────────────────────────────────
-interface Props { onRun: (execQuery: string, meta: MetaFilter) => void }
+interface Props {
+  onRun: (execQuery: string, meta: MetaFilter) => void;
+  carryQuery?: string | null;   // 논문→특허 검색식 이월 [검색-212]
+  onCarryConsumed?: () => void;
+}
 
 // 결과 화면의 "결과 내 검색"이 호출할 수 있도록 노출하는 핸들
 export interface PatentInputHandle { refine: (term: string) => void }
@@ -146,7 +150,7 @@ const KEY_TABS: { id: ScopeTab; label: string }[] = [
 ];
 
 // ── Main ──────────────────────────────────────────────────────
-export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentInput({ onRun }, ref) {
+export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentInput({ onRun, carryQuery, onCarryConsumed }, ref) {
   const { searchHistory, searchHistoryAdd, searchHistoryRemove, searchHistoryClear, searchHistoryTogglePin } = useStore();
   // 저장(pinned)된 검색을 상단에, 나머지는 최신순(삽입순) 유지
   const patentHistory = searchHistory
@@ -282,6 +286,18 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
       s.onRun(execQuery, s.buildMeta());
     },
   }), []);
+
+  // 검색식 이월 수신 — 논문에서 넘어온 키워드로 즉시 검색 [검색-212]
+  useEffect(() => {
+    if (!carryQuery) return;
+    setFormulaText(carryQuery);
+    setFields(prev => prev.map(f => ({ ...f, value: '', dateFrom: '', dateTo: '' })));
+    const execQuery = applyScope(carryQuery, keyTab);
+    searchHistoryAdd('patent', execQuery);
+    onRun(execQuery, buildMeta());
+    onCarryConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carryQuery]);
 
   const canSearch = hasSearchInput(
     formulaText,
