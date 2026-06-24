@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import clsx from 'clsx';
 import { PATENT_SEED } from '../data/patentSeed';
-import { PATENT_FACET_GROUPS_BASE, PATENT_FACET_GROUPS_EXT } from '../data/facetGroups';
+import { PATENT_FACET_GROUPS_BASE, PATENT_FACET_GROUPS_EXT, type FacetGroup } from '../data/facetGroups';
 import { Icon } from '../components/Icon';
 import { useStore } from '../store';
 import { toast, Button } from '@muhayu/axp-ui';
@@ -75,6 +75,7 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
   const [sort, setSort] = useState<SortKey>('recent');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [openFacet, setOpenFacet] = useState<string | null>(null); // 칩별 스코프 팝오버
   const [drawerExpanded, setDrawerExpanded] = useState<Record<string, boolean>>({});
   const [pendingFilters, setPendingFilters] = useState<Record<string, string[]>>({});
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilter[]>([]);
@@ -139,6 +140,7 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
     setPage(1);
     setSelectedCard(null);
     setDrawerOpen(false);
+    setOpenFacet(null);
   };
 
   const cancelFilters = () => {
@@ -151,6 +153,7 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
     });
     setPendingFilters(restored);
     setDrawerOpen(false);
+    setOpenFacet(null);
   };
 
   const removeAppliedFilter = (f: AppliedFilter) => {
@@ -245,30 +248,43 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
         </div>
       </div>
 
-      {/* ── 2. sri-filter-bar (7그룹 + 모든 필터) ── */}
-      <div className="flex items-center gap-1 px-3 py-1.5 border-b border-gray-100 bg-white shrink-0 flex-wrap">
+      {/* ── 2. sri-filter-bar (칩별 스코프 팝오버 + 모든 필터) ── */}
+      <div className="flex items-center gap-1 px-3 py-1.5 border-b border-gray-100 bg-white shrink-0 flex-wrap relative z-20">
         <span className="text-xs2 font-semibold text-gray-400 mr-1">필터</span>
         {PATENT_FACET_GROUPS_BASE.map(g => {
           const activeCount = (appliedFilters.filter(f => f.facetKey === g.key).length);
+          const isOpen = openFacet === g.key;
           return (
-            <button
-              key={g.key}
-              onClick={() => setDrawerOpen(v => !v)}
-              className={clsx(
-                'inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-sm2 transition-all',
-                activeCount > 0
-                  ? 'bg-brand-400 text-white border-brand-400'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-brand-400',
+            <div key={g.key} className="relative">
+              <button
+                onClick={() => { setOpenFacet(isOpen ? null : g.key); setDrawerOpen(false); }}
+                className={clsx(
+                  'inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-sm2 transition-all',
+                  activeCount > 0
+                    ? 'bg-brand-400 text-white border-brand-400'
+                    : isOpen
+                      ? 'bg-blue-50 text-brand-400 border-blue-400'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-brand-400',
+                )}
+              >
+                {g.title}
+                {activeCount > 0 && <span className="bg-white/20 rounded-full px-1 text-xs2">{activeCount}</span>}
+                <Icon name="chevron-down" size={11} className={clsx('transition-transform', isOpen && 'rotate-180')} />
+              </button>
+              {isOpen && (
+                <FacetPopover
+                  group={g}
+                  selected={pendingFilters[g.key] || []}
+                  onToggle={(label) => togglePendingFilter(g.key, label)}
+                  onApply={applyFilters}
+                  onClose={() => setOpenFacet(null)}
+                />
               )}
-            >
-              {g.title}
-              {activeCount > 0 && <span className="bg-white/20 rounded-full px-1 text-xs2">{activeCount}</span>}
-              <Icon name="chevron-down" size={11} />
-            </button>
+            </div>
           );
         })}
         <button
-          onClick={() => setDrawerOpen(v => !v)}
+          onClick={() => { setDrawerOpen(v => !v); setOpenFacet(null); }}
           className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-300 rounded-md text-sm2 text-gray-600 hover:border-blue-400 hover:text-brand-400"
         >
           <Icon name="hamburger" size={11} />
@@ -276,6 +292,9 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
         </button>
         <button onClick={resetFilters} className="text-sm2 text-gray-400 hover:text-red-500 ml-1">필터 초기화</button>
       </div>
+
+      {/* 팝오버 바깥 클릭 닫기 백드롭 */}
+      {openFacet && <div className="fixed inset-0 z-10" onClick={() => setOpenFacet(null)} />}
 
       {/* ── 3. 모든 필터 드로어 ── */}
       {drawerOpen && (
@@ -345,6 +364,57 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
       )}
       {viewMode === 'sliding' && <SlidingView data={data} onOpenDetail={onOpenDetail} onSave={onSave} onBgPatent={num => { setBgPatentRef(num); setMode('spec'); toast(`배경기술 추가: ${num}`); }} />}
       {viewMode === 'gallery' && <GalleryView data={data} onSave={onSave} onBgPatent={num => { setBgPatentRef(num); setMode('spec'); toast(`배경기술 추가: ${num}`); }} />}
+    </div>
+  );
+}
+
+// ── 패싯 칩 스코프 팝오버 (해당 패싯 값+건수만) ──
+function FacetPopover({ group, selected, onToggle, onApply, onClose }: {
+  group: FacetGroup;
+  selected: string[];
+  onToggle: (label: string) => void;
+  onApply: () => void;
+  onClose: () => void;
+}) {
+  const [q, setQ] = useState('');
+  const items = group.items.filter(it => it.label !== '전체');
+  const searchable = items.length > 8;
+  const shown = q.trim()
+    ? items.filter(it => it.label.toLowerCase().includes(q.trim().toLowerCase()))
+    : items;
+  return (
+    <div className="absolute z-30 top-full mt-1 left-0 w-64 bg-white border border-gray-200 rounded-lg shadow-card-deep p-2">
+      <div className="flex items-center justify-between px-1 pb-1.5 mb-1 border-b border-gray-100">
+        <span className="text-sm2 font-semibold text-gray-700">{group.title}</span>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xs2 leading-none">✕</button>
+      </div>
+      {searchable && (
+        <input
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder={`${group.title} 검색`}
+          className="w-full mb-1.5 px-2 py-1 border border-gray-200 rounded text-xs2 outline-none focus:border-blue-400"
+        />
+      )}
+      <div className="max-h-56 overflow-y-auto scroll-thin space-y-0.5">
+        {shown.length === 0 && <div className="text-xs2 text-gray-400 px-1 py-2 text-center">일치 항목 없음</div>}
+        {shown.map((it, i) => (
+          <label key={i} className="flex items-center gap-1.5 px-1 py-1 rounded text-sm2 text-gray-600 cursor-pointer hover:bg-gray-50">
+            <input
+              type="checkbox"
+              className="form-checkbox text-brand-400 rounded w-3 h-3"
+              checked={selected.includes(it.label)}
+              onChange={() => onToggle(it.label)}
+            />
+            <span className="truncate flex-1">{it.label}</span>
+            {it.count != null && <span className="text-xs2 text-gray-400">{it.count.toLocaleString()}</span>}
+          </label>
+        ))}
+      </div>
+      <div className="flex justify-end gap-1.5 pt-1.5 mt-1 border-t border-gray-100">
+        <Button variant="outlined" color="primary" size="xs" onClick={onClose}>취소</Button>
+        <Button variant="filled" color="primary" size="sm" className="text-sm2" onClick={onApply}>적용</Button>
+      </div>
     </div>
   );
 }
