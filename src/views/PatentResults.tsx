@@ -245,8 +245,8 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
           <div className="inline-flex border border-gray-300 rounded overflow-hidden">
             {([
               { key: 'list', title: '리스트', disabled: false },
-              { key: 'sliding', title: '슬라이딩 뷰', disabled: true },
-              { key: 'gallery', title: '갤러리(스크리닝)', disabled: true },
+              { key: 'sliding', title: '슬라이딩 뷰', disabled: false },
+              { key: 'gallery', title: '갤러리(스크리닝)', disabled: false },
             ] as const).map(v => (
               <button
                 key={v.key}
