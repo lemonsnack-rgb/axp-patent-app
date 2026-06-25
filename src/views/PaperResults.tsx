@@ -7,7 +7,7 @@ import { Icon } from '../components/Icon';
 import { parseKeywords, KW_COLORS } from '../components/PatentDetail';
 import { Badge, Card } from '../components/ui';
 import type { PaperResult } from '../types';
-import { Button } from '@muhayu/axp-ui';
+import { Button, toast } from '@muhayu/axp-ui';
 
 type SortKey = 'match' | 'cited' | 'recent';
 type ViewMode = 'list' | 'gallery';
@@ -455,13 +455,30 @@ export function PaperInlineDetail({
 
         {/* 액션 */}
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outlined" color="primary" size="sm" className="text-xs2">
+          <Button
+            variant="outlined" color="primary" size="sm" className="text-xs2"
+            onClick={() => window.open(
+              paper.doi ? `https://doi.org/${paper.doi}` : `https://scholar.google.com/scholar?q=${encodeURIComponent(paper.title)}`,
+              '_blank', 'noopener,noreferrer'
+            )}
+            title={paper.doi ? `원문 보기 (DOI: ${paper.doi})` : '원문 검색 (Google Scholar)'}
+          >
             <Icon name="link" size={11} /> 전체 보기 ↗
           </Button>
           <Button variant="outlined" color="primary" size="sm" onClick={onSave} className="text-xs2">
             <Icon name="star" size={11} /> 라이브러리 저장
           </Button>
-          <Button variant="outlined" color="primary" size="sm" className="text-xs2">
+          <Button
+            variant="outlined" color="primary" size="sm" className="text-xs2"
+            onClick={() => {
+              const cite = `${paper.authors} (${paper.year ?? 'n.d.'}). ${paper.title}.${paper.journal ? ` ${paper.journal}.` : ''}${paper.doi ? ` https://doi.org/${paper.doi}` : ''}`;
+              navigator.clipboard?.writeText(cite).then(
+                () => toast.success('인용 정보가 복사되었습니다.'),
+                () => toast('복사에 실패했습니다.'),
+              );
+            }}
+            title="인용 정보를 클립보드에 복사"
+          >
             <Icon name="clipboard" size={11} /> 인용 복사
           </Button>
         </div>
