@@ -3,8 +3,9 @@ import { useStore } from '../store';
 import { toast, Button } from '@muhayu/axp-ui';
 import { Modal } from './Modal';
 import { Badge, Input } from './ui';
+import type { LibraryItem } from '../types';
 
-export function LibraryDetailModal({ id, onClose }: { id: string | null; onClose: () => void }) {
+export function LibraryDetailModal({ id, onClose, onReview }: { id: string | null; onClose: () => void; onReview?: (item: LibraryItem) => void }) {
   const { library, collections, libraryUpdate, libraryRemove, libraryToggleFavorite } = useStore();
   const [editingNote, setEditingNote] = useState(false);
   const [noteText, setNoteText] = useState('');
@@ -46,7 +47,12 @@ export function LibraryDetailModal({ id, onClose }: { id: string | null; onClose
           className="mr-auto text-red-600 border-red-200 hover:bg-red-50"
           onClick={() => { if (confirm('이 자료를 삭제할까요?')) { libraryRemove(it.id); toast('자료 삭제됨'); onClose(); } }}
         >삭제</Button>
-        <Button variant="outlined" color="primary" size="sm" onClick={onClose}>닫기</Button>
+        {onReview && it.data && (
+          <Button variant="outlined" color="primary" size="sm" onClick={() => { onReview(it); onClose(); }}>
+            📄 전체 상세페이지 보기 ↗
+          </Button>
+        )}
+        <Button variant="filled" color="primary" size="sm" onClick={onClose}>닫기</Button>
       </>}
     >
       <div className="space-y-4">

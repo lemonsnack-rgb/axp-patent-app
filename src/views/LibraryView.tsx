@@ -5,10 +5,12 @@ import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
 import { LibrarySaveModal } from '../components/LibrarySaveModal';
 import { LibraryDetailModal } from '../components/LibraryDetailModal';
+import { PatentDetail } from '../components/PatentDetail';
+import { PaperInlineDetail } from './PaperResults';
 import clsx from 'clsx';
 import { EmptyState } from '../components/EmptyState';
 import { Badge, Card, Input } from '../components/ui';
-import type { LibraryItem, LibraryCollection } from '../types';
+import type { LibraryItem, LibraryCollection, PatentResult, PaperResult } from '../types';
 
 type DrillFilter = { id: string };
 
@@ -18,8 +20,41 @@ export function LibraryView() {
   const [sort, setSort] = useState<'recent' | 'title'>('recent');
   const [newOpen, setNewOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [reviewItem, setReviewItem] = useState<LibraryItem | null>(null);
 
   useEffect(() => { ensureUncategorized(); }, []);
+
+  // 저장 자료의 전체 상세페이지 재열람 (검색과 동일한 상세 UI 재사용)
+  if (reviewItem && reviewItem.data) {
+    return (
+      <div className="flex-1 flex flex-col overflow-hidden bg-white">
+        {reviewItem.type === 'patent' ? (
+          <PatentDetail
+            data={reviewItem.data as PatentResult}
+            onBack={() => setReviewItem(null)}
+            backLabel="라이브러리로"
+            posLabel="라이브러리"
+            onSave={() => toast('이미 저장된 자료입니다.')}
+          />
+        ) : (
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 bg-gray-50 shrink-0">
+              <Button variant="outlined" color="primary" size="sm" onClick={() => setReviewItem(null)}>← 라이브러리</Button>
+              <span className="text-sm2 text-gray-500">논문 상세</span>
+            </div>
+            <div className="flex-1 overflow-y-auto scroll-thin flex justify-center bg-zinc-50">
+              <PaperInlineDetail
+                paper={reviewItem.data as PaperResult}
+                posLabel="라이브러리"
+                onClose={() => setReviewItem(null)}
+                onSave={() => toast('이미 저장된 자료입니다.')}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const uncatCol = collections.find(c => c._system === 'uncat');
   const userCols = [...collections]
@@ -117,7 +152,7 @@ export function LibraryView() {
       )}
 
       <NewCollectionModal open={newOpen} onClose={() => setNewOpen(false)} onCreate={name => { collectionAdd(name); setNewOpen(false); }} />
-      <LibraryDetailModal id={detailId} onClose={() => setDetailId(null)} />
+      <LibraryDetailModal id={detailId} onClose={() => setDetailId(null)} onReview={setReviewItem} />
     </div>
   );
 }

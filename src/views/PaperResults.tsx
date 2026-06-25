@@ -375,7 +375,7 @@ function ListResults({
 }
 
 // ── 논문 인라인 상세 패널 ──
-function PaperInlineDetail({
+export function PaperInlineDetail({
   paper, posLabel, onClose, onSave, onPrev, onNext,
 }: {
   paper: PaperResult;
