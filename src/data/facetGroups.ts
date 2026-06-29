@@ -208,25 +208,34 @@ export const PATENT_FACET_GROUPS_EXT: FacetGroup[] = [
   },
 ];
 
+// 논문 패싯은 실제 시드(PAPER_SEED)에서 동적 산출 — 라벨 불일치로 0건 되는 문제 방지
+import { PAPER_SEED } from './patentSeed';
+
+function countBy<T>(items: T[], key: (t: T) => string | undefined): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const it of items) {
+    const k = key(it);
+    if (!k) continue;
+    m.set(k, (m.get(k) ?? 0) + 1);
+  }
+  return m;
+}
+
+const yearCounts = countBy(PAPER_SEED, p => p.year != null ? String(p.year) : undefined);
+const journalCounts = countBy(PAPER_SEED, p => p.journal);
+
 export const PAPER_FACET_GROUPS: FacetGroup[] = [
   {
     key: 'pub_year', title: '발행연도',
-    items: [
-      { label: '2025', count: 38 },
-      { label: '2024', count: 67 },
-      { label: '2023', count: 54 },
-      { label: '2022', count: 42 },
-      { label: '2021 이전', count: 42 },
-    ],
+    items: [...yearCounts.entries()]
+      .sort((a, b) => Number(b[0]) - Number(a[0]))
+      .map(([label, count]) => ({ label, count })),
   },
   {
     key: 'journal', title: '저널명',
-    items: [
-      { label: 'IEEE Trans. ITS', count: 45 },
-      { label: 'Sensors',         count: 32 },
-      { label: 'CVPR',            count: 28 },
-      { label: 'ICRA',            count: 21 },
-      { label: 'IEEE Trans. PAMI', count: 18 },
-    ],
+    items: [...journalCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([label, count]) => ({ label, count })),
   },
 ];

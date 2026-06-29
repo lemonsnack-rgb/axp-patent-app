@@ -482,7 +482,7 @@ function FacetPopover({ group, selected, onToggle, onApply, onClose }: {
       </div>
       <div className="flex justify-end gap-1.5 pt-1.5 mt-1 border-t border-gray-100">
         <Button variant="outlined" color="primary" size="xs" onClick={onClose}>취소</Button>
-        <Button variant="filled" color="primary" size="sm" className="text-sm2" onClick={onApply}>적용</Button>
+        <Button variant="filled" color="primary" size="xs" onClick={onApply}>적용</Button>
       </div>
     </div>
   );
@@ -579,7 +579,7 @@ function FilterDrawer({ pendingFilters, extFilterValues, onToggle, onExtChange, 
         </span>
         <div className="flex gap-1.5">
           <Button variant="outlined" color="primary" size="xs" onClick={onCancel}>취소</Button>
-          <Button variant="filled" color="primary" size="sm" className="text-sm2" onClick={onApply}>적용</Button>
+          <Button variant="filled" color="primary" size="xs" onClick={onApply}>적용</Button>
         </div>
       </div>
     </div>

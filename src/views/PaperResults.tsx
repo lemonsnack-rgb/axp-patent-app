@@ -31,6 +31,7 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
   const [refineTerm, setRefineTerm] = useState('');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState<20 | 50 | 100>(20);
+  const [openGroup, setOpenGroup] = useState<string | null>(null); // 드로어에 표시할 그룹(null=전체)
 
   // 검색어 키워드 + 패싯(발행연도/저널명)으로 실제 필터링 [검색-100·154]
   const queryKeywords = parseKeywords(searchQuery || '');
@@ -156,10 +157,14 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
             variant="outlined"
             color="primary"
             size="xs"
-            onClick={() => setDrawerOpen(o => !o)}
+            onClick={() => {
+              // 같은 그룹 칩을 다시 누르면 닫기, 아니면 해당 그룹만 열기
+              if (drawerOpen && openGroup === g.key) { setDrawerOpen(false); }
+              else { setOpenGroup(g.key); setDrawerOpen(true); }
+            }}
             className={clsx(
               'text-xs2',
-              (pendingFilters[g.key] || []).length > 0 && 'border-blue-400 text-blue-700 bg-blue-50',
+              ((pendingFilters[g.key] || []).length > 0 || (drawerOpen && openGroup === g.key)) && 'border-blue-400 text-blue-700 bg-blue-50',
             )}
           >
             {g.title}
@@ -172,8 +177,8 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
           variant="outlined"
           color="primary"
           size="xs"
-          onClick={() => setDrawerOpen(o => !o)}
-          className={clsx('text-xs2', drawerOpen && 'border-blue-400 text-blue-700 bg-blue-50')}
+          onClick={() => { if (drawerOpen && openGroup === null) { setDrawerOpen(false); } else { setOpenGroup(null); setDrawerOpen(true); } }}
+          className={clsx('text-xs2', drawerOpen && openGroup === null && 'border-blue-400 text-blue-700 bg-blue-50')}
         >
           모든 필터
         </Button>
@@ -213,8 +218,8 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
       {drawerOpen && (
         <div className="border-b border-gray-200 bg-white shrink-0">
           <div className="p-4 overflow-y-auto max-h-80 scroll-thin">
-            <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-              {PAPER_FACET_GROUPS.map(g => (
+            <div className={clsx('grid gap-x-8 gap-y-4', openGroup === null ? 'grid-cols-2' : 'grid-cols-1')}>
+              {PAPER_FACET_GROUPS.filter(g => openGroup === null || g.key === openGroup).map(g => (
                 <div key={g.key}>
                   <div className="text-xs2 font-semibold text-gray-600 mb-1.5">{g.title}</div>
                   <div className="space-y-1">
@@ -245,8 +250,8 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
           <div className="flex items-center justify-between px-4 py-2 border-t border-gray-100 bg-gray-50">
             <span className="text-xs2 text-gray-500">선택한 필터는 [적용] 클릭 시 결과에 반영됩니다</span>
             <div className="flex gap-2">
-              <Button variant="outlined" color="primary" size="xs" onClick={cancelFilters}>취소</Button>
-              <Button variant="filled" color="primary" size="sm" onClick={applyFilters} className="text-xs2">적용</Button>
+              <Button variant="outlined" color="primary" size="xs" onClick={cancelFilters} className="text-xs2">취소</Button>
+              <Button variant="filled" color="primary" size="xs" onClick={applyFilters} className="text-xs2">적용</Button>
             </div>
           </div>
         </div>
