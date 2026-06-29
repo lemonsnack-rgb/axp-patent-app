@@ -205,7 +205,8 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
   const pubDate = mkDate(year, seq + 3, seq + 5);
   const regDate = isReg ? mkDate(year, seq + 6, seq + 1) : '-';
   const exp = isReg ? `${year - 1 + 20}-${appDate.slice(5)}` : '-';
-  const titleSuffix = ['장치 및 방법', '시스템', '장치', '방법', '구조'][slot % 5];
+  // device명과 중복되지 않는 자연스러운 접미 (slot 0은 접미 없음)
+  const titleSuffix = ['', ' 및 그 동작 방법', ' 및 제어 방법', ' 및 그 제조 방법', '를 포함하는 시스템'][slot % 5];
   const { citing, cited } = buildCitations(dm, year, seq);
   const applicant = dm.applicants[cc];
   const isEn = cc === 'US' || cc === 'EP';
@@ -216,7 +217,9 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
 
   return {
     number: nums.number, country: cc, status,
-    title: isEn ? `${dm.titleEn} (${titleSuffix === '방법' ? 'Method' : 'Apparatus'})` : `${dm.titleKo} ${titleSuffix}`,
+    title: isEn
+      ? `${dm.titleEn}${['', ' (Method)', ' (Control Method)', ' (Manufacturing Method)', ' (System)'][slot % 5]}`
+      : `${dm.titleKo}${titleSuffix}`,
     applicant, inventors: isEn ? 'A. Researcher, B. Engineer' : '김OO, 이OO',
     applicationNo: nums.appNo, applicationDate: appDate,
     publicationNo: nums.pubNo, publicationDate: pubDate,
