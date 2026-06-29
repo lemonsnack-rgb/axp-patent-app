@@ -35,11 +35,35 @@ function applyMetaFilter(items: PatentResult[], meta?: MetaFilter | null): Paten
   });
 }
 
+// 확장 필터(Sheet 4) 코드 → PatentResult 필드 매핑 (대응되는 것만 실제 필터링)
+function extFieldValue(p: PatentResult, code: string): string | null {
+  switch (code) {
+    case 'TI': return p.title;
+    case 'AB': return p.abstract;
+    case 'CLI': case 'TI_AB_CLA': return `${p.title} ${p.abstract} ${p.repClaim}`;
+    case 'INV': return p.inventors;
+    case 'AG': return p.agent ?? '';
+    case 'OWN': case 'AP_REP': return p.applicant;
+    case 'IPCM': case 'IPC_FULL': return p.ipc;
+    case 'CPCM': case 'CPC_FULL': return p.cpc;
+    case 'PN': return p.publicationNo;
+    case 'DOCN': return p.number;
+    default: return null;   // 매핑 없는 코드는 필터 적용 안 함
+  }
+}
+
 function applyFacetFilters(items: PatentResult[], filters: AppliedFilter[]): PatentResult[] {
   if (!filters.length) return items;
   return items.filter(p =>
     filters.every(f => {
       if (f.label === '전체') return true;
+      // 확장 필터: facetKey = '그룹:코드'
+      if (f.facetKey.includes(':')) {
+        const code = f.facetKey.split(':')[1];
+        const fieldVal = extFieldValue(p, code);
+        if (fieldVal == null) return true; // 미대응 코드는 통과(필터 미적용)
+        return fieldVal.toLowerCase().includes(f.label.toLowerCase());
+      }
       switch (f.facetKey) {
         case 'country':      return p.country === f.label;
         case 'right_status': return p.status === f.label;
@@ -404,6 +428,7 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
             if (col === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
             else { setSortCol(col); setSortDir('desc'); }
           }}
+          compact={selectedCard !== null}
         />
       ) : (
         <SlidingView data={data} onOpenDetail={onOpenDetail} onSave={onSave} />
@@ -562,7 +587,7 @@ function FilterDrawer({ pendingFilters, extFilterValues, onToggle, onExtChange, 
 }
 
 // ── 테이블 목록 뷰 (참고: 선행기술조사 결과 화면) ──
-function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, page, onPageChange, totalCount, perPage, searchQuery, checked, onToggleCheck, onToggleAll, sortCol, sortDir, onSort }: {
+function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, page, onPageChange, totalCount, perPage, searchQuery, checked, onToggleCheck, onToggleAll, sortCol, sortDir, onSort, compact }: {
   data: PatentResult[];
   selectedCard: number | null;
   onSelectCard: (i: number) => void;
@@ -579,6 +604,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
   sortCol: 'applicationDate' | 'title';
   sortDir: 'asc' | 'desc';
   onSort: (col: 'applicationDate' | 'title') => void;
+  compact: boolean;   // 상세 패널 열림 시 핵심 컬럼만 표시
 }) {
   const totalPages = Math.ceil(totalCount / perPage);
   const startIdx = (page - 1) * perPage;
@@ -631,24 +657,26 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                     onChange={e => onToggleAll(e.target.checked)}
                   />
                 </th>
-                <th className="w-10 px-3 py-2 text-center font-semibold text-gray-500 border-r border-gray-100">No</th>
-                <th className="w-14 px-2 py-2 text-center font-semibold text-gray-500 border-r border-gray-100">상태</th>
-                <th className="w-40 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100">문헌번호</th>
-                <th className="w-24 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100">문헌일</th>
+                <th className="w-10 px-3 py-2 text-center font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">No</th>
+                <th className="w-14 px-2 py-2 text-center font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">상태</th>
+                <th className="w-40 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">문헌번호</th>
+                {!compact && <th className="w-24 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">문헌일</th>}
+                {!compact && (
+                  <th
+                    className="w-24 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 cursor-pointer select-none hover:text-brand-400 whitespace-nowrap"
+                    onClick={() => onSort('applicationDate')}
+                  >
+                    출원일 {sortCol === 'applicationDate' ? (sortDir === 'desc' ? '↓' : '↑') : '↕'}
+                  </th>
+                )}
                 <th
-                  className="w-24 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 cursor-pointer select-none hover:text-brand-400"
-                  onClick={() => onSort('applicationDate')}
-                >
-                  출원일 {sortCol === 'applicationDate' ? (sortDir === 'desc' ? '↓' : '↑') : '↕'}
-                </th>
-                <th
-                  className="px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 cursor-pointer select-none hover:text-brand-400"
+                  className="px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 cursor-pointer select-none hover:text-brand-400 whitespace-nowrap"
                   onClick={() => onSort('title')}
                 >
                   발명의 명칭 {sortCol === 'title' ? (sortDir === 'desc' ? '↓' : '↑') : '↕'}
                 </th>
-                <th className="w-32 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100">출원인</th>
-                <th className="w-28 px-2 py-2 text-left font-semibold text-gray-500">만료일</th>
+                {!compact && <th className="w-32 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">출원인</th>}
+                <th className="w-28 px-2 py-2 text-left font-semibold text-gray-500 whitespace-nowrap">{compact ? '저장' : '만료일'}</th>
               </tr>
             </thead>
             <tbody>
@@ -682,9 +710,10 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                     </td>
                     <td className="px-2 py-2">
                       <div className="font-mono text-xs2 text-brand-400 leading-snug">{d.number}</div>
+                      {compact && <div className="text-xs2 text-gray-400 font-mono mt-0.5">{d.applicationDate}</div>}
                     </td>
-                    <td className="px-2 py-2 text-xs2 text-gray-600 font-mono">{d.publicationDate || '—'}</td>
-                    <td className="px-2 py-2 text-xs2 text-gray-600 font-mono">{d.applicationDate}</td>
+                    {!compact && <td className="px-2 py-2 text-xs2 text-gray-600 font-mono">{d.publicationDate || '—'}</td>}
+                    {!compact && <td className="px-2 py-2 text-xs2 text-gray-600 font-mono">{d.applicationDate}</td>}
                     <td className="px-2 py-2">
                       <button
                         onClick={e => { e.stopPropagation(); onOpenDetail(absIdx); }}
@@ -693,11 +722,12 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                       >
                         {highlightText(d.title, searchQuery)}
                       </button>
+                      {compact && <div className="text-xs2 text-gray-500 truncate mt-0.5">{d.applicant}</div>}
                     </td>
-                    <td className="px-2 py-2 text-xs2 text-gray-600 truncate max-w-[120px]">{d.applicant}</td>
+                    {!compact && <td className="px-2 py-2 text-xs2 text-gray-600 truncate max-w-[120px]">{d.applicant}</td>}
                     <td className="px-2 py-2">
                       <div className="flex items-center gap-1">
-                        <span className="text-xs2 text-gray-600 font-mono">{d.expirationDate || '—'}</span>
+                        {!compact && <span className="text-xs2 text-gray-600 font-mono">{d.expirationDate || '—'}</span>}
                         <button
                           onClick={e => { e.stopPropagation(); onSave(absIdx); }}
                           className="ml-1 text-gray-400 hover:text-yellow-500 shrink-0"

@@ -29,6 +29,8 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
   const [selectedCard, setSelectedCard] = useState<number | null>(0);
   const [appliedFilterRowVisible, setAppliedFilterRowVisible] = useState(false);
   const [refineTerm, setRefineTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState<20 | 50 | 100>(20);
 
   // 검색어 키워드 + 패싯(발행연도/저널명)으로 실제 필터링 [검색-100·154]
   const queryKeywords = parseKeywords(searchQuery || '');
@@ -54,6 +56,9 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
         return sort === 'old' ? ya - yb : yb - ya;
       });
   const count = data.length;
+  const totalPages = Math.max(1, Math.ceil(count / perPage));
+  const safePage = Math.min(page, totalPages);
+  const pageData = data.slice((safePage - 1) * perPage, safePage * perPage);
   const appliedQuery = searchQuery && searchQuery.trim() ? searchQuery : '전체 검색';
 
   const togglePendingFilter = (groupKey: string, label: string) => {
@@ -174,7 +179,15 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
         </Button>
         <Button variant="outlined" color="primary" size="xs" onClick={resetFilters} className="text-xs2 text-gray-400">필터 초기화</Button>
         <span className="flex-1" />
-        <span className="text-xs2 text-gray-400">20개씩 보기</span>
+        <select
+          value={perPage}
+          onChange={e => { setPerPage(Number(e.target.value) as 20 | 50 | 100); setPage(1); }}
+          className="input text-sm2 py-0.5 h-7 w-28"
+        >
+          <option value={20}>20개씩 보기</option>
+          <option value={50}>50개씩 보기</option>
+          <option value={100}>100개씩 보기</option>
+        </select>
         <Button
           variant="outlined" color="primary" size="xs" className="text-xs2"
           disabled={data.length === 0}
@@ -274,7 +287,32 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
           )}
         </div>
       ) : (
-        <ListResults data={data} selectedCard={selectedCard} onSelect={setSelectedCard} onSave={onSave} searchQuery={searchQuery} />
+        <>
+          <ListResults data={pageData} selectedCard={selectedCard} onSelect={setSelectedCard} onSave={onSave} searchQuery={searchQuery} />
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-1 py-3 border-t border-gray-100 bg-white text-sm2">
+              <button
+                onClick={() => { setPage(p => Math.max(1, p - 1)); setSelectedCard(0); }}
+                disabled={safePage === 1}
+                className="px-2 py-0.5 border border-gray-300 rounded-md text-gray-500 hover:border-blue-400 disabled:opacity-30"
+              >‹</button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                <button
+                  key={p}
+                  onClick={() => { setPage(p); setSelectedCard(0); }}
+                  className={clsx('w-7 h-6 rounded-md border text-sm2 font-mono',
+                    p === safePage ? 'bg-blue-400 text-white border-blue-400' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400')}
+                >{p}</button>
+              ))}
+              <button
+                onClick={() => { setPage(p => Math.min(totalPages, p + 1)); setSelectedCard(0); }}
+                disabled={safePage === totalPages}
+                className="px-2 py-0.5 border border-gray-300 rounded-md text-gray-500 hover:border-blue-400 disabled:opacity-30"
+              >›</button>
+              <span className="text-xs2 text-gray-400 ml-2">{safePage} / {totalPages}쪽 · 총 {count}건</span>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

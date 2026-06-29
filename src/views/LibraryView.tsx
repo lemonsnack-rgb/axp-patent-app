@@ -117,10 +117,11 @@ export function LibraryView() {
   return (
     <div className="flex-1 overflow-y-auto scroll-thin p-6 bg-zinc-50">
       <div className="mb-4 flex items-center gap-2">
-        <span className="text-md2 text-zinc-500">폴더 {userCols.length}개</span>
+        <span className="text-md2 font-semibold text-zinc-700">라이브러리</span>
+        <span className="text-sm2 text-zinc-400">폴더 {userCols.length}개 · 저장 {library.length}건</span>
         {drill && (
           <Button variant="text" size="sm" className="ml-2 text-xs2 px-2 py-1" onClick={() => setDrill(null)}>
-            ← 전체 폴더
+            ← 전체 자료로
           </Button>
         )}
       </div>
@@ -142,14 +143,13 @@ export function LibraryView() {
         {uncatCol && renderFolder(uncatCol)}
       </div>
 
-      {drill && (
-        <DrillDownItems
-          filterId={drill.id}
-          sort={sort}
-          onSortChange={setSort}
-          onOpenDetail={setDetailId}
-        />
-      )}
+      {/* 드릴다운 시 해당 폴더, 아니면 전체 저장 자료를 항상 표시 */}
+      <DrillDownItems
+        filterId={drill ? drill.id : '__all__'}
+        sort={sort}
+        onSortChange={setSort}
+        onOpenDetail={setDetailId}
+      />
 
       <NewCollectionModal open={newOpen} onClose={() => setNewOpen(false)} onCreate={name => { collectionAdd(name); setNewOpen(false); }} />
       <LibraryDetailModal id={detailId} onClose={() => setDetailId(null)} onReview={setReviewItem} />
@@ -163,8 +163,9 @@ function DrillDownItems({ filterId, sort, onSortChange, onOpenDetail }: {
 }) {
   const { library, collections, libraryToggleFavorite } = useStore();
 
+  const isAll = filterId === '__all__';
   const col = collections.find(c => c.id === filterId);
-  let items: LibraryItem[] = library.filter(l => l.collectionId === filterId);
+  let items: LibraryItem[] = isAll ? [...library] : library.filter(l => l.collectionId === filterId);
 
   if (sort === 'title') items = [...items].sort((a, b) => (a.title || '').localeCompare(b.title || '', 'ko'));
   else items = [...items].sort((a, b) => b.savedAt - a.savedAt);
@@ -172,7 +173,7 @@ function DrillDownItems({ filterId, sort, onSortChange, onOpenDetail }: {
   return (
     <section className="mt-6">
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-base2 font-semibold text-zinc-700">{col?.name || '폴더'}</span>
+        <span className="text-base2 font-semibold text-zinc-700">{isAll ? '전체 저장 자료' : (col?.name || '폴더')}</span>
         <span className="text-sm2 text-zinc-400">{items.length}개</span>
         <select className="input ml-auto py-1 px-2 text-sm2 w-auto" value={sort} onChange={e => onSortChange(e.target.value as 'recent' | 'title')}>
           <option value="recent">최근 저장</option>

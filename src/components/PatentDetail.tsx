@@ -401,11 +401,21 @@ function Row({ k, v }: { k: string; v: string }) {
 }
 
 function TextBlock({ children }: { children: React.ReactNode }) {
+  const [translated, setTranslated] = useState(false);
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
       <div className="flex justify-end mb-1.5">
-        <Button variant="outlined" color="primary" size="xs" onClick={() => alert('🌐 자동번역 (mockup)')}>🌐 자동번역</Button>
+        <Button
+          variant={translated ? 'filled' : 'outlined'} color="primary" size="xs"
+          onClick={() => setTranslated(v => !v)}
+          title="원문/자동번역 보기 전환"
+        >🌐 {translated ? '원문 보기' : '자동번역'}</Button>
       </div>
+      {translated && (
+        <div className="mb-2 text-xs2 text-blue-700 bg-blue-50 border border-blue-100 rounded px-2.5 py-1.5">
+          자동번역 미리보기 — 외부 번역 서비스 연동 시 번역문이 이 영역에 표시됩니다. 현재는 원문을 표시합니다.
+        </div>
+      )}
       <div className="text-base2 text-gray-700 leading-relaxed whitespace-pre-line">{children}</div>
     </div>
   );

@@ -49,7 +49,7 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
   const paperHistory = searchHistory
     .filter(e => e.kind === 'paper')
     .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
-  const [historyOpen, setHistoryOpen] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const [scope, setScope] = useState<PaperScope>('TI_AB');
   const [periodChip, setPeriodChip] = useState('all');

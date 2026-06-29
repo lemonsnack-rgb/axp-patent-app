@@ -176,7 +176,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
   const patentHistory = searchHistory
     .filter(e => e.kind === 'patent')
     .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
-  const [historyOpen, setHistoryOpen] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // 국가
   const [countries, setCountries] = useState<Record<string, boolean>>({ KR: true, US: true });
