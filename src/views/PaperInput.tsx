@@ -4,7 +4,7 @@ import { useState, useRef, useImperativeHandle, useEffect, forwardRef } from 're
 import clsx from 'clsx';
 import { Button } from '@muhayu/axp-ui';
 import { FinderModal } from '../components/FinderModal';
-import { accumulateQuery, applyScope, hasSearchInput, type SFieldInput } from '../features/search';
+import { accumulateQuery, applyScope, type SFieldInput } from '../features/search';
 import { useStore } from '../store';
 
 interface PField { code: string; label: string; value: string; hint?: string }
@@ -67,8 +67,8 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
     fields.map(f => ({ code: f.code, type: 'text' as const, value: f.value }));
 
   const handleSearch = () => {
+    // 목업: 검색어가 없어도 검색 버튼만 누르면 전체 결과가 나오도록 허용
     const fieldInputs = toFieldInputs();
-    if (!hasSearchInput(formulaText, fieldInputs)) return;
     const accumulated = accumulateQuery(formulaText, fieldInputs);
     setFormulaText(accumulated);
     setFields(prev => prev.map(f => ({ ...f, value: '' })));
@@ -78,7 +78,8 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
     onRun(execQuery);
   };
 
-  const canSearch = hasSearchInput(formulaText, toFieldInputs());
+  // 목업: 검색어 무관하게 검색 버튼은 항상 활성화
+  const canSearch = true;
 
   const resetAll = () => {
     setFormulaText('');

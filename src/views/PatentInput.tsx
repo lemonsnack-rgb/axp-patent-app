@@ -8,7 +8,7 @@ import {
   COUNTRY_LIST, COUNTRY_ADDITIONAL, PATENT_PERIODS,
   PATENT_DOC_KINDS, PATENT_STATUS_ACTIVE, PATENT_STATUS_INACTIVE,
 } from '../data/patentFields';
-import { accumulateQuery, applyScope, hasSearchInput, type ScopeTab, type SFieldInput, type MetaFilter } from '../features/search';
+import { accumulateQuery, applyScope, type ScopeTab, type SFieldInput, type MetaFilter } from '../features/search';
 import { useStore } from '../store';
 
 // ── 검색필드 타입 ──────────────────────────────────────────────
@@ -257,11 +257,10 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
   });
 
   const handleSearch = () => {
-    // [검색-51] 검색식·필드 모두 비면 실행하지 않음 (버튼도 disabled)
+    // 목업: 검색어가 없어도 검색 버튼만 누르면 전체 결과가 나오도록 허용
     const fieldInputs: SFieldInput[] = fields.map(f => ({
       code: f.code, type: f.type, value: f.value, dateFrom: f.dateFrom, dateTo: f.dateTo,
     }));
-    if (!hasSearchInput(formulaText, fieldInputs)) return;
 
     // [검색-60~63] 필드 절을 기존 검색식에 AND 누적 → 입력창에 반영
     const accumulated = accumulateQuery(formulaText, fieldInputs);
@@ -319,10 +318,8 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [carryQuery]);
 
-  const canSearch = hasSearchInput(
-    formulaText,
-    fields.map(f => ({ code: f.code, type: f.type, value: f.value, dateFrom: f.dateFrom, dateTo: f.dateTo })),
-  );
+  // 목업: 검색어 무관하게 검색 버튼은 항상 활성화 (빈 검색 = 전체 결과)
+  const canSearch = true;
 
   const resetAll = () => {
     setFormulaText('');

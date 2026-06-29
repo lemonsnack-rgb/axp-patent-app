@@ -37,11 +37,15 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
   const queryKeywords = parseKeywords(searchQuery || '');
   const yearFilters = appliedFilters.filter(f => f.facetKey === 'pub_year').map(f => f.label);
   const journalFilters = appliedFilters.filter(f => f.facetKey === 'journal').map(f => f.label);
-  const filtered = PAPER_SEED.filter(p => {
-    if (queryKeywords.length > 0) {
-      const hay = `${p.title} ${p.abstract ?? ''} ${p.authors} ${p.journal ?? ''}`.toLowerCase();
-      if (!queryKeywords.every(k => hay.includes(k.toLowerCase()))) return false;
-    }
+  // 목업: 검색어가 매칭되지 않아도 결과가 비지 않도록 키워드 매칭 0건이면 전체로 폴백
+  const kwMatched = queryKeywords.length === 0
+    ? PAPER_SEED
+    : PAPER_SEED.filter(p => {
+        const hay = `${p.title} ${p.abstract ?? ''} ${p.authors} ${p.journal ?? ''}`.toLowerCase();
+        return queryKeywords.every(k => hay.includes(k.toLowerCase()));
+      });
+  const kwScoped = kwMatched.length > 0 ? kwMatched : PAPER_SEED;
+  const filtered = kwScoped.filter(p => {
     if (yearFilters.length > 0) {
       const ok = yearFilters.some(lbl => lbl === '2021 이전' ? !!(p.year && p.year <= 2021) : String(p.year ?? '') === lbl);
       if (!ok) return false;

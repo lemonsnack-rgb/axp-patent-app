@@ -30,14 +30,6 @@ export const PATENT_FACET_GROUPS_BASE: FacetGroup[] = [
     ],
   },
   {
-    key: 'right_type', title: '권리구분',
-    items: [
-      { label: '전체', count: 4792 },
-      { label: '특허', count: 4435 },
-      { label: '실용', count: 357 },
-    ],
-  },
-  {
     key: 'right_status', title: '권리상태', badge: 'active / inactive',
     items: [
       { label: '공개',     count: 1134, sub: 'active' },
