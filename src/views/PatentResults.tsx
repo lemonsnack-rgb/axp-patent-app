@@ -5,15 +5,14 @@ import { PATENT_SEED } from '../data/patentSeed';
 import { PATENT_FACET_GROUPS_BASE, PATENT_FACET_GROUPS_EXT, type FacetGroup } from '../data/facetGroups';
 import { PatentDetail, parseKeywords, KW_COLORS } from '../components/PatentDetail';
 import { Icon } from '../components/Icon';
-import { useStore } from '../store';
 import { toast, Button } from '@muhayu/axp-ui';
 import { getPatentStatusBadgeColor } from '../utils/badgeUtils';
 import { Badge } from '../components/ui';
 import type { PatentResult } from '../types';
 import type { MetaFilter } from '../features/search';
 
-type SortKey = 'recent' | 'cited' | 'grade' | 'relevance';
-type ViewMode = 'list' | 'sliding' | 'gallery';
+type SortKey = 'match' | 'recent' | 'old';
+type ViewMode = 'list' | 'sliding';
 
 interface AppliedFilter { facetKey: string; title: string; label: string }
 
@@ -75,7 +74,6 @@ interface Props {
 
 export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, meta, onRefine, onCrossSearch }: Props) {
   const [refineTerm, setRefineTerm] = useState('');
-  const { setMode, setBgPatentRef } = useStore();
   const [sort, setSort] = useState<SortKey>('recent');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -112,11 +110,14 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
       });
   const metaScoped = applyMetaFilter(queryScoped, meta);
   const filtered = applyFacetFilters(metaScoped, appliedFilters);
-  const data = [...filtered].sort((a, b) => {
-    const va = (a[sortCol] ?? '');
-    const vb = (b[sortCol] ?? '');
-    return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
-  });
+  // 매칭순은 검색 매칭 순서를 유지하고, 그 외에는 컬럼/방향으로 정렬
+  const data = sort === 'match'
+    ? filtered
+    : [...filtered].sort((a, b) => {
+        const va = (a[sortCol] ?? '');
+        const vb = (b[sortCol] ?? '');
+        return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+      });
   const count = data.length;
 
   // 적용된 실제 실행 검색식 칩
@@ -224,12 +225,18 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
           <select
             className="input py-1 text-sm2 w-auto"
             value={sort}
-            onChange={e => setSort(e.target.value as SortKey)}
+            onChange={e => {
+              const v = e.target.value as SortKey;
+              setSort(v);
+              setPage(1);
+              if (v === 'match') return;            // 매칭순: 검색 매칭 순서 유지
+              setSortCol('applicationDate');
+              setSortDir(v === 'old' ? 'asc' : 'desc');
+            }}
           >
+            <option value="match">매칭순</option>
             <option value="recent">최신순</option>
-            <option value="cited">피인용 많은 순</option>
-            <option value="grade">평가등급 높은 순</option>
-            <option value="relevance">관련도 순</option>
+            <option value="old">오래된순</option>
           </select>
           <select
             value={perPage}
@@ -241,12 +248,11 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
             <option value={100}>100개씩 보기</option>
             <option value={200}>200개씩 보기</option>
           </select>
-          {/* 뷰 토글: 리스트 / 슬라이딩 / 갤러리 */}
+          {/* 뷰 토글: 리스트 / 슬라이딩 */}
           <div className="inline-flex border border-gray-300 rounded overflow-hidden">
             {([
               { key: 'list', title: '리스트', disabled: false },
               { key: 'sliding', title: '슬라이딩 뷰', disabled: false },
-              { key: 'gallery', title: '갤러리(스크리닝)', disabled: false },
             ] as const).map(v => (
               <button
                 key={v.key}
@@ -264,12 +270,6 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
                 {v.key === 'sliding' && (
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="3" width="18" height="6" rx="1"/><rect x="3" y="11" width="18" height="6" rx="1"/>
-                  </svg>
-                )}
-                {v.key === 'gallery' && (
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-                    <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
                   </svg>
                 )}
               </button>
@@ -405,10 +405,8 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
             else { setSortCol(col); setSortDir('desc'); }
           }}
         />
-      ) : viewMode === 'sliding' ? (
-        <SlidingView data={data} onOpenDetail={onOpenDetail} onSave={onSave} onBgPatent={num => { setBgPatentRef(num); setMode('spec'); toast(`배경기술 추가: ${num}`); }} />
       ) : (
-        <GalleryView data={data} onSave={onSave} onBgPatent={num => { setBgPatentRef(num); setMode('spec'); toast(`배경기술 추가: ${num}`); }} />
+        <SlidingView data={data} onOpenDetail={onOpenDetail} onSave={onSave} />
       )}
     </div>
   );
@@ -601,17 +599,6 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
           <div className="flex gap-1.5">
             <Button
               variant="outlined" color="primary" size="xs"
-              disabled={selectedCard === null}
-              title={selectedCard === null ? '특허를 선택하세요' : 'BibTeX 복사'}
-              onClick={() => {
-                const d = selectedCard !== null ? data[selectedCard] : null;
-                if (!d) return;
-                const bib = `@patent{${d.number.replace(/\s/g,'_')},\n  title={${d.title}},\n  author={${d.applicant}},\n  number={${d.number}},\n  date={${d.applicationDate}},\n}`;
-                navigator.clipboard.writeText(bib).then(() => toast('BibTeX 복사됨'));
-              }}
-            >BibTeX</Button>
-            <Button
-              variant="outlined" color="primary" size="xs"
               disabled={checked.size === 0}
               title={checked.size === 0 ? '항목을 선택하세요' : `${checked.size}건 CSV 다운로드`}
               onClick={() => {
@@ -761,7 +748,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
 }
 
 // ── 슬라이딩 뷰 (미니목록 + 연속 스크롤 본문) ──
-function SlidingView({ data, onOpenDetail, onSave, onBgPatent }: { data: PatentResult[]; onOpenDetail: (i: number) => void; onSave: (i: number) => void; onBgPatent: (number: string) => void }) {
+function SlidingView({ data, onOpenDetail, onSave }: { data: PatentResult[]; onOpenDetail: (i: number) => void; onSave: (i: number) => void }) {
   const [current, setCurrent] = useState(0);
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -802,7 +789,6 @@ function SlidingView({ data, onOpenDetail, onSave, onBgPatent }: { data: PatentR
               <div className="ml-auto flex gap-1.5">
                 <Button variant="outlined" color="primary" size="xs" onClick={() => onOpenDetail(i)}>전체 보기</Button>
                 <Button variant="outlined" color="primary" size="xs" onClick={() => onSave(i)}><Icon name="star" size={11} /> 저장</Button>
-                <Button variant="filled" color="primary" size="xs" onClick={() => onBgPatent(d.number)}>→ 배경기술</Button>
               </div>
             </div>
             <h3 className="text-base2 font-bold text-gray-800 mb-2 cursor-pointer hover:text-brand-400" onClick={() => onOpenDetail(i)}>{d.title}</h3>
@@ -888,37 +874,6 @@ function Pagination({ current, total, onChange }: {
         placeholder="—"
       />
       <span className="text-xs2 text-gray-400">/ {total}쪽</span>
-    </div>
-  );
-}
-
-// ── 갤러리 뷰 (도면 테이블) ──
-function GalleryView({ data, onSave, onBgPatent }: { data: PatentResult[]; onSave: (i: number) => void; onBgPatent: (number: string) => void }) {
-  return (
-    <div className="flex-1 overflow-y-auto scroll-thin p-4 bg-gray-50">
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
-        {data.map((d, i) => (
-          <div key={i} className="bg-white rounded-xl border border-neutral-150 shadow-card p-3">
-            <div className="bg-gray-100 rounded h-40 flex items-center justify-center text-gray-400 mb-2">
-              <div className="text-center">
-                <Icon name="image" size={32} className="mx-auto mb-1" />
-                <div className="text-xs2">{d.figures?.[0]?.label || 'FIG 1'}</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="font-mono text-sm2 text-brand-400">{d.number}</span>
-              <Badge color={getPatentStatusBadgeColor(d.status)} className="text-xs2">{d.status}</Badge>
-            </div>
-            <div className="text-md2 font-semibold text-gray-800 line-clamp-2 mb-1">{d.title}</div>
-            <div className="text-sm2 text-gray-500 truncate">{d.applicant}</div>
-            <div className="flex gap-1.5 mt-2 pt-2 border-t border-gray-100">
-              <Button variant="filled" color="primary" size="xs" className="flex-1" onClick={() => onBgPatent(d.number)}>→ 배경기술</Button>
-              <Button variant="outlined" color="primary" size="xs" onClick={() => onSave(i)}><Icon name="star" size={11} /></Button>
-              <Button variant="outlined" color="primary" size="xs" className="text-red-500">👎</Button>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

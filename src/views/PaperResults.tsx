@@ -9,8 +9,7 @@ import { Badge, Card } from '../components/ui';
 import type { PaperResult } from '../types';
 import { Button, toast } from '@muhayu/axp-ui';
 
-type SortKey = 'match' | 'cited' | 'recent';
-type ViewMode = 'list' | 'gallery';
+type SortKey = 'match' | 'recent' | 'old';
 
 interface AppliedFilter { facetKey: string; title: string; label: string }
 
@@ -23,8 +22,7 @@ interface Props {
 }
 
 export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossSearch }: Props) {
-  const [sort, setSort] = useState<SortKey>('match');
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [sort, setSort] = useState<SortKey>('recent');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [pendingFilters, setPendingFilters] = useState<Record<string, string[]>>({});
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilter[]>([]);
@@ -36,7 +34,7 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
   const queryKeywords = parseKeywords(searchQuery || '');
   const yearFilters = appliedFilters.filter(f => f.facetKey === 'pub_year').map(f => f.label);
   const journalFilters = appliedFilters.filter(f => f.facetKey === 'journal').map(f => f.label);
-  const data = PAPER_SEED.filter(p => {
+  const filtered = PAPER_SEED.filter(p => {
     if (queryKeywords.length > 0) {
       const hay = `${p.title} ${p.abstract ?? ''} ${p.authors} ${p.journal ?? ''}`.toLowerCase();
       if (!queryKeywords.every(k => hay.includes(k.toLowerCase()))) return false;
@@ -48,6 +46,13 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
     if (journalFilters.length > 0 && !journalFilters.some(lbl => (p.journal ?? '') === lbl)) return false;
     return true;
   });
+  // 매칭순은 검색 매칭 순서 유지, 그 외는 발행연도 기준 정렬
+  const data = sort === 'match'
+    ? filtered
+    : [...filtered].sort((a, b) => {
+        const ya = a.year ?? 0, yb = b.year ?? 0;
+        return sort === 'old' ? ya - yb : yb - ya;
+      });
   const count = data.length;
   const appliedQuery = searchQuery && searchQuery.trim() ? searchQuery : '전체 검색';
 
@@ -127,27 +132,14 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
         )}
         <span className="flex-1" />
         <select
-          className="input py-1 text-sm2 w-28"
+          className="input py-1 text-sm2 w-36"
           value={sort}
           onChange={e => setSort(e.target.value as SortKey)}
         >
           <option value="match">매칭순</option>
-          <option value="cited">피인용 많은 순</option>
-          <option value="recent">최신순</option>
+          <option value="recent">발행연도(최신)</option>
+          <option value="old">발행연도(오래된)</option>
         </select>
-        {/* 뷰 토글 */}
-        {(['list', 'gallery'] as ViewMode[]).map(v => (
-          <Button
-            key={v}
-            variant="outlined"
-            color="primary"
-            size="xs"
-            onClick={() => setViewMode(v)}
-            className={clsx(viewMode === v && 'bg-blue-50 border-blue-400 text-blue-700')}
-          >
-            {v === 'list' ? '리스트' : '갤러리(스크리닝)'}
-          </Button>
-        ))}
       </div>
 
       {/* ── filter-bar ── */}
@@ -183,8 +175,25 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
         <Button variant="outlined" color="primary" size="xs" onClick={resetFilters} className="text-xs2 text-gray-400">필터 초기화</Button>
         <span className="flex-1" />
         <span className="text-xs2 text-gray-400">20개씩 보기</span>
-        <Button variant="outlined" color="primary" size="xs" className="text-xs2">BibTeX</Button>
-        <Button variant="outlined" color="primary" size="xs" className="text-xs2">CSV 다운</Button>
+        <Button
+          variant="outlined" color="primary" size="xs" className="text-xs2"
+          disabled={data.length === 0}
+          title={data.length === 0 ? '결과가 없습니다' : `${data.length}건 CSV 다운로드`}
+          onClick={() => {
+            const header = '제목,저자,저널,발행연도,피인용수,DOI';
+            const esc = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`;
+            const csv = [header, ...data.map(p => [
+              esc(p.title), esc(p.authors), esc(p.journal ?? ''), p.year ?? '', p.citationCount ?? '', esc(p.doi ?? ''),
+            ].join(','))].join('\n');
+            const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'papers.csv';
+            a.click();
+            URL.revokeObjectURL(a.href);
+            toast(`${data.length}건 CSV 다운로드`);
+          }}
+        >CSV 다운</Button>
       </div>
 
       {/* ── FilterDrawer ── */}
@@ -264,10 +273,8 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
             <Button variant="outlined" color="primary" size="sm" className="mt-3" onClick={resetFilters}>필터 초기화</Button>
           )}
         </div>
-      ) : viewMode === 'list' ? (
-        <ListResults data={data} selectedCard={selectedCard} onSelect={setSelectedCard} onSave={onSave} searchQuery={searchQuery} />
       ) : (
-        <GalleryResults data={data} onSave={onSave} />
+        <ListResults data={data} selectedCard={selectedCard} onSelect={setSelectedCard} onSave={onSave} searchQuery={searchQuery} />
       )}
     </div>
   );
@@ -441,30 +448,17 @@ export function PaperInlineDetail({
           </div>
         )}
 
-        {/* AI 요약 */}
-        <div className="rounded-lg bg-blue-50 border border-blue-100 p-3 mb-4">
-          <div className="text-xs2 font-semibold text-blue-700 mb-1">🧠 AI 요약</div>
-          <p className="text-sm2 text-blue-900">
-            {paper.title.includes('Survey') || paper.title.includes('Comprehensive')
-              ? '딥러닝 기반 3D 객체 감지 기법의 최신 동향을 종합적으로 분석하며, LiDAR 포인트 클라우드 처리의 핵심 발전 방향을 제시한다.'
-              : paper.citationCount && paper.citationCount > 100
-              ? `높은 피인용 수(${paper.citationCount})로 해당 분야의 핵심 참고문헌으로 자리잡음. 자율주행 인식 시스템의 기초 방법론을 제시한다.`
-              : '자율주행 환경에서 센서 융합 기반 객체 인식 정확도 향상을 위한 새로운 접근법을 제안한다.'}
-          </p>
-        </div>
-
         {/* 액션 */}
         <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="outlined" color="primary" size="sm" className="text-xs2"
-            onClick={() => window.open(
-              paper.doi ? `https://doi.org/${paper.doi}` : `https://scholar.google.com/scholar?q=${encodeURIComponent(paper.title)}`,
-              '_blank', 'noopener,noreferrer'
-            )}
-            title={paper.doi ? `원문 보기 (DOI: ${paper.doi})` : '원문 검색 (Google Scholar)'}
-          >
-            <Icon name="link" size={11} /> 전체 보기 ↗
-          </Button>
+          {paper.doi && (
+            <Button
+              variant="outlined" color="primary" size="sm" className="text-xs2"
+              onClick={() => window.open(`https://doi.org/${paper.doi}`, '_blank', 'noopener,noreferrer')}
+              title={`원문 보기 (DOI: ${paper.doi})`}
+            >
+              <Icon name="link" size={11} /> 전체 보기 ↗
+            </Button>
+          )}
           <Button variant="outlined" color="primary" size="sm" onClick={onSave} className="text-xs2">
             <Icon name="star" size={11} /> 라이브러리 저장
           </Button>
@@ -484,60 +478,5 @@ export function PaperInlineDetail({
         </div>
       </div>
     </aside>
-  );
-}
-
-// ── 갤러리 뷰 ──
-function GalleryResults({
-  data, onSave,
-}: {
-  data: PaperResult[];
-  onSave: (p: PaperResult) => void;
-}) {
-  return (
-    <div className="p-4 bg-gray-50">
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-3">
-        {data.map(p => (
-          <Card key={p.id} hoverable className="!p-3 flex flex-col gap-2">
-            {/* 상단: 저널 배지 */}
-            <div className="flex items-center gap-2">
-              {p.journal && (
-                <Badge color="neutral" className="text-xs2 truncate max-w-[140px]">{p.journal}</Badge>
-              )}
-              {p.year && <span className="text-xs2 text-gray-400">{p.year}</span>}
-              {p.citationCount != null && (
-                <span className="ml-auto text-xs2 font-semibold text-amber-600">인용 {p.citationCount}</span>
-              )}
-            </div>
-
-            {/* 제목 */}
-            <div className="text-sm2 font-semibold text-gray-800 leading-snug line-clamp-3">{p.title}</div>
-
-            {/* 저자 */}
-            <div className="text-xs2 text-gray-500 truncate">{p.authors}</div>
-
-            {/* 초록 요약 */}
-            {p.abstract && (
-              <div className="text-xs2 text-gray-600 line-clamp-3 flex-1">{p.abstract}</div>
-            )}
-
-            {/* 액션 */}
-            <div className="flex items-center gap-1.5 mt-1 pt-2 border-t border-gray-100">
-              <Button variant="outlined" color="primary" size="xs" className="text-xs2 flex-1">→ 인용사용</Button>
-              <Button
-                variant="outlined"
-                color="primary"
-                size="xs"
-                onClick={e => { e.stopPropagation(); onSave(p); }}
-                className="text-xs2"
-              >
-                <Icon name="star" size={10} />
-              </Button>
-              <Button variant="outlined" color="primary" size="xs" className="text-xs2 text-red-400 hover:border-red-400">👎</Button>
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
   );
 }

@@ -87,9 +87,6 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
         {posLabel && <span className="text-sm2 text-gray-500 font-mono">{posLabel}</span>}
         {onNext && <Button variant="outlined" color="primary" size="sm" onClick={onNext} title="다음">▶</Button>}
         <div className="ml-auto flex items-center gap-1.5">
-          <Button variant="filled" color="primary" size="sm" onClick={() => alert('배경기술 참조 (mockup)')}>
-            <Icon name="link" size={12} /> 배경기술 참조
-          </Button>
           <Button variant="outlined" color="primary" size="sm" onClick={onSave}>
             <Icon name="star" size={11} /> 라이브러리 저장
           </Button>
