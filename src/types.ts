@@ -113,6 +113,11 @@ export interface PatentResult {
   citing: number;
   cited: number;
   figures?: { label: string; desc: string; art?: string }[];
+  // 구조화된 청구항 (없으면 repClaim 단독 표시)
+  claims?: { no: number; dependsOn?: number; text: string }[];
+  // 구조화된 인용/피인용 (없으면 citing/cited 카운트만 표시)
+  citingList?: PatentCitation[];
+  citedList?: PatentCitation[];
   // Sheet 3 추가 필드
   applicantAddress?: string;
   inventorAddress?: string;
@@ -125,6 +130,13 @@ export interface PatentResult {
   agentAddress?: string;
 }
 
+export interface PatentCitation {
+  kind: 'patent' | 'npl';   // 특허 / 비특허(논문)
+  ref: string;              // 문헌번호 또는 [NPL]
+  title: string;
+  stage?: string;           // 심사/이의 등 (비특허 표용)
+}
+
 export interface PaperResult {
   id: string;
   title: string;
@@ -134,4 +146,7 @@ export interface PaperResult {
   abstract?: string;
   doi?: string;
   citationCount?: number;
+  keywords?: string[];
+  field?: string;           // 분야(카테고리) 필터용
+  language?: 'EN' | 'KO' | 'JP' | 'ZH';
 }

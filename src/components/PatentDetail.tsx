@@ -1,7 +1,7 @@
 // Sheet 3 사양 — 특허 상세 페이지
 import { useRef, useState } from 'react';
 import clsx from 'clsx';
-import type { PatentResult } from '../types';
+import type { PatentResult, PatentCitation } from '../types';
 import { Icon } from './Icon';
 import { Badge } from './ui';
 import { Button } from '@muhayu/axp-ui';
@@ -234,16 +234,27 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                   >전체청구항</button>
                 </div>
                 <div className="border border-blue-200 rounded-lg p-3.5 bg-white">
-                  <div className="text-md2 font-semibold text-blue-700 mb-1.5">독립항 — 제1항</div>
-                  <div className="text-base2 text-gray-700 leading-relaxed bg-blue-50 px-3 py-2 rounded border-l-4 border-blue-500">
-                    {data.repClaim}
-                  </div>
-                  {claimMode === 'all' && (
-                    <div className="mt-2.5 space-y-1.5">
-                      <SubClaim n={2}>제2항에 있어서, … (예시)</SubClaim>
-                      <SubClaim n={3}>제3항에 있어서, … (예시)</SubClaim>
-                    </div>
-                  )}
+                  {(() => {
+                    const claims = data.claims && data.claims.length
+                      ? data.claims
+                      : [{ no: 1, text: data.repClaim }];
+                    const independents = claims.filter(c => !c.dependsOn);
+                    const visible = claimMode === 'independent' ? independents : claims;
+                    return visible.map((c, idx) => (
+                      c.dependsOn ? (
+                        <div key={c.no} className={clsx(idx > 0 && 'mt-2.5')}>
+                          <SubClaim n={c.no} dependsOn={c.dependsOn}>{stripClaimNo(c.text)}</SubClaim>
+                        </div>
+                      ) : (
+                        <div key={c.no} className={clsx(idx > 0 && 'mt-2.5')}>
+                          <div className="text-md2 font-semibold text-blue-700 mb-1.5">독립항 — 제{c.no}항</div>
+                          <div className="text-base2 text-gray-700 leading-relaxed bg-blue-50 px-3 py-2 rounded border-l-4 border-blue-500">
+                            {stripClaimNo(c.text)}
+                          </div>
+                        </div>
+                      )
+                    ));
+                  })()}
                 </div>
               </Section>
             </div>
@@ -284,35 +295,12 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               </Section>
             </div>
 
-            {/* 인용·피인용 — 비특허 인용 별도 섹션 */}
+            {/* 인용·피인용 — 구조화된 목록 */}
             <div ref={secCite}>
               <Section title="인용·피인용" icon="link">
-                <CiteBlock title={`인용 (${data.citing}건)`} patentCount={Math.max(1, (data.citing||0) - 2)} nplCount={2} />
+                <CiteBlock title={`인용 (${(data.citingList ?? []).length || data.citing}건)`} list={data.citingList} />
                 <div className="mt-3">
-                  <CiteBlock title={`피인용 (${data.cited}건)`} patentCount={Math.max(1, (data.cited||0) - 1)} nplCount={1} />
-                </div>
-                <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="bg-gray-50 px-3 py-1.5 text-sm2 font-semibold text-gray-600 border-b border-gray-200">비특허 인용</div>
-                  <table className="w-full text-sm2">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-100">
-                        <th className="px-2 py-1.5 text-left text-xs2 font-semibold text-gray-500">No</th>
-                        <th className="px-2 py-1.5 text-left text-xs2 font-semibold text-gray-500">카테고리</th>
-                        <th className="px-2 py-1.5 text-left text-xs2 font-semibold text-gray-500">단계</th>
-                        <th className="px-2 py-1.5 text-left text-xs2 font-semibold text-gray-500">출처</th>
-                        <th className="px-2 py-1.5 text-left text-xs2 font-semibold text-gray-500">내용</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-b border-gray-50 hover:bg-gray-50">
-                        <td className="px-2 py-1.5 text-xs2 text-gray-400">1</td>
-                        <td className="px-2 py-1.5 text-xs2 text-gray-600">선행</td>
-                        <td className="px-2 py-1.5 text-xs2 text-gray-600">심사</td>
-                        <td className="px-2 py-1.5 text-xs2 text-gray-600">조사자</td>
-                        <td className="px-2 py-1.5 text-xs2 text-gray-600">(예시) 비특허 문헌 인용</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <CiteBlock title={`피인용 (${(data.citedList ?? []).length || data.cited}건)`} list={data.citedList} />
                 </div>
               </Section>
             </div>
@@ -423,30 +411,43 @@ function TextBlock({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SubClaim({ n, children }: { n: number; children: React.ReactNode }) {
+function SubClaim({ n, dependsOn, children }: { n: number; dependsOn?: number; children: React.ReactNode }) {
   return (
-    <div className="px-2.5 py-1.5 bg-gray-50 rounded text-md2 text-gray-600 leading-relaxed">
-      <span className="font-semibold text-gray-500 mr-1.5">종속항 (제{n}항)</span>
+    <div className="px-2.5 py-1.5 bg-gray-50 rounded text-md2 text-gray-600 leading-relaxed border-l-4 border-gray-200">
+      <span className="font-semibold text-gray-500 mr-1.5">종속항 (제{n}항{dependsOn ? ` → 제${dependsOn}항 인용` : ''})</span>
       {children}
     </div>
   );
 }
 
-function CiteBlock({ title, patentCount, nplCount }: { title: string; patentCount: number; nplCount: number }) {
+// "제N항." 접두를 제거해 라벨과 중복되지 않게 한다.
+function stripClaimNo(text: string): string {
+  return text.replace(/^제\s*\d+\s*항\.?\s*/, '');
+}
+
+function CiteBlock({ title, list }: { title: string; list?: PatentCitation[] }) {
+  const items = list ?? [];
+  const patents = items.filter(c => c.kind === 'patent');
+  const npls = items.filter(c => c.kind === 'npl');
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-3.5">
       <div className="text-base2 font-bold text-gray-700 mb-2">{title}</div>
       <div className="text-xs2 font-semibold text-gray-500 mt-2 mb-1">특허 정보</div>
-      <ul className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
-        {Array.from({ length: Math.min(3, Math.max(1, patentCount)) }).map((_, i) => (
-          <li key={i}><span className="font-mono">KR 10-2020-{1234567 + i}</span> · 라이다 기반 객체 인식 (예시)</li>
-        ))}
-      </ul>
+      {patents.length > 0 ? (
+        <ul className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
+          {patents.map((c, i) => (
+            <li key={i}><span className="font-mono text-brand-400">{c.ref}</span> · {c.title}</li>
+          ))}
+        </ul>
+      ) : <div className="text-md2 text-gray-400 pl-1">없음</div>}
       <div className="text-xs2 font-semibold text-gray-500 mt-3 mb-1">비특허(논문) 정보</div>
-      <ul className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
-        {nplCount > 0 ? <li><span className="font-mono">[NPL]</span> Smith J. et al., "LiDAR object detection", IEEE Trans. ITS, 2023 (예시)</li>
-                      : <li className="text-gray-400 list-none">없음</li>}
-      </ul>
+      {npls.length > 0 ? (
+        <ul className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
+          {npls.map((c, i) => (
+            <li key={i}><span className="font-mono">{c.ref}</span> {c.title}</li>
+          ))}
+        </ul>
+      ) : <div className="text-md2 text-gray-400 pl-1">없음</div>}
     </div>
   );
 }
@@ -518,10 +519,12 @@ function DrawingsPanel({ figures }: { figures?: { label: string; desc: string }[
   return (
     <div className="flex flex-col flex-1 overflow-y-auto scroll-thin p-3">
       {/* 메인 도면 */}
-      <div className="bg-white rounded-xl border border-neutral-150 shadow-card h-44 flex flex-col items-center justify-center mb-2 shrink-0 p-2">
-        <Icon name="image" size={24} className="text-gray-300 mb-1" />
-        <div className="text-xs2 font-semibold text-gray-500">{figs[selected]?.label}</div>
-        <div className="text-xs2 text-gray-400 mt-0.5 px-2 text-center line-clamp-2">{figs[selected]?.desc}</div>
+      <div className="bg-white rounded-xl border border-neutral-150 shadow-card mb-2 shrink-0 overflow-hidden">
+        <div className="px-3 pt-2 flex items-baseline gap-2">
+          <span className="text-xs2 font-semibold text-gray-600 font-mono">{figs[selected]?.label}</span>
+          <span className="text-xs2 text-gray-400 truncate">{figs[selected]?.desc}</span>
+        </div>
+        <FigureSVG index={selected} className="w-full h-40" />
       </div>
 
       {/* 썸네일 그리드 (3열) */}
@@ -531,17 +534,76 @@ function DrawingsPanel({ figures }: { figures?: { label: string; desc: string }[
             key={i}
             onClick={() => setSelected(i)}
             className={clsx(
-              'bg-gray-100 rounded-md h-14 flex flex-col items-center justify-center p-1 transition-all',
-              selected === i ? 'ring-2 ring-blue-400 bg-blue-50' : 'hover:bg-gray-200',
+              'rounded-md overflow-hidden border transition-all bg-white',
+              selected === i ? 'ring-2 ring-blue-400 border-blue-400' : 'border-gray-200 hover:border-gray-300',
             )}
           >
-            <Icon name="image" size={12} className={selected === i ? 'text-blue-400' : 'text-gray-400'} />
-            <div className="text-xs2 text-gray-500 mt-0.5 font-mono truncate w-full text-center leading-tight">
+            <FigureSVG index={i} className="w-full h-12" />
+            <div className="text-xs2 text-gray-500 font-mono truncate w-full text-center leading-tight py-0.5 border-t border-gray-100">
               {f.label}
             </div>
           </button>
         ))}
       </div>
     </div>
+  );
+}
+
+// ── 절차적 도면(SVG) — 특허 도면 느낌의 블록/흐름/구조 다이어그램 ──
+function FigureSVG({ index, className }: { index: number; className?: string }) {
+  const variant = index % 4;
+  const stroke = '#475069';
+  const label = '#94a0b8';
+  return (
+    <svg viewBox="0 0 200 120" className={className} role="img" aria-label="특허 도면 도식" preserveAspectRatio="xMidYMid meet">
+      <rect x="0" y="0" width="200" height="120" fill="#fbfcfe" />
+      {variant === 0 && (
+        // 블록도: 3 박스 + 화살표
+        <g fill="none" stroke={stroke} strokeWidth="1.4">
+          <rect x="16" y="46" width="40" height="28" rx="3" />
+          <rect x="80" y="46" width="40" height="28" rx="3" />
+          <rect x="144" y="46" width="40" height="28" rx="3" />
+          <line x1="56" y1="60" x2="80" y2="60" markerEnd="url(#ah)" />
+          <line x1="120" y1="60" x2="144" y2="60" markerEnd="url(#ah)" />
+          <text x="36" y="40" fill={label} fontSize="8" textAnchor="middle">110</text>
+          <text x="100" y="40" fill={label} fontSize="8" textAnchor="middle">120</text>
+          <text x="164" y="40" fill={label} fontSize="8" textAnchor="middle">130</text>
+        </g>
+      )}
+      {variant === 1 && (
+        // 흐름도: 마름모 + 박스
+        <g fill="none" stroke={stroke} strokeWidth="1.4">
+          <rect x="74" y="12" width="52" height="20" rx="3" />
+          <path d="M100 44 L126 60 L100 76 L74 60 Z" />
+          <rect x="74" y="88" width="52" height="20" rx="3" />
+          <line x1="100" y1="32" x2="100" y2="44" markerEnd="url(#ah)" />
+          <line x1="100" y1="76" x2="100" y2="88" markerEnd="url(#ah)" />
+          <text x="138" y="62" fill={label} fontSize="8">S20</text>
+        </g>
+      )}
+      {variant === 2 && (
+        // 적층/구조: 수평 레이어
+        <g fill="none" stroke={stroke} strokeWidth="1.4">
+          {[0, 1, 2, 3].map(i => <rect key={i} x="50" y={28 + i * 16} width="100" height="14" />)}
+          <text x="158" y="38" fill={label} fontSize="8">210</text>
+          <text x="158" y="54" fill={label} fontSize="8">220</text>
+          <text x="158" y="70" fill={label} fontSize="8">230</text>
+        </g>
+      )}
+      {variant === 3 && (
+        // 그래프: 축 + 곡선
+        <g fill="none" stroke={stroke} strokeWidth="1.4">
+          <line x1="30" y1="100" x2="180" y2="100" />
+          <line x1="30" y1="100" x2="30" y2="20" />
+          <polyline points="30,92 60,78 90,70 120,48 150,40 175,30" stroke="#2c5fa8" strokeWidth="1.8" />
+          <polyline points="30,96 60,90 90,86 120,80 150,76 175,70" stroke="#bd7a1c" strokeWidth="1.4" strokeDasharray="3 2" />
+        </g>
+      )}
+      <defs>
+        <marker id="ah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 Z" fill={stroke} />
+        </marker>
+      </defs>
+    </svg>
   );
 }
