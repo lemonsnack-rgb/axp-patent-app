@@ -465,6 +465,7 @@ export function PaperInlineDetail({
   onOpenDetail?: () => void;   // 새 탭 전체보기 (미리보기에서만)
   preview?: boolean;
 }) {
+  const altTitle = paper.language === 'KO' ? paper.titleEn : paper.titleKo;
   return (
     <aside className="w-[440px] min-w-[360px] max-w-[480px] border-l border-gray-200 bg-white flex flex-col overflow-hidden shrink-0 sticky top-0 self-start h-[calc(100vh-52px)]">
       {/* 헤더 */}
@@ -501,71 +502,70 @@ export function PaperInlineDetail({
         </button>
       </div>
 
-      {/* 본문 */}
-      <div className="flex-1 overflow-y-auto scroll-thin p-4">
-        {/* 제목 */}
-        <h3 className="text-base2 font-semibold text-gray-900 leading-snug mb-3">{paper.title}</h3>
-
-        {/* 서지사항 */}
-        <div className="text-sm2 text-gray-600 mb-4 bg-gray-50 rounded-lg p-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-          <span className="font-medium text-gray-700">저자</span><span>{paper.authors}</span>
-          {paper.journal && <><span className="font-medium text-gray-700">저널</span><span>{paper.journal}</span></>}
-          {paper.year && <><span className="font-medium text-gray-700">발행년도</span><span>{paper.year}</span></>}
-          {paper.field && <><span className="font-medium text-gray-700">분야</span><span>{paper.field}</span></>}
-          <span className="font-medium text-gray-700">언어</span><span>{LANG_LABEL[paper.language ?? 'EN']}</span>
-          {paper.doi && <><span className="font-medium text-gray-700">DOI</span><span className="font-mono text-blue-600 break-all">{paper.doi}</span></>}
-        </div>
-
-        {/* 키워드 */}
-        {paper.keywords && paper.keywords.length > 0 && (
-          <div className="mb-4">
-            <div className="text-xs2 font-semibold text-gray-500 uppercase tracking-wide mb-1.5">키워드</div>
-            <div className="flex flex-wrap gap-1.5">
-              {paper.keywords.map(k => (
-                <span key={k} className="text-xs2 px-2 py-0.5 bg-blue-50 text-brand-400 border border-blue-100 rounded-full">{k}</span>
-              ))}
+      {/* 본문 — 상세페이지와 동일한 표시 방식(레이블:값 + 흰 카드) */}
+      <div className="flex-1 overflow-y-auto scroll-thin p-3 bg-gray-50 space-y-3">
+        {/* 콘텐츠 카드 */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          {/* 제목 + 대등제목 + 링크 */}
+          <header className="pb-3 mb-1 border-b border-gray-100">
+            <h3 className="text-lg font-bold text-gray-900 leading-snug">{paper.title}</h3>
+            {altTitle && altTitle !== paper.title && (
+              <div className="text-sm2 text-gray-500 mt-1 leading-snug">{altTitle}</div>
+            )}
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              {paper.externalUrl && (
+                <Button variant="filled" color="primary" size="sm" className="text-xs2 h-8"
+                  onClick={() => window.open(paper.externalUrl, '_blank', 'noopener,noreferrer')}>
+                  <Icon name="link" size={12} /> 원문 보기
+                </Button>
+              )}
+              <button
+                onClick={() => toast('내부 전용 본문 뷰어입니다 (데모). 실제 연동 시 본문이 표시됩니다.')}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded border border-gray-300 text-xs2 text-gray-600 hover:border-blue-400 hover:text-brand-400"
+                title="기관 내부 이용자 전용 본문"
+              >
+                <Icon name="doc" size={12} /> 본문 보기 <span className="bg-gray-100 text-gray-500 rounded px-1">내부 전용</span>
+              </button>
             </div>
-          </div>
-        )}
-
-        {/* 초록 */}
-        {paper.abstract && (
-          <div className="mb-4">
-            <div className="text-xs2 font-semibold text-gray-500 uppercase tracking-wide mb-1.5">초록 (Abstract)</div>
-            <p className="text-sm2 text-gray-700 leading-relaxed">{paper.abstract}</p>
-          </div>
-        )}
-
-        {/* 인용 형식 */}
-        <div className="mb-4">
-          <div className="text-xs2 font-semibold text-gray-500 uppercase tracking-wide mb-1.5">인용 형식</div>
-          <div className="space-y-2">
-            <CitationRow label="APA" text={apaCitation(paper)} />
-            <CitationRow label="BibTeX" text={bibtexCitation(paper)} mono />
-          </div>
+          </header>
+          {/* 메타데이터 — 상세페이지 순서 */}
+          <dl className="divide-y divide-gray-100">
+            <MetaRow label="저자명">
+              {paper.authors || '-'}
+              {paper.authorsEn && paper.authorsEn !== paper.authors && <span className="text-gray-400"> ({paper.authorsEn})</span>}
+            </MetaRow>
+            <MetaRow label="발행연도">{paper.year || '-'}</MetaRow>
+            {paper.paperType === 'thesis' ? (
+              <MetaRow label="학위수여기관">{paper.institution || '-'}</MetaRow>
+            ) : (
+              <>
+                <MetaRow label="저널명">{paper.journal || '-'}</MetaRow>
+                <MetaRow label="저널명(영문)">{paper.journalEn || '-'}</MetaRow>
+              </>
+            )}
+            <MetaRow label="분야">{paper.field || '-'}</MetaRow>
+            <MetaRow label="키워드">
+              {paper.keywords && paper.keywords.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {paper.keywords.map(k => <span key={k} className="text-xs2 px-2 py-0.5 bg-blue-50 text-brand-400 border border-blue-100 rounded-full">{k}</span>)}
+                </div>
+              ) : '-'}
+            </MetaRow>
+            <MetaRow label="초록" block>{paper.abstract || '-'}</MetaRow>
+            <MetaRow label="영문초록" block>{paper.abstractEn || '-'}</MetaRow>
+          </dl>
         </div>
-
-        {/* 액션 */}
-        <div className="flex gap-2 flex-wrap">
-          {paper.doi && (
-            <Button
-              variant="outlined" color="primary" size="sm" className="text-xs2"
-              onClick={() => window.open(`https://doi.org/${paper.doi}`, '_blank', 'noopener,noreferrer')}
-              title={`원문 보기 (DOI: ${paper.doi})`}
-            >
-              <Icon name="link" size={11} /> 원문 ↗
-            </Button>
-          )}
-          <Button variant="outlined" color="primary" size="sm" onClick={onSave} className="text-xs2">
-            <Icon name="star" size={11} /> 라이브러리 저장
-          </Button>
+        {/* 인용 */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="text-xs2 font-bold text-gray-500 uppercase tracking-wide mb-3">인용</div>
+          <div className="space-y-2">
+            {citationList(paper).map(c => <CitationRow key={c.label} label={c.label} text={c.text} mono={c.mono} />)}
+          </div>
         </div>
       </div>
     </aside>
   );
 }
-
-const LANG_LABEL: Record<string, string> = { EN: '영어', KO: '한국어', JP: '일본어', ZH: '중국어' };
 
 // 검색결과 논문 메타 라인 — 저자명, [저널명|학위수여기관] 권(호), 시작-끝, 발행연도(월)
 // 없는 항목은 생략. 학위논문은 저널명 대신 학위수여기관 표시
@@ -692,8 +692,14 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
               {paper.authorsEn && paper.authorsEn !== paper.authors && <span className="text-gray-400"> ({paper.authorsEn})</span>}
             </MetaRow>
             <MetaRow label="발행연도">{paper.year || '-'}</MetaRow>
-            <MetaRow label="저널명">{paper.journal || '-'}</MetaRow>
-            <MetaRow label="저널명(영문)">{paper.journalEn || '-'}</MetaRow>
+            {paper.paperType === 'thesis' ? (
+              <MetaRow label="학위수여기관">{paper.institution || '-'}</MetaRow>
+            ) : (
+              <>
+                <MetaRow label="저널명">{paper.journal || '-'}</MetaRow>
+                <MetaRow label="저널명(영문)">{paper.journalEn || '-'}</MetaRow>
+              </>
+            )}
             <MetaRow label="분야">{paper.field || '-'}</MetaRow>
             <MetaRow label="키워드">
               {paper.keywords && paper.keywords.length > 0 ? (
