@@ -572,9 +572,27 @@ const LANG_LABEL: Record<string, string> = { EN: '영어', KO: '한국어', JP: 
 function apaCitation(p: PaperResult): string {
   return `${p.authors} (${p.year ?? 'n.d.'}). ${p.title}.${p.journal ? ` ${p.journal}.` : ''}${p.doi ? ` https://doi.org/${p.doi}` : ''}`;
 }
+function mlaCitation(p: PaperResult): string {
+  return `${p.authors}. "${p.title}." ${p.journal ?? ''}${p.journal ? ', ' : ''}${p.year ?? 'n.d.'}.`;
+}
+function chicagoCitation(p: PaperResult): string {
+  return `${p.authors}. "${p.title}." ${p.journal ?? ''} (${p.year ?? 'n.d.'}).${p.doi ? ` https://doi.org/${p.doi}.` : ''}`;
+}
+function harvardCitation(p: PaperResult): string {
+  return `${p.authors} (${p.year ?? 'n.d.'}) '${p.title}', ${p.journal ?? ''}.`;
+}
 function bibtexCitation(p: PaperResult): string {
   const key = (p.authors.split(/[,\s]/)[0] || 'ref') + (p.year ?? '');
   return `@article{${key},\n  title={${p.title}},\n  author={${p.authors}},\n  journal={${p.journal ?? ''}},\n  year={${p.year ?? ''}}${p.doi ? `,\n  doi={${p.doi}}` : ''}\n}`;
+}
+function citationList(p: PaperResult): { label: string; text: string; mono?: boolean }[] {
+  return [
+    { label: 'APA', text: apaCitation(p) },
+    { label: 'MLA', text: mlaCitation(p) },
+    { label: 'Chicago', text: chicagoCitation(p) },
+    { label: 'Harvard', text: harvardCitation(p) },
+    { label: 'BibTeX', text: bibtexCitation(p), mono: true },
+  ];
 }
 
 function CitationRow({ label, text, mono }: { label: string; text: string; mono?: boolean }) {
@@ -632,16 +650,18 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
 
       {/* 본문 — 중앙 정렬 + 데스크톱 2단 */}
       <div className="flex-1 overflow-y-auto scroll-thin">
-        <div className="mx-auto max-w-6xl px-8 py-8 space-y-7">
+        <div className="mx-auto max-w-7xl px-6 lg:px-8 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <main className="lg:col-span-8 min-w-0 space-y-6">
           {/* 1. 제목 — 원제목(원문) + 다른 언어 제목 */}
           <div>
             <div className="flex items-center gap-2 flex-wrap mb-2">
               {paper.field && <span className="text-xs2 px-2 py-0.5 bg-blue-50 text-brand-400 border border-blue-100 rounded-full">{paper.field}</span>}
               {paper.year && <span className="text-xs2 text-gray-400">{paper.year}</span>}
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 leading-snug text-balance">{paper.title}</h1>
+            <h1 className="text-3xl font-bold text-gray-900 leading-tight text-balance">{paper.title}</h1>
             {paper.titleEn && paper.titleEn !== paper.title && (
-              <div className="text-base2 text-gray-500 mt-1.5 leading-snug">{paper.titleEn}</div>
+              <div className="text-lg text-gray-500 mt-2 leading-snug">{paper.titleEn}</div>
             )}
           </div>
 
@@ -671,41 +691,22 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
           {/* 3. 초록 (원문 + 영문) */}
           {paper.abstract && (
             <section>
-              <h2 className="text-sm2 font-bold text-gray-700 mb-2">초록</h2>
+              <h2 className="text-base2 font-bold text-gray-800 mb-2 pb-1.5 border-b border-gray-100">초록</h2>
               <p className="text-base2 text-gray-700 leading-relaxed">{paper.abstract}</p>
             </section>
           )}
           {paper.abstractEn && paper.abstractEn !== paper.abstract && (
             <section>
-              <h2 className="text-sm2 font-bold text-gray-700 mb-2">영문 초록 (Abstract)</h2>
+              <h2 className="text-base2 font-bold text-gray-800 mb-2 pb-1.5 border-b border-gray-100">영문 초록 (Abstract)</h2>
               <p className="text-base2 text-gray-700 leading-relaxed">{paper.abstractEn}</p>
             </section>
           )}
 
-          {/* 4. 서지정보 (저자 제외 — 위에 표기) */}
+          {/* 4. 인용 형식 (여러 스타일 리스트) */}
           <section>
-            <h2 className="text-sm2 font-bold text-gray-700 mb-2 pb-1.5 border-b border-gray-100">서지정보</h2>
-            <dl className="text-sm2 text-gray-600 grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-2">
-              {paper.journal && <div className="flex gap-3"><dt className="font-medium text-gray-700 w-24 shrink-0">저널</dt><dd>{paper.journal}</dd></div>}
-              {paper.journalEn && paper.journalEn !== paper.journal && <div className="flex gap-3"><dt className="font-medium text-gray-700 w-24 shrink-0">저널(영문)</dt><dd>{paper.journalEn}</dd></div>}
-              {paper.year && <div className="flex gap-3"><dt className="font-medium text-gray-700 w-24 shrink-0">발행연도</dt><dd>{paper.year}</dd></div>}
-              {paper.field && <div className="flex gap-3"><dt className="font-medium text-gray-700 w-24 shrink-0">분야</dt><dd>{paper.field}</dd></div>}
-              {paper.keywords && paper.keywords.length > 0 && (
-                <div className="flex gap-3 md:col-span-2"><dt className="font-medium text-gray-700 w-24 shrink-0">키워드</dt>
-                  <dd className="flex flex-wrap gap-1.5">
-                    {paper.keywords.map(k => <span key={k} className="text-xs2 px-2 py-0.5 bg-blue-50 text-brand-400 border border-blue-100 rounded-full">{k}</span>)}
-                  </dd>
-                </div>
-              )}
-            </dl>
-          </section>
-
-          {/* 5. 인용 형식 */}
-          <section>
-            <h2 className="text-sm2 font-bold text-gray-700 mb-2 pb-1.5 border-b border-gray-100">인용 형식</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <CitationRow label="APA" text={apaCitation(paper)} />
-              <CitationRow label="BibTeX" text={bibtexCitation(paper)} mono />
+            <h2 className="text-base2 font-bold text-gray-800 mb-2 pb-1.5 border-b border-gray-100">인용</h2>
+            <div className="space-y-2">
+              {citationList(paper).map(c => <CitationRow key={c.label} label={c.label} text={c.text} mono={c.mono} />)}
             </div>
           </section>
 
@@ -735,6 +736,29 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
               </div>
             </section>
           )}
+            </main>
+
+            {/* 우측 메타 레일 (OpenAlex 레이아웃 차용) */}
+            <aside className="lg:col-span-4 space-y-4 lg:sticky lg:top-6">
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <div className="text-xs2 font-bold text-gray-500 uppercase tracking-wide mb-2">서지정보</div>
+                <dl className="text-sm2 text-gray-600 space-y-1.5">
+                  {paper.journal && <div className="flex gap-3"><dt className="font-medium text-gray-700 w-20 shrink-0">저널</dt><dd className="min-w-0">{paper.journal}</dd></div>}
+                  {paper.journalEn && paper.journalEn !== paper.journal && <div className="flex gap-3"><dt className="font-medium text-gray-700 w-20 shrink-0">저널(영문)</dt><dd className="min-w-0">{paper.journalEn}</dd></div>}
+                  {paper.year && <div className="flex gap-3"><dt className="font-medium text-gray-700 w-20 shrink-0">발행연도</dt><dd>{paper.year}</dd></div>}
+                  {paper.field && <div className="flex gap-3"><dt className="font-medium text-gray-700 w-20 shrink-0">분야</dt><dd>{paper.field}</dd></div>}
+                </dl>
+              </div>
+              {paper.keywords && paper.keywords.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <div className="text-xs2 font-bold text-gray-500 uppercase tracking-wide mb-2">키워드</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {paper.keywords.map(k => <span key={k} className="text-xs2 px-2 py-0.5 bg-blue-50 text-brand-400 border border-blue-100 rounded-full">{k}</span>)}
+                  </div>
+                </div>
+              )}
+            </aside>
+          </div>
         </div>
 
         {/* 푸터 */}
