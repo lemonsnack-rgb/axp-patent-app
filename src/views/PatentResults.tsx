@@ -64,7 +64,7 @@ function applyFacetFilters(items: PatentResult[], filters: AppliedFilter[]): Pat
 
 interface Props {
   onModify: () => void;
-  onOpenDetail: (idx: number) => void;
+  onOpenDetail: (patentNumber: string) => void;   // 새 탭으로 전체 보기
   onSave: (idx: number) => void;
   searchQuery?: string;
   meta?: MetaFilter | null;
@@ -117,6 +117,26 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
         return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
       });
   const count = data.length;
+
+  // 미리보기 패널 키보드 네비게이션: ← 이전 / → 다음 / Esc 닫기
+  useEffect(() => {
+    if (selectedCard === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return; // 입력 중에는 무시
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedCard(c => (c != null && c < count - 1 ? c + 1 : c));
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedCard(c => (c != null && c > 0 ? c - 1 : c));
+      } else if (e.key === 'Escape') {
+        setSelectedCard(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedCard, count]);
 
   // 적용된 실제 실행 검색식 칩
   const appliedQuery = searchQuery && searchQuery.trim() ? searchQuery : '전체 검색';
@@ -421,7 +441,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
   data: PatentResult[];
   selectedCard: number | null;
   onSelectCard: (i: number) => void;
-  onOpenDetail: (i: number) => void;
+  onOpenDetail: (patentNumber: string) => void;
   onSave: (i: number) => void;
   page: number;
   onPageChange: (p: number) => void;
@@ -546,9 +566,9 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                     {!compact && <td className="px-2 py-2 text-xs2 text-gray-600 font-mono">{d.applicationDate}</td>}
                     <td className="px-2 py-2">
                       <button
-                        onClick={e => { e.stopPropagation(); onOpenDetail(absIdx); }}
+                        onClick={e => { e.stopPropagation(); onSelectCard(absIdx); }}
                         className="text-left text-sm2 text-gray-800 hover:text-brand-400 line-clamp-2 leading-snug font-medium w-full"
-                        title={d.title}
+                        title={`${d.title}\n(클릭: 우측 미리보기)`}
                       >
                         {highlightText(d.title, searchQuery)}
                       </button>
@@ -556,15 +576,20 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                     </td>
                     {!compact && <td className="px-2 py-2 text-xs2 text-gray-600 truncate max-w-[120px]">{d.applicant}</td>}
                     <td className="px-2 py-2">
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
                         {!compact && <span className="text-xs2 text-gray-600 font-mono">{d.expirationDate || '—'}</span>}
                         <button
                           onClick={e => { e.stopPropagation(); onSave(absIdx); }}
-                          className="ml-1 text-gray-400 hover:text-yellow-500 shrink-0"
+                          className="text-gray-400 hover:text-yellow-500 shrink-0"
                           title="라이브러리 저장"
                         >
-                          <Icon name="star" size={11} />
+                          <Icon name="star" size={12} />
                         </button>
+                        <button
+                          onClick={e => { e.stopPropagation(); onOpenDetail(d.number); }}
+                          className="text-gray-400 hover:text-brand-400 shrink-0 text-xs2 font-semibold"
+                          title="새 탭에서 전체 보기"
+                        >↗</button>
                       </div>
                     </td>
                   </tr>
@@ -585,13 +610,13 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
         {selectedCard !== null && data[selectedCard] && (
           <>
             <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 border-b border-gray-200 shrink-0">
-              <Button variant="outlined" color="primary" size="xs" className="px-1.5 disabled:opacity-30" disabled={selectedCard <= 0} onClick={() => onSelectCard(selectedCard - 1)} title="이전">◀</Button>
-              <Button variant="outlined" color="primary" size="xs" className="px-1.5 disabled:opacity-30" disabled={selectedCard >= data.length - 1} onClick={() => onSelectCard(selectedCard + 1)} title="다음">▶</Button>
+              <span className="text-xs2 font-semibold text-gray-500 bg-gray-200 rounded px-1.5 py-0.5 shrink-0">미리보기</span>
+              <Button variant="outlined" color="primary" size="xs" className="px-1.5 disabled:opacity-30" disabled={selectedCard <= 0} onClick={() => onSelectCard(selectedCard - 1)} title="이전 (←)">◀</Button>
+              <Button variant="outlined" color="primary" size="xs" className="px-1.5 disabled:opacity-30" disabled={selectedCard >= data.length - 1} onClick={() => onSelectCard(selectedCard + 1)} title="다음 (→)">▶</Button>
               <span className="text-xs2 text-gray-400 font-mono">{selectedCard + 1} / {data.length}</span>
-              <span className="font-mono text-sm2 text-brand-400 truncate ml-1">{data[selectedCard]?.number}</span>
               <span className="flex-1" />
-              <Button variant="outlined" color="primary" size="xs" onClick={() => onOpenDetail(selectedCard)} title="새 탭에서 전체 보기">전체 보기 ↗</Button>
-              <button onClick={() => onSelectCard(-1)} className="text-gray-400 hover:text-gray-700 p-1 shrink-0" title="닫기"><Icon name="close" size={14} /></button>
+              <Button variant="filled" color="primary" size="xs" onClick={() => onOpenDetail(data[selectedCard].number)} title="새 탭에서 전체 보기">새 탭 전체보기 ↗</Button>
+              <button onClick={() => onSelectCard(-1)} className="text-gray-400 hover:text-gray-700 p-1 shrink-0" title="닫기 (Esc)"><Icon name="close" size={14} /></button>
             </div>
             <PatentDetail
               embedded
@@ -608,7 +633,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
 }
 
 // ── 슬라이딩 뷰 (미니목록 + 연속 스크롤 본문) ──
-function SlidingView({ data, onOpenDetail, onSave }: { data: PatentResult[]; onOpenDetail: (i: number) => void; onSave: (i: number) => void }) {
+function SlidingView({ data, onOpenDetail, onSave }: { data: PatentResult[]; onOpenDetail: (patentNumber: string) => void; onSave: (i: number) => void }) {
   const [current, setCurrent] = useState(0);
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -647,11 +672,11 @@ function SlidingView({ data, onOpenDetail, onSave }: { data: PatentResult[]; onO
               <Badge color={getPatentStatusBadgeColor(d.status)} className="text-xs2">{d.status}</Badge>
               {d.grade && <Badge color="brand" className="text-xs2">평가 {d.grade}</Badge>}
               <div className="ml-auto flex gap-1.5">
-                <Button variant="outlined" color="primary" size="xs" onClick={() => onOpenDetail(i)}>전체 보기</Button>
+                <Button variant="outlined" color="primary" size="xs" onClick={() => onOpenDetail(d.number)} title="새 탭에서 전체 보기">전체 보기 ↗</Button>
                 <Button variant="outlined" color="primary" size="xs" onClick={() => onSave(i)}><Icon name="star" size={11} /> 저장</Button>
               </div>
             </div>
-            <h3 className="text-base2 font-bold text-gray-800 mb-2 cursor-pointer hover:text-brand-400" onClick={() => onOpenDetail(i)}>{d.title}</h3>
+            <h3 className="text-base2 font-bold text-gray-800 mb-2 cursor-pointer hover:text-brand-400" onClick={() => onOpenDetail(d.number)} title="새 탭에서 전체 보기">{d.title}</h3>
             <div className="text-sm2 text-gray-500 mb-2">{d.applicant} · 출원일 {d.applicationDate} · IPC: <span className="font-mono">{d.ipc}</span></div>
             <div className="text-md2 text-gray-700 leading-relaxed">{d.abstract}</div>
           </div>

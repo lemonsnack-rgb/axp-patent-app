@@ -1,5 +1,5 @@
 // Sheet 3 사양 — 특허 상세 페이지
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import clsx from 'clsx';
 import type { PatentResult, PatentCitation } from '../types';
 import { Icon } from './Icon';
@@ -516,6 +516,7 @@ function renderFamilyPills(total: number): [string, number][] {
 function DrawingsPanel({ figures }: { figures?: { label: string; desc: string }[] }) {
   const figs = figures || [];
   const [selected, setSelected] = useState(0);
+  const [zoom, setZoom] = useState(false);
 
   if (figs.length === 0) {
     return (
@@ -528,13 +529,16 @@ function DrawingsPanel({ figures }: { figures?: { label: string; desc: string }[
 
   return (
     <div className="flex flex-col flex-1 overflow-y-auto scroll-thin p-3">
-      {/* 메인 도면 */}
+      {/* 메인 도면 — 클릭 시 확대 */}
       <div className="bg-white rounded-xl border border-neutral-150 shadow-card mb-2 shrink-0 overflow-hidden">
         <div className="px-3 pt-2 flex items-baseline gap-2">
           <span className="text-xs2 font-semibold text-gray-600 font-mono">{figs[selected]?.label}</span>
-          <span className="text-xs2 text-gray-400 truncate">{figs[selected]?.desc}</span>
+          <span className="text-xs2 text-gray-400 truncate flex-1">{figs[selected]?.desc}</span>
+          <button onClick={() => setZoom(true)} className="text-xs2 text-brand-400 hover:underline shrink-0" title="도면 확대">⤢ 확대</button>
         </div>
-        <FigureSVG index={selected} className="w-full h-40" />
+        <button onClick={() => setZoom(true)} className="block w-full cursor-zoom-in" title="도면 확대">
+          <FigureSVG index={selected} className="w-full h-40" />
+        </button>
       </div>
 
       {/* 썸네일 그리드 (3열) */}
@@ -543,6 +547,7 @@ function DrawingsPanel({ figures }: { figures?: { label: string; desc: string }[
           <button
             key={i}
             onClick={() => setSelected(i)}
+            onDoubleClick={() => { setSelected(i); setZoom(true); }}
             className={clsx(
               'rounded-md overflow-hidden border transition-all bg-white',
               selected === i ? 'ring-2 ring-blue-400 border-blue-400' : 'border-gray-200 hover:border-gray-300',
@@ -554,6 +559,69 @@ function DrawingsPanel({ figures }: { figures?: { label: string; desc: string }[
             </div>
           </button>
         ))}
+      </div>
+
+      {zoom && (
+        <DrawingZoomModal
+          figures={figs}
+          index={selected}
+          onIndex={setSelected}
+          onClose={() => setZoom(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── 도면 확대 모달 (도면 출력창) ──
+function DrawingZoomModal({ figures, index, onIndex, onClose }: {
+  figures: { label: string; desc: string }[];
+  index: number;
+  onIndex: (i: number) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === 'ArrowRight') onIndex(Math.min(figures.length - 1, index + 1));
+      else if (e.key === 'ArrowLeft') onIndex(Math.max(0, index - 1));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [index, figures.length, onIndex, onClose]);
+
+  const fig = figures[index];
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-6" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        {/* 헤더 */}
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 bg-gray-50 shrink-0">
+          <span className="font-mono font-semibold text-gray-700">{fig?.label}</span>
+          <span className="text-sm2 text-gray-500 truncate flex-1">{fig?.desc}</span>
+          <span className="text-xs2 text-gray-400 font-mono shrink-0">{index + 1} / {figures.length}</span>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1 shrink-0" title="닫기 (Esc)"><Icon name="close" size={16} /></button>
+        </div>
+        {/* 큰 도면 */}
+        <div className="flex-1 min-h-0 flex items-center justify-center bg-gray-50 p-4 overflow-auto">
+          <FigureSVG index={index} className="w-full max-w-2xl h-auto" />
+        </div>
+        {/* 하단 내비 + 썸네일 */}
+        <div className="flex items-center gap-2 px-4 py-2 border-t border-gray-200 bg-white shrink-0">
+          <Button variant="outlined" color="primary" size="sm" disabled={index <= 0} onClick={() => onIndex(index - 1)} title="이전 (←)">◀ 이전</Button>
+          <Button variant="outlined" color="primary" size="sm" disabled={index >= figures.length - 1} onClick={() => onIndex(index + 1)} title="다음 (→)">다음 ▶</Button>
+          <div className="flex-1 flex gap-1 overflow-x-auto scroll-thin justify-end">
+            {figures.map((f, i) => (
+              <button
+                key={i}
+                onClick={() => onIndex(i)}
+                className={clsx('rounded border shrink-0 overflow-hidden w-16', index === i ? 'ring-2 ring-blue-400 border-blue-400' : 'border-gray-200 hover:border-gray-300')}
+                title={f.label}
+              >
+                <FigureSVG index={i} className="w-full h-10" />
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

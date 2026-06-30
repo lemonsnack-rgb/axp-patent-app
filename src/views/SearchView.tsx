@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { PATENT_SEED } from '../data/patentSeed';
-import { PatentDetail } from '../components/PatentDetail';
 import { LibrarySaveModal } from '../components/LibrarySaveModal';
+import { openDetailTab } from '../features/detailTab';
 import { PatentInput, type PatentInputHandle } from './PatentInput';
 import { PatentResults } from './PatentResults';
 import { PaperInput, type PaperInputHandle } from './PaperInput';
@@ -25,8 +25,6 @@ export function SearchView() {
 
   // 특허 검색 — 인라인 결과
   const [patentSearched, setPatentSearched] = useState(false);
-  const [patentDetailOpen, setPatentDetailOpen] = useState(false);
-  const [detailIdx, setDetailIdx] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [committedMeta, setCommittedMeta] = useState<MetaFilter | null>(null);
   const patentInputRef = useRef<PatentInputHandle>(null);
@@ -54,7 +52,6 @@ export function SearchView() {
 
   useEffect(() => {
     setPatentSearched(false);
-    setPatentDetailOpen(false);
     setPaperSearched(false);
   }, [searchKind]);
 
@@ -68,21 +65,8 @@ export function SearchView() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
 
-      {/* 특허 검색 — 전체화면 상세 */}
-      {searchType === 'patent' && patentDetailOpen && (
-        <PatentDetail
-          data={PATENT_SEED[detailIdx]}
-          searchQuery={searchQuery}
-          onBack={() => setPatentDetailOpen(false)}
-          posLabel={`${detailIdx + 1} / ${PATENT_SEED.length}`}
-          onSave={() => openSavePatent(detailIdx)}
-          onPrev={detailIdx > 0 ? () => setDetailIdx(detailIdx - 1) : undefined}
-          onNext={detailIdx < PATENT_SEED.length - 1 ? () => setDetailIdx(detailIdx + 1) : undefined}
-        />
-      )}
-
       {/* 특허 검색 — 입력 + 인라인 결과 (단일 페이지 스크롤) */}
-      {searchType === 'patent' && !patentDetailOpen && (
+      {searchType === 'patent' && (
         <div className="flex-1 overflow-y-auto scroll-thin flex flex-col">
           <PatentInput
             ref={patentInputRef}
@@ -94,7 +78,7 @@ export function SearchView() {
             <div ref={patentResultsRef} className="flex flex-col">
               <PatentResults
                 onModify={() => setPatentSearched(false)}
-                onOpenDetail={i => { setDetailIdx(i); setPatentDetailOpen(true); }}
+                onOpenDetail={no => openDetailTab('patent', no)}
                 onSave={openSavePatent}
                 searchQuery={searchQuery}
                 meta={committedMeta}
@@ -120,6 +104,7 @@ export function SearchView() {
               <PaperResults
                 onModify={() => setPaperSearched(false)}
                 onSave={openSavePaper}
+                onOpenDetail={id => openDetailTab('paper', id)}
                 searchQuery={paperSearchQuery}
                 onRefine={term => paperInputRef.current?.refine(term)}
                 onCrossSearch={kws => crossSearch('patent', kws)}

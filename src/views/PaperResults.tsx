@@ -1,5 +1,5 @@
 // 논문 검색 결과 — sri-header + filter-bar + FilterDrawer + 적용필터칩 + 2-Column
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import clsx from 'clsx';
 import { PAPER_SEED } from '../data/patentSeed';
 import { PAPER_FACET_GROUPS } from '../data/facetGroups';
@@ -16,12 +16,13 @@ interface AppliedFilter { facetKey: string; title: string; label: string }
 interface Props {
   onModify: () => void;
   onSave: (p: PaperResult) => void;
+  onOpenDetail?: (id: string) => void;   // 새 탭으로 전체 보기
   searchQuery?: string;
   onRefine?: (term: string) => void;
   onCrossSearch?: (keywords: string) => void;   // 검색식 이월 → 특허 [검색-212]
 }
 
-export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossSearch }: Props) {
+export function PaperResults({ onModify, onSave, onOpenDetail, searchQuery, onRefine, onCrossSearch }: Props) {
   const [sort, setSort] = useState<SortKey>('recent');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [pendingFilters, setPendingFilters] = useState<Record<string, string[]>>({});
@@ -65,6 +66,26 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
   const safePage = Math.min(page, totalPages);
   const pageData = data.slice((safePage - 1) * perPage, safePage * perPage);
   const appliedQuery = searchQuery && searchQuery.trim() ? searchQuery : '전체 검색';
+
+  // 미리보기 패널 키보드 네비게이션: ← 이전 / → 다음 / Esc 닫기
+  useEffect(() => {
+    if (selectedCard === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedCard(c => (c != null && c < pageData.length - 1 ? c + 1 : c));
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedCard(c => (c != null && c > 0 ? c - 1 : c));
+      } else if (e.key === 'Escape') {
+        setSelectedCard(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedCard, pageData.length]);
 
   const togglePendingFilter = (groupKey: string, label: string) => {
     setPendingFilters(prev => {
@@ -297,7 +318,7 @@ export function PaperResults({ onModify, onSave, searchQuery, onRefine, onCrossS
         </div>
       ) : (
         <>
-          <ListResults data={pageData} selectedCard={selectedCard} onSelect={setSelectedCard} onSave={onSave} searchQuery={searchQuery} />
+          <ListResults data={pageData} selectedCard={selectedCard} onSelect={setSelectedCard} onSave={onSave} onOpenDetail={onOpenDetail} searchQuery={searchQuery} />
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-1 py-3 border-t border-gray-100 bg-white text-sm2">
               <button
@@ -348,12 +369,13 @@ function highlightText(text: string, query?: string): ReactNode {
 
 // ── 2-Column 리스트 + 상세 패널 ──
 function ListResults({
-  data, selectedCard, onSelect, onSave, searchQuery,
+  data, selectedCard, onSelect, onSave, onOpenDetail, searchQuery,
 }: {
   data: PaperResult[];
   selectedCard: number | null;
   onSelect: (i: number) => void;
   onSave: (p: PaperResult) => void;
+  onOpenDetail?: (id: string) => void;
   searchQuery?: string;
 }) {
   const selected = selectedCard != null ? data[selectedCard] : null;
@@ -398,16 +420,25 @@ function ListResults({
                   <div className="text-xs2 text-blue-500 mt-1 font-mono">DOI: {p.doi}</div>
                 )}
               </div>
-              <Button
-                variant="outlined"
-                color="primary"
-                size="xs"
-                onClick={e => { e.stopPropagation(); onSave(p); }}
-                className="h-fit shrink-0"
-                title="라이브러리 저장"
-              >
-                <Icon name="star" size={11} /> 저장
-              </Button>
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  size="xs"
+                  onClick={e => { e.stopPropagation(); onSave(p); }}
+                  className="h-fit"
+                  title="라이브러리 저장"
+                >
+                  <Icon name="star" size={11} /> 저장
+                </Button>
+                {onOpenDetail && (
+                  <button
+                    onClick={e => { e.stopPropagation(); onOpenDetail(p.id); }}
+                    className="text-gray-400 hover:text-brand-400 text-xs2 font-semibold"
+                    title="새 탭에서 전체 보기"
+                  >↗ 새 탭</button>
+                )}
+              </div>
             </div>
           </Card>
         ))}
@@ -418,8 +449,10 @@ function ListResults({
         <PaperInlineDetail
           paper={selected}
           posLabel={`${(selectedCard ?? 0) + 1} / ${data.length}`}
+          preview
           onClose={() => onSelect(-1)}
           onSave={() => onSave(selected)}
+          onOpenDetail={onOpenDetail ? () => onOpenDetail(selected.id) : undefined}
           onPrev={selectedCard != null && selectedCard > 0 ? () => onSelect(selectedCard - 1) : undefined}
           onNext={selectedCard != null && selectedCard < data.length - 1 ? () => onSelect(selectedCard + 1) : undefined}
         />
@@ -430,7 +463,7 @@ function ListResults({
 
 // ── 논문 인라인 상세 패널 ──
 export function PaperInlineDetail({
-  paper, posLabel, onClose, onSave, onPrev, onNext,
+  paper, posLabel, onClose, onSave, onPrev, onNext, onOpenDetail, preview,
 }: {
   paper: PaperResult;
   posLabel: string;
@@ -438,11 +471,14 @@ export function PaperInlineDetail({
   onSave: () => void;
   onPrev?: () => void;
   onNext?: () => void;
+  onOpenDetail?: () => void;   // 새 탭 전체보기 (미리보기에서만)
+  preview?: boolean;
 }) {
   return (
     <aside className="w-[45%] min-w-[320px] max-w-[520px] border-l border-gray-200 bg-white flex flex-col overflow-hidden shrink-0 sticky top-0 self-start h-[calc(100vh-52px)]">
       {/* 헤더 */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 shrink-0 bg-gray-50">
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-100 shrink-0 bg-gray-50">
+        {preview && <span className="text-xs2 font-semibold text-gray-500 bg-gray-200 rounded px-1.5 py-0.5 shrink-0">미리보기</span>}
         <Button
           variant="outlined"
           color="primary"
@@ -463,10 +499,13 @@ export function PaperInlineDetail({
         >▶</Button>
         <span className="text-xs2 text-gray-400 font-mono">{posLabel}</span>
         <span className="flex-1" />
-        <Button variant="filled" color="primary" size="xs" onClick={onSave}>
+        {onOpenDetail && (
+          <Button variant="filled" color="primary" size="xs" onClick={onOpenDetail} title="새 탭에서 전체 보기">새 탭 ↗</Button>
+        )}
+        <Button variant="outlined" color="primary" size="xs" onClick={onSave}>
           <Icon name="star" size={11} /> 저장
         </Button>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1">
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1" title="닫기 (Esc)">
           <Icon name="close" size={14} />
         </button>
       </div>
@@ -503,7 +542,7 @@ export function PaperInlineDetail({
               onClick={() => window.open(`https://doi.org/${paper.doi}`, '_blank', 'noopener,noreferrer')}
               title={`원문 보기 (DOI: ${paper.doi})`}
             >
-              <Icon name="link" size={11} /> 전체 보기 ↗
+              <Icon name="link" size={11} /> 원문 ↗
             </Button>
           )}
           <Button variant="outlined" color="primary" size="sm" onClick={onSave} className="text-xs2">
