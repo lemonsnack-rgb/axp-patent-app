@@ -29,7 +29,7 @@ export function PaperResults({ onModify, onSave, onSaveMany, onOpenDetail, searc
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [pendingFilters, setPendingFilters] = useState<Record<string, string[]>>({});
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilter[]>([]);
-  const [selectedCard, setSelectedCard] = useState<number | null>(0);
+  const [selectedCard, setSelectedCard] = useState<number | null>(null);
   const [appliedFilterRowVisible, setAppliedFilterRowVisible] = useState(false);
   const [refineTerm, setRefineTerm] = useState('');
   const [page, setPage] = useState(1);
@@ -345,20 +345,20 @@ export function PaperResults({ onModify, onSave, onSaveMany, onOpenDetail, searc
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-1 py-3 border-t border-gray-100 bg-white text-sm2">
               <button
-                onClick={() => { setPage(p => Math.max(1, p - 1)); setSelectedCard(0); }}
+                onClick={() => { setPage(p => Math.max(1, p - 1)); setSelectedCard(null); }}
                 disabled={safePage === 1}
                 className="px-2 py-0.5 border border-gray-300 rounded-md text-gray-500 hover:border-blue-400 disabled:opacity-30"
               >‹</button>
               {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
                 <button
                   key={p}
-                  onClick={() => { setPage(p); setSelectedCard(0); }}
+                  onClick={() => { setPage(p); setSelectedCard(null); }}
                   className={clsx('w-7 h-6 rounded-md border text-sm2 font-mono',
                     p === safePage ? 'bg-blue-400 text-white border-blue-400' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400')}
                 >{p}</button>
               ))}
               <button
-                onClick={() => { setPage(p => Math.min(totalPages, p + 1)); setSelectedCard(0); }}
+                onClick={() => { setPage(p => Math.min(totalPages, p + 1)); setSelectedCard(null); }}
                 disabled={safePage === totalPages}
                 className="px-2 py-0.5 border border-gray-300 rounded-md text-gray-500 hover:border-blue-400 disabled:opacity-30"
               >›</button>
@@ -448,11 +448,22 @@ function ListResults({
                 title="선택"
               />
               <div className="flex-1 min-w-0">
-                <div className={clsx(
-                  'text-base2 font-semibold leading-snug',
-                  selectedCard === i ? 'text-blue-700' : 'text-gray-800 hover:text-blue-700',
-                )}>
-                  {highlightText(p.title, searchQuery)}
+                <div className="flex items-start gap-2">
+                  <div className={clsx(
+                    'flex-1 min-w-0 text-base2 font-semibold leading-snug',
+                    selectedCard === i ? 'text-blue-700' : 'text-gray-800 hover:text-blue-700',
+                  )}>
+                    {highlightText(p.title, searchQuery)}
+                  </div>
+                  {onOpenDetail && (
+                    <button
+                      onClick={e => { e.stopPropagation(); onOpenDetail(p.id); }}
+                      className="shrink-0 inline-flex items-center gap-1 text-xs2 text-gray-400 hover:text-brand-400 mt-0.5"
+                      title="새 탭에서 전체 보기"
+                    >
+                      새 탭에서 열기 <Icon name="link" size={11} />
+                    </button>
+                  )}
                 </div>
                 {p.titleEn && p.titleEn !== p.title && (
                   <div className="text-xs2 text-gray-400 line-clamp-1 mb-1">{p.titleEn}</div>
@@ -467,20 +478,6 @@ function ListResults({
                   <div className="text-xs2 text-blue-500 mt-1 font-mono">DOI: {p.doi}</div>
                 )}
               </div>
-              {onOpenDetail && (
-                <div className="shrink-0 self-center">
-                  <Button
-                    variant="outlined"
-                    color="primary"
-                    size="xs"
-                    onClick={e => { e.stopPropagation(); onOpenDetail(p.id); }}
-                    className="text-xs2 whitespace-nowrap"
-                    title="새 탭에서 전체 보기"
-                  >
-                    새 탭에서 열기 <Icon name="link" size={11} />
-                  </Button>
-                </div>
-              )}
             </div>
           </Card>
         ))}
