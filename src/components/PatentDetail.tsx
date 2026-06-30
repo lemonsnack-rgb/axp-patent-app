@@ -32,12 +32,13 @@ export const KW_COLORS = [
   { dot: '#84cc16', bg: '#f7fee7', text: '#65a30d', border: '#d9f99d' },
 ];
 
-export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, searchQuery, embedded = false, backLabel = '검색결과로' }: {
+export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, searchQuery, embedded = false, backLabel = '검색결과로', backIcon = true }: {
   data: PatentResult; onBack: () => void; posLabel?: string;
   onSave?: () => void; onPrev?: () => void; onNext?: () => void;
   searchQuery?: string;
   embedded?: boolean; // 사이드 리더(분할) 모드 — 상단 액션바 숨김, 단일 컬럼(도면은 본문 내)
   backLabel?: string; // 뒤로가기 버튼 라벨 (검색/라이브러리 등 진입 맥락에 맞춤)
+  backIcon?: boolean; // false면 화살표 숨김 (탭 닫기 등 복귀가 아닌 액션)
 }) {
   const timeline = buildTimeline(data);
   const statusColor = data.status === '등록' ? 'green'
@@ -82,7 +83,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
       {!embedded && (
       <div className="px-6 py-3 border-b border-gray-200 flex items-center gap-2 shrink-0">
         <Button variant="outlined" color="primary" size="sm" onClick={onBack}>
-          <Icon name="arrow-left" size={13} /> {backLabel}
+          {backIcon && <Icon name="arrow-left" size={13} />} {backLabel}
         </Button>
         {onPrev && <Button variant="outlined" color="primary" size="sm" onClick={onPrev} title="이전">◀</Button>}
         {posLabel && <span className="text-sm2 text-gray-500 font-mono">{posLabel}</span>}

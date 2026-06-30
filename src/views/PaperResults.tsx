@@ -141,13 +141,13 @@ export function PaperResults({ onModify, onSave, onSaveMany, onOpenDetail, searc
         {/* 검색식(먼저) → 건수 순서 */}
         <span className="text-xs2 text-gray-400 font-semibold shrink-0">검색식</span>
         <span
-          className="text-sm2 px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-mono cursor-pointer hover:bg-blue-100 transition-colors max-w-md truncate"
+          className="inline-flex items-center h-7 text-xs2 px-2.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-mono cursor-pointer hover:bg-blue-100 transition-colors max-w-md truncate"
           title={appliedQuery}
         >
           {appliedQuery}
         </span>
-        <Badge color="neutral" className="font-bold text-md2 shrink-0">{count.toLocaleString()}건</Badge>
-        <Button variant="outlined" color="primary" size="xs" onClick={onModify}>
+        <Badge color="neutral" className="font-bold text-sm2 shrink-0">{count.toLocaleString()}건</Badge>
+        <Button variant="outlined" color="primary" size="xs" className="h-7" onClick={onModify}>
           <Icon name="edit" size={11} /> 검색조건 수정
         </Button>
         {onRefine && (
@@ -157,7 +157,7 @@ export function PaperResults({ onModify, onSave, onSaveMany, onOpenDetail, searc
             onKeyDown={e => { if (e.key === 'Enter' && refineTerm.trim()) { onRefine(refineTerm.trim()); setRefineTerm(''); } }}
             placeholder="결과 내 검색 + (Enter)"
             title="현재 검색식에 AND로 추가해 결과를 좁힙니다"
-            className="shrink-0 w-44 px-2 py-1 border border-gray-200 rounded text-sm2 outline-none focus:border-blue-400"
+            className="shrink-0 w-44 h-7 px-2 border border-gray-200 rounded text-xs2 outline-none focus:border-blue-400"
           />
         )}
         {onCrossSearch && searchQuery && (
@@ -184,7 +184,7 @@ export function PaperResults({ onModify, onSave, onSaveMany, onOpenDetail, searc
               else { setOpenGroup(g.key); setDrawerOpen(true); }
             }}
             className={clsx(
-              'text-xs2',
+              'text-xs2 h-7',
               ((pendingFilters[g.key] || []).length > 0 || (drawerOpen && openGroup === g.key)) && 'border-blue-400 text-blue-700 bg-blue-50',
             )}
           >
@@ -199,14 +199,14 @@ export function PaperResults({ onModify, onSave, onSaveMany, onOpenDetail, searc
           color="primary"
           size="xs"
           onClick={() => { if (drawerOpen && openGroup === null) { setDrawerOpen(false); } else { setOpenGroup(null); setDrawerOpen(true); } }}
-          className={clsx('text-xs2', drawerOpen && openGroup === null && 'border-blue-400 text-blue-700 bg-blue-50')}
+          className={clsx('text-xs2 h-7', drawerOpen && openGroup === null && 'border-blue-400 text-blue-700 bg-blue-50')}
         >
           모든 필터
         </Button>
-        <Button variant="outlined" color="primary" size="xs" onClick={resetFilters} className="text-xs2 text-gray-400">필터 초기화</Button>
+        <Button variant="outlined" color="primary" size="xs" onClick={resetFilters} className="text-xs2 h-7 text-gray-400">필터 초기화</Button>
         <span className="flex-1" />
         <select
-          className="input text-sm2 py-0.5 h-7 w-32"
+          className="input text-xs2 h-7 w-32"
           value={sort}
           onChange={e => setSort(e.target.value as SortKey)}
           title="정렬 기준"
@@ -218,14 +218,14 @@ export function PaperResults({ onModify, onSave, onSaveMany, onOpenDetail, searc
         <select
           value={perPage}
           onChange={e => { setPerPage(Number(e.target.value) as 20 | 50 | 100); setPage(1); }}
-          className="input text-sm2 py-0.5 h-7 w-28"
+          className="input text-xs2 h-7 w-28"
         >
           <option value={20}>20개씩 보기</option>
           <option value={50}>50개씩 보기</option>
           <option value={100}>100개씩 보기</option>
         </select>
         <Button
-          variant="outlined" color="primary" size="xs" className="text-xs2"
+          variant="outlined" color="primary" size="xs" className="text-xs2 h-7"
           disabled={data.length === 0}
           title={data.length === 0 ? '결과가 없습니다' : `${data.length}건 CSV 다운로드`}
           onClick={() => {
@@ -700,7 +700,7 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
     <div className="flex flex-col h-screen overflow-hidden bg-zinc-50">
       {/* 헤더 */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 bg-white shrink-0">
-        <Button variant="outlined" color="primary" size="sm" onClick={onClose}>← 탭 닫기</Button>
+        <Button variant="outlined" color="primary" size="sm" onClick={onClose}>탭 닫기</Button>
         <span className="flex-1" />
         <Button variant="filled" color="primary" size="sm" onClick={onSave}><Icon name="star" size={12} /> 라이브러리 저장</Button>
       </div>

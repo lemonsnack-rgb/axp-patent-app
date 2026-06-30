@@ -131,12 +131,12 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
         {PERIODS.map(p => (
           <Chip key={p.id} active={periodChip === p.id} onClick={() => { setPeriodChip(p.id); setYearFrom(''); setYearTo(''); }}>{p.label}</Chip>
         ))}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <input type="number" placeholder="YYYY" value={yearFrom} onChange={e => { setYearFrom(e.target.value); setPeriodChip(''); }}
-            className="w-20 px-1 py-0 border border-gray-200 rounded text-xs2 h-5" />
+            className="w-20 px-2 border border-gray-200 rounded text-xs2 h-7 outline-none focus:border-blue-400" />
           <span className="text-gray-400 text-xs2">~</span>
           <input type="number" placeholder="YYYY" value={yearTo} onChange={e => { setYearTo(e.target.value); setPeriodChip(''); }}
-            className="w-20 px-1 py-0 border border-gray-200 rounded text-xs2 h-5" />
+            className="w-20 px-2 border border-gray-200 rounded text-xs2 h-7 outline-none focus:border-blue-400" />
         </div>
       </div>
 
@@ -147,7 +147,7 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
           <div className="flex border border-gray-200 rounded-md overflow-hidden">
             {SCOPE_TABS.map(tab => (
               <button key={tab.id} onClick={() => setScope(tab.id)}
-                className={clsx('px-3 py-1.5 text-sm2 font-medium border-r border-gray-200 last:border-r-0 transition-colors',
+                className={clsx('inline-flex items-center h-7 px-3 text-xs2 font-medium border-r border-gray-200 last:border-r-0 transition-colors',
                   scope === tab.id ? 'bg-brand-400 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}>
                 {tab.label}
               </button>
@@ -267,7 +267,7 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
 function Chip({ active, onClick, children }: { active?: boolean; onClick?: () => void; children: React.ReactNode }) {
   return (
     <button onClick={onClick}
-      className={clsx('rounded-full border transition-colors font-medium px-2 py-0 text-xs2',
+      className={clsx('inline-flex items-center h-7 rounded-full border transition-colors font-medium px-3 text-xs2',
         active ? 'bg-brand-400 text-white border-brand-400' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-brand-400')}>
       {children}
     </button>
