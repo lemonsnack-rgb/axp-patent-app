@@ -1,5 +1,5 @@
-// 특허 검색 결과 — sri-header + filter-bar(7그룹) + 모든 필터 드로어(Sheet 4) + 적용필터 칩 + 2-Column
-import { useState, useRef, useEffect } from 'react';
+// 특허 검색 결과 — 논문 검색과 동일 구성: 고정 툴바 + 필터 + 체크박스 일괄저장 + 테이블 + 우측 오버레이 드로어
+import { useState, useEffect } from 'react';
 import clsx from 'clsx';
 import { PATENT_SEED } from '../data/patentSeed';
 import { PATENT_FACET_GROUPS_BASE, type FacetGroup } from '../data/facetGroups';
@@ -13,7 +13,6 @@ import type { PatentResult } from '../types';
 import type { MetaFilter } from '../features/search';
 
 type SortKey = 'match' | 'recent' | 'old';
-type ViewMode = 'list' | 'sliding';
 
 interface AppliedFilter { facetKey: string; title: string; label: string }
 
@@ -21,14 +20,11 @@ interface AppliedFilter { facetKey: string; title: string; label: string }
 function applyMetaFilter(items: PatentResult[], meta?: MetaFilter | null): PatentResult[] {
   if (!meta) return items;
   return items.filter(p => {
-    // 국가: 선택된 국가가 있으면 그 중 하나여야 함
     if (meta.countries.length > 0 && !meta.countries.includes(p.country)) return false;
-    // 상태: 전체가 아니면 active/inactive 선택값에 포함되어야 함
     if (!meta.statusAll) {
       const picked = [...meta.statusActive, ...meta.statusInactive];
       if (picked.length > 0 && !picked.includes(p.status)) return false;
     }
-    // 기간(custom from~to, YYYYMMDD): 출원일 기준
     const yyyymmdd = (p.applicationDate || '').replace(/\D/g, '');
     if (meta.periodFrom && yyyymmdd && yyyymmdd < meta.periodFrom.replace(/\D/g, '')) return false;
     if (meta.periodTo && yyyymmdd && yyyymmdd > meta.periodTo.replace(/\D/g, '')) return false;
@@ -67,20 +63,20 @@ interface Props {
   onModify: () => void;
   onOpenDetail: (patentNumber: string) => void;   // 새 탭으로 전체 보기
   onSave: (idx: number) => void;
+  onSaveMany?: (patents: PatentResult[]) => void;   // 체크박스 일괄 저장
   searchQuery?: string;
   meta?: MetaFilter | null;
   onRefine?: (term: string) => void;   // 결과 내 검색
   onCrossSearch?: (keywords: string) => void;   // 검색식 이월 → 논문 [검색-212]
 }
 
-export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, meta, onRefine, onCrossSearch }: Props) {
+export function PatentResults({ onModify, onOpenDetail, onSave, onSaveMany, searchQuery, meta, onRefine, onCrossSearch }: Props) {
   const [refineTerm, setRefineTerm] = useState('');
   const [sort, setSort] = useState<SortKey>('recent');
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [openFacet, setOpenFacet] = useState<string | null>(null); // 칩별 스코프 팝오버
+  const [openFacet, setOpenFacet] = useState<string | null>(null);
   const [pendingFilters, setPendingFilters] = useState<Record<string, string[]>>({});
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilter[]>([]);
-  const [selectedCard, setSelectedCard] = useState<number | null>(null);  // 검색 직후 미리보기 닫힘 → 목록 전체 노출
+  const [selectedCard, setSelectedCard] = useState<number | null>(null);  // 기본: 목록만 노출
   const [appliedFilterRowVisible, setAppliedFilterRowVisible] = useState(false);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState<20 | 50 | 100 | 200>(20);
@@ -88,16 +84,17 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
   const [sortCol, setSortCol] = useState<'applicationDate' | 'title'>('applicationDate');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
-  // [검색-121·155] 새 검색(searchQuery 변경) 시 패싯 해제 + 첫 페이지
+  // 새 검색 시 패싯 해제 + 첫 페이지 + 선택/체크 초기화
   useEffect(() => {
     setPendingFilters({});
     setAppliedFilters([]);
     setAppliedFilterRowVisible(false);
     setPage(1);
     setSelectedCard(null);
+    setChecked(new Set());
   }, [searchQuery]);
 
-  // 결과 데이터 — 검색어 키워드 매칭 ∩ 메타필터 ∩ 패싯 → 정렬 [검색-90·100·154]
+  // 결과 데이터 — 검색어 키워드 매칭 ∩ 메타필터 ∩ 패싯 → 정렬
   const queryKeywords = parseKeywords(searchQuery || '');
   const kwMatched = queryKeywords.length === 0
     ? PATENT_SEED
@@ -105,11 +102,9 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
         const hay = `${p.title} ${p.abstract ?? ''} ${p.applicant} ${p.ipc} ${p.repClaim ?? ''} ${p.inventors ?? ''}`.toLowerCase();
         return queryKeywords.every(k => hay.includes(k.toLowerCase()));
       });
-  // 목업: 검색어가 매칭되지 않아도 결과가 비지 않도록 전체 시드로 폴백
   const queryScoped = kwMatched.length > 0 ? kwMatched : PATENT_SEED;
   const metaScoped = applyMetaFilter(queryScoped, meta);
   const filtered = applyFacetFilters(metaScoped, appliedFilters);
-  // 매칭순은 검색 매칭 순서를 유지하고, 그 외에는 컬럼/방향으로 정렬
   const data = sort === 'match'
     ? filtered
     : [...filtered].sort((a, b) => {
@@ -119,12 +114,12 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
       });
   const count = data.length;
 
-  // 미리보기 패널 키보드 네비게이션: ← 이전 / → 다음 / Esc 닫기
+  // 오버레이 패널 키보드 네비게이션: ← 이전 / → 다음 / Esc 닫기
   useEffect(() => {
     if (selectedCard === null) return;
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
-      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return; // 입력 중에는 무시
+      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedCard(c => (c != null && c < count - 1 ? c + 1 : c));
@@ -139,7 +134,6 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
     return () => window.removeEventListener('keydown', onKey);
   }, [selectedCard, count]);
 
-  // 적용된 실제 실행 검색식 칩
   const appliedQuery = searchQuery && searchQuery.trim() ? searchQuery : '전체 검색';
 
   const togglePendingFilter = (groupKey: string, label: string) => {
@@ -153,7 +147,6 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
 
   const applyFilters = () => {
     const newApplied: AppliedFilter[] = [];
-    // Base facet 그룹
     for (const g of PATENT_FACET_GROUPS_BASE) {
       for (const label of (pendingFilters[g.key] || [])) {
         newApplied.push({ facetKey: g.key, title: g.title, label });
@@ -170,7 +163,6 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
     const next = appliedFilters.filter(x => !(x.facetKey === f.facetKey && x.label === f.label));
     setAppliedFilters(next);
     setAppliedFilterRowVisible(next.length > 0);
-    // pending도 동기화
     setPendingFilters(prev => {
       const cur = prev[f.facetKey] || [];
       return { ...prev, [f.facetKey]: cur.filter(x => x !== f.label) };
@@ -183,51 +175,105 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
     setAppliedFilterRowVisible(false);
   };
 
+  const exportCsv = () => {
+    const rows = checked.size > 0 ? Array.from(checked).map(i => data[i]).filter(Boolean) : data;
+    const header = '문헌번호,발명의명칭,출원인,출원일,상태,IPC';
+    const esc = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`;
+    const csv = [header, ...rows.map(d => [esc(d.number), esc(d.title), esc(d.applicant), d.applicationDate, d.status, esc(d.ipc)].join(','))].join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'patents.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast(`${rows.length}건 CSV 다운로드`);
+  };
+
   return (
     <div className="flex flex-col">
-      {/* ── 1. sri-header ── */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 bg-white shrink-0 flex-wrap">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <Badge color="neutral" className="font-bold text-md2">{count.toLocaleString()}건</Badge>
-          {/* 적용된 검색식 칩 */}
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 border border-blue-100 rounded text-sm2 text-brand-400 font-mono truncate max-w-xs">
+      {/* ── 상단 고정 툴바 (검색식·건수·필터·정렬) ── */}
+      <div className="sticky top-0 z-20 bg-white shrink-0">
+        {/* sri-header — 검색식(먼저) → 건수 */}
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 bg-white flex-wrap">
+          <span className="text-xs2 text-gray-400 font-semibold shrink-0">검색식</span>
+          <span
+            className="inline-flex items-center h-7 text-xs2 px-2.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-mono cursor-pointer hover:bg-blue-100 transition-colors max-w-md truncate"
+            title={appliedQuery}
+          >
             {appliedQuery}
           </span>
-          <Button variant="outlined" color="primary" size="xs" className="shrink-0" onClick={onModify}>
+          <Badge color="neutral" className="font-bold text-sm2 shrink-0">{count.toLocaleString()}건</Badge>
+          <Button variant="outlined" color="primary" size="xs" className="h-7" onClick={onModify}>
             <Icon name="edit" size={11} /> 검색조건 수정
           </Button>
           {onRefine && (
             <input
               value={refineTerm}
               onChange={e => setRefineTerm(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && refineTerm.trim()) { onRefine(refineTerm.trim()); setRefineTerm(''); }
-              }}
+              onKeyDown={e => { if (e.key === 'Enter' && refineTerm.trim()) { onRefine(refineTerm.trim()); setRefineTerm(''); } }}
               placeholder="결과 내 검색 + (Enter)"
               title="현재 검색식에 AND로 추가해 결과를 좁힙니다"
-              className="shrink-0 w-44 px-2 py-1 border border-gray-200 rounded text-sm2 outline-none focus:border-blue-400"
+              className="shrink-0 w-44 h-7 px-2 border border-gray-200 rounded text-xs2 outline-none focus:border-blue-400"
             />
           )}
           {onCrossSearch && searchQuery && (
-            <Button variant="text" color="primary" size="xs" className="shrink-0 text-amber-600"
+            <Button variant="text" color="primary" size="xs" className="shrink-0 text-amber-600 h-7"
               title="이 검색 키워드로 논문 검색 (검색식 이월)"
               onClick={() => onCrossSearch(parseKeywords(searchQuery).join(' '))}>
               → 논문으로
             </Button>
           )}
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+
+        {/* filter-bar — 필터 칩 ... 정렬·페이지·CSV */}
+        <div className="flex items-center gap-1.5 px-4 py-1.5 border-b border-gray-100 bg-gray-50 flex-wrap relative z-20">
+          <span className="text-xs2 font-semibold text-gray-500 mr-1">필터</span>
+          {PATENT_FACET_GROUPS_BASE.map(g => {
+            const activeCount = appliedFilters.filter(f => f.facetKey === g.key).length;
+            const isOpen = openFacet === g.key;
+            return (
+              <div key={g.key} className="relative">
+                <button
+                  onClick={() => setOpenFacet(isOpen ? null : g.key)}
+                  className={clsx(
+                    'inline-flex items-center gap-1 h-7 px-2.5 rounded-full border text-xs2 transition-all',
+                    activeCount > 0
+                      ? 'bg-brand-400 text-white border-brand-400'
+                      : isOpen
+                        ? 'bg-blue-50 text-brand-400 border-blue-400'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-brand-400',
+                  )}
+                >
+                  {g.title}
+                  {activeCount > 0 && <span className="bg-white/20 rounded-full px-1 text-xs2">{activeCount}</span>}
+                  <Icon name="chevron-down" size={11} className={clsx('transition-transform', isOpen && 'rotate-180')} />
+                </button>
+                {isOpen && (
+                  <FacetPopover
+                    group={g}
+                    selected={pendingFilters[g.key] || []}
+                    onToggle={(label) => togglePendingFilter(g.key, label)}
+                    onApply={applyFilters}
+                    onClose={() => setOpenFacet(null)}
+                  />
+                )}
+              </div>
+            );
+          })}
+          <Button variant="outlined" color="primary" size="xs" onClick={resetFilters} className="text-xs2 h-7 text-gray-400">필터 초기화</Button>
+          <span className="flex-1" />
           <select
-            className="input py-1 text-sm2 w-auto"
+            className="h-7 px-2 w-28 border border-gray-200 rounded text-xs2 bg-white outline-none hover:border-gray-300 focus:border-blue-400"
             value={sort}
             onChange={e => {
               const v = e.target.value as SortKey;
               setSort(v);
               setPage(1);
-              if (v === 'match') return;            // 매칭순: 검색 매칭 순서 유지
+              if (v === 'match') return;
               setSortCol('applicationDate');
               setSortDir(v === 'old' ? 'asc' : 'desc');
             }}
+            title="정렬 기준"
           >
             <option value="match">매칭순</option>
             <option value="recent">최신순</option>
@@ -236,98 +282,40 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
           <select
             value={perPage}
             onChange={e => { setPerPage(Number(e.target.value) as 20 | 50 | 100 | 200); setPage(1); }}
-            className="input text-sm2 py-0.5 h-7 w-28"
+            className="h-7 px-2 w-28 border border-gray-200 rounded text-xs2 bg-white outline-none hover:border-gray-300 focus:border-blue-400"
           >
             <option value={20}>20개씩 보기</option>
             <option value={50}>50개씩 보기</option>
             <option value={100}>100개씩 보기</option>
             <option value={200}>200개씩 보기</option>
           </select>
-          {/* 뷰 토글: 리스트 / 슬라이딩 */}
-          <div className="inline-flex border border-gray-300 rounded overflow-hidden">
-            {([
-              { key: 'list', title: '리스트', disabled: false },
-              { key: 'sliding', title: '슬라이딩 뷰', disabled: false },
-            ] as const).map(v => (
-              <button
-                key={v.key}
-                title={v.disabled ? '준비 중' : v.title}
-                disabled={v.disabled}
-                onClick={() => !v.disabled && setViewMode(v.key)}
-                className={clsx('px-2 py-1.5 flex items-center', v.disabled ? 'bg-white text-gray-300 cursor-not-allowed' : viewMode === v.key ? 'bg-brand-400 text-white' : 'bg-white text-gray-500 hover:bg-gray-50')}
-              >
-                {v.key === 'list' && (
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
-                    <circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>
-                  </svg>
-                )}
-                {v.key === 'sliding' && (
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="6" rx="1"/><rect x="3" y="11" width="18" height="6" rx="1"/>
-                  </svg>
-                )}
-              </button>
-            ))}
-          </div>
+          <Button
+            variant="outlined" color="primary" size="xs" className="text-xs2 h-7"
+            disabled={count === 0}
+            title={checked.size > 0 ? `${checked.size}건 CSV 다운로드` : `전체 ${count}건 CSV 다운로드`}
+            onClick={exportCsv}
+          >CSV 다운{checked.size > 0 ? ` (${checked.size})` : ''}</Button>
         </div>
-      </div>
-
-      {/* ── 2. sri-filter-bar (칩별 스코프 팝오버) ── */}
-      <div className="flex items-center gap-1 px-3 py-1.5 border-b border-gray-100 bg-white shrink-0 flex-wrap relative z-20">
-        <span className="text-xs2 font-semibold text-gray-400 mr-1">필터</span>
-        {PATENT_FACET_GROUPS_BASE.map(g => {
-          const activeCount = (appliedFilters.filter(f => f.facetKey === g.key).length);
-          const isOpen = openFacet === g.key;
-          return (
-            <div key={g.key} className="relative">
-              <button
-                onClick={() => setOpenFacet(isOpen ? null : g.key)}
-                className={clsx(
-                  'inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-sm2 transition-all',
-                  activeCount > 0
-                    ? 'bg-brand-400 text-white border-brand-400'
-                    : isOpen
-                      ? 'bg-blue-50 text-brand-400 border-blue-400'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-brand-400',
-                )}
-              >
-                {g.title}
-                {activeCount > 0 && <span className="bg-white/20 rounded-full px-1 text-xs2">{activeCount}</span>}
-                <Icon name="chevron-down" size={11} className={clsx('transition-transform', isOpen && 'rotate-180')} />
-              </button>
-              {isOpen && (
-                <FacetPopover
-                  group={g}
-                  selected={pendingFilters[g.key] || []}
-                  onToggle={(label) => togglePendingFilter(g.key, label)}
-                  onApply={applyFilters}
-                  onClose={() => setOpenFacet(null)}
-                />
-              )}
-            </div>
-          );
-        })}
-        <button onClick={resetFilters} className="text-sm2 text-gray-400 hover:text-red-500 ml-1">필터 초기화</button>
       </div>
 
       {/* 팝오버 바깥 클릭 닫기 백드롭 */}
       {openFacet && <div className="fixed inset-0 z-10" onClick={() => setOpenFacet(null)} />}
 
-      {/* ── 적용된 필터 칩 행 ── */}
+      {/* 적용된 필터 칩 행 */}
       {appliedFilterRowVisible && appliedFilters.length > 0 && (
         <div className="flex items-center gap-1.5 px-4 py-2 bg-white border-b border-gray-100 flex-wrap shrink-0">
-          <span className="text-sm2 font-semibold text-gray-500 mr-1">적용된 필터</span>
+          <span className="text-xs2 font-semibold text-gray-500 mr-1">적용된 필터</span>
           {appliedFilters.map((f, i) => (
-            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 border border-blue-100 rounded-full text-sm2 text-brand-400">
+            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 border border-blue-100 rounded-full text-xs2 text-brand-400">
               {f.title}: {f.label}
               <button onClick={() => removeAppliedFilter(f)} className="hover:text-blue-900 ml-0.5">×</button>
             </span>
           ))}
+          <button onClick={resetFilters} className="text-xs2 text-gray-400 hover:text-red-500 ml-1">전체 해제</button>
         </div>
       )}
 
-      {/* ── 5. 결과 본문 ── */}
+      {/* ── 결과 본문 ── */}
       {count === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-16 text-gray-400">
           <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="mb-3 text-gray-300">
@@ -342,7 +330,7 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
             <Button variant="outlined" color="primary" size="sm" className="mt-3" onClick={resetFilters}>필터 초기화</Button>
           )}
         </div>
-      ) : viewMode === 'list' ? (
+      ) : (
         <TableResults
           data={data}
           selectedCard={selectedCard}
@@ -370,6 +358,8 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
               return next;
             });
           }}
+          onClearChecked={() => setChecked(new Set())}
+          onSaveChecked={() => { onSaveMany?.(Array.from(checked).map(i => data[i]).filter(Boolean)); setChecked(new Set()); }}
           sortCol={sortCol}
           sortDir={sortDir}
           onSort={(col) => {
@@ -377,10 +367,7 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
             if (col === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
             else { setSortCol(col); setSortDir('desc'); }
           }}
-          compact={selectedCard !== null}
         />
-      ) : (
-        <SlidingView data={data} onOpenDetail={onOpenDetail} onSave={onSave} />
       )}
     </div>
   );
@@ -411,7 +398,7 @@ function FacetPopover({ group, selected, onToggle, onApply, onClose }: {
           value={q}
           onChange={e => setQ(e.target.value)}
           placeholder={`${group.title} 검색`}
-          className="w-full mb-1.5 px-2 py-1 border border-gray-200 rounded text-xs2 outline-none focus:border-blue-400"
+          className="w-full mb-1.5 px-2 h-7 border border-gray-200 rounded text-xs2 outline-none focus:border-blue-400"
         />
       )}
       <div className="max-h-56 overflow-y-auto scroll-thin space-y-0.5">
@@ -436,8 +423,8 @@ function FacetPopover({ group, selected, onToggle, onApply, onClose }: {
   );
 }
 
-// ── 테이블 목록 뷰 (참고: 선행기술조사 결과 화면) ──
-function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, page, onPageChange, totalCount, perPage, searchQuery, checked, onToggleCheck, onToggleAll, sortCol, sortDir, onSort, compact }: {
+// ── 테이블 목록 + 우측 오버레이 상세 ──
+function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, page, onPageChange, totalCount, perPage, searchQuery, checked, onToggleCheck, onToggleAll, onClearChecked, onSaveChecked, sortCol, sortDir, onSort }: {
   data: PatentResult[];
   selectedCard: number | null;
   onSelectCard: (i: number) => void;
@@ -451,253 +438,165 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
   checked: Set<number>;
   onToggleCheck: (i: number) => void;
   onToggleAll: (all: boolean) => void;
+  onClearChecked: () => void;
+  onSaveChecked: () => void;
   sortCol: 'applicationDate' | 'title';
   sortDir: 'asc' | 'desc';
   onSort: (col: 'applicationDate' | 'title') => void;
-  compact: boolean;   // 상세 패널 열림 시 핵심 컬럼만 표시
 }) {
   const totalPages = Math.ceil(totalCount / perPage);
   const startIdx = (page - 1) * perPage;
   const pageData = data.slice(startIdx, startIdx + perPage);
+  const pageAllChecked = pageData.length > 0 && pageData.every((_, i) => checked.has(startIdx + i));
 
   return (
-    <div className="flex items-start">
-      {/* 결과 테이블 영역 */}
-      <div className="flex-1 flex flex-col min-w-0 border-r border-gray-200">
-        {/* 테이블 상단 바 */}
-        <div className="flex items-center justify-between px-4 py-1.5 bg-white border-b border-gray-200 shrink-0">
-          <div className="flex items-center gap-3">
-            <span className="text-sm2 font-semibold text-gray-700">
-              총 <span className="text-brand-400">{totalCount.toLocaleString()}</span>건
-            </span>
-            <Pagination current={page} total={totalPages} onChange={onPageChange} />
-          </div>
-          <div className="flex gap-1.5">
-            <Button
-              variant="outlined" color="primary" size="xs"
-              disabled={checked.size === 0}
-              title={checked.size === 0 ? '항목을 선택하세요' : `${checked.size}건 CSV 다운로드`}
-              onClick={() => {
-                const rows = Array.from(checked).map(i => data[i]).filter(Boolean);
-                const header = '문헌번호,발명의명칭,출원인,출원일,상태,IPC';
-                const csv = [header, ...rows.map(d => [d.number, `"${d.title}"`, d.applicant, d.applicationDate, d.status, d.ipc].join(','))].join('\n');
-                const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = 'patents.csv';
-                a.click();
-                URL.revokeObjectURL(a.href);
-                toast(`${rows.length}건 CSV 다운로드`);
-              }}
-            >CSV 다운</Button>
-            <Button variant="outlined" color="primary" size="xs" title="컬럼 설정 (준비 중)" disabled>컬럼</Button>
-          </div>
-        </div>
-
-        {/* 테이블 (페이지 전체 스크롤 — 내부 스크롤 박스 없음 [검색-92]) */}
-        <div className="bg-white">
-          <table className="w-full text-sm2 border-collapse">
-            <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="w-8 px-2 py-2 text-center border-r border-gray-100">
-                  <input
-                    type="checkbox"
-                    className="form-checkbox text-brand-400 rounded w-3 h-3"
-                    checked={pageData.length > 0 && pageData.every((_, i) => checked.has(startIdx + i))}
-                    onChange={e => onToggleAll(e.target.checked)}
-                  />
-                </th>
-                <th className="w-10 px-3 py-2 text-center font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">No</th>
-                <th className="w-14 px-2 py-2 text-center font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">상태</th>
-                <th className={clsx('px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap', compact ? 'w-28' : 'w-40')}>문헌번호</th>
-                {!compact && <th className="w-24 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">문헌일</th>}
-                {!compact && (
-                  <th
-                    className="w-24 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 cursor-pointer select-none hover:text-brand-400 whitespace-nowrap"
-                    onClick={() => onSort('applicationDate')}
-                  >
-                    출원일 {sortCol === 'applicationDate' ? (sortDir === 'desc' ? '↓' : '↑') : '↕'}
-                  </th>
-                )}
-                <th
-                  className="px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 cursor-pointer select-none hover:text-brand-400 whitespace-nowrap"
-                  onClick={() => onSort('title')}
-                >
-                  발명의 명칭 {sortCol === 'title' ? (sortDir === 'desc' ? '↓' : '↑') : '↕'}
-                </th>
-                {!compact && <th className="w-32 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">출원인</th>}
-                {!compact && <th className="w-24 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">만료일</th>}
-                <th className="w-20 px-2 py-2 text-center font-semibold text-gray-500 whitespace-nowrap">저장 · PDF</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageData.map((d, i) => {
-                const absIdx = startIdx + i;
-                const rowNo = absIdx + 1;
-                const isSelected = selectedCard === absIdx;
-                const statusColor = getPatentStatusBadgeColor(d.status);
-                return (
-                  <tr
-                    key={absIdx}
-                    onClick={() => onSelectCard(absIdx)}
-                    className={clsx(
-                      'border-b border-gray-100 cursor-pointer transition-colors',
-                      isSelected
-                        ? 'bg-blue-50 border-l-2 border-l-blue-600'
-                        : 'hover:bg-gray-50',
-                    )}
-                  >
-                    <td className="px-2 py-2 text-center border-r border-gray-100" onClick={e => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        className="form-checkbox text-brand-400 rounded w-3 h-3"
-                        checked={checked.has(absIdx)}
-                        onChange={() => onToggleCheck(absIdx)}
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-center text-xs2 text-gray-400">{rowNo}</td>
-                    <td className="px-2 py-2 text-center">
-                      <Badge color={statusColor} className="text-xs2">{d.status}</Badge>
-                    </td>
-                    <td className="px-2 py-2">
-                      <div className="font-mono text-xs2 text-brand-400 leading-snug">{d.number}</div>
-                      {compact && <div className="text-xs2 text-gray-400 font-mono mt-0.5">{d.applicationDate}</div>}
-                    </td>
-                    {!compact && <td className="px-2 py-2 text-xs2 text-gray-600 font-mono">{d.publicationDate || '—'}</td>}
-                    {!compact && <td className="px-2 py-2 text-xs2 text-gray-600 font-mono">{d.applicationDate}</td>}
-                    <td className="px-2 py-2">
-                      <div className="flex items-start gap-1.5">
-                        <button
-                          onClick={e => { e.stopPropagation(); onSelectCard(absIdx); }}
-                          className="flex-1 min-w-0 text-left text-sm2 text-gray-800 hover:text-brand-400 line-clamp-2 leading-snug font-medium"
-                          title={`${d.title}\n(클릭: 우측 미리보기)`}
-                        >
-                          {highlightText(d.title, searchQuery)}
-                        </button>
-                        <button
-                          onClick={e => { e.stopPropagation(); onOpenDetail(d.number); }}
-                          className="shrink-0 inline-flex items-center gap-0.5 px-1.5 h-6 rounded border border-blue-200 bg-blue-50 text-brand-400 text-xs2 font-semibold hover:bg-blue-100 hover:border-blue-400"
-                          title="새 탭에서 열기"
-                        >열기 ↗</button>
-                      </div>
-                      {compact && <div className="text-xs2 text-gray-500 truncate mt-0.5">{d.applicant}</div>}
-                    </td>
-                    {!compact && <td className="px-2 py-2 text-xs2 text-gray-600 truncate max-w-[120px]">{d.applicant}</td>}
-                    {!compact && <td className="px-2 py-2 text-xs2 text-gray-600 font-mono">{d.expirationDate || '—'}</td>}
-                    <td className="px-2 py-2" onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center gap-1.5 justify-center">
-                        <button
-                          onClick={() => onSave(absIdx)}
-                          className="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded border border-gray-200 text-gray-400 hover:border-yellow-400 hover:text-yellow-500"
-                          title="라이브러리 저장"
-                        >
-                          <Icon name="star" size={12} />
-                        </button>
-                        <button
-                          onClick={() => downloadPatentPdf(d)}
-                          className="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded border border-gray-200 text-gray-400 hover:border-brand-400 hover:text-brand-400"
-                          title="특허 원문 PDF 다운로드"
-                        >
-                          <Icon name="doc" size={12} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* 하단 페이지네이션 */}
-        <div className="flex justify-center py-2 border-t border-gray-100 bg-white shrink-0">
-          <Pagination current={page} total={totalPages} onChange={onPageChange} />
-        </div>
-      </div>
-
-      {/* 우측 사이드 리더 (분할) — 풀 상세. sticky로 목록 스크롤 중에도 고정 */}
-      <div className={clsx('flex flex-col transition-all border-l border-gray-200 sticky top-0 self-start', selectedCard !== null ? 'w-[400px] min-w-[400px] h-[calc(100vh-52px)] overflow-hidden' : 'w-0 min-w-0')}>
-        {selectedCard !== null && data[selectedCard] && (
+    <div>
+      {/* 선택/페이지 바 — 일괄 저장은 체크 시 노출 (전체선택은 표 헤더 체크박스) */}
+      <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border-b border-gray-100">
+        {checked.size > 0 ? (
           <>
-            <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 border-b border-gray-200 shrink-0">
-              <span className="text-xs2 font-semibold text-gray-500 bg-gray-200 rounded px-1.5 py-0.5 shrink-0">미리보기</span>
-              <Button variant="outlined" color="primary" size="xs" className="px-1.5 disabled:opacity-30" disabled={selectedCard <= 0} onClick={() => onSelectCard(selectedCard - 1)} title="이전 (←)">◀</Button>
-              <Button variant="outlined" color="primary" size="xs" className="px-1.5 disabled:opacity-30" disabled={selectedCard >= data.length - 1} onClick={() => onSelectCard(selectedCard + 1)} title="다음 (→)">▶</Button>
-              <span className="text-xs2 text-gray-400 font-mono">{selectedCard + 1} / {data.length}</span>
-              <span className="flex-1" />
-              <Button variant="filled" color="primary" size="xs" onClick={() => onOpenDetail(data[selectedCard].number)} title="새 탭에서 전체 보기">새 탭 전체보기 ↗</Button>
-              <button onClick={() => onSelectCard(-1)} className="text-gray-400 hover:text-gray-700 p-1 shrink-0" title="닫기 (Esc)"><Icon name="close" size={14} /></button>
-            </div>
-            <PatentDetail
-              embedded
-              data={data[selectedCard]}
-              searchQuery={searchQuery}
-              onBack={() => onSelectCard(-1)}
-              onSave={() => onSave(selectedCard)}
-            />
+            <span className="text-sm2 font-semibold text-blue-700">{checked.size}건 선택</span>
+            <Button variant="filled" color="primary" size="xs" className="text-xs2 h-7" onClick={onSaveChecked}>
+              <Icon name="star" size={11} /> 선택 저장
+            </Button>
+            <button onClick={onClearChecked} className="text-xs2 text-gray-400 hover:text-red-500">선택 해제</button>
           </>
+        ) : (
+          <span className="text-xs2 text-gray-400">행을 클릭하면 우측에서 상세를 미리볼 수 있습니다 · 체크 후 일괄 저장</span>
         )}
+        <span className="flex-1" />
+        <Pagination current={page} total={totalPages} onChange={onPageChange} />
       </div>
-    </div>
-  );
-}
 
-// ── 슬라이딩 뷰 (미니목록 + 연속 스크롤 본문) ──
-function SlidingView({ data, onOpenDetail, onSave }: { data: PatentResult[]; onOpenDetail: (patentNumber: string) => void; onSave: (i: number) => void }) {
-  const [current, setCurrent] = useState(0);
-  const bodyRef = useRef<HTMLDivElement>(null);
-
-  const jumpTo = (i: number) => {
-    setCurrent(i);
-    const el = bodyRef.current?.querySelector(`[data-sliding-idx="${i}"]`);
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
-  return (
-    <div className="flex-1 flex min-h-0 overflow-hidden">
-      {/* 미니목록 */}
-      <div className="w-56 shrink-0 border-r border-gray-200 overflow-y-auto scroll-thin bg-white">
-        {data.map((d, i) => (
-          <button
-            key={i}
-            onClick={() => jumpTo(i)}
-            className={clsx('w-full text-left px-3 py-2 border-b border-gray-100 text-sm2 hover:bg-gray-50',
-              current === i && 'bg-blue-50 border-l-2 border-l-blue-700')}
-          >
-            <div className="font-mono text-brand-400 text-xs2">{d.number}</div>
-            <div className="text-gray-700 text-xs2 truncate mt-0.5">{d.title}</div>
-          </button>
-        ))}
+      {/* 테이블 (페이지 전체 스크롤) */}
+      <div className="bg-white">
+        <table className="w-full text-sm2 border-collapse">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="w-8 px-2 py-2 text-center border-r border-gray-100" onClick={e => e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  className="form-checkbox text-brand-400 rounded w-3.5 h-3.5"
+                  checked={pageAllChecked}
+                  onChange={e => onToggleAll(e.target.checked)}
+                />
+              </th>
+              <th className="w-10 px-2 py-2 text-center font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">No</th>
+              <th className="w-16 px-2 py-2 text-center font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">상태</th>
+              <th className="w-40 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">문헌번호</th>
+              <th
+                className="w-24 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 cursor-pointer select-none hover:text-brand-400 whitespace-nowrap"
+                onClick={() => onSort('applicationDate')}
+              >
+                출원일 {sortCol === 'applicationDate' ? (sortDir === 'desc' ? '↓' : '↑') : '↕'}
+              </th>
+              <th
+                className="px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 cursor-pointer select-none hover:text-brand-400 whitespace-nowrap"
+                onClick={() => onSort('title')}
+              >
+                발명의 명칭 {sortCol === 'title' ? (sortDir === 'desc' ? '↓' : '↑') : '↕'}
+              </th>
+              <th className="w-32 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">출원인</th>
+              <th className="w-28 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">IPC</th>
+              <th className="w-16 px-2 py-2 text-center font-semibold text-gray-500 whitespace-nowrap">원문</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageData.map((d, i) => {
+              const absIdx = startIdx + i;
+              const rowNo = absIdx + 1;
+              const isSelected = selectedCard === absIdx;
+              const statusColor = getPatentStatusBadgeColor(d.status);
+              return (
+                <tr
+                  key={absIdx}
+                  onClick={() => onSelectCard(absIdx)}
+                  className={clsx(
+                    'border-b border-gray-100 cursor-pointer transition-colors',
+                    isSelected ? 'bg-blue-50 border-l-2 border-l-blue-600' : 'hover:bg-gray-50',
+                  )}
+                >
+                  <td className="px-2 py-2 text-center border-r border-gray-100 align-top" onClick={e => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      className="form-checkbox text-brand-400 rounded w-3.5 h-3.5 mt-0.5"
+                      checked={checked.has(absIdx)}
+                      onChange={() => onToggleCheck(absIdx)}
+                    />
+                  </td>
+                  <td className="px-2 py-2 text-center text-xs2 text-gray-400 align-top">{rowNo}</td>
+                  <td className="px-2 py-2 text-center align-top">
+                    <Badge color={statusColor} className="text-xs2">{d.status}</Badge>
+                  </td>
+                  <td className="px-2 py-2 align-top">
+                    <div className="font-mono text-xs2 text-brand-400 leading-snug">{d.number}</div>
+                  </td>
+                  <td className="px-2 py-2 text-xs2 text-gray-600 font-mono align-top">{d.applicationDate}</td>
+                  <td className="px-2 py-2 align-top">
+                    <div className="flex items-start gap-1.5">
+                      <button
+                        onClick={e => { e.stopPropagation(); onSelectCard(absIdx); }}
+                        className="flex-1 min-w-0 text-left text-sm2 text-gray-800 hover:text-brand-400 line-clamp-2 leading-snug font-medium"
+                        title={`${d.title}\n(클릭: 우측 미리보기)`}
+                      >
+                        {highlightText(d.title, searchQuery)}
+                      </button>
+                      <button
+                        onClick={e => { e.stopPropagation(); onOpenDetail(d.number); }}
+                        className="shrink-0 inline-flex items-center gap-1 text-xs2 text-gray-400 hover:text-brand-400 mt-0.5"
+                        title="새 탭에서 전체 보기"
+                      >새 탭에서 열기 <Icon name="link" size={11} /></button>
+                    </div>
+                  </td>
+                  <td className="px-2 py-2 text-xs2 text-gray-600 truncate max-w-[120px] align-top">{d.applicant}</td>
+                  <td className="px-2 py-2 text-xs2 text-gray-600 font-mono align-top">{d.ipc}</td>
+                  <td className="px-2 py-2 text-center align-top" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => downloadPatentPdf(d)}
+                      className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded border border-gray-200 text-gray-400 hover:border-brand-400 hover:text-brand-400"
+                      title="특허 원문 PDF 다운로드"
+                    >
+                      <Icon name="doc" size={13} />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
-      {/* 연속 스크롤 본문 */}
-      <div ref={bodyRef} className="flex-1 overflow-y-auto scroll-thin p-4 bg-gray-50 space-y-4">
-        {data.map((d, i) => (
-          <div
-            key={i}
-            data-sliding-idx={i}
-            className="bg-white rounded-xl border border-neutral-150 shadow-card p-4"
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <span className="font-mono text-md2 text-brand-400">{d.number}</span>
-              <Badge color={getPatentStatusBadgeColor(d.status)} className="text-xs2">{d.status}</Badge>
-              {d.grade && <Badge color="brand" className="text-xs2">평가 {d.grade}</Badge>}
-              <div className="ml-auto flex gap-1.5">
-                <Button variant="outlined" color="primary" size="xs" onClick={() => onOpenDetail(d.number)} title="새 탭에서 전체 보기">전체 보기 ↗</Button>
-                <Button variant="outlined" color="primary" size="xs" onClick={() => onSave(i)}><Icon name="star" size={11} /> 저장</Button>
-              </div>
-            </div>
-            <h3 className="text-base2 font-bold text-gray-800 mb-2 cursor-pointer hover:text-brand-400" onClick={() => onOpenDetail(d.number)} title="새 탭에서 전체 보기">{d.title}</h3>
-            <div className="text-sm2 text-gray-500 mb-2">{d.applicant} · 출원일 {d.applicationDate} · IPC: <span className="font-mono">{d.ipc}</span></div>
-            <div className="text-md2 text-gray-700 leading-relaxed">{d.abstract}</div>
+
+      {/* 하단 페이지네이션 */}
+      <div className="flex justify-center py-2 border-t border-gray-100 bg-white shrink-0">
+        <Pagination current={page} total={totalPages} onChange={onPageChange} />
+      </div>
+
+      {/* 우측 오버레이 상세 패널 (OpenAlex 방식 — 목록을 덮음) */}
+      {selectedCard !== null && data[selectedCard] && (
+        <aside className="fixed top-[52px] right-0 bottom-0 z-40 w-[50%] min-w-[480px] max-w-[840px] border-l border-gray-200 bg-white flex flex-col overflow-hidden shadow-2xl">
+          <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 border-b border-gray-200 shrink-0">
+            <Button variant="outlined" color="primary" size="xs" className="px-1.5 disabled:opacity-30" disabled={selectedCard <= 0} onClick={() => onSelectCard(selectedCard - 1)} title="이전 (←)">◀</Button>
+            <Button variant="outlined" color="primary" size="xs" className="px-1.5 disabled:opacity-30" disabled={selectedCard >= data.length - 1} onClick={() => onSelectCard(selectedCard + 1)} title="다음 (→)">▶</Button>
+            <span className="text-xs2 text-gray-400 font-mono">{selectedCard + 1} / {data.length}</span>
+            <span className="flex-1" />
+            <Button variant="filled" color="primary" size="xs" onClick={() => onOpenDetail(data[selectedCard].number)} title="새 탭에서 전체 보기">새 탭 ↗</Button>
+            <Button variant="outlined" color="primary" size="xs" onClick={() => onSave(selectedCard)}><Icon name="star" size={11} /> 저장</Button>
+            <button onClick={() => onSelectCard(-1)} className="text-gray-400 hover:text-gray-700 p-1 shrink-0" title="닫기 (Esc)"><Icon name="close" size={14} /></button>
           </div>
-        ))}
-      </div>
+          <PatentDetail
+            embedded
+            data={data[selectedCard]}
+            searchQuery={searchQuery}
+            onBack={() => onSelectCard(-1)}
+            onSave={() => onSave(selectedCard)}
+          />
+        </aside>
+      )}
     </div>
   );
 }
 
 // ── 키워드 하이라이트 ──
-// 검색식에서 키워드만 추출해(연산자·필드코드·괄호 제거) 키워드별 고유 색으로 하이라이트 (키워트식 다색)
 function highlightText(text: string, query?: string): React.ReactNode {
   const kws = parseKeywords(query || '');
   if (!kws.length) return text;

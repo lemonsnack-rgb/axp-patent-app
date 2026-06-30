@@ -59,6 +59,22 @@ export function SearchView() {
   const openSavePatent = (idx: number) => {
     setSaveCtx({ type: 'patent', data: PATENT_SEED[idx] });
   };
+  // 체크박스 일괄 저장 — 미분류로 바로 라이브러리에 추가
+  const saveManyPatents = (patents: PatentResult[]) => {
+    if (patents.length === 0) return;
+    patents.forEach(p => libraryAdd({
+      type: 'patent',
+      refNumber: p.number,
+      title: p.title,
+      applicant: p.applicant,
+      applicationDate: p.applicationDate,
+      abstract: p.abstract,
+      tags: [],
+      favorite: false,
+      data: p,
+    }));
+    toast(`${patents.length}건을 라이브러리에 저장했습니다`);
+  };
   const openSavePaper = (p: PaperResult) => {
     setSaveCtx({ type: 'paper', data: p });
   };
@@ -97,6 +113,7 @@ export function SearchView() {
                 onModify={() => setPatentSearched(false)}
                 onOpenDetail={no => openDetailTab('patent', no)}
                 onSave={openSavePatent}
+                onSaveMany={saveManyPatents}
                 searchQuery={searchQuery}
                 meta={committedMeta}
                 onRefine={term => patentInputRef.current?.refine(term)}
