@@ -155,6 +155,14 @@ export interface PaperResult {
   doi?: string;
   citationCount?: number;
   keywords?: string[];
+  // 서지 상세 (검색결과 출력용) — 없으면 생략
+  volume?: string;          // 권
+  issue?: string;           // 호
+  startPage?: number;       // 시작 페이지
+  endPage?: number;         // 끝 페이지
+  month?: number;           // 발행 월
+  paperType?: 'journal' | 'thesis';   // 학술지논문 / 학위논문
+  institution?: string;     // 학위수여기관 (학위논문)
   field?: string;           // 분야(카테고리)
   language?: 'EN' | 'KO' | 'JP' | 'ZH';   // 원문 언어
   internalUrl?: string;     // 본문 내용(내부 전용 링크)

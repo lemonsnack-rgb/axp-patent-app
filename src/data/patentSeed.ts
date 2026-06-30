@@ -357,6 +357,13 @@ function buildPaper(tpl: PaperTpl, ti: number, slot: number): PaperResult {
   const abstractEn = `This ${isSurvey ? 'survey reviews recent advances in' : 'paper proposes a novel method for'} ${topicEn.toLowerCase()}. Existing approaches suffer from limited accuracy and poor generalization, particularly under diverse real-world conditions. To address these limitations, we introduce a new framework and conduct extensive experiments on both large-scale public benchmarks and a self-collected dataset. The results demonstrate that the proposed method significantly outperforms prior state-of-the-art baselines in accuracy while maintaining practical computational efficiency. We further provide comprehensive ablation studies to analyze the contribution of each component and validate its applicability in real deployment scenarios.`;
   const doi = `10.${1000 + (seq % 9000)}/${tpl.field.length}${year}.${pad(seq, 6)}`;
 
+  // 서지 상세 — 일부는 학위논문(학위수여기관 표시)
+  const isThesis = seq % 10 === 7;
+  const INSTITUTIONS = ['서울대학교 대학원', 'KAIST', '연세대학교 대학원', '고려대학교 대학원', '한양대학교 대학원'];
+  const startPage = 1 + ((seq * 13) % 280);
+  const endPage = startPage + 10 + (seq % 15);
+  const month = 1 + (seq % 12);
+
   const ko = lang === 'KO';
   return {
     id: `pp_${seq}`,
@@ -372,6 +379,14 @@ function buildPaper(tpl: PaperTpl, ti: number, slot: number): PaperResult {
     language: lang,
     internalUrl: `axp-internal://fulltext/pp_${seq}`,   // 본문 내용(내부 전용)
     externalUrl: doi ? `https://doi.org/${doi}` : undefined, // 외부 제공 링크
+    // 서지 상세
+    paperType: isThesis ? 'thesis' : 'journal',
+    institution: isThesis ? INSTITUTIONS[seq % INSTITUTIONS.length] : undefined,
+    volume: isThesis ? undefined : `${10 + (seq % 40)}`,
+    issue: isThesis ? undefined : `${1 + (seq % 6)}`,
+    startPage,
+    endPage,
+    month,
   };
 }
 

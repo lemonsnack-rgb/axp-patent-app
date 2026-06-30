@@ -402,9 +402,7 @@ function ListResults({
                   <div className="text-xs2 text-gray-400 line-clamp-1 mb-1">{p.titleEn}</div>
                 )}
                 <div className="text-sm2 text-gray-500 mb-1 mt-1">
-                  {p.authors}
-                  {p.year && <span> · {p.year}</span>}
-                  {p.journal && <span> · <span className="text-gray-600">{p.journal}</span></span>}
+                  {paperMetaLine(p)}
                 </div>
                 {p.abstract && (
                   <div className="text-sm2 text-gray-600 line-clamp-2">{highlightText(p.abstract, searchQuery)}</div>
@@ -569,6 +567,24 @@ export function PaperInlineDetail({
 
 const LANG_LABEL: Record<string, string> = { EN: '영어', KO: '한국어', JP: '일본어', ZH: '중국어' };
 
+// 검색결과 논문 메타 라인 — 저자명, [저널명|학위수여기관] 권(호), 시작-끝, 발행연도(월)
+// 없는 항목은 생략. 학위논문은 저널명 대신 학위수여기관 표시
+function paperMetaLine(p: PaperResult): string {
+  const parts: string[] = [];
+  if (p.authors) parts.push(p.authors);
+  const source = p.paperType === 'thesis' ? p.institution : p.journal;
+  if (source) {
+    let s = source;
+    if (p.volume) s += ` ${p.volume}`;
+    if (p.issue) s += `(${p.issue})`;
+    parts.push(s);
+  }
+  if (p.startPage != null && p.endPage != null) parts.push(`${p.startPage}-${p.endPage}`);
+  else if (p.startPage != null) parts.push(`${p.startPage}`);
+  if (p.year != null) parts.push(p.month != null ? `${p.year}(${p.month})` : `${p.year}`);
+  return parts.join(', ');
+}
+
 function apaCitation(p: PaperResult): string {
   return `${p.authors} (${p.year ?? 'n.d.'}). ${p.title}.${p.journal ? ` ${p.journal}.` : ''}${p.doi ? ` https://doi.org/${p.doi}` : ''}`;
 }
@@ -707,7 +723,7 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
                     <div className="flex-1 min-w-0">
                       <div className="text-sm2 font-semibold text-gray-800 group-hover:text-brand-400 truncate">{r.title}</div>
                       <div className="text-xs2 text-gray-500 truncate mt-0.5">
-                        {r.authors}{r.journal && ` · ${r.journal}`}{r.year && ` · ${r.year}`}
+                        {paperMetaLine(r)}
                       </div>
                     </div>
                     {r.field && <span className="shrink-0 text-xs2 px-1.5 py-0.5 bg-blue-50 text-brand-400 rounded self-center">{r.field}</span>}
