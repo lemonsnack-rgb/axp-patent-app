@@ -605,7 +605,7 @@ function RefSigns({ signs, className }: { signs: { sign: string; label: string }
   );
 }
 
-// ── 도면 확대 모달 (도면 출력창) ── 부호의 설명 포함
+// ── 도면 확대 모달 (도면 출력창) ── 확대/축소·팬 + 부호의 설명
 function DrawingZoomModal({ figures, refSigns, index, onIndex, onClose }: {
   figures: { label: string; desc: string }[];
   refSigns?: { sign: string; label: string }[];
@@ -613,11 +613,24 @@ function DrawingZoomModal({ figures, refSigns, index, onIndex, onClose }: {
   onIndex: (i: number) => void;
   onClose: () => void;
 }) {
+  const [scale, setScale] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const drag = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
+
+  const clampScale = (s: number) => Math.min(5, Math.max(0.5, s));
+  const reset = () => { setScale(1); setPan({ x: 0, y: 0 }); };
+
+  // 도면 전환 시 줌 초기화
+  useEffect(() => { reset(); }, [index]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
       else if (e.key === 'ArrowRight') onIndex(Math.min(figures.length - 1, index + 1));
       else if (e.key === 'ArrowLeft') onIndex(Math.max(0, index - 1));
+      else if (e.key === '+' || e.key === '=') setScale(s => clampScale(s + 0.25));
+      else if (e.key === '-') setScale(s => clampScale(s - 0.25));
+      else if (e.key === '0') reset();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -627,18 +640,40 @@ function DrawingZoomModal({ figures, refSigns, index, onIndex, onClose }: {
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-6" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-        {/* 헤더 */}
+        {/* 헤더 + 줌 컨트롤 */}
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 bg-gray-50 shrink-0">
           <span className="font-mono font-semibold text-gray-700">{fig?.label}</span>
           <span className="text-sm2 text-gray-500 truncate flex-1">{fig?.desc}</span>
+          <div className="flex items-center gap-0.5 shrink-0 mr-1">
+            <button onClick={() => setScale(s => clampScale(s - 0.25))} className="w-7 h-7 rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-brand-400 font-bold" title="축소 (-)">−</button>
+            <span className="text-xs2 text-gray-500 font-mono w-12 text-center tabular-nums">{Math.round(scale * 100)}%</span>
+            <button onClick={() => setScale(s => clampScale(s + 0.25))} className="w-7 h-7 rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-brand-400 font-bold" title="확대 (+)">+</button>
+            <button onClick={reset} className="ml-1 px-1.5 h-7 rounded border border-gray-300 text-xs2 text-gray-600 hover:border-blue-400 hover:text-brand-400" title="원래 크기 (0)">맞춤</button>
+          </div>
           <span className="text-xs2 text-gray-400 font-mono shrink-0">{index + 1} / {figures.length}</span>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1 shrink-0" title="닫기 (Esc)"><Icon name="close" size={16} /></button>
         </div>
-        {/* 큰 도면 + 부호의 설명 */}
-        <div className="flex-1 min-h-0 flex flex-col items-center bg-gray-50 p-4 overflow-auto">
-          <FigureSVG index={index} className="w-full max-w-2xl h-auto" />
+        {/* 큰 도면 (줌·팬) + 부호의 설명 */}
+        <div className="flex-1 min-h-0 flex flex-col bg-gray-50 overflow-auto">
+          <div
+            className={clsx('relative h-[46vh] shrink-0 overflow-hidden bg-white border-b border-gray-100', scale > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in')}
+            onWheel={e => { e.preventDefault(); setScale(s => clampScale(s + (e.deltaY < 0 ? 0.15 : -0.15))); }}
+            onDoubleClick={() => setScale(s => (s >= 2 ? 1 : clampScale(s + 1)))}
+            onMouseDown={e => { drag.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y }; }}
+            onMouseMove={e => { if (drag.current) setPan({ x: drag.current.px + (e.clientX - drag.current.x), y: drag.current.py + (e.clientY - drag.current.y) }); }}
+            onMouseUp={() => { drag.current = null; }}
+            onMouseLeave={() => { drag.current = null; }}
+          >
+            <div
+              className="absolute inset-0 flex items-center justify-center"
+              style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, transition: drag.current ? 'none' : 'transform 0.08s' }}
+            >
+              <FigureSVG index={index} className="w-full max-w-2xl h-auto px-6" />
+            </div>
+            <div className="absolute bottom-1.5 right-2 text-xs2 text-gray-400 bg-white/70 rounded px-1.5 py-0.5 pointer-events-none">휠: 확대/축소 · 더블클릭 · 드래그 이동</div>
+          </div>
           {refSigns && refSigns.length > 0 && (
-            <div className="mt-4 max-w-2xl w-full">
+            <div className="p-4">
               <RefSigns signs={refSigns} />
             </div>
           )}

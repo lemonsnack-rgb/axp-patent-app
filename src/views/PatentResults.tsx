@@ -7,6 +7,7 @@ import { PatentDetail, parseKeywords, KW_COLORS } from '../components/PatentDeta
 import { Icon } from '../components/Icon';
 import { toast, Button } from '@muhayu/axp-ui';
 import { getPatentStatusBadgeColor } from '../utils/badgeUtils';
+import { downloadPatentPdf } from '../features/patentPdf';
 import { Badge } from '../components/ui';
 import type { PatentResult } from '../types';
 import type { MetaFilter } from '../features/search';
@@ -527,7 +528,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                 </th>
                 {!compact && <th className="w-32 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">출원인</th>}
                 {!compact && <th className="w-24 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">만료일</th>}
-                <th className="w-24 px-2 py-2 text-center font-semibold text-gray-500 whitespace-nowrap">저장 · 열기</th>
+                <th className="w-20 px-2 py-2 text-center font-semibold text-gray-500 whitespace-nowrap">저장 · PDF</th>
               </tr>
             </thead>
             <tbody>
@@ -566,31 +567,40 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                     {!compact && <td className="px-2 py-2 text-xs2 text-gray-600 font-mono">{d.publicationDate || '—'}</td>}
                     {!compact && <td className="px-2 py-2 text-xs2 text-gray-600 font-mono">{d.applicationDate}</td>}
                     <td className="px-2 py-2">
-                      <button
-                        onClick={e => { e.stopPropagation(); onSelectCard(absIdx); }}
-                        className="text-left text-sm2 text-gray-800 hover:text-brand-400 line-clamp-2 leading-snug font-medium w-full"
-                        title={`${d.title}\n(클릭: 우측 미리보기)`}
-                      >
-                        {highlightText(d.title, searchQuery)}
-                      </button>
+                      <div className="flex items-start gap-1.5">
+                        <button
+                          onClick={e => { e.stopPropagation(); onSelectCard(absIdx); }}
+                          className="flex-1 min-w-0 text-left text-sm2 text-gray-800 hover:text-brand-400 line-clamp-2 leading-snug font-medium"
+                          title={`${d.title}\n(클릭: 우측 미리보기)`}
+                        >
+                          {highlightText(d.title, searchQuery)}
+                        </button>
+                        <button
+                          onClick={e => { e.stopPropagation(); onOpenDetail(d.number); }}
+                          className="shrink-0 inline-flex items-center gap-0.5 px-1.5 h-6 rounded border border-blue-200 bg-blue-50 text-brand-400 text-xs2 font-semibold hover:bg-blue-100 hover:border-blue-400"
+                          title="새 탭에서 열기"
+                        >열기 ↗</button>
+                      </div>
                       {compact && <div className="text-xs2 text-gray-500 truncate mt-0.5">{d.applicant}</div>}
                     </td>
                     {!compact && <td className="px-2 py-2 text-xs2 text-gray-600 truncate max-w-[120px]">{d.applicant}</td>}
                     {!compact && <td className="px-2 py-2 text-xs2 text-gray-600 font-mono">{d.expirationDate || '—'}</td>}
-                    <td className="px-2 py-2">
-                      <div className="flex items-center gap-1.5">
+                    <td className="px-2 py-2" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-1.5 justify-center">
                         <button
-                          onClick={e => { e.stopPropagation(); onSave(absIdx); }}
+                          onClick={() => onSave(absIdx)}
                           className="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded border border-gray-200 text-gray-400 hover:border-yellow-400 hover:text-yellow-500"
                           title="라이브러리 저장"
                         >
                           <Icon name="star" size={12} />
                         </button>
                         <button
-                          onClick={e => { e.stopPropagation(); onOpenDetail(d.number); }}
-                          className="shrink-0 inline-flex items-center gap-0.5 px-1.5 h-6 rounded border border-blue-200 bg-blue-50 text-brand-400 text-xs2 font-semibold hover:bg-blue-100 hover:border-blue-400"
-                          title="새 탭에서 전체 보기"
-                        >새 탭 ↗</button>
+                          onClick={() => downloadPatentPdf(d)}
+                          className="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded border border-gray-200 text-gray-400 hover:border-brand-400 hover:text-brand-400"
+                          title="특허 원문 PDF 다운로드"
+                        >
+                          <Icon name="doc" size={12} />
+                        </button>
                       </div>
                     </td>
                   </tr>
