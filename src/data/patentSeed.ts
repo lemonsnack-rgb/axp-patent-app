@@ -132,6 +132,20 @@ const DOMAINS: Domain[] = [
   },
 ];
 
+// 도면 부호의 설명용 — 도메인별 주요 구성요소(부호 110/120/130에 대응)
+const DOMAIN_COMPS: Record<string, [string, string, string]> = {
+  lidar: ['데이터 수집부', '전처리부', '인식부'],
+  battery: ['양극', '고체 전해질층', '음극'],
+  semi: ['적층체', '채널 구조', '비트라인'],
+  graphene: ['그래핀 산화물 분산액', '고분자 매트릭스', '계면층'],
+  comm: ['안테나 어레이', '빔 제어부', '송신부'],
+  medical: ['영상 입력부', '신경망부', '출력부'],
+  display: ['마이크로 LED 화소', '구동 트랜지스터', '정렬 마크'],
+  hydrogen: ['고분자 전해질막', '촉매층', '유로'],
+  robot: ['로봇 암', '토크 센서부', '제어부'],
+  vision: ['패치 임베딩부', '어텐션부', '분류부'],
+};
+
 const COUNTRY_SEQ: Array<'KR' | 'US' | 'JP' | 'CN' | 'EP'> = ['KR', 'US', 'JP', 'CN', 'EP'];
 const STATUS_SEQ = ['등록', '심사중', '공개', '거절', '소멸'] as const;
 const GRADES = ['AAA', 'AA', 'A', 'BBB', 'BB'];
@@ -237,6 +251,15 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
     family: 1 + (seq % 5), citing: citing.length, cited: cited.length,
     citingList: citing, citedList: cited,
     figures: figuresFor(dm),
+    refSigns: (() => {
+      const c = DOMAIN_COMPS[dm.key] ?? ['제1 구성부', '제2 구성부', '제3 구성부'];
+      return [
+        { sign: '100', label: dm.device },
+        { sign: '110', label: c[0] },
+        { sign: '120', label: c[1] },
+        { sign: '130', label: c[2] },
+      ];
+    })(),
     applicantAddress: cc === 'KR' ? '서울특별시 강남구 테헤란로 152' : cc === 'US' ? '1 Innovation Way, San Jose, CA' : cc === 'JP' ? '東京都港区赤坂1-1-1' : cc === 'CN' ? '深圳市南山区科技园' : 'Hauptstraße 1, München',
     applicantCode: pad(120000000000 + seq * 7919, 12),
     priorityDate: mkDate(year - 2, seq, seq), examRequestDate: mkDate(year - 1, seq + 1, seq + 2),

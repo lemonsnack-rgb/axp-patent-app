@@ -113,6 +113,8 @@ export interface PatentResult {
   citing: number;
   cited: number;
   figures?: { label: string; desc: string; art?: string }[];
+  // 도면 부호의 설명 (도면 주요 부분에 대한 부호 설명)
+  refSigns?: { sign: string; label: string }[];
   // 구조화된 청구항 (없으면 repClaim 단독 표시)
   claims?: { no: number; dependsOn?: number; text: string }[];
   // 구조화된 인용/피인용 (없으면 citing/cited 카운트만 표시)

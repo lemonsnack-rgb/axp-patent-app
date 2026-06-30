@@ -2,6 +2,7 @@
 import { useRef, useState, useEffect } from 'react';
 import clsx from 'clsx';
 import type { PatentResult, PatentCitation } from '../types';
+import { downloadPatentPdf } from '../features/patentPdf';
 import { Icon } from './Icon';
 import { Badge } from './ui';
 import { Button } from '@muhayu/axp-ui';
@@ -159,6 +160,13 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                 <Badge color="brand">{data.country}</Badge>
                 <span className="font-mono text-md2 font-semibold text-gray-600">{data.number}</span>
                 {data.grade && <Badge color="brand">평가 {data.grade}</Badge>}
+                <button
+                  onClick={() => downloadPatentPdf(data)}
+                  className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-300 text-sm2 text-gray-600 hover:border-brand-400 hover:text-brand-400 shrink-0"
+                  title="특허 원문 PDF 다운로드"
+                >
+                  <Icon name="doc" size={12} /> 원문 PDF ↓
+                </button>
               </div>
               <h2 className="text-xl font-bold text-gray-800 leading-snug">{data.title}</h2>
             </div>
@@ -168,7 +176,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               <div className="mb-4">
                 <div className="text-xs2 font-semibold text-gray-500 mb-1.5">도면 ({(data.figures || []).length})</div>
                 <div className="border border-gray-200 rounded-lg bg-gray-50 overflow-hidden" style={{ height: 220 }}>
-                  <DrawingsPanel figures={data.figures} />
+                  <DrawingsPanel figures={data.figures} refSigns={data.refSigns} />
                 </div>
               </div>
             )}
@@ -355,7 +363,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
             <span className="text-sm2 font-bold text-gray-600">도면</span>
             <span className="ml-1.5 text-xs2 text-gray-400">({(data.figures || []).length})</span>
           </div>
-          <DrawingsPanel figures={data.figures} />
+          <DrawingsPanel figures={data.figures} refSigns={data.refSigns} />
         </div>
         )}
 
@@ -513,8 +521,9 @@ function renderFamilyPills(total: number): [string, number][] {
 }
 
 // ── 우측 도면 패널 (keywert 참고) ──
-function DrawingsPanel({ figures }: { figures?: { label: string; desc: string }[] }) {
+function DrawingsPanel({ figures, refSigns }: { figures?: { label: string; desc: string }[]; refSigns?: { sign: string; label: string }[] }) {
   const figs = figures || [];
+  const signs = refSigns || [];
   const [selected, setSelected] = useState(0);
   const [zoom, setZoom] = useState(false);
 
@@ -561,9 +570,13 @@ function DrawingsPanel({ figures }: { figures?: { label: string; desc: string }[
         ))}
       </div>
 
+      {/* 부호의 설명 */}
+      {signs.length > 0 && <RefSigns signs={signs} className="mt-3" />}
+
       {zoom && (
         <DrawingZoomModal
           figures={figs}
+          refSigns={signs}
           index={selected}
           onIndex={setSelected}
           onClose={() => setZoom(false)}
@@ -573,9 +586,29 @@ function DrawingsPanel({ figures }: { figures?: { label: string; desc: string }[
   );
 }
 
-// ── 도면 확대 모달 (도면 출력창) ──
-function DrawingZoomModal({ figures, index, onIndex, onClose }: {
+// ── 부호의 설명 (도면 주요 부분에 대한 부호 설명) ──
+function RefSigns({ signs, className }: { signs: { sign: string; label: string }[]; className?: string }) {
+  return (
+    <div className={clsx('border border-gray-200 rounded-lg overflow-hidden', className)}>
+      <div className="bg-gray-50 px-3 py-1.5 text-xs2 font-semibold text-gray-600 border-b border-gray-200">
+        도면 주요 부분에 대한 부호의 설명
+      </div>
+      <ul className="divide-y divide-gray-50">
+        {signs.map(s => (
+          <li key={s.sign} className="flex items-baseline gap-2 px-3 py-1.5 text-sm2">
+            <span className="font-mono font-semibold text-brand-400 shrink-0 w-10">{s.sign}</span>
+            <span className="text-gray-700">{s.label}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ── 도면 확대 모달 (도면 출력창) ── 부호의 설명 포함
+function DrawingZoomModal({ figures, refSigns, index, onIndex, onClose }: {
   figures: { label: string; desc: string }[];
+  refSigns?: { sign: string; label: string }[];
   index: number;
   onIndex: (i: number) => void;
   onClose: () => void;
@@ -601,9 +634,14 @@ function DrawingZoomModal({ figures, index, onIndex, onClose }: {
           <span className="text-xs2 text-gray-400 font-mono shrink-0">{index + 1} / {figures.length}</span>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1 shrink-0" title="닫기 (Esc)"><Icon name="close" size={16} /></button>
         </div>
-        {/* 큰 도면 */}
-        <div className="flex-1 min-h-0 flex items-center justify-center bg-gray-50 p-4 overflow-auto">
+        {/* 큰 도면 + 부호의 설명 */}
+        <div className="flex-1 min-h-0 flex flex-col items-center bg-gray-50 p-4 overflow-auto">
           <FigureSVG index={index} className="w-full max-w-2xl h-auto" />
+          {refSigns && refSigns.length > 0 && (
+            <div className="mt-4 max-w-2xl w-full">
+              <RefSigns signs={refSigns} />
+            </div>
+          )}
         </div>
         {/* 하단 내비 + 썸네일 */}
         <div className="flex items-center gap-2 px-4 py-2 border-t border-gray-200 bg-white shrink-0">

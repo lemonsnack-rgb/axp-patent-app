@@ -79,7 +79,7 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
   const [openFacet, setOpenFacet] = useState<string | null>(null); // 칩별 스코프 팝오버
   const [pendingFilters, setPendingFilters] = useState<Record<string, string[]>>({});
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilter[]>([]);
-  const [selectedCard, setSelectedCard] = useState<number | null>(0);
+  const [selectedCard, setSelectedCard] = useState<number | null>(null);  // 검색 직후 미리보기 닫힘 → 목록 전체 노출
   const [appliedFilterRowVisible, setAppliedFilterRowVisible] = useState(false);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState<20 | 50 | 100 | 200>(20);
@@ -93,7 +93,7 @@ export function PatentResults({ onModify, onOpenDetail, onSave, searchQuery, met
     setAppliedFilters([]);
     setAppliedFilterRowVisible(false);
     setPage(1);
-    setSelectedCard(0);
+    setSelectedCard(null);
   }, [searchQuery]);
 
   // 결과 데이터 — 검색어 키워드 매칭 ∩ 메타필터 ∩ 패싯 → 정렬 [검색-90·100·154]
@@ -509,7 +509,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                 </th>
                 <th className="w-10 px-3 py-2 text-center font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">No</th>
                 <th className="w-14 px-2 py-2 text-center font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">상태</th>
-                <th className="w-40 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">문헌번호</th>
+                <th className={clsx('px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap', compact ? 'w-28' : 'w-40')}>문헌번호</th>
                 {!compact && <th className="w-24 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">문헌일</th>}
                 {!compact && (
                   <th
@@ -526,7 +526,8 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                   발명의 명칭 {sortCol === 'title' ? (sortDir === 'desc' ? '↓' : '↑') : '↕'}
                 </th>
                 {!compact && <th className="w-32 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">출원인</th>}
-                <th className="w-28 px-2 py-2 text-left font-semibold text-gray-500 whitespace-nowrap">{compact ? '저장' : '만료일'}</th>
+                {!compact && <th className="w-24 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">만료일</th>}
+                <th className="w-24 px-2 py-2 text-center font-semibold text-gray-500 whitespace-nowrap">저장 · 열기</th>
               </tr>
             </thead>
             <tbody>
@@ -575,21 +576,21 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                       {compact && <div className="text-xs2 text-gray-500 truncate mt-0.5">{d.applicant}</div>}
                     </td>
                     {!compact && <td className="px-2 py-2 text-xs2 text-gray-600 truncate max-w-[120px]">{d.applicant}</td>}
+                    {!compact && <td className="px-2 py-2 text-xs2 text-gray-600 font-mono">{d.expirationDate || '—'}</td>}
                     <td className="px-2 py-2">
                       <div className="flex items-center gap-1.5">
-                        {!compact && <span className="text-xs2 text-gray-600 font-mono">{d.expirationDate || '—'}</span>}
                         <button
                           onClick={e => { e.stopPropagation(); onSave(absIdx); }}
-                          className="text-gray-400 hover:text-yellow-500 shrink-0"
+                          className="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded border border-gray-200 text-gray-400 hover:border-yellow-400 hover:text-yellow-500"
                           title="라이브러리 저장"
                         >
                           <Icon name="star" size={12} />
                         </button>
                         <button
                           onClick={e => { e.stopPropagation(); onOpenDetail(d.number); }}
-                          className="text-gray-400 hover:text-brand-400 shrink-0 text-xs2 font-semibold"
+                          className="shrink-0 inline-flex items-center gap-0.5 px-1.5 h-6 rounded border border-blue-200 bg-blue-50 text-brand-400 text-xs2 font-semibold hover:bg-blue-100 hover:border-blue-400"
                           title="새 탭에서 전체 보기"
-                        >↗</button>
+                        >새 탭 ↗</button>
                       </div>
                     </td>
                   </tr>
@@ -606,7 +607,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
       </div>
 
       {/* 우측 사이드 리더 (분할) — 풀 상세. sticky로 목록 스크롤 중에도 고정 */}
-      <div className={clsx('flex flex-col transition-all border-l border-gray-200 sticky top-0 self-start', selectedCard !== null ? 'w-[460px] min-w-[460px] h-[calc(100vh-52px)] overflow-hidden' : 'w-0 min-w-0')}>
+      <div className={clsx('flex flex-col transition-all border-l border-gray-200 sticky top-0 self-start', selectedCard !== null ? 'w-[400px] min-w-[400px] h-[calc(100vh-52px)] overflow-hidden' : 'w-0 min-w-0')}>
         {selectedCard !== null && data[selectedCard] && (
           <>
             <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 border-b border-gray-200 shrink-0">
