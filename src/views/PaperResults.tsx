@@ -638,12 +638,13 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
   onOpenRelated?: (id: string) => void;
 }) {
   const related = relatedPapers(paper, PAPER_SEED);
+  // 대등제목 — 원문이 한글이면 영문, 영문이면 한글
+  const altTitle = paper.language === 'KO' ? paper.titleEn : paper.titleKo;
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-zinc-50">
       {/* 헤더 */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 bg-white shrink-0">
         <Button variant="outlined" color="primary" size="sm" onClick={onClose}>← 탭 닫기</Button>
-        <span className="text-sm2 text-gray-500">논문 상세</span>
         <span className="flex-1" />
         <Button variant="filled" color="primary" size="sm" onClick={onSave}><Icon name="star" size={12} /> 라이브러리 저장</Button>
       </div>
@@ -652,65 +653,54 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
       <div className="flex-1 overflow-y-auto scroll-thin">
         <div className="mx-auto max-w-7xl px-6 lg:px-8 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            <main className="lg:col-span-8 min-w-0 space-y-6">
-          {/* 1. 제목 — 원제목(원문) + 다른 언어 제목 */}
-          <div>
-            <div className="flex items-center gap-2 flex-wrap mb-2">
-              {paper.field && <span className="text-xs2 px-2 py-0.5 bg-blue-50 text-brand-400 border border-blue-100 rounded-full">{paper.field}</span>}
-              {paper.year && <span className="text-xs2 text-gray-400">{paper.year}</span>}
-            </div>
+            <main className="lg:col-span-8 min-w-0">
+          {/* 제목 — 원제목(원문) + 대등제목(다른 언어). 레이블 없음 */}
+          <header className="pb-4 mb-1 border-b border-gray-200">
             <h1 className="text-3xl font-bold text-gray-900 leading-tight text-balance">{paper.title}</h1>
-            {paper.titleEn && paper.titleEn !== paper.title && (
-              <div className="text-lg text-gray-500 mt-2 leading-snug">{paper.titleEn}</div>
+            {altTitle && altTitle !== paper.title && (
+              <div className="text-lg text-gray-500 mt-2 leading-snug">{altTitle}</div>
             )}
-          </div>
+          </header>
 
-          {/* 2. 저자정보 (한 번만) + 제공 링크 */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-gray-200">
-            <div className="text-md2 text-gray-700">
-              <span className="font-medium">{paper.authors}</span>
-              {paper.authorsEn && paper.authorsEn !== paper.authors && <span className="text-gray-400 ml-2">({paper.authorsEn})</span>}
-            </div>
-            <div className="flex items-center gap-2">
-              {paper.externalUrl && (
-                <Button variant="filled" color="primary" size="sm" className="text-xs2"
-                  onClick={() => window.open(paper.externalUrl, '_blank', 'noopener,noreferrer')}>
-                  <Icon name="link" size={12} /> 원문 보기 (외부) ↗
-                </Button>
-              )}
-              <button
-                onClick={() => toast('내부 전용 본문 뷰어입니다 (데모). 실제 연동 시 본문이 표시됩니다.')}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-gray-300 text-xs2 text-gray-600 hover:border-blue-400 hover:text-brand-400"
-                title="기관 내부 이용자 전용 본문"
-              >
-                <Icon name="doc" size={12} /> 본문 보기 <span className="bg-gray-100 text-gray-500 rounded px-1">내부 전용</span>
-              </button>
-            </div>
-          </div>
+          {/* 메타데이터 — OpenAlex 방식: 레이블 │ 값 명시적 구분 */}
+          <dl className="divide-y divide-gray-100">
+            <MetaRow label="링크">
+              <div className="flex flex-wrap items-center gap-2">
+                {paper.externalUrl ? (
+                  <Button variant="filled" color="primary" size="sm" className="text-xs2"
+                    onClick={() => window.open(paper.externalUrl, '_blank', 'noopener,noreferrer')}>
+                    <Icon name="link" size={12} /> 원문 보기 (외부) ↗
+                  </Button>
+                ) : <span className="text-gray-400">-</span>}
+                <button
+                  onClick={() => toast('내부 전용 본문 뷰어입니다 (데모). 실제 연동 시 본문이 표시됩니다.')}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-gray-300 text-xs2 text-gray-600 hover:border-blue-400 hover:text-brand-400"
+                  title="기관 내부 이용자 전용 본문"
+                >
+                  <Icon name="doc" size={12} /> 본문 보기 <span className="bg-gray-100 text-gray-500 rounded px-1">내부 전용</span>
+                </button>
+              </div>
+            </MetaRow>
+            <MetaRow label="저자명">
+              {paper.authors || '-'}
+              {paper.authorsEn && paper.authorsEn !== paper.authors && <span className="text-gray-400"> ({paper.authorsEn})</span>}
+            </MetaRow>
+            <MetaRow label="발행연도">{paper.year || '-'}</MetaRow>
+            <MetaRow label="저널명">{paper.journal || '-'}</MetaRow>
+            <MetaRow label="저널명(영문)">{paper.journalEn || '-'}</MetaRow>
+            <MetaRow label="분야">{paper.field || '-'}</MetaRow>
+            <MetaRow label="초록">{paper.abstract || '-'}</MetaRow>
+            <MetaRow label="영문초록">{paper.abstractEn || '-'}</MetaRow>
+            <MetaRow label="키워드">
+              {paper.keywords && paper.keywords.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {paper.keywords.map(k => <span key={k} className="text-xs2 px-2 py-0.5 bg-blue-50 text-brand-400 border border-blue-100 rounded-full">{k}</span>)}
+                </div>
+              ) : '-'}
+            </MetaRow>
+          </dl>
 
-          {/* 3. 초록 (원문 + 영문) */}
-          {paper.abstract && (
-            <section>
-              <h2 className="text-base2 font-bold text-gray-800 mb-2 pb-1.5 border-b border-gray-100">초록</h2>
-              <p className="text-base2 text-gray-700 leading-relaxed">{paper.abstract}</p>
-            </section>
-          )}
-          {paper.abstractEn && paper.abstractEn !== paper.abstract && (
-            <section>
-              <h2 className="text-base2 font-bold text-gray-800 mb-2 pb-1.5 border-b border-gray-100">영문 초록 (Abstract)</h2>
-              <p className="text-base2 text-gray-700 leading-relaxed">{paper.abstractEn}</p>
-            </section>
-          )}
-
-          {/* 4. 인용 형식 (여러 스타일 리스트) */}
-          <section>
-            <h2 className="text-base2 font-bold text-gray-800 mb-2 pb-1.5 border-b border-gray-100">인용</h2>
-            <div className="space-y-2">
-              {citationList(paper).map(c => <CitationRow key={c.label} label={c.label} text={c.text} mono={c.mono} />)}
-            </div>
-          </section>
-
-          {/* 관련 논문 — 같은 분야/키워드 (검색결과처럼 한 줄씩) */}
+          {/* 관련 논문 — 같은 분야/키워드 (검색결과처럼 한 줄씩), 하단 */}
           {related.length > 0 && (
             <section className="mt-8 pt-6 border-t border-gray-200">
               <h2 className="text-base2 font-bold text-gray-800 mb-3">관련 논문 <span className="text-sm2 font-normal text-gray-400">· 같은 분야·키워드 {related.length}건</span></h2>
@@ -738,25 +728,14 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
           )}
             </main>
 
-            {/* 우측 메타 레일 (OpenAlex 레이아웃 차용) */}
-            <aside className="lg:col-span-4 space-y-4 lg:sticky lg:top-6">
+            {/* 우측 — 인용정보 복사 영역 */}
+            <aside className="lg:col-span-4 lg:sticky lg:top-6">
               <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <div className="text-xs2 font-bold text-gray-500 uppercase tracking-wide mb-2">서지정보</div>
-                <dl className="text-sm2 text-gray-600 space-y-1.5">
-                  {paper.journal && <div className="flex gap-3"><dt className="font-medium text-gray-700 w-20 shrink-0">저널</dt><dd className="min-w-0">{paper.journal}</dd></div>}
-                  {paper.journalEn && paper.journalEn !== paper.journal && <div className="flex gap-3"><dt className="font-medium text-gray-700 w-20 shrink-0">저널(영문)</dt><dd className="min-w-0">{paper.journalEn}</dd></div>}
-                  {paper.year && <div className="flex gap-3"><dt className="font-medium text-gray-700 w-20 shrink-0">발행연도</dt><dd>{paper.year}</dd></div>}
-                  {paper.field && <div className="flex gap-3"><dt className="font-medium text-gray-700 w-20 shrink-0">분야</dt><dd>{paper.field}</dd></div>}
-                </dl>
-              </div>
-              {paper.keywords && paper.keywords.length > 0 && (
-                <div className="bg-white border border-gray-200 rounded-lg p-4">
-                  <div className="text-xs2 font-bold text-gray-500 uppercase tracking-wide mb-2">키워드</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {paper.keywords.map(k => <span key={k} className="text-xs2 px-2 py-0.5 bg-blue-50 text-brand-400 border border-blue-100 rounded-full">{k}</span>)}
-                  </div>
+                <div className="text-xs2 font-bold text-gray-500 uppercase tracking-wide mb-3">인용</div>
+                <div className="space-y-2">
+                  {citationList(paper).map(c => <CitationRow key={c.label} label={c.label} text={c.text} mono={c.mono} />)}
                 </div>
-              )}
+              </div>
             </aside>
           </div>
         </div>
@@ -764,6 +743,16 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
         {/* 푸터 */}
         <PaperDetailFooter />
       </div>
+    </div>
+  );
+}
+
+// ── 레이블:값 행 (OpenAlex 방식 — 레이블과 값을 명시적으로 구분) ──
+function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 py-3">
+      <dt className="w-28 shrink-0 text-sm2 font-medium text-gray-500 sm:pt-0.5">{label}</dt>
+      <dd className="flex-1 min-w-0 text-base2 text-gray-800 leading-relaxed">{children}</dd>
     </div>
   );
 }

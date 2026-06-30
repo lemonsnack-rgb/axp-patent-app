@@ -355,13 +355,13 @@ function buildPaper(tpl: PaperTpl, ti: number, slot: number): PaperResult {
   const journalKo = tpl.koJournals[i];
   const abstractKo = `본 ${isSurvey ? '논문은' : '연구는'} ${tpl.field} 분야의 ${topicKo} 문제를 다룬다. 제안 방법은 기존 대비 성능을 향상시켰으며 다양한 데이터셋에서 검증되었다.`;
   const abstractEn = `This ${isSurvey ? 'survey reviews' : 'paper proposes a method for'} ${topicEn.toLowerCase()}. The approach is evaluated on multiple benchmarks and shows consistent improvements over prior work.`;
-  const doi = seq % 4 === 3 ? undefined : `10.${1000 + (seq % 9000)}/${tpl.field.length}${year}.${pad(seq, 6)}`;
+  const doi = `10.${1000 + (seq % 9000)}/${tpl.field.length}${year}.${pad(seq, 6)}`;
 
   const ko = lang === 'KO';
   return {
     id: `pp_${seq}`,
     // 원문 언어가 primary(주 표시), 영문은 보조
-    title: ko ? titleKo : titleEn, titleEn,
+    title: ko ? titleKo : titleEn, titleEn, titleKo,
     authors: ko ? authorsKo : authorsEn, authorsEn,
     journal: ko ? journalKo : journalEn, journalEn,
     abstract: ko ? abstractKo : abstractEn, abstractEn,

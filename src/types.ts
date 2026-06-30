@@ -147,6 +147,7 @@ export interface PaperResult {
   year?: number;
   abstract?: string;        // 초록(한글)
   // 영문 메타데이터 (DBpia 참고 — 한/영 병기)
+  titleKo?: string;         // 한글 논문명(대등제목)
   titleEn?: string;         // 영문 논문명
   authorsEn?: string;       // 저자 영문명
   journalEn?: string;       // 영문 저널명
