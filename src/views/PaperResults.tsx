@@ -206,7 +206,7 @@ export function PaperResults({ onModify, onSave, onSaveMany, onOpenDetail, searc
         <Button variant="outlined" color="primary" size="xs" onClick={resetFilters} className="text-xs2 h-7 text-gray-400">필터 초기화</Button>
         <span className="flex-1" />
         <select
-          className="input text-xs2 h-7 w-32"
+          className="h-7 px-2 w-32 border border-gray-200 rounded text-xs2 bg-white outline-none hover:border-gray-300 focus:border-blue-400"
           value={sort}
           onChange={e => setSort(e.target.value as SortKey)}
           title="정렬 기준"
@@ -218,7 +218,7 @@ export function PaperResults({ onModify, onSave, onSaveMany, onOpenDetail, searc
         <select
           value={perPage}
           onChange={e => { setPerPage(Number(e.target.value) as 20 | 50 | 100); setPage(1); }}
-          className="input text-xs2 h-7 w-28"
+          className="h-7 px-2 w-28 border border-gray-200 rounded text-xs2 bg-white outline-none hover:border-gray-300 focus:border-blue-400"
         >
           <option value={20}>20개씩 보기</option>
           <option value={50}>50개씩 보기</option>
@@ -438,13 +438,13 @@ function ListResults({
             selected={selectedCard === i}
             className="!p-3 mb-2"
           >
-            <div className="flex gap-3">
+            <div className="flex gap-3 items-start">
               <input
                 type="checkbox"
                 checked={checkedIds.has(p.id)}
                 onChange={() => onToggleId(p.id)}
                 onClick={e => e.stopPropagation()}
-                className="mt-1 shrink-0 rounded border-gray-300 text-blue-600 cursor-pointer"
+                className="self-start mt-1 shrink-0 rounded border-gray-300 text-blue-600 cursor-pointer"
                 title="선택"
               />
               <div className="flex-1 min-w-0">
@@ -465,9 +465,6 @@ function ListResults({
                     </button>
                   )}
                 </div>
-                {p.titleEn && p.titleEn !== p.title && (
-                  <div className="text-xs2 text-gray-400 line-clamp-1 mb-1">{p.titleEn}</div>
-                )}
                 <div className="text-sm2 text-gray-500 mb-1 mt-1">
                   {paperMetaLine(p)}
                 </div>
