@@ -595,15 +595,6 @@ function CitationRow({ label, text, mono }: { label: string; text: string; mono?
   );
 }
 
-// 논문 발행 유형 추정 (저널/학술대회/프리프린트)
-function pubType(journal?: string): string {
-  const j = (journal || '').toLowerCase();
-  if (!journal) return '미상';
-  if (/arxiv|preprint/.test(j)) return '프리프린트';
-  if (/proceedings|conference|cvpr|iclr|neurips|icra|iedm/.test(j)) return '학술대회';
-  return '저널';
-}
-
 // 관련 논문 — 같은 분야 우선, 공유 키워드 수로 정렬 (자기 자신 제외)
 function relatedPapers(paper: PaperResult, all: PaperResult[], n = 10): PaperResult[] {
   const kw = new Set(paper.keywords ?? []);
@@ -641,95 +632,82 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
 
       {/* 본문 — 중앙 정렬 + 데스크톱 2단 */}
       <div className="flex-1 overflow-y-auto scroll-thin">
-        <div className="mx-auto max-w-5xl px-6 py-8">
-          {/* 제목·메타 (한글 + 영문 병기) */}
-          <div className="pb-5 mb-6 border-b border-gray-200">
+        <div className="mx-auto max-w-6xl px-8 py-8 space-y-7">
+          {/* 1. 제목 — 원제목(원문) + 다른 언어 제목 */}
+          <div>
             <div className="flex items-center gap-2 flex-wrap mb-2">
               {paper.field && <span className="text-xs2 px-2 py-0.5 bg-blue-50 text-brand-400 border border-blue-100 rounded-full">{paper.field}</span>}
-              <span className="text-xs2 px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">원문 {LANG_LABEL[paper.language ?? 'EN']}</span>
               {paper.year && <span className="text-xs2 text-gray-400">{paper.year}</span>}
             </div>
             <h1 className="text-2xl font-bold text-gray-900 leading-snug text-balance">{paper.title}</h1>
             {paper.titleEn && paper.titleEn !== paper.title && (
-              <div className="text-base2 text-gray-500 mt-1 leading-snug">{paper.titleEn}</div>
+              <div className="text-base2 text-gray-500 mt-1.5 leading-snug">{paper.titleEn}</div>
             )}
-            <div className="text-md2 text-gray-500 mt-2">{paper.authors}{paper.journal && <span> · <span className="text-gray-700">{paper.journal}</span></span>}</div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* 메인 */}
-            <main className="lg:col-span-2 space-y-6 min-w-0">
-              {paper.abstract && (
-                <section>
-                  <h2 className="text-sm2 font-bold text-gray-700 mb-2 pb-1.5 border-b border-gray-100">초록</h2>
-                  <p className="text-base2 text-gray-700 leading-relaxed">{paper.abstract}</p>
-                </section>
+          {/* 2. 저자정보 (한 번만) + 제공 링크 */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-gray-200">
+            <div className="text-md2 text-gray-700">
+              <span className="font-medium">{paper.authors}</span>
+              {paper.authorsEn && paper.authorsEn !== paper.authors && <span className="text-gray-400 ml-2">({paper.authorsEn})</span>}
+            </div>
+            <div className="flex items-center gap-2">
+              {paper.externalUrl && (
+                <Button variant="filled" color="primary" size="sm" className="text-xs2"
+                  onClick={() => window.open(paper.externalUrl, '_blank', 'noopener,noreferrer')}>
+                  <Icon name="link" size={12} /> 원문 보기 (외부) ↗
+                </Button>
               )}
-              {paper.abstractEn && paper.abstractEn !== paper.abstract && (
-                <section>
-                  <h2 className="text-sm2 font-bold text-gray-700 mb-2 pb-1.5 border-b border-gray-100">영문 초록 (Abstract)</h2>
-                  <p className="text-base2 text-gray-700 leading-relaxed">{paper.abstractEn}</p>
-                </section>
-              )}
-              <section>
-                <h2 className="text-sm2 font-bold text-gray-700 mb-2 pb-1.5 border-b border-gray-100">인용 형식</h2>
-                <div className="space-y-2">
-                  <CitationRow label="APA" text={apaCitation(paper)} />
-                  <CitationRow label="BibTeX" text={bibtexCitation(paper)} mono />
-                </div>
-              </section>
-            </main>
+              <button
+                onClick={() => toast('내부 전용 본문 뷰어입니다 (데모). 실제 연동 시 본문이 표시됩니다.')}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-gray-300 text-xs2 text-gray-600 hover:border-blue-400 hover:text-brand-400"
+                title="기관 내부 이용자 전용 본문"
+              >
+                <Icon name="doc" size={12} /> 본문 보기 <span className="bg-gray-100 text-gray-500 rounded px-1">내부 전용</span>
+              </button>
+            </div>
+          </div>
 
-            {/* 사이드 */}
-            <aside className="space-y-4">
-              {/* 제공 링크 — 외부(이용자) / 본문(내부 전용) */}
-              <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-2">
-                <div className="text-xs2 font-bold text-gray-500 uppercase tracking-wide mb-1">원문·본문</div>
-                {paper.externalUrl ? (
-                  <Button variant="filled" color="primary" size="sm" className="w-full justify-center"
-                    onClick={() => window.open(paper.externalUrl, '_blank', 'noopener,noreferrer')}>
-                    <Icon name="link" size={12} /> 원문 보기 (외부) ↗
-                  </Button>
-                ) : (
-                  <div className="text-xs2 text-gray-400 text-center py-1">외부 원문 링크 없음</div>
-                )}
-                <button
-                  onClick={() => toast('내부 전용 본문 뷰어입니다 (데모). 실제 연동 시 본문이 표시됩니다.')}
-                  className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded border border-gray-300 text-sm2 text-gray-600 hover:border-blue-400 hover:text-brand-400"
-                  title="기관 내부 이용자 전용 본문"
-                >
-                  <Icon name="doc" size={12} /> 본문 보기
-                  <span className="text-xs2 bg-gray-100 text-gray-500 rounded px-1">내부 전용</span>
-                </button>
-              </div>
+          {/* 3. 초록 (원문 + 영문) */}
+          {paper.abstract && (
+            <section>
+              <h2 className="text-sm2 font-bold text-gray-700 mb-2">초록</h2>
+              <p className="text-base2 text-gray-700 leading-relaxed">{paper.abstract}</p>
+            </section>
+          )}
+          {paper.abstractEn && paper.abstractEn !== paper.abstract && (
+            <section>
+              <h2 className="text-sm2 font-bold text-gray-700 mb-2">영문 초록 (Abstract)</h2>
+              <p className="text-base2 text-gray-700 leading-relaxed">{paper.abstractEn}</p>
+            </section>
+          )}
 
-              {/* 서지정보 (한/영 병기) */}
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <div className="text-xs2 font-bold text-gray-500 uppercase tracking-wide mb-2">서지정보</div>
-                <div className="text-sm2 text-gray-600 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
-                  <span className="font-medium text-gray-700">저자</span><span>{paper.authors}</span>
-                  {paper.authorsEn && paper.authorsEn !== paper.authors && <><span className="font-medium text-gray-700">저자(영문)</span><span>{paper.authorsEn}</span></>}
-                  {paper.journal && <><span className="font-medium text-gray-700">저널</span><span>{paper.journal}</span></>}
-                  {paper.journalEn && paper.journalEn !== paper.journal && <><span className="font-medium text-gray-700">저널(영문)</span><span>{paper.journalEn}</span></>}
-                  {paper.year && <><span className="font-medium text-gray-700">발행연도</span><span>{paper.year}</span></>}
-                  {paper.field && <><span className="font-medium text-gray-700">분야</span><span>{paper.field}</span></>}
-                  <span className="font-medium text-gray-700">유형</span><span>{pubType(paper.journalEn || paper.journal)}</span>
-                  <span className="font-medium text-gray-700">원문 언어</span><span>{LANG_LABEL[paper.language ?? 'EN']}</span>
-                  {paper.doi && <><span className="font-medium text-gray-700">DOI</span><span className="font-mono text-blue-600 break-all">{paper.doi}</span></>}
-                </div>
-              </div>
+          {/* 4. 서지정보 (저자 제외 — 위에 표기) */}
+          <section>
+            <h2 className="text-sm2 font-bold text-gray-700 mb-2 pb-1.5 border-b border-gray-100">서지정보</h2>
+            <dl className="text-sm2 text-gray-600 grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-2">
+              {paper.journal && <div className="flex gap-3"><dt className="font-medium text-gray-700 w-24 shrink-0">저널</dt><dd>{paper.journal}</dd></div>}
+              {paper.journalEn && paper.journalEn !== paper.journal && <div className="flex gap-3"><dt className="font-medium text-gray-700 w-24 shrink-0">저널(영문)</dt><dd>{paper.journalEn}</dd></div>}
+              {paper.year && <div className="flex gap-3"><dt className="font-medium text-gray-700 w-24 shrink-0">발행연도</dt><dd>{paper.year}</dd></div>}
+              {paper.field && <div className="flex gap-3"><dt className="font-medium text-gray-700 w-24 shrink-0">분야</dt><dd>{paper.field}</dd></div>}
               {paper.keywords && paper.keywords.length > 0 && (
-                <div className="bg-white border border-gray-200 rounded-lg p-4">
-                  <div className="text-xs2 font-bold text-gray-500 uppercase tracking-wide mb-2">키워드</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {paper.keywords.map(k => (
-                      <span key={k} className="text-xs2 px-2 py-0.5 bg-blue-50 text-brand-400 border border-blue-100 rounded-full">{k}</span>
-                    ))}
-                  </div>
+                <div className="flex gap-3 md:col-span-2"><dt className="font-medium text-gray-700 w-24 shrink-0">키워드</dt>
+                  <dd className="flex flex-wrap gap-1.5">
+                    {paper.keywords.map(k => <span key={k} className="text-xs2 px-2 py-0.5 bg-blue-50 text-brand-400 border border-blue-100 rounded-full">{k}</span>)}
+                  </dd>
                 </div>
               )}
-            </aside>
-          </div>
+            </dl>
+          </section>
+
+          {/* 5. 인용 형식 */}
+          <section>
+            <h2 className="text-sm2 font-bold text-gray-700 mb-2 pb-1.5 border-b border-gray-100">인용 형식</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <CitationRow label="APA" text={apaCitation(paper)} />
+              <CitationRow label="BibTeX" text={bibtexCitation(paper)} mono />
+            </div>
+          </section>
 
           {/* 관련 논문 — 같은 분야/키워드 (검색결과처럼 한 줄씩) */}
           {related.length > 0 && (
@@ -758,7 +736,39 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
             </section>
           )}
         </div>
+
+        {/* 푸터 */}
+        <PaperDetailFooter />
       </div>
     </div>
+  );
+}
+
+// ── 서비스 푸터 (copykiller 스타일 참고) ──
+function PaperDetailFooter() {
+  const links = ['이용약관', '개인정보처리방침', '고객센터', '도움말'];
+  return (
+    <footer className="border-t border-gray-200 bg-gray-50 mt-10">
+      <div className="mx-auto max-w-6xl px-8 py-7">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-gray-200">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-gray-700">AXPlain.ai</span>
+            <span className="text-xs2 text-gray-400">선행기술조사 · 특허·논문 검색</span>
+          </div>
+          <nav className="flex items-center gap-1 text-xs2 text-gray-500">
+            {links.map((l, i) => (
+              <span key={l} className="flex items-center">
+                {i > 0 && <span className="text-gray-300 mx-1.5">·</span>}
+                <button className="hover:text-brand-400">{l}</button>
+              </span>
+            ))}
+          </nav>
+        </div>
+        <div className="pt-4 text-xs2 text-gray-400 leading-relaxed">
+          <div>(주)무하유 · 대표 OOO · 서울특별시 강남구 · 사업자등록번호 000-00-00000</div>
+          <div className="mt-1">© 2026 AXPlain.ai · muhayu. 본 화면은 데모 데이터로 구성되었으며, 실제 서비스 연동 시 원문·서지정보로 대체됩니다.</div>
+        </div>
+      </div>
+    </footer>
   );
 }
