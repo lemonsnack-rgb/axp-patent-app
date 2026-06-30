@@ -679,8 +679,6 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
             <MetaRow label="저널명">{paper.journal || '-'}</MetaRow>
             <MetaRow label="저널명(영문)">{paper.journalEn || '-'}</MetaRow>
             <MetaRow label="분야">{paper.field || '-'}</MetaRow>
-            <MetaRow label="초록" block>{paper.abstract || '-'}</MetaRow>
-            <MetaRow label="영문초록" block>{paper.abstractEn || '-'}</MetaRow>
             <MetaRow label="키워드">
               {paper.keywords && paper.keywords.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
@@ -688,6 +686,8 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
                 </div>
               ) : '-'}
             </MetaRow>
+            <MetaRow label="초록" block>{paper.abstract || '-'}</MetaRow>
+            <MetaRow label="영문초록" block>{paper.abstractEn || '-'}</MetaRow>
           </dl>
           </div>
 
