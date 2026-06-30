@@ -424,8 +424,7 @@ function FacetPopover({ group, selected, onToggle, onApply, onClose }: {
               checked={selected.includes(it.label)}
               onChange={() => onToggle(it.label)}
             />
-            <span className="truncate flex-1">{it.label}</span>
-            {it.count != null && <span className="text-xs2 text-gray-400">{it.count.toLocaleString()}</span>}
+            <span className="truncate">{it.label}{it.count != null && <span className="text-gray-400"> ({it.count.toLocaleString()}건)</span>}</span>
           </label>
         ))}
       </div>
