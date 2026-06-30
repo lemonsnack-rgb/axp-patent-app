@@ -36,6 +36,11 @@ export function StandaloneDetail() {
       paper={paper}
       onClose={() => window.close()}
       onSave={() => toast('저장은 검색 결과 화면에서 진행해 주세요.')}
+      onOpenRelated={id => {
+        // 같은 탭에서 관련 논문 상세로 이동 (해시 변경 후 재마운트)
+        window.location.hash = `detail?kind=paper&key=${encodeURIComponent(id)}`;
+        window.location.reload();
+      }}
     />
   );
 }

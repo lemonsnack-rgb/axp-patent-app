@@ -592,12 +592,40 @@ function CitationRow({ label, text, mono }: { label: string; text: string; mono?
   );
 }
 
+// 논문 발행 유형 추정 (저널/학술대회/프리프린트)
+function pubType(journal?: string): string {
+  const j = (journal || '').toLowerCase();
+  if (!journal) return '미상';
+  if (/arxiv|preprint/.test(j)) return '프리프린트';
+  if (/proceedings|conference|cvpr|iclr|neurips|icra|iedm/.test(j)) return '학술대회';
+  return '저널';
+}
+
+// 관련 논문 — 같은 분야 우선, 공유 키워드 수로 정렬 (자기 자신 제외)
+function relatedPapers(paper: PaperResult, all: PaperResult[], n = 6): PaperResult[] {
+  const kw = new Set(paper.keywords ?? []);
+  return all
+    .filter(p => p.id !== paper.id)
+    .map(p => {
+      const sharedKw = (p.keywords ?? []).filter(k => kw.has(k)).length;
+      const sameField = p.field && p.field === paper.field ? 1 : 0;
+      const sameJournal = p.journal && p.journal === paper.journal ? 1 : 0;
+      return { p, score: sameField * 3 + sharedKw * 2 + sameJournal };
+    })
+    .filter(x => x.score > 0)
+    .sort((a, b) => b.score - a.score || (b.p.year ?? 0) - (a.p.year ?? 0))
+    .slice(0, n)
+    .map(x => x.p);
+}
+
 // ── 논문 전체 상세 (새 탭) — PC 우선 2단 레이아웃 + 모바일 반응형 ──
-export function PaperDetailFull({ paper, onClose, onSave }: {
+export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
   paper: PaperResult;
   onClose: () => void;
   onSave: () => void;
+  onOpenRelated?: (id: string) => void;
 }) {
+  const related = relatedPapers(paper, PAPER_SEED);
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-zinc-50">
       {/* 헤더 */}
@@ -655,6 +683,7 @@ export function PaperDetailFull({ paper, onClose, onSave }: {
                   {paper.journal && <><span className="font-medium text-gray-700">저널</span><span>{paper.journal}</span></>}
                   {paper.year && <><span className="font-medium text-gray-700">발행년도</span><span>{paper.year}</span></>}
                   {paper.field && <><span className="font-medium text-gray-700">분야</span><span>{paper.field}</span></>}
+                  <span className="font-medium text-gray-700">유형</span><span>{pubType(paper.journal)}</span>
                   <span className="font-medium text-gray-700">언어</span><span>{LANG_LABEL[paper.language ?? 'EN']}</span>
                   {paper.doi && <><span className="font-medium text-gray-700">DOI</span><span className="font-mono text-blue-600 break-all">{paper.doi}</span></>}
                 </div>
@@ -671,6 +700,31 @@ export function PaperDetailFull({ paper, onClose, onSave }: {
               )}
             </aside>
           </div>
+
+          {/* 관련 논문 — 같은 분야/키워드 */}
+          {related.length > 0 && (
+            <section className="mt-8 pt-6 border-t border-gray-200">
+              <h2 className="text-base2 font-bold text-gray-800 mb-3">관련 논문 <span className="text-sm2 font-normal text-gray-400">· 같은 분야·키워드 {related.length}건</span></h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {related.map(r => (
+                  <button
+                    key={r.id}
+                    onClick={() => onOpenRelated?.(r.id)}
+                    disabled={!onOpenRelated}
+                    className="text-left bg-white border border-gray-200 rounded-lg p-3 hover:border-blue-400 hover:shadow-card transition-all disabled:cursor-default group"
+                  >
+                    <div className="flex items-center gap-1.5 mb-1">
+                      {r.field && <span className="text-xs2 px-1.5 py-0.5 bg-blue-50 text-brand-400 rounded">{r.field}</span>}
+                      {r.year && <span className="text-xs2 text-gray-400">{r.year}</span>}
+                      {onOpenRelated && <span className="ml-auto text-xs2 text-gray-300 group-hover:text-brand-400">열기 →</span>}
+                    </div>
+                    <div className="text-sm2 font-semibold text-gray-800 group-hover:text-brand-400 line-clamp-2 leading-snug">{r.title}</div>
+                    <div className="text-xs2 text-gray-500 truncate mt-1">{r.authors}{r.journal && ` · ${r.journal}`}</div>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       </div>
     </div>
