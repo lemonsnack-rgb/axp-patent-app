@@ -614,20 +614,9 @@ function CitationRow({ label, text, mono }: { label: string; text: string; mono?
 }
 
 // 관련 논문 — 같은 분야 우선, 공유 키워드 수로 정렬 (자기 자신 제외)
+// 관련 논문 = 검색결과 상위 N건 (유사도가 아닌 검색결과 순서)
 function relatedPapers(paper: PaperResult, all: PaperResult[], n = 10): PaperResult[] {
-  const kw = new Set(paper.keywords ?? []);
-  return all
-    .filter(p => p.id !== paper.id)
-    .map(p => {
-      const sharedKw = (p.keywords ?? []).filter(k => kw.has(k)).length;
-      const sameField = p.field && p.field === paper.field ? 1 : 0;
-      const sameJournal = p.journal && p.journal === paper.journal ? 1 : 0;
-      return { p, score: sameField * 3 + sharedKw * 2 + sameJournal };
-    })
-    .filter(x => x.score > 0)
-    .sort((a, b) => b.score - a.score || (b.p.year ?? 0) - (a.p.year ?? 0))
-    .slice(0, n)
-    .map(x => x.p);
+  return all.filter(p => p.id !== paper.id).slice(0, n);
 }
 
 // ── 논문 전체 상세 (새 탭) — PC 우선 2단 레이아웃 + 모바일 반응형 ──
@@ -653,34 +642,35 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
       <div className="flex-1 overflow-y-auto scroll-thin">
         <div className="mx-auto max-w-7xl px-6 lg:px-8 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            <main className="lg:col-span-8 min-w-0">
+            <main className="lg:col-span-8 min-w-0 space-y-6">
+          {/* 콘텐츠 카드 — 회색 페이지 위 흰색 영역(OpenAlex) */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6 lg:p-8">
           {/* 제목 — 원제목(원문) + 대등제목(다른 언어). 레이블 없음 */}
-          <header className="pb-4 mb-1 border-b border-gray-200">
+          <header className="pb-4 mb-2 border-b border-gray-100">
             <h1 className="text-3xl font-bold text-gray-900 leading-tight text-balance">{paper.title}</h1>
             {altTitle && altTitle !== paper.title && (
               <div className="text-lg text-gray-500 mt-2 leading-snug">{altTitle}</div>
             )}
+            {/* 링크 — 제목 하단 (원문/본문) */}
+            <div className="flex flex-wrap items-center gap-2 mt-4">
+              {paper.externalUrl && (
+                <Button variant="filled" color="primary" size="sm" className="text-xs2 h-8"
+                  onClick={() => window.open(paper.externalUrl, '_blank', 'noopener,noreferrer')}>
+                  <Icon name="link" size={12} /> 원문 보기
+                </Button>
+              )}
+              <button
+                onClick={() => toast('내부 전용 본문 뷰어입니다 (데모). 실제 연동 시 본문이 표시됩니다.')}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded border border-gray-300 text-xs2 text-gray-600 hover:border-blue-400 hover:text-brand-400"
+                title="기관 내부 이용자 전용 본문"
+              >
+                <Icon name="doc" size={12} /> 본문 보기 <span className="bg-gray-100 text-gray-500 rounded px-1">내부 전용</span>
+              </button>
+            </div>
           </header>
 
-          {/* 메타데이터 — OpenAlex 방식: 레이블 │ 값 명시적 구분 */}
+          {/* 메타데이터 — OpenAlex 방식: 레이블 값 명시적 구분 */}
           <dl className="divide-y divide-gray-100">
-            <MetaRow label="링크">
-              <div className="flex flex-wrap items-center gap-2">
-                {paper.externalUrl ? (
-                  <Button variant="filled" color="primary" size="sm" className="text-xs2"
-                    onClick={() => window.open(paper.externalUrl, '_blank', 'noopener,noreferrer')}>
-                    <Icon name="link" size={12} /> 원문 보기 (외부) ↗
-                  </Button>
-                ) : <span className="text-gray-400">-</span>}
-                <button
-                  onClick={() => toast('내부 전용 본문 뷰어입니다 (데모). 실제 연동 시 본문이 표시됩니다.')}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-gray-300 text-xs2 text-gray-600 hover:border-blue-400 hover:text-brand-400"
-                  title="기관 내부 이용자 전용 본문"
-                >
-                  <Icon name="doc" size={12} /> 본문 보기 <span className="bg-gray-100 text-gray-500 rounded px-1">내부 전용</span>
-                </button>
-              </div>
-            </MetaRow>
             <MetaRow label="저자명">
               {paper.authors || '-'}
               {paper.authorsEn && paper.authorsEn !== paper.authors && <span className="text-gray-400"> ({paper.authorsEn})</span>}
@@ -699,12 +689,13 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
               ) : '-'}
             </MetaRow>
           </dl>
+          </div>
 
-          {/* 관련 논문 — 같은 분야/키워드 (검색결과처럼 한 줄씩), 하단 */}
+          {/* 관련 논문 — 검색결과 상위(한 줄씩), 하단 */}
           {related.length > 0 && (
-            <section className="mt-8 pt-6 border-t border-gray-200">
-              <h2 className="text-base2 font-bold text-gray-800 mb-3">관련 논문 <span className="text-sm2 font-normal text-gray-400">· 같은 분야·키워드 {related.length}건</span></h2>
-              <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
+            <section className="bg-white border border-gray-200 rounded-xl p-6 lg:p-8">
+              <h2 className="text-base2 font-bold text-gray-800 mb-3">관련 논문 <span className="text-sm2 font-normal text-gray-400">· 검색결과 상위 {related.length}건</span></h2>
+              <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
                 {related.map((r, i) => (
                   <button
                     key={r.id}
@@ -750,9 +741,9 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
 // ── 레이블:값 행 (OpenAlex 방식 — 레이블과 값을 명시적으로 구분) ──
 function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 py-3">
-      <dt className="w-28 shrink-0 text-sm2 font-medium text-gray-500 sm:pt-0.5">{label}</dt>
-      <dd className="flex-1 min-w-0 text-base2 text-gray-800 leading-relaxed">{children}</dd>
+    <div className="flex flex-col sm:flex-row gap-1 sm:gap-6 py-3.5">
+      <dt className="w-32 shrink-0 text-sm2 font-medium text-gray-400 sm:pt-0.5">{label}</dt>
+      <dd className="flex-1 min-w-0 text-base2 text-gray-900 leading-relaxed">{children}</dd>
     </div>
   );
 }
