@@ -393,12 +393,15 @@ function ListResults({
             <div className="flex gap-3">
               <div className="flex-1 min-w-0">
                 <div className={clsx(
-                  'text-base2 font-semibold leading-snug mb-1',
+                  'text-base2 font-semibold leading-snug',
                   selectedCard === i ? 'text-blue-700' : 'text-gray-800 hover:text-blue-700',
                 )}>
                   {highlightText(p.title, searchQuery)}
                 </div>
-                <div className="text-sm2 text-gray-500 mb-1">
+                {p.titleEn && p.titleEn !== p.title && (
+                  <div className="text-xs2 text-gray-400 line-clamp-1 mb-1">{p.titleEn}</div>
+                )}
+                <div className="text-sm2 text-gray-500 mb-1 mt-1">
                   {p.authors}
                   {p.year && <span> · {p.year}</span>}
                   {p.journal && <span> · <span className="text-gray-600">{p.journal}</span></span>}
@@ -633,26 +636,23 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
         <Button variant="outlined" color="primary" size="sm" onClick={onClose}>← 탭 닫기</Button>
         <span className="text-sm2 text-gray-500">논문 상세</span>
         <span className="flex-1" />
-        {paper.doi && (
-          <Button variant="outlined" color="primary" size="sm" className="text-xs2"
-            onClick={() => window.open(`https://doi.org/${paper.doi}`, '_blank', 'noopener,noreferrer')}>
-            <Icon name="link" size={12} /> 원문 ↗
-          </Button>
-        )}
         <Button variant="filled" color="primary" size="sm" onClick={onSave}><Icon name="star" size={12} /> 라이브러리 저장</Button>
       </div>
 
       {/* 본문 — 중앙 정렬 + 데스크톱 2단 */}
       <div className="flex-1 overflow-y-auto scroll-thin">
         <div className="mx-auto max-w-5xl px-6 py-8">
-          {/* 제목·메타 */}
+          {/* 제목·메타 (한글 + 영문 병기) */}
           <div className="pb-5 mb-6 border-b border-gray-200">
             <div className="flex items-center gap-2 flex-wrap mb-2">
               {paper.field && <span className="text-xs2 px-2 py-0.5 bg-blue-50 text-brand-400 border border-blue-100 rounded-full">{paper.field}</span>}
-              <span className="text-xs2 px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{LANG_LABEL[paper.language ?? 'EN']}</span>
+              <span className="text-xs2 px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">원문 {LANG_LABEL[paper.language ?? 'EN']}</span>
               {paper.year && <span className="text-xs2 text-gray-400">{paper.year}</span>}
             </div>
             <h1 className="text-2xl font-bold text-gray-900 leading-snug text-balance">{paper.title}</h1>
+            {paper.titleEn && paper.titleEn !== paper.title && (
+              <div className="text-base2 text-gray-500 mt-1 leading-snug">{paper.titleEn}</div>
+            )}
             <div className="text-md2 text-gray-500 mt-2">{paper.authors}{paper.journal && <span> · <span className="text-gray-700">{paper.journal}</span></span>}</div>
           </div>
 
@@ -661,8 +661,14 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
             <main className="lg:col-span-2 space-y-6 min-w-0">
               {paper.abstract && (
                 <section>
-                  <h2 className="text-sm2 font-bold text-gray-700 mb-2 pb-1.5 border-b border-gray-100">초록 (Abstract)</h2>
+                  <h2 className="text-sm2 font-bold text-gray-700 mb-2 pb-1.5 border-b border-gray-100">초록</h2>
                   <p className="text-base2 text-gray-700 leading-relaxed">{paper.abstract}</p>
+                </section>
+              )}
+              {paper.abstractEn && paper.abstractEn !== paper.abstract && (
+                <section>
+                  <h2 className="text-sm2 font-bold text-gray-700 mb-2 pb-1.5 border-b border-gray-100">영문 초록 (Abstract)</h2>
+                  <p className="text-base2 text-gray-700 leading-relaxed">{paper.abstractEn}</p>
                 </section>
               )}
               <section>
@@ -676,15 +682,39 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
 
             {/* 사이드 */}
             <aside className="space-y-4">
+              {/* 제공 링크 — 외부(이용자) / 본문(내부 전용) */}
+              <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-2">
+                <div className="text-xs2 font-bold text-gray-500 uppercase tracking-wide mb-1">원문·본문</div>
+                {paper.externalUrl ? (
+                  <Button variant="filled" color="primary" size="sm" className="w-full justify-center"
+                    onClick={() => window.open(paper.externalUrl, '_blank', 'noopener,noreferrer')}>
+                    <Icon name="link" size={12} /> 원문 보기 (외부) ↗
+                  </Button>
+                ) : (
+                  <div className="text-xs2 text-gray-400 text-center py-1">외부 원문 링크 없음</div>
+                )}
+                <button
+                  onClick={() => toast('내부 전용 본문 뷰어입니다 (데모). 실제 연동 시 본문이 표시됩니다.')}
+                  className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded border border-gray-300 text-sm2 text-gray-600 hover:border-blue-400 hover:text-brand-400"
+                  title="기관 내부 이용자 전용 본문"
+                >
+                  <Icon name="doc" size={12} /> 본문 보기
+                  <span className="text-xs2 bg-gray-100 text-gray-500 rounded px-1">내부 전용</span>
+                </button>
+              </div>
+
+              {/* 서지정보 (한/영 병기) */}
               <div className="bg-white border border-gray-200 rounded-lg p-4">
                 <div className="text-xs2 font-bold text-gray-500 uppercase tracking-wide mb-2">서지정보</div>
                 <div className="text-sm2 text-gray-600 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
                   <span className="font-medium text-gray-700">저자</span><span>{paper.authors}</span>
+                  {paper.authorsEn && paper.authorsEn !== paper.authors && <><span className="font-medium text-gray-700">저자(영문)</span><span>{paper.authorsEn}</span></>}
                   {paper.journal && <><span className="font-medium text-gray-700">저널</span><span>{paper.journal}</span></>}
-                  {paper.year && <><span className="font-medium text-gray-700">발행년도</span><span>{paper.year}</span></>}
+                  {paper.journalEn && paper.journalEn !== paper.journal && <><span className="font-medium text-gray-700">저널(영문)</span><span>{paper.journalEn}</span></>}
+                  {paper.year && <><span className="font-medium text-gray-700">발행연도</span><span>{paper.year}</span></>}
                   {paper.field && <><span className="font-medium text-gray-700">분야</span><span>{paper.field}</span></>}
-                  <span className="font-medium text-gray-700">유형</span><span>{pubType(paper.journal)}</span>
-                  <span className="font-medium text-gray-700">언어</span><span>{LANG_LABEL[paper.language ?? 'EN']}</span>
+                  <span className="font-medium text-gray-700">유형</span><span>{pubType(paper.journalEn || paper.journal)}</span>
+                  <span className="font-medium text-gray-700">원문 언어</span><span>{LANG_LABEL[paper.language ?? 'EN']}</span>
                   {paper.doi && <><span className="font-medium text-gray-700">DOI</span><span className="font-mono text-blue-600 break-all">{paper.doi}</span></>}
                 </div>
               </div>
@@ -704,7 +734,7 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
           {/* 관련 논문 — 같은 분야/키워드 (검색결과처럼 한 줄씩) */}
           {related.length > 0 && (
             <section className="mt-8 pt-6 border-t border-gray-200">
-              <h2 className="text-base2 font-bold text-gray-800 mb-3">관련 논문 <span className="text-sm2 font-normal text-gray-400">· 같은 분야·키워드 상위 {related.length}건</span></h2>
+              <h2 className="text-base2 font-bold text-gray-800 mb-3">관련 논문 <span className="text-sm2 font-normal text-gray-400">· 같은 분야·키워드 {related.length}건</span></h2>
               <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
                 {related.map((r, i) => (
                   <button

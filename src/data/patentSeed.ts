@@ -280,47 +280,98 @@ export const PATENT_SEED: PatentResult[] = DOMAINS.flatMap((dm, di) =>
 // 논문 시드 — 분야·언어·연도·피인용 다양화 (30건)
 // ──────────────────────────────────────────────────────────────────────────
 
-interface PaperTpl { field: string; topics: string[]; journals: string[]; kw: string[]; }
+interface PaperTpl {
+  field: string;
+  topics: string[]; koTopics: string[];
+  journals: string[]; koJournals: string[];
+  kw: string[];
+}
 const PAPER_TPLS: PaperTpl[] = [
-  { field: '자율주행', topics: ['LiDAR Point Cloud 3D Object Detection', 'Multi-Sensor Fusion for Perception', 'BEV-Based Scene Understanding'], journals: ['IEEE Transactions on Intelligent Transportation Systems', 'Sensors', 'CVPR Proceedings'], kw: ['라이다', '자율주행', '객체검출'] },
-  { field: '에너지', topics: ['Solid-State Electrolyte for Li Batteries', 'Sulfide Electrolyte Interface Stability', 'High-Nickel Cathode Degradation'], journals: ['Nature Energy', 'Journal of Power Sources', 'Advanced Energy Materials'], kw: ['배터리', '전해질', '리튬'] },
-  { field: '반도체', topics: ['3D NAND Cell Reliability', 'Vertical Channel Scaling Limits', 'Charge Trap Flash Endurance'], journals: ['IEEE Electron Device Letters', 'IEDM Proceedings', 'Solid-State Electronics'], kw: ['반도체', '메모리', '낸드'] },
-  { field: '소재', topics: ['Graphene Composite Mechanical Properties', 'Reduced Graphene Oxide Conductivity', 'Interfacial Bonding in Nanocomposites'], journals: ['Carbon', 'ACS Nano', 'Composites Science and Technology'], kw: ['그래핀', '복합소재'] },
-  { field: '통신', topics: ['Massive MIMO Beamforming', 'Hybrid Precoding for 5G NR', 'Channel Estimation in mmWave'], journals: ['IEEE Transactions on Wireless Communications', 'IEEE JSAC', 'IEEE Communications Letters'], kw: ['통신', '빔포밍', '안테나'] },
-  { field: '의료AI', topics: ['Deep Learning Lesion Segmentation', 'Self-Supervised Medical Image Pretraining', 'Uncertainty Estimation in Diagnosis'], journals: ['Medical Image Analysis', 'Radiology: Artificial Intelligence', 'Nature Medicine'], kw: ['의료', '영상', '진단'] },
-  { field: '컴퓨터비전', topics: ['Vision Transformers at Scale', 'Knowledge Distillation for ViT', 'Self-Attention Efficiency'], journals: ['ICLR Proceedings', 'NeurIPS Proceedings', 'IEEE TPAMI'], kw: ['영상인식', '트랜스포머', '신경망'] },
+  { field: '자율주행',
+    topics: ['LiDAR Point Cloud 3D Object Detection', 'Multi-Sensor Fusion for Perception', 'BEV-Based Scene Understanding'],
+    koTopics: ['라이다 포인트 클라우드 기반 3차원 객체 검출', '자율주행 인식을 위한 다중 센서 융합', 'BEV 기반 주행환경 인식'],
+    journals: ['IEEE Transactions on Intelligent Transportation Systems', 'Sensors', 'CVPR Proceedings'],
+    koJournals: ['한국지능형교통시스템학회 논문지', '한국센서학회 논문지', '한국컴퓨터비전학회 논문집'],
+    kw: ['라이다', '자율주행', '객체검출'] },
+  { field: '에너지',
+    topics: ['Solid-State Electrolyte for Li Batteries', 'Sulfide Electrolyte Interface Stability', 'High-Nickel Cathode Degradation'],
+    koTopics: ['리튬전지용 고체 전해질', '황화물 전해질 계면 안정성', '고니켈 양극재 열화 거동'],
+    journals: ['Nature Energy', 'Journal of Power Sources', 'Advanced Energy Materials'],
+    koJournals: ['한국에너지학회지', '전기화학회지', '한국전지학회 논문지'],
+    kw: ['배터리', '전해질', '리튬'] },
+  { field: '반도체',
+    topics: ['3D NAND Cell Reliability', 'Vertical Channel Scaling Limits', 'Charge Trap Flash Endurance'],
+    koTopics: ['3차원 낸드 셀 신뢰성', '수직 채널 스케일링 한계', '전하트랩 플래시 내구성'],
+    journals: ['IEEE Electron Device Letters', 'IEDM Proceedings', 'Solid-State Electronics'],
+    koJournals: ['한국반도체학회 논문지', '전자공학회 논문지', '한국전자소자학회지'],
+    kw: ['반도체', '메모리', '낸드'] },
+  { field: '소재',
+    topics: ['Graphene Composite Mechanical Properties', 'Reduced Graphene Oxide Conductivity', 'Interfacial Bonding in Nanocomposites'],
+    koTopics: ['그래핀 복합소재의 기계적 물성', '환원 그래핀 산화물의 전도도', '나노복합재의 계면 결합'],
+    journals: ['Carbon', 'ACS Nano', 'Composites Science and Technology'],
+    koJournals: ['한국탄소학회지', '한국재료학회지', '복합재료학회 논문집'],
+    kw: ['그래핀', '복합소재'] },
+  { field: '통신',
+    topics: ['Massive MIMO Beamforming', 'Hybrid Precoding for 5G NR', 'Channel Estimation in mmWave'],
+    koTopics: ['대규모 MIMO 빔포밍', '5G NR 하이브리드 프리코딩', '밀리미터파 채널 추정'],
+    journals: ['IEEE Transactions on Wireless Communications', 'IEEE JSAC', 'IEEE Communications Letters'],
+    koJournals: ['한국통신학회 논문지', '한국전자파학회 논문지', '정보통신학회 논문지'],
+    kw: ['통신', '빔포밍', '안테나'] },
+  { field: '의료AI',
+    topics: ['Deep Learning Lesion Segmentation', 'Self-Supervised Medical Image Pretraining', 'Uncertainty Estimation in Diagnosis'],
+    koTopics: ['딥러닝 기반 병변 분할', '자기지도 의료영상 사전학습', '진단 불확실성 추정'],
+    journals: ['Medical Image Analysis', 'Radiology: Artificial Intelligence', 'Nature Medicine'],
+    koJournals: ['대한의료정보학회지', '대한영상의학회지', '의공학회 논문지'],
+    kw: ['의료', '영상', '진단'] },
+  { field: '컴퓨터비전',
+    topics: ['Vision Transformers at Scale', 'Knowledge Distillation for ViT', 'Self-Attention Efficiency'],
+    koTopics: ['대규모 비전 트랜스포머', 'ViT 지식 증류', '셀프 어텐션 효율화'],
+    journals: ['ICLR Proceedings', 'NeurIPS Proceedings', 'IEEE TPAMI'],
+    koJournals: ['한국컴퓨터비전학회 논문집', '한국정보과학회 논문지', '패턴인식학회 논문지'],
+    kw: ['영상인식', '트랜스포머', '신경망'] },
 ];
 
 const AUTHORS_EN = [
   'Kim, J., Lee, S., Park, H.', 'Zhang, L., Wang, X., Chen, Y.', 'Smith, J., Brown, K., Davis, M.',
   'Tanaka, H., Suzuki, R.', 'Müller, F., Schmidt, A.', 'Gupta, R., Nair, P.',
 ];
-const AUTHORS_KO = ['박준영, 김민수, 이지훈', '정우성, 한지민', '오세훈, 류현진, 강백호'];
+const AUTHORS_KO = ['김정현, 이상우, 박해진', '장리, 왕샤오, 천위', '스미스, 브라운, 데이비스', '다나카, 스즈키', '뮐러, 슈미트', '굽타, 나이르'];
 
+// DBpia 참고 — 한글 primary + 영문 병기 (분야·언어·키워드·내부/외부 링크)
 function buildPaper(tpl: PaperTpl, ti: number, slot: number): PaperResult {
   const seq = ti * 5 + slot;
-  const topic = tpl.topics[slot % tpl.topics.length];
-  const isKo = slot % 5 === 4;
-  const year = 2024 - ((seq * 2) % 12); // 2012~2024
-  const cite = (3500 - (seq * 137) % 3450); // 다양한 피인용
-  const journal = isKo ? `한국${tpl.field}학회 논문집` : tpl.journals[slot % tpl.journals.length];
+  const i = slot % tpl.topics.length;
+  const topicEn = tpl.topics[i];
+  const topicKo = tpl.koTopics[i];
   const isSurvey = slot % 3 === 0;
+  const year = 2024 - ((seq * 2) % 12); // 2012~2024
+  const lang: 'KO' | 'EN' = slot % 5 === 4 ? 'KO' : 'EN'; // 원문 언어
+
+  const titleEn = `${isSurvey ? 'A Survey of ' : ''}${topicEn}${isSurvey ? ' for Real-World Applications' : ''}`;
+  const titleKo = `${topicKo}${isSurvey ? ' 연구 동향' : ' 연구'}`;
+  const authorsKo = AUTHORS_KO[seq % AUTHORS_KO.length];
+  const authorsEn = AUTHORS_EN[seq % AUTHORS_EN.length];
+  const journalEn = tpl.journals[i];
+  const journalKo = tpl.koJournals[i];
+  const abstractKo = `본 ${isSurvey ? '논문은' : '연구는'} ${tpl.field} 분야의 ${topicKo} 문제를 다룬다. 제안 방법은 기존 대비 성능을 향상시켰으며 다양한 데이터셋에서 검증되었다.`;
+  const abstractEn = `This ${isSurvey ? 'survey reviews' : 'paper proposes a method for'} ${topicEn.toLowerCase()}. The approach is evaluated on multiple benchmarks and shows consistent improvements over prior work.`;
+  const doi = seq % 4 === 3 ? undefined : `10.${1000 + (seq % 9000)}/${tpl.field.length}${year}.${pad(seq, 6)}`;
+
+  const ko = lang === 'KO';
   return {
     id: `pp_${seq}`,
-    title: isKo
-      ? `${tpl.field} 분야의 ${topic.replace(/[A-Za-z ]+/g, '').trim() || topic} 연구${isSurvey ? ' 동향' : ''}`.replace('  ', ' ')
-      : `${isSurvey ? 'A Survey of ' : ''}${topic}${isSurvey ? ' for Real-World Applications' : ''}`,
-    authors: isKo ? AUTHORS_KO[seq % AUTHORS_KO.length] : AUTHORS_EN[seq % AUTHORS_EN.length],
-    journal,
+    // 원문 언어가 primary(주 표시), 영문은 보조
+    title: ko ? titleKo : titleEn, titleEn,
+    authors: ko ? authorsKo : authorsEn, authorsEn,
+    journal: ko ? journalKo : journalEn, journalEn,
+    abstract: ko ? abstractKo : abstractEn, abstractEn,
     year,
-    abstract: isKo
-      ? `본 연구는 ${tpl.field} 분야에서 ${topic} 문제를 다룬다. 제안 방법은 기존 대비 성능을 향상시켰으며 다양한 데이터셋에서 검증되었다.`
-      : `This ${isSurvey ? 'survey reviews' : 'paper proposes a method for'} ${topic.toLowerCase()}. The approach is evaluated on multiple benchmarks and shows consistent improvements over prior work.`,
-    doi: seq % 4 === 3 ? undefined : `10.${1000 + (seq % 9000)}/${tpl.field.length}${year}.${pad(seq, 6)}`,
-    citationCount: Math.max(2, cite),
+    doi,
     keywords: tpl.kw,
     field: tpl.field,
-    language: isKo ? 'KO' : 'EN',
+    language: lang,
+    internalUrl: `axp-internal://fulltext/pp_${seq}`,   // 본문 내용(내부 전용)
+    externalUrl: doi ? `https://doi.org/${doi}` : undefined, // 외부 제공 링크
   };
 }
 

@@ -141,14 +141,21 @@ export interface PatentCitation {
 
 export interface PaperResult {
   id: string;
-  title: string;
-  authors: string;
-  journal?: string;
+  title: string;            // 한글 논문명(주 표시)
+  authors: string;          // 저자명(한글)
+  journal?: string;         // 저널정보(한글)
   year?: number;
-  abstract?: string;
+  abstract?: string;        // 초록(한글)
+  // 영문 메타데이터 (DBpia 참고 — 한/영 병기)
+  titleEn?: string;         // 영문 논문명
+  authorsEn?: string;       // 저자 영문명
+  journalEn?: string;       // 영문 저널명
+  abstractEn?: string;      // 영문 초록
   doi?: string;
   citationCount?: number;
   keywords?: string[];
-  field?: string;           // 분야(카테고리) 필터용
-  language?: 'EN' | 'KO' | 'JP' | 'ZH';
+  field?: string;           // 분야(카테고리)
+  language?: 'EN' | 'KO' | 'JP' | 'ZH';   // 원문 언어
+  internalUrl?: string;     // 본문 내용(내부 전용 링크)
+  externalUrl?: string;     // 외부 제공 링크(원문/DOI)
 }
