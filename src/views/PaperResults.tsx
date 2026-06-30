@@ -602,7 +602,7 @@ function pubType(journal?: string): string {
 }
 
 // 관련 논문 — 같은 분야 우선, 공유 키워드 수로 정렬 (자기 자신 제외)
-function relatedPapers(paper: PaperResult, all: PaperResult[], n = 6): PaperResult[] {
+function relatedPapers(paper: PaperResult, all: PaperResult[], n = 10): PaperResult[] {
   const kw = new Set(paper.keywords ?? []);
   return all
     .filter(p => p.id !== paper.id)
@@ -701,25 +701,27 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
             </aside>
           </div>
 
-          {/* 관련 논문 — 같은 분야/키워드 */}
+          {/* 관련 논문 — 같은 분야/키워드 (검색결과처럼 한 줄씩) */}
           {related.length > 0 && (
             <section className="mt-8 pt-6 border-t border-gray-200">
-              <h2 className="text-base2 font-bold text-gray-800 mb-3">관련 논문 <span className="text-sm2 font-normal text-gray-400">· 같은 분야·키워드 {related.length}건</span></h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {related.map(r => (
+              <h2 className="text-base2 font-bold text-gray-800 mb-3">관련 논문 <span className="text-sm2 font-normal text-gray-400">· 같은 분야·키워드 상위 {related.length}건</span></h2>
+              <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
+                {related.map((r, i) => (
                   <button
                     key={r.id}
                     onClick={() => onOpenRelated?.(r.id)}
                     disabled={!onOpenRelated}
-                    className="text-left bg-white border border-gray-200 rounded-lg p-3 hover:border-blue-400 hover:shadow-card transition-all disabled:cursor-default group"
+                    className="w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-blue-50/40 transition-colors disabled:cursor-default group"
                   >
-                    <div className="flex items-center gap-1.5 mb-1">
-                      {r.field && <span className="text-xs2 px-1.5 py-0.5 bg-blue-50 text-brand-400 rounded">{r.field}</span>}
-                      {r.year && <span className="text-xs2 text-gray-400">{r.year}</span>}
-                      {onOpenRelated && <span className="ml-auto text-xs2 text-gray-300 group-hover:text-brand-400">열기 →</span>}
+                    <span className="text-xs2 font-mono text-gray-400 w-5 shrink-0 pt-0.5">{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm2 font-semibold text-gray-800 group-hover:text-brand-400 truncate">{r.title}</div>
+                      <div className="text-xs2 text-gray-500 truncate mt-0.5">
+                        {r.authors}{r.journal && ` · ${r.journal}`}{r.year && ` · ${r.year}`}
+                      </div>
                     </div>
-                    <div className="text-sm2 font-semibold text-gray-800 group-hover:text-brand-400 line-clamp-2 leading-snug">{r.title}</div>
-                    <div className="text-xs2 text-gray-500 truncate mt-1">{r.authors}{r.journal && ` · ${r.journal}`}</div>
+                    {r.field && <span className="shrink-0 text-xs2 px-1.5 py-0.5 bg-blue-50 text-brand-400 rounded self-center">{r.field}</span>}
+                    {onOpenRelated && <span className="shrink-0 text-xs2 text-gray-300 group-hover:text-brand-400 self-center">열기 →</span>}
                   </button>
                 ))}
               </div>
