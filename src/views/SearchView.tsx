@@ -7,13 +7,14 @@ import { PatentResults } from './PatentResults';
 import { PaperInput, type PaperInputHandle } from './PaperInput';
 import { PaperResults } from './PaperResults';
 import { useStore } from '../store';
+import { toast } from '@muhayu/axp-ui';
 import type { PatentResult, PaperResult } from '../types';
 import type { MetaFilter } from '../features/search';
 
 type SearchType = 'patent' | 'paper';
 
 export function SearchView() {
-  const { searchKind, setSearchKind } = useStore();
+  const { searchKind, setSearchKind, libraryAdd } = useStore();
   const searchType: SearchType = searchKind;
   // 검색식 이월 — 특허↔논문 교차 시 키워드 이월 [검색-212]
   const [carryQuery, setCarryQuery] = useState<string | null>(null);
@@ -61,6 +62,22 @@ export function SearchView() {
   const openSavePaper = (p: PaperResult) => {
     setSaveCtx({ type: 'paper', data: p });
   };
+  // 체크박스 일괄 저장 — 미분류로 바로 라이브러리에 추가
+  const saveManyPapers = (papers: PaperResult[]) => {
+    if (papers.length === 0) return;
+    papers.forEach(p => libraryAdd({
+      type: 'paper',
+      refNumber: p.id,
+      title: p.title,
+      applicant: p.authors,
+      applicationDate: String(p.year || ''),
+      abstract: p.abstract,
+      tags: [],
+      favorite: false,
+      data: p,
+    }));
+    toast(`${papers.length}건을 라이브러리에 저장했습니다`);
+  };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
@@ -104,6 +121,7 @@ export function SearchView() {
               <PaperResults
                 onModify={() => setPaperSearched(false)}
                 onSave={openSavePaper}
+                onSaveMany={saveManyPapers}
                 onOpenDetail={id => openDetailTab('paper', id)}
                 searchQuery={paperSearchQuery}
                 onRefine={term => paperInputRef.current?.refine(term)}

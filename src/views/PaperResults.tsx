@@ -16,13 +16,15 @@ interface AppliedFilter { facetKey: string; title: string; label: string }
 interface Props {
   onModify: () => void;
   onSave: (p: PaperResult) => void;
+  onSaveMany?: (papers: PaperResult[]) => void;   // 체크박스 일괄 저장
   onOpenDetail?: (id: string) => void;   // 새 탭으로 전체 보기
   searchQuery?: string;
   onRefine?: (term: string) => void;
   onCrossSearch?: (keywords: string) => void;   // 검색식 이월 → 특허 [검색-212]
 }
 
-export function PaperResults({ onModify, onSave, onOpenDetail, searchQuery, onRefine, onCrossSearch }: Props) {
+export function PaperResults({ onModify, onSave, onSaveMany, onOpenDetail, searchQuery, onRefine, onCrossSearch }: Props) {
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState<SortKey>('recent');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [pendingFilters, setPendingFilters] = useState<Record<string, string[]>>({});
@@ -132,15 +134,19 @@ export function PaperResults({ onModify, onSave, onOpenDetail, searchQuery, onRe
 
   return (
     <div className="flex flex-col">
+      {/* ── 상단 고정 툴바 (검색 건수·검색필드·필터·정렬) ── */}
+      <div className="sticky top-0 z-20 bg-white shrink-0">
       {/* ── sri-header ── */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 bg-white shrink-0 flex-wrap">
-        <Badge color="neutral" className="font-bold text-md2">{count.toLocaleString()}건</Badge>
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 bg-white flex-wrap">
+        {/* 검색식(먼저) → 건수 순서 */}
+        <span className="text-xs2 text-gray-400 font-semibold shrink-0">검색식</span>
         <span
-          className="text-xs2 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-mono cursor-pointer hover:bg-blue-100 transition-colors max-w-xs truncate"
+          className="text-sm2 px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-mono cursor-pointer hover:bg-blue-100 transition-colors max-w-md truncate"
           title={appliedQuery}
         >
           {appliedQuery}
         </span>
+        <Badge color="neutral" className="font-bold text-md2 shrink-0">{count.toLocaleString()}건</Badge>
         <Button variant="outlined" color="primary" size="xs" onClick={onModify}>
           <Icon name="edit" size={11} /> 검색조건 수정
         </Button>
@@ -161,20 +167,10 @@ export function PaperResults({ onModify, onSave, onOpenDetail, searchQuery, onRe
             → 특허로
           </Button>
         )}
-        <span className="flex-1" />
-        <select
-          className="input py-1 text-sm2 w-36"
-          value={sort}
-          onChange={e => setSort(e.target.value as SortKey)}
-        >
-          <option value="match">매칭순</option>
-          <option value="recent">발행연도(최신)</option>
-          <option value="old">발행연도(오래된)</option>
-        </select>
       </div>
 
       {/* ── filter-bar ── */}
-      <div className="flex items-center gap-1.5 px-4 py-1.5 border-b border-gray-100 bg-gray-50 shrink-0 flex-wrap">
+      <div className="flex items-center gap-1.5 px-4 py-1.5 border-b border-gray-100 bg-gray-50 flex-wrap">
         <span className="text-xs2 text-gray-500 font-semibold mr-1">필터</span>
         {PAPER_FACET_GROUPS.map(g => (
           <Button
@@ -210,6 +206,16 @@ export function PaperResults({ onModify, onSave, onOpenDetail, searchQuery, onRe
         <Button variant="outlined" color="primary" size="xs" onClick={resetFilters} className="text-xs2 text-gray-400">필터 초기화</Button>
         <span className="flex-1" />
         <select
+          className="input text-sm2 py-0.5 h-7 w-32"
+          value={sort}
+          onChange={e => setSort(e.target.value as SortKey)}
+          title="정렬 기준"
+        >
+          <option value="match">매칭순</option>
+          <option value="recent">발행연도(최신)</option>
+          <option value="old">발행연도(오래된)</option>
+        </select>
+        <select
           value={perPage}
           onChange={e => { setPerPage(Number(e.target.value) as 20 | 50 | 100); setPage(1); }}
           className="input text-sm2 py-0.5 h-7 w-28"
@@ -237,6 +243,7 @@ export function PaperResults({ onModify, onSave, onOpenDetail, searchQuery, onRe
             toast(`${data.length}건 CSV 다운로드`);
           }}
         >CSV 다운</Button>
+      </div>
       </div>
 
       {/* ── FilterDrawer ── */}
@@ -316,7 +323,25 @@ export function PaperResults({ onModify, onSave, onOpenDetail, searchQuery, onRe
         </div>
       ) : (
         <>
-          <ListResults data={pageData} selectedCard={selectedCard} onSelect={setSelectedCard} onSave={onSave} onOpenDetail={onOpenDetail} searchQuery={searchQuery} />
+          <ListResults
+            data={pageData}
+            selectedCard={selectedCard}
+            onSelect={setSelectedCard}
+            onSave={onSave}
+            onOpenDetail={onOpenDetail}
+            searchQuery={searchQuery}
+            checkedIds={checkedIds}
+            onToggleId={id => setCheckedIds(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; })}
+            onTogglePage={() => setCheckedIds(s => {
+              const ids = pageData.map(p => p.id);
+              const all = ids.every(id => s.has(id));
+              const n = new Set(s);
+              ids.forEach(id => all ? n.delete(id) : n.add(id));
+              return n;
+            })}
+            onClearChecked={() => setCheckedIds(new Set())}
+            onSaveChecked={() => { onSaveMany?.(data.filter(p => checkedIds.has(p.id))); setCheckedIds(new Set()); }}
+          />
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-1 py-3 border-t border-gray-100 bg-white text-sm2">
               <button
@@ -365,9 +390,10 @@ function highlightText(text: string, query?: string): ReactNode {
   );
 }
 
-// ── 2-Column 리스트 + 상세 패널 ──
+// ── 리스트 + 우측 오버레이 상세 패널 ──
 function ListResults({
   data, selectedCard, onSelect, onSave, onOpenDetail, searchQuery,
+  checkedIds, onToggleId, onTogglePage, onClearChecked, onSaveChecked,
 }: {
   data: PaperResult[];
   selectedCard: number | null;
@@ -375,13 +401,35 @@ function ListResults({
   onSave: (p: PaperResult) => void;
   onOpenDetail?: (id: string) => void;
   searchQuery?: string;
+  checkedIds: Set<string>;
+  onToggleId: (id: string) => void;
+  onTogglePage: () => void;
+  onClearChecked: () => void;
+  onSaveChecked: () => void;
 }) {
   const selected = selectedCard != null ? data[selectedCard] : null;
+  const pageAllChecked = data.length > 0 && data.every(p => checkedIds.has(p.id));
 
   return (
-    <div className="flex items-start">
-      {/* 목록 컬럼 (페이지 전체 스크롤) */}
-      <div className="p-3 bg-gray-50 min-w-0 flex-1">
+    <div>
+      {/* 목록 컬럼 — 패널은 오버레이라 목록 폭을 유지한다 */}
+      <div className="p-3 bg-gray-50">
+        {/* 선택 바 (체크박스 일괄 저장) */}
+        <div className="flex items-center gap-2 px-1 pb-2">
+          <label className="flex items-center gap-1.5 cursor-pointer text-sm2 text-gray-600 select-none">
+            <input type="checkbox" checked={pageAllChecked} onChange={onTogglePage} className="rounded border-gray-300 text-blue-600" />
+            전체 선택
+          </label>
+          {checkedIds.size > 0 && (
+            <>
+              <span className="text-sm2 font-semibold text-blue-700">{checkedIds.size}건 선택</span>
+              <Button variant="filled" color="primary" size="xs" className="text-xs2" onClick={onSaveChecked}>
+                <Icon name="star" size={11} /> 선택 저장
+              </Button>
+              <button onClick={onClearChecked} className="text-xs2 text-gray-400 hover:text-red-500">선택 해제</button>
+            </>
+          )}
+        </div>
         {data.map((p, i) => (
           <Card
             key={p.id}
@@ -391,6 +439,14 @@ function ListResults({
             className="!p-3 mb-2"
           >
             <div className="flex gap-3">
+              <input
+                type="checkbox"
+                checked={checkedIds.has(p.id)}
+                onChange={() => onToggleId(p.id)}
+                onClick={e => e.stopPropagation()}
+                className="mt-1 shrink-0 rounded border-gray-300 text-blue-600 cursor-pointer"
+                title="선택"
+              />
               <div className="flex-1 min-w-0">
                 <div className={clsx(
                   'text-base2 font-semibold leading-snug',
@@ -411,36 +467,30 @@ function ListResults({
                   <div className="text-xs2 text-blue-500 mt-1 font-mono">DOI: {p.doi}</div>
                 )}
               </div>
-              <div className="flex flex-col items-end gap-1 shrink-0">
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  size="xs"
-                  onClick={e => { e.stopPropagation(); onSave(p); }}
-                  className="h-fit"
-                  title="라이브러리 저장"
-                >
-                  <Icon name="star" size={11} /> 저장
-                </Button>
-                {onOpenDetail && (
-                  <button
+              {onOpenDetail && (
+                <div className="shrink-0 self-center">
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    size="xs"
                     onClick={e => { e.stopPropagation(); onOpenDetail(p.id); }}
-                    className="text-gray-400 hover:text-brand-400 text-xs2 font-semibold"
+                    className="text-xs2 whitespace-nowrap"
                     title="새 탭에서 전체 보기"
-                  >↗ 새 탭</button>
-                )}
-              </div>
+                  >
+                    새 탭에서 열기 <Icon name="link" size={11} />
+                  </Button>
+                </div>
+              )}
             </div>
           </Card>
         ))}
       </div>
 
-      {/* 우측 인라인 상세 패널 */}
+      {/* 우측 오버레이 상세 패널 (OpenAlex 방식 — 목록을 덮음) */}
       {selected && (
         <PaperInlineDetail
           paper={selected}
           posLabel={`${(selectedCard ?? 0) + 1} / ${data.length}`}
-          preview
           onClose={() => onSelect(-1)}
           onSave={() => onSave(selected)}
           onOpenDetail={onOpenDetail ? () => onOpenDetail(selected.id) : undefined}
@@ -454,7 +504,7 @@ function ListResults({
 
 // ── 논문 인라인 상세 패널 ──
 export function PaperInlineDetail({
-  paper, posLabel, onClose, onSave, onPrev, onNext, onOpenDetail, preview,
+  paper, posLabel, onClose, onSave, onPrev, onNext, onOpenDetail,
 }: {
   paper: PaperResult;
   posLabel: string;
@@ -462,15 +512,13 @@ export function PaperInlineDetail({
   onSave: () => void;
   onPrev?: () => void;
   onNext?: () => void;
-  onOpenDetail?: () => void;   // 새 탭 전체보기 (미리보기에서만)
-  preview?: boolean;
+  onOpenDetail?: () => void;   // 새 탭 전체보기
 }) {
   const altTitle = paper.language === 'KO' ? paper.titleEn : paper.titleKo;
   return (
-    <aside className="w-[440px] min-w-[360px] max-w-[480px] border-l border-gray-200 bg-white flex flex-col overflow-hidden shrink-0 sticky top-0 self-start h-[calc(100vh-52px)]">
+    <aside className="fixed top-[52px] right-0 bottom-0 z-40 w-[50%] min-w-[480px] max-w-[840px] border-l border-gray-200 bg-white flex flex-col overflow-hidden shadow-2xl">
       {/* 헤더 */}
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-100 shrink-0 bg-gray-50">
-        {preview && <span className="text-xs2 font-semibold text-gray-500 bg-gray-200 rounded px-1.5 py-0.5 shrink-0">미리보기</span>}
         <Button
           variant="outlined"
           color="primary"
@@ -534,7 +582,7 @@ export function PaperInlineDetail({
               {paper.authors || '-'}
               {paper.authorsEn && paper.authorsEn !== paper.authors && <span className="text-gray-400"> ({paper.authorsEn})</span>}
             </MetaRow>
-            <MetaRow label="발행연도">{paper.year || '-'}</MetaRow>
+            <MetaRow label="발행일">{pubDate(paper)}</MetaRow>
             {paper.paperType === 'thesis' ? (
               <MetaRow label="학위수여기관">{paper.institution || '-'}</MetaRow>
             ) : (
@@ -581,8 +629,14 @@ function paperMetaLine(p: PaperResult): string {
   }
   if (p.startPage != null && p.endPage != null) parts.push(`${p.startPage}-${p.endPage}`);
   else if (p.startPage != null) parts.push(`${p.startPage}`);
-  if (p.year != null) parts.push(p.month != null ? `${p.year}(${p.month})` : `${p.year}`);
+  if (p.year != null) parts.push(p.month != null ? `${p.year}. ${p.month}` : `${p.year}`);
   return parts.join(', ');
+}
+
+// 발행일 — 발행연도(+월 함께 표시 가능)
+function pubDate(p: PaperResult): string {
+  if (p.year == null) return '-';
+  return p.month != null ? `${p.year}. ${p.month}` : `${p.year}`;
 }
 
 function apaCitation(p: PaperResult): string {
@@ -691,7 +745,7 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
               {paper.authors || '-'}
               {paper.authorsEn && paper.authorsEn !== paper.authors && <span className="text-gray-400"> ({paper.authorsEn})</span>}
             </MetaRow>
-            <MetaRow label="발행연도">{paper.year || '-'}</MetaRow>
+            <MetaRow label="발행일">{pubDate(paper)}</MetaRow>
             {paper.paperType === 'thesis' ? (
               <MetaRow label="학위수여기관">{paper.institution || '-'}</MetaRow>
             ) : (

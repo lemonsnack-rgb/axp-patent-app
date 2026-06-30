@@ -12,6 +12,9 @@ const K_COLLECTIONS = 'axp_library_collections_v1';
 const K_SIDEBAR_COLLAPSED = 'axp_sidebar_collapsed_v1';
 const K_SEARCH_HISTORY = 'axp_search_history_v1';
 
+// 라이브러리 일괄 저장 시 동일 ms id 충돌 방지용 증가 카운터
+let _liSeq = 0;
+
 export interface SearchHistoryEntry {
   id: string;
   kind: 'patent' | 'paper';
@@ -219,7 +222,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   // === library ops ===
   const libraryAdd: StoreCtx['libraryAdd'] = useCallback((li) => {
-    const nl: LibraryItem = { id: 'li_' + Date.now(), savedAt: Date.now(), ...li };
+    const nl: LibraryItem = { id: `li_${Date.now()}_${++_liSeq}`, savedAt: Date.now(), ...li };
     setLibrary(prev => [nl, ...prev]);
     return nl;
   }, [setLibrary]);
