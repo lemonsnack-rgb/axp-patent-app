@@ -679,8 +679,8 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
             <MetaRow label="저널명">{paper.journal || '-'}</MetaRow>
             <MetaRow label="저널명(영문)">{paper.journalEn || '-'}</MetaRow>
             <MetaRow label="분야">{paper.field || '-'}</MetaRow>
-            <MetaRow label="초록">{paper.abstract || '-'}</MetaRow>
-            <MetaRow label="영문초록">{paper.abstractEn || '-'}</MetaRow>
+            <MetaRow label="초록" block>{paper.abstract || '-'}</MetaRow>
+            <MetaRow label="영문초록" block>{paper.abstractEn || '-'}</MetaRow>
             <MetaRow label="키워드">
               {paper.keywords && paper.keywords.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
@@ -739,7 +739,16 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
 }
 
 // ── 레이블:값 행 (OpenAlex 방식 — 레이블과 값을 명시적으로 구분) ──
-function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
+function MetaRow({ label, children, block }: { label: string; children: React.ReactNode; block?: boolean }) {
+  // block=true: 장문(초록 등) — 레이블 위, 값은 전체 폭
+  if (block) {
+    return (
+      <div className="py-3.5">
+        <dt className="text-sm2 font-medium text-gray-400 mb-1.5">{label}</dt>
+        <dd className="text-base2 text-gray-900 leading-relaxed whitespace-pre-line">{children}</dd>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col sm:flex-row gap-1 sm:gap-6 py-3.5">
       <dt className="w-32 shrink-0 text-sm2 font-medium text-gray-400 sm:pt-0.5">{label}</dt>

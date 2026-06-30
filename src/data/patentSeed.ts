@@ -353,8 +353,8 @@ function buildPaper(tpl: PaperTpl, ti: number, slot: number): PaperResult {
   const authorsEn = AUTHORS_EN[seq % AUTHORS_EN.length];
   const journalEn = tpl.journals[i];
   const journalKo = tpl.koJournals[i];
-  const abstractKo = `본 ${isSurvey ? '논문은' : '연구는'} ${tpl.field} 분야의 ${topicKo} 문제를 다룬다. 제안 방법은 기존 대비 성능을 향상시켰으며 다양한 데이터셋에서 검증되었다.`;
-  const abstractEn = `This ${isSurvey ? 'survey reviews' : 'paper proposes a method for'} ${topicEn.toLowerCase()}. The approach is evaluated on multiple benchmarks and shows consistent improvements over prior work.`;
+  const abstractKo = `본 ${isSurvey ? '논문은' : '연구는'} ${tpl.field} 분야의 ${topicKo} 문제를 다룬다. 기존 방법은 정확도와 일반화 성능에서 한계를 보였으며, 특히 다양한 환경 조건에서 견고성이 부족하였다. 본 ${isSurvey ? '논문' : '연구'}에서는 이러한 한계를 극복하기 위한 새로운 접근 방식을 제안하고, 대규모 공개 데이터셋과 자체 구축 데이터셋을 활용하여 광범위한 실험을 수행하였다. 실험 결과 제안 방법은 기존 최고 성능 대비 정확도를 유의미하게 향상시켰으며, 연산 효율성 측면에서도 실용적인 수준을 달성하였다. 또한 다양한 절제 실험을 통해 각 구성 요소의 기여도를 정량적으로 분석하였으며, 실제 응용 환경에서의 적용 가능성을 검증하였다.`;
+  const abstractEn = `This ${isSurvey ? 'survey reviews recent advances in' : 'paper proposes a novel method for'} ${topicEn.toLowerCase()}. Existing approaches suffer from limited accuracy and poor generalization, particularly under diverse real-world conditions. To address these limitations, we introduce a new framework and conduct extensive experiments on both large-scale public benchmarks and a self-collected dataset. The results demonstrate that the proposed method significantly outperforms prior state-of-the-art baselines in accuracy while maintaining practical computational efficiency. We further provide comprehensive ablation studies to analyze the contribution of each component and validate its applicability in real deployment scenarios.`;
   const doi = `10.${1000 + (seq % 9000)}/${tpl.field.length}${year}.${pad(seq, 6)}`;
 
   const ko = lang === 'KO';
