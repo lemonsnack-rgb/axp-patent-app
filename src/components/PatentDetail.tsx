@@ -45,6 +45,8 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
     : data.status === '심사중' ? 'amber'
     : data.status === '소멸' || data.status === '거절' ? 'neutral'
     : 'brand';
+  // 문헌종류 — 등록/소멸은 등록특허공보, 그 외는 공개특허공보
+  const docKind = (data.status === '등록' || data.status === '소멸') ? '등록특허공보' : '공개특허공보';
 
   const [activeTab, setActiveTab] = useState('bib');
   const [claimMode, setClaimMode] = useState<'independent' | 'all'>('independent');
@@ -191,6 +193,9 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                     <BibRow k="출원번호" v={data.applicationNo} mono k2="(출원일)" v2={data.applicationDate || '—'} />
                     <BibRow k="공개/공고번호" v={data.publicationNo} mono k2="(공개/공고일)" v2={data.publicationDate || '—'} />
                     <BibRow k="등록번호" v={data.registerNo && data.registerNo !== '-' ? data.registerNo : '—'} mono k2="(등록일)" v2={data.registerDate && data.registerDate !== '-' ? data.registerDate : '—'} />
+                    <BibRow k="문헌종류" v={docKind} k2="권리상태" v2={data.rightStatus || '—'} />
+                    <BibRow k="우선권주장일" v={data.priorityDate || '—'} k2="심사청구일" v2={data.examRequestDate || '—'} />
+                    <BibRow k="존속기간(예상)만료일" v={data.expirationDate && data.expirationDate !== '-' ? data.expirationDate : '—'} k2="권리변동" v2={data.rightChange || '—'} />
                   </tbody>
                 </table>
                 <div className="mt-3.5">
@@ -222,10 +227,27 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               </Section>
             </div>
 
-            {/* 상세설명 */}
+            {/* 상세설명 — 표준 구조(기술분야·배경기술·과제·해결수단·효과·도면의 설명·구체적 내용) */}
             <div ref={secDesc}>
               <Section title="상세설명" icon="book">
-                <TextBlock>{data.description || '(데모) 상세설명 원문이 표시되는 영역입니다. 발명의 배경, 기술적 과제, 해결수단, 효과 등 본문 전체가 노출됩니다.'}</TextBlock>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3.5">
+                  <DescSub title="기술분야">{`본 발명은 ${data.title}에 관한 것으로, 해당 기술분야의 장치 및 방법에 관한 것이다.`}</DescSub>
+                  <DescSub title="배경기술">{`종래 기술은 정확도와 견고성 측면에서 한계가 있었으며, 다양한 환경 조건에서 안정적인 성능을 확보하기 어려웠다.`}</DescSub>
+                  {data.aiPurpose && <DescSub title="해결하려는 과제">{data.aiPurpose}</DescSub>}
+                  {data.aiSolution && <DescSub title="과제의 해결 수단">{data.aiSolution}</DescSub>}
+                  {data.aiEffect && <DescSub title="발명의 효과">{data.aiEffect}</DescSub>}
+                  {(data.figures || []).length > 0 && (
+                    <div>
+                      <div className="text-sm2 font-semibold text-gray-600 mb-1">도면의 설명</div>
+                      <ul className="text-base2 text-gray-700 leading-relaxed space-y-0.5">
+                        {(data.figures || []).map((f, i) => (
+                          <li key={i}><span className="font-mono text-gray-500 mr-1.5">{f.label}</span>{f.desc}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <DescSub title="발명의 구체적인 내용">{data.description || '(데모) 발명의 배경, 기술적 과제, 해결수단, 효과 등 본문 전체가 노출됩니다.'}</DescSub>
+                </div>
               </Section>
             </div>
 
@@ -407,6 +429,16 @@ function InfoRow({ k, v, mono, muted }: { k: string; v: string; mono?: boolean; 
 
 function Row({ k, v }: { k: string; v: string }) {
   return <div className="flex items-center gap-2 py-1 text-md2"><span className="text-gray-500 w-32">{k}</span><span>{v}</span></div>;
+}
+
+// 상세설명 하위 섹션 (기술분야/배경기술/과제/해결수단/효과/구체적 내용)
+function DescSub({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-sm2 font-semibold text-gray-600 mb-1">{title}</div>
+      <div className="text-base2 text-gray-700 leading-relaxed whitespace-pre-line">{children}</div>
+    </div>
+  );
 }
 
 function TextBlock({ children }: { children: React.ReactNode }) {
