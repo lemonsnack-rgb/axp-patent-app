@@ -563,7 +563,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
             <span className="text-xs2 text-gray-400 font-mono">{selectedCard + 1} / {data.length}</span>
             <span className="flex-1" />
             <Button variant="filled" color="primary" size="xs" onClick={() => onOpenDetail(data[selectedCard].number)} title="새 탭에서 전체 보기">새 탭 ↗</Button>
-            <Button variant="outlined" color="primary" size="xs" onClick={() => onSave(selectedCard)}><Icon name="star" size={11} /> 저장</Button>
+            <Button variant="outlined" color="primary" size="xs" onClick={() => onSave(selectedCard)} title="이 문헌을 내 라이브러리에 저장"><Icon name="star" size={11} /> 라이브러리 저장</Button>
             <button onClick={() => onSelectCard(-1)} className="text-gray-400 hover:text-gray-700 p-1 shrink-0" title="닫기 (Esc)"><Icon name="close" size={14} /></button>
           </div>
           <PatentDetail

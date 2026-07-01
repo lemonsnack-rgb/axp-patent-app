@@ -536,8 +536,8 @@ export function PaperInlineDetail({
         {onOpenDetail && (
           <Button variant="filled" color="primary" size="xs" onClick={onOpenDetail} title="새 탭에서 전체 보기">새 탭 ↗</Button>
         )}
-        <Button variant="outlined" color="primary" size="xs" onClick={onSave}>
-          <Icon name="star" size={11} /> 저장
+        <Button variant="outlined" color="primary" size="xs" onClick={onSave} title="이 논문을 내 라이브러리에 저장">
+          <Icon name="star" size={11} /> 라이브러리 저장
         </Button>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1" title="닫기 (Esc)">
           <Icon name="close" size={14} />

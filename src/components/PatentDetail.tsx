@@ -147,7 +147,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                 className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-300 text-sm2 text-gray-600 hover:border-brand-400 hover:text-brand-400 shrink-0"
                 title="특허 원문 PDF 다운로드"
               >
-                <Icon name="doc" size={12} /> 원문 PDF ↓
+                <Icon name="doc" size={12} /> 원문 PDF 다운로드
               </button>
             </div>
             <h2 className="text-xl font-bold text-gray-800 leading-snug">{data.title}</h2>
@@ -381,7 +381,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
 
         {/* 우: 도면 패널 (전체화면 전용 — 분할 리더에선 본문 내 표시) */}
         {!embedded && (
-        <div className="w-96 shrink-0 border-l border-gray-200 bg-gray-50 flex flex-col overflow-hidden">
+        <div className="w-[30rem] shrink-0 border-l border-gray-200 bg-gray-50 flex flex-col overflow-hidden">
           <div className="px-3 py-2 border-b border-gray-200 bg-white shrink-0">
             <span className="text-sm2 font-bold text-gray-600">도면</span>
             <span className="ml-1.5 text-xs2 text-gray-400">({(data.figures || []).length})</span>
@@ -580,7 +580,7 @@ function DrawingsPanel({ figures, refSigns }: { figures?: { label: string; desc:
           <button onClick={() => setZoom(true)} className="text-xs2 text-brand-400 hover:underline shrink-0" title="도면 확대">⤢ 확대</button>
         </div>
         <button onClick={() => setZoom(true)} className="block w-full cursor-zoom-in" title="도면 확대">
-          <FigureSVG index={selected} className="w-full h-56" />
+          <FigureSVG index={selected} className="w-full h-64" />
         </button>
       </div>
 
