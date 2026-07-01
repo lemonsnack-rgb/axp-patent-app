@@ -49,14 +49,14 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
   const paperHistory = searchHistory
     .filter(e => e.kind === 'paper')
     .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(true);
 
   const [scope, setScope] = useState<PaperScope>('TI_AB');
   const [periodChip, setPeriodChip] = useState('all');
   const [yearFrom, setYearFrom] = useState('');
   const [yearTo, setYearTo] = useState('');
   const [formulaText, setFormulaText] = useState('');
-  const [fieldsOpen, setFieldsOpen] = useState(false);
+  const [fieldsOpen, setFieldsOpen] = useState(true);
   const [fields, setFields] = useState<PField[]>(DEFAULT_FIELDS);
   const [finderOpen, setFinderOpen] = useState<{ fieldIdx: number } | null>(null);
 
