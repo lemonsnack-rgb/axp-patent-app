@@ -244,9 +244,9 @@ export interface PatentInputHandle { refine: (term: string) => void }
 
 // ── 검색 범위 탭 (검색어를 어느 항목에서 찾을지) ──────────────
 const KEY_TABS: { id: ScopeTab; label: string; hint: string }[] = [
-  { id: 'KEY_CLI', label: '핵심 항목',   hint: '발명의 명칭·요약·독립청구항에서 검색 (가장 빠르고 정확)' },
-  { id: 'KEY_CLA', label: '청구항 전체', hint: '발명의 명칭·요약·전체청구항(독립+종속)에서 검색' },
-  { id: 'DSC',     label: '전문',        hint: '상세설명 본문 전체까지 포함해 검색 (가장 폭넓음)' },
+  { id: 'KEY_CLI', label: '명칭+요약+독립항',     hint: '발명의 명칭·요약·독립청구항에서 검색' },
+  { id: 'KEY_CLA', label: '명칭+요약+전체청구항', hint: '발명의 명칭·요약·전체청구항(독립+종속)에서 검색' },
+  { id: 'DSC',     label: '상세설명',             hint: '상세설명 본문 전체에서 검색' },
 ];
 
 // ── Main ──────────────────────────────────────────────────────
@@ -287,7 +287,8 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
   const [formulaText, setFormulaText] = useState('');
 
   // 검색필드 섹션 — 기본 접힘
-  const [fieldsOpen, setFieldsOpen] = useState(true);
+  const [fieldsOpen, setFieldsOpen] = useState(false);
+  const [histPage, setHistPage] = useState(1);
   const [fields, setFields] = useState<SField[]>(INITIAL_FIELDS);
 
   // 파인더
@@ -533,8 +534,23 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
       {/* ── 검색식 입력 영역 ─────────────────────────────── */}
       <div className="p-4 space-y-2">
 
-        {/* 검색 범위 + 입력 방식 */}
+        {/* 검색어 입력방식(먼저) + 검색 범위 */}
         <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs2 font-semibold text-gray-500 shrink-0" title="검색어를 어떻게 입력할지 선택합니다">검색어 입력방식</span>
+            <div className="inline-flex border border-gray-300 rounded-md overflow-hidden">
+              <button
+                onClick={() => setMode('normal')}
+                title="키워드만 입력하면 자동으로 검색합니다 (초보자 권장)"
+                className={clsx('px-3 py-1.5 text-sm2 font-semibold', mode === 'normal' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600')}
+              >간편 검색</button>
+              <button
+                onClick={() => setMode('editor')}
+                title="AND·OR·NOT, 괄호, 와일드카드(*) 등 연산자로 검색식을 직접 작성합니다 (전문가용)"
+                className={clsx('px-3 py-1.5 text-sm2 font-semibold', mode === 'editor' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600')}
+              >검색식 직접작성</button>
+            </div>
+          </div>
           <div className="flex items-center gap-1.5">
             <span className="text-xs2 font-semibold text-gray-500 shrink-0" title="검색어를 특허의 어느 부분에서 찾을지 선택합니다">검색 범위</span>
             <div className="flex border border-gray-200 rounded-md overflow-hidden">
@@ -553,21 +569,6 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
                   {tab.label}
                 </button>
               ))}
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs2 font-semibold text-gray-500 shrink-0" title="검색어 입력 방식을 선택합니다">입력 방식</span>
-            <div className="inline-flex border border-gray-300 rounded-md overflow-hidden">
-              <button
-                onClick={() => setMode('normal')}
-                title="키워드만 입력하면 자동으로 검색합니다 (초보자 권장)"
-                className={clsx('px-3 py-1.5 text-sm2 font-semibold', mode === 'normal' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600')}
-              >간편 검색</button>
-              <button
-                onClick={() => setMode('editor')}
-                title="AND·OR·NOT, 괄호, 와일드카드(*) 등 연산자로 검색식을 직접 작성합니다 (전문가용)"
-                className={clsx('px-3 py-1.5 text-sm2 font-semibold', mode === 'editor' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600')}
-              >검색식 직접작성</button>
             </div>
           </div>
         </div>
@@ -621,17 +622,21 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
       {/* ── 검색필드 섹션 (검색창 바로 아래 — 입력이 검색식에 반영) ─────────────────────────── */}
       <div className="border-t border-gray-200">
 
-        {/* 섹션 헤더 (토글) */}
+        {/* 섹션 헤더 (토글) — 접혀 있어도 눈에 띄도록 */}
         <button
           onClick={() => setFieldsOpen(v => !v)}
-          className="w-full flex items-center justify-between px-4 py-2 text-sm2 font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+          className={clsx(
+            'w-full flex items-center justify-between px-4 py-2.5 text-sm2 font-semibold transition-colors',
+            fieldsOpen ? 'text-gray-700 hover:bg-gray-50' : 'text-brand-500 bg-blue-50/60 hover:bg-blue-50',
+          )}
         >
           <span className="flex items-center gap-1.5">
-            <span className="text-gray-400 text-xs2">≡</span>
-            검색필드
-            <span className="text-xs2 font-medium text-brand-400 bg-blue-50 px-1.5 py-0 rounded-full leading-5">{fields.length}</span>
+            <span className="text-brand-400 text-xs2">≡</span>
+            항목별 검색필드
+            <span className="text-xs2 font-medium text-brand-400 bg-blue-100 px-1.5 py-0 rounded-full leading-5">{fields.length}</span>
+            {!fieldsOpen && <span className="text-xs2 font-normal text-gray-400">— 제목·초록·청구항·출원인 등 필드별 검색</span>}
           </span>
-          <span className="text-gray-400 text-xs2">{fieldsOpen ? '▲' : '▼'}</span>
+          <span className="text-xs2 font-medium text-brand-400">{fieldsOpen ? '접기 ▲' : '펼치기 ▼'}</span>
         </button>
 
         {fieldsOpen && (
@@ -755,26 +760,42 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
           </button>
           {historyOpen && (
             <div className="px-4 pb-3">
-              <div className="flex justify-end mb-1">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs2 text-gray-400">검색식 최대 100개 누적</span>
                 <button onClick={() => searchHistoryClear('patent')} className="text-xs2 text-gray-400 hover:text-red-500">전체 삭제</button>
               </div>
-              <div className="space-y-0.5 max-h-48 overflow-y-auto scroll-thin">
-                {patentHistory.map(e => (
-                  <div key={e.id} className={clsx('group flex items-center gap-2 py-1 px-2 rounded hover:bg-gray-50', e.pinned && 'bg-amber-50/40')}>
+              {/* 컬럼 헤더 — 검색식 / 검색일시 구분 */}
+              <div className="flex items-center gap-2 px-2 py-1 border-b border-gray-200 text-xs2 font-semibold text-gray-400">
+                <span className="w-4 shrink-0" />
+                <span className="flex-1 min-w-0">검색식</span>
+                <span className="w-28 shrink-0">검색일시</span>
+                <span className="w-[52px] shrink-0 text-center">재검색</span>
+                <span className="w-5 shrink-0" />
+              </div>
+              <div>
+                {patentHistory.slice((histPage - 1) * 10, histPage * 10).map(e => (
+                  <div key={e.id} className={clsx('group flex items-center gap-2 py-1.5 px-2 border-b border-gray-50 hover:bg-gray-50', e.pinned && 'bg-amber-50/40')}>
                     <button
                       onClick={() => searchHistoryTogglePin(e.id)}
-                      className={clsx('shrink-0 leading-none', e.pinned ? 'text-amber-500' : 'text-gray-300 hover:text-amber-400')}
+                      className={clsx('w-4 shrink-0 leading-none', e.pinned ? 'text-amber-500' : 'text-gray-300 hover:text-amber-400')}
                       title={e.pinned ? '저장 해제' : '검색 저장 (★)'}
                     >★</button>
-                    <button onClick={() => rerun(e.query)} className="flex-1 min-w-0 text-left" title="이 검색 재실행">
-                      <div className="font-mono text-xs2 text-brand-400 truncate">{e.query}</div>
-                      <div className="text-xs2 text-gray-400">{histTime(e.at)}{e.pinned && ' · 저장됨'}</div>
-                    </button>
-                    <button onClick={() => rerun(e.query)} className="text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 shrink-0">재실행</button>
+                    <button onClick={() => rerun(e.query)} className="flex-1 min-w-0 text-left font-mono text-xs2 text-brand-400 truncate" title="이 검색식으로 재검색">{e.query}</button>
+                    <span className="w-28 shrink-0 text-xs2 text-gray-400 font-mono">{histTime(e.at)}{e.pinned && ' · 저장'}</span>
+                    <button onClick={() => rerun(e.query)} className="w-[52px] shrink-0 text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 text-center">재검색</button>
                     <button onClick={() => searchHistoryRemove(e.id)} className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-500 rounded shrink-0 opacity-0 group-hover:opacity-100" title="삭제">×</button>
                   </div>
                 ))}
               </div>
+              {patentHistory.length > 10 && (
+                <div className="flex items-center justify-center gap-1 pt-2 text-sm2">
+                  <button onClick={() => setHistPage(p => Math.max(1, p - 1))} disabled={histPage === 1} className="px-1.5 py-0.5 border border-gray-300 rounded text-gray-500 hover:border-blue-400 disabled:opacity-30">‹</button>
+                  {Array.from({ length: Math.ceil(patentHistory.length / 10) }, (_, i) => i + 1).map(p => (
+                    <button key={p} onClick={() => setHistPage(p)} className={clsx('w-6 h-6 rounded border text-xs2 font-mono', p === histPage ? 'bg-blue-400 text-white border-blue-400' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400')}>{p}</button>
+                  ))}
+                  <button onClick={() => setHistPage(p => Math.min(Math.ceil(patentHistory.length / 10), p + 1))} disabled={histPage >= Math.ceil(patentHistory.length / 10)} className="px-1.5 py-0.5 border border-gray-300 rounded text-gray-500 hover:border-blue-400 disabled:opacity-30">›</button>
+                </div>
+              )}
             </div>
           )}
         </div>

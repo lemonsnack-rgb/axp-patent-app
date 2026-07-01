@@ -56,7 +56,8 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
   const [yearFrom, setYearFrom] = useState('');
   const [yearTo, setYearTo] = useState('');
   const [formulaText, setFormulaText] = useState('');
-  const [fieldsOpen, setFieldsOpen] = useState(true);
+  const [fieldsOpen, setFieldsOpen] = useState(false);
+  const [histPage, setHistPage] = useState(1);
   const [fields, setFields] = useState<PField[]>(DEFAULT_FIELDS);
   const [finderOpen, setFinderOpen] = useState<{ fieldIdx: number } | null>(null);
 
@@ -174,13 +175,15 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
       {/* 검색필드 패널 (검색창 바로 아래 — 입력이 검색식에 반영) */}
       <div className="border-t border-gray-200">
         <button onClick={() => setFieldsOpen(v => !v)}
-          className="w-full flex items-center justify-between px-4 py-2 text-sm2 font-semibold text-gray-700 hover:bg-gray-50">
+          className={clsx('w-full flex items-center justify-between px-4 py-2.5 text-sm2 font-semibold transition-colors',
+            fieldsOpen ? 'text-gray-700 hover:bg-gray-50' : 'text-brand-500 bg-blue-50/60 hover:bg-blue-50')}>
           <span className="flex items-center gap-1.5">
-            <span className="text-gray-400 text-xs2">≡</span>
-            검색필드
-            <span className="text-xs2 font-medium text-brand-400 bg-blue-50 px-1.5 py-0 rounded-full leading-5">{fields.length}</span>
+            <span className="text-brand-400 text-xs2">≡</span>
+            항목별 검색필드
+            <span className="text-xs2 font-medium text-brand-400 bg-blue-100 px-1.5 py-0 rounded-full leading-5">{fields.length}</span>
+            {!fieldsOpen && <span className="text-xs2 font-normal text-gray-400">— 제목·초록·키워드·저자 등 필드별 검색</span>}
           </span>
-          <span className="text-gray-400 text-xs2">{fieldsOpen ? '▲' : '▼'}</span>
+          <span className="text-xs2 font-medium text-brand-400">{fieldsOpen ? '접기 ▲' : '펼치기 ▼'}</span>
         </button>
         {fieldsOpen && (
           <div className="px-4 pb-3 pt-1 space-y-px">
@@ -214,24 +217,40 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
           </button>
           {historyOpen && (
             <div className="px-4 pb-3">
-              <div className="flex justify-end mb-1">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs2 text-gray-400">검색식 최대 100개 누적</span>
                 <button onClick={() => searchHistoryClear('paper')} className="text-xs2 text-gray-400 hover:text-red-500">전체 삭제</button>
               </div>
-              <div className="space-y-0.5 max-h-48 overflow-y-auto scroll-thin">
-                {paperHistory.map(e => (
-                  <div key={e.id} className={clsx('group flex items-center gap-2 py-1 px-2 rounded hover:bg-gray-50', e.pinned && 'bg-amber-50/40')}>
+              {/* 컬럼 헤더 — 검색식 / 검색일시 구분 */}
+              <div className="flex items-center gap-2 px-2 py-1 border-b border-gray-200 text-xs2 font-semibold text-gray-400">
+                <span className="w-4 shrink-0" />
+                <span className="flex-1 min-w-0">검색식</span>
+                <span className="w-28 shrink-0">검색일시</span>
+                <span className="w-[52px] shrink-0 text-center">재검색</span>
+                <span className="w-5 shrink-0" />
+              </div>
+              <div>
+                {paperHistory.slice((histPage - 1) * 10, histPage * 10).map(e => (
+                  <div key={e.id} className={clsx('group flex items-center gap-2 py-1.5 px-2 border-b border-gray-50 hover:bg-gray-50', e.pinned && 'bg-amber-50/40')}>
                     <button onClick={() => searchHistoryTogglePin(e.id)}
-                      className={clsx('shrink-0 leading-none', e.pinned ? 'text-amber-500' : 'text-gray-300 hover:text-amber-400')}
+                      className={clsx('w-4 shrink-0 leading-none', e.pinned ? 'text-amber-500' : 'text-gray-300 hover:text-amber-400')}
                       title={e.pinned ? '저장 해제' : '검색 저장 (★)'}>★</button>
-                    <button onClick={() => rerun(e.query)} className="flex-1 min-w-0 text-left" title="이 검색 재실행">
-                      <div className="font-mono text-xs2 text-brand-400 truncate">{e.query}</div>
-                      <div className="text-xs2 text-gray-400">{histTime(e.at)}{e.pinned && ' · 저장됨'}</div>
-                    </button>
-                    <button onClick={() => rerun(e.query)} className="text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 shrink-0">재실행</button>
+                    <button onClick={() => rerun(e.query)} className="flex-1 min-w-0 text-left font-mono text-xs2 text-brand-400 truncate" title="이 검색식으로 재검색">{e.query}</button>
+                    <span className="w-28 shrink-0 text-xs2 text-gray-400 font-mono">{histTime(e.at)}{e.pinned && ' · 저장'}</span>
+                    <button onClick={() => rerun(e.query)} className="w-[52px] shrink-0 text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 text-center">재검색</button>
                     <button onClick={() => searchHistoryRemove(e.id)} className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-500 rounded shrink-0 opacity-0 group-hover:opacity-100" title="삭제">×</button>
                   </div>
                 ))}
               </div>
+              {paperHistory.length > 10 && (
+                <div className="flex items-center justify-center gap-1 pt-2 text-sm2">
+                  <button onClick={() => setHistPage(p => Math.max(1, p - 1))} disabled={histPage === 1} className="px-1.5 py-0.5 border border-gray-300 rounded text-gray-500 hover:border-blue-400 disabled:opacity-30">‹</button>
+                  {Array.from({ length: Math.ceil(paperHistory.length / 10) }, (_, i) => i + 1).map(p => (
+                    <button key={p} onClick={() => setHistPage(p)} className={clsx('w-6 h-6 rounded border text-xs2 font-mono', p === histPage ? 'bg-blue-400 text-white border-blue-400' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400')}>{p}</button>
+                  ))}
+                  <button onClick={() => setHistPage(p => Math.min(Math.ceil(paperHistory.length / 10), p + 1))} disabled={histPage >= Math.ceil(paperHistory.length / 10)} className="px-1.5 py-0.5 border border-gray-300 rounded text-gray-500 hover:border-blue-400 disabled:opacity-30">›</button>
+                </div>
+              )}
             </div>
           )}
         </div>
