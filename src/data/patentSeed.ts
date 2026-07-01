@@ -208,22 +208,56 @@ function figuresFor(dm: Domain): { label: string; desc: string }[] {
   return base.slice(0, n).map((desc, i) => ({ label: `FIG ${i + 1}`, desc }));
 }
 
+// 실제 특허 수준의 분량으로 요약·상세설명 본문을 생성
+function buildDetail(dm: Domain, isEn: boolean): { abstract: string; description: string } {
+  const [p1, p2, p3] = dm.parts;
+  const [d1, d2, d3] = dm.deps;
+  if (isEn) {
+    const abstract = `${dm.abEn} The disclosed system comprises a first component (110), a second component (120), and a third component (130) operatively coupled to one another. Embodiments provide improved accuracy, robustness, and manufacturability over conventional approaches, and are validated across diverse operating conditions.`;
+    const description = [
+      `[0001] The present invention relates to ${dm.titleEn.toLowerCase()}, and more particularly to a system including a plurality of cooperating components.`,
+      `[0002] Conventional systems have suffered from limited accuracy and robustness, and it has been difficult to secure stable performance under diverse environmental conditions.`,
+      `[0003] An object of the present invention is to overcome these limitations and to provide a reliable and efficient solution.`,
+      `[0004] To achieve the above object, a system (100) according to an embodiment includes a first component (110), a second component (120), and a third component (130) operatively coupled to one another.`,
+      `[0005] In operation, the first component (110) acquires input data, the second component (120) performs preprocessing and transformation, and the third component (130) produces the final result. The components may be implemented in hardware, software, or a combination thereof.`,
+      `[0006] In one embodiment, additional features are provided to further improve performance. In another embodiment, alternative configurations are contemplated to suit particular applications.`,
+      `[0007] FIG. 1 illustrates the overall configuration of the system, and FIGS. 2 to 5 depict the operation of respective components and experimental results.`,
+      `[0008] According to the present invention, improved performance and practical industrial applicability are achieved, as demonstrated by the accompanying experimental data.`,
+    ].join('\n');
+    return { abstract, description };
+  }
+  const abstract = `${dm.abKo} 본 발명에 따른 ${dm.device}는 ${p1}, ${p2} 및 ${p3}를 포함하며, ${dm.sKo} 이를 통해 종래 기술 대비 성능과 신뢰성을 향상시키고, ${dm.eKo}`;
+  const description = [
+    `【0001】 본 발명은 ${dm.titleKo}에 관한 것으로, 보다 상세하게는 ${p1}, ${p2} 및 ${p3}를 포함하는 ${dm.device}에 관한 것이다.`,
+    `【0002】 종래의 ${dm.device}는 정확도와 견고성 측면에서 한계가 있었으며, 다양한 환경 조건에서 안정적인 성능을 확보하기 어려운 문제가 있었다.`,
+    `【0003】 본 발명이 해결하고자 하는 과제는 ${dm.pKo}`,
+    `【0004】 상기 과제를 해결하기 위하여, 본 발명의 일 실시예에 따른 ${dm.device}(100)는 ${p1}(110); ${p2}(120); 및 ${p3}(130)를 포함한다.`,
+    `【0005】 ${dm.sKo} 구체적으로, 제1 구성부(110)는 입력 데이터를 획득하고, 제2 구성부(120)는 전처리 및 변환을 수행하며, 제3 구성부(130)는 최종 결과를 산출한다.`,
+    `【0006】 일 실시예에서, ${d1}. 다른 실시예에서, ${d2}. 또 다른 실시예에서, ${d3}.`,
+    `【0007】 도 1은 ${dm.device}의 전체 구성을 나타내고, 도 2 내지 도 5는 각 구성부의 동작 및 실험 결과를 도시한다.`,
+    `【0008】 본 발명에 따르면 ${dm.eKo} 따라서 산업상 이용 가능성이 높다.`,
+  ].join('\n');
+  return { abstract, description };
+}
+
 function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
   const seq = domIdx * 5 + slot;
   const cc = COUNTRY_SEQ[slot % COUNTRY_SEQ.length];
   const status = STATUS_SEQ[(domIdx + slot) % STATUS_SEQ.length];
   const year = 2024 - ((seq * 3) % 16); // 2008~2024 분포
   const nums = docNumber(cc, year, seq);
+  const isReg = status === '등록' || status === '소멸';
   const appDate = mkDate(year - 1, seq, seq * 2);
   const pubDate = mkDate(year, seq + 3, seq + 5);
-  // 데모: 모든 예시가 완전히 채워지도록 등록일·존속만료일을 항상 부여(정상 반영 검증용)
-  const regDate = mkDate(year, seq + 6, seq + 1);
-  const exp = `${year - 1 + 20}-${appDate.slice(5)}`;
+  // 등록 필드는 상태상 존재하는 경우에만(공개·심사중·거절은 미등록 → '-')
+  const regDate = isReg ? mkDate(year, seq + 6, seq + 1) : '-';
+  const exp = isReg ? `${year - 1 + 20}-${appDate.slice(5)}` : '-';
   // device명과 중복되지 않는 자연스러운 접미 (slot 0은 접미 없음)
   const titleSuffix = ['', ' 및 그 동작 방법', ' 및 제어 방법', ' 및 그 제조 방법', '를 포함하는 시스템'][slot % 5];
   const { citing, cited } = buildCitations(dm, year, seq);
   const applicant = dm.applicants[cc];
   const isEn = cc === 'US' || cc === 'EP';
+  const detail = buildDetail(dm, isEn);
 
   const rightStatus = status === '등록' ? '존속 중' : status === '소멸' ? '소멸' : status === '거절' ? '거절확정' : status === '심사중' ? '심사 중' : '공개';
   const dispute = seq % 7 === 0 ? `분쟁 있음 (IPR${year}-${pad(seq, 4)})` : '분쟁 없음';
@@ -237,14 +271,14 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
     applicant, inventors: isEn ? 'A. Researcher, B. Engineer' : '김OO, 이OO',
     applicationNo: nums.appNo, applicationDate: appDate,
     publicationNo: nums.pubNo, publicationDate: pubDate,
-    registerNo: nums.regNo || nums.number, registerDate: regDate,
+    registerNo: nums.regNo && isReg ? nums.regNo : '-', registerDate: regDate,
     expirationDate: exp,
-    ipc: dm.ipc, cpc: dm.cpc,
+    ipc: dm.ipc, cpc: cc === 'JP' ? '-' : dm.cpc,
     rightStatus, rightChange: seq % 5 === 0 ? '있음 (권리 양도)' : '없음',
     grade: GRADES[seq % GRADES.length],
     trial, rejectionCount: status === '거절' ? 2 : status === '심사중' ? 1 : 0,
     applicantStandard: applicant, standardOrg: seq % 6 === 0 ? '3GPP' : '-', dispute,
-    abstract: isEn ? dm.abEn : dm.abKo,
+    abstract: detail.abstract,
     repClaim: `제1항. ${dm.parts[0]}; ${dm.parts[1]}; 및 ${dm.parts[2]}를 포함하는, ${dm.device}.`,
     claims: buildClaims(dm),
     aiPurpose: dm.pKo, aiSolution: dm.sKo, aiEffect: dm.eKo,
@@ -265,9 +299,7 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
     inventorAddress: cc === 'KR' ? '서울특별시 서초구 서초대로 396' : cc === 'US' ? '250 Tech Park Dr, Austin, TX' : cc === 'JP' ? '東京都千代田区丸の内2-4-1' : cc === 'CN' ? '北京市海淀区中关村大街1号' : 'Königstraße 10, Stuttgart',
     priorityDate: mkDate(year - 2, seq, seq), examRequestDate: mkDate(year - 1, seq + 1, seq + 2),
     terminationDate: status === '소멸' ? mkDate(year + 5, seq, seq) : undefined,
-    description: isEn
-      ? `The present invention relates to ${dm.titleEn.toLowerCase()}. Conventional approaches suffered from limited accuracy and robustness. ${dm.sKo}`
-      : `본 발명은 ${dm.titleKo}에 관한 것이다. 종래 기술은 정확도와 견고성에 한계가 있었다. ${dm.sKo} ${dm.eKo}`,
+    description: detail.description,
     agent: cc === 'KR' ? '특허법인 다래' : cc === 'US' ? 'Wilson Sonsini Goodrich & Rosati' : cc === 'JP' ? '弁理士法人OOO' : 'Maucher Jenkins',
     agentAddress: cc === 'KR' ? '서울특별시 강남구 테헤란로 152' : cc === 'US' ? '650 Page Mill Rd, Palo Alto, CA' : cc === 'JP' ? '東京都港区虎ノ門1-1-1' : cc === 'CN' ? '上海市浦东新区世纪大道100号' : 'Neuhauser Str. 20, München',
   };
