@@ -120,7 +120,7 @@ const FIELD_CATALOG: SField[] = [
 ];
 
 // 연산검색(행 기반 빌더)
-type OpRow = { op: 'AND' | 'OR' | 'NOT'; field: string; value: string };
+type OpRow = { op: 'AND' | 'OR' | 'NOT'; field: string; value: string; dateFrom?: string; dateTo?: string };
 
 // 초기 표시 필드(데모 기본 18개) — 나머지는 '검색 필드 추가'로 확장
 const INITIAL_FIELD_CODES = ['TI', 'AB', 'CL', 'CLI', 'CLA', 'DSC', 'IPCM', 'CPCM', 'AP', 'APD', 'INV', 'AG', 'AN', 'PN', 'RN', 'AD', 'PD', 'RD'];
@@ -147,6 +147,14 @@ function fieldLabelOf(code: string): string {
   if (code === 'KEY') return '명칭+요약+독립항';
   if (code === 'TAC') return '명칭+요약+전체청구항';
   return FIELD_CATALOG.find(f => f.code === code)?.label ?? code;
+}
+// 필드 타입 — 연산검색 입력형태(날짜=기간, ipc/텍스트=입력창)를 가변 적용
+function fieldTypeOf(code: string): 'text' | 'date-range' | 'ipc' {
+  if (code === 'KEY' || code === 'TAC') return 'text';
+  return FIELD_CATALOG.find(f => f.code === code)?.type ?? 'text';
+}
+function fieldHintOf(code: string): string {
+  return FIELD_CATALOG.find(f => f.code === code)?.hint ?? '검색어 입력 (and / or / not, 와일드카드 * 사용 가능)';
 }
 
 // ── 토크나이저 ────────────────────────────────────────────────
@@ -312,8 +320,18 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
   const updateOpRow = (i: number, patch: Partial<OpRow>) => setOpRows(prev => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
   const removeOpRow = (i: number) => setOpRows(prev => prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev);
   const buildOpQuery = () => {
-    const withVal = opRows.filter(r => r.value.trim());
-    return withVal.map((r, i) => (i === 0 ? '' : `${r.op} `) + `${r.field}:(${r.value.trim()})`).join(' ');
+    const parts = opRows.map(r => {
+      if (fieldTypeOf(r.field) === 'date-range') {
+        const from = (r.dateFrom || '').replace(/\D/g, '');
+        const to = (r.dateTo || '').replace(/\D/g, '');
+        if (!from && !to) return null;
+        return { op: r.op, clause: `${r.field}:([${from || '*'} ~ ${to || '*'}])` };
+      }
+      const v = r.value.trim();
+      if (!v) return null;
+      return { op: r.op, clause: `${r.field}:(${v})` };
+    }).filter((p): p is { op: OpRow['op']; clause: string } => !!p);
+    return parts.map((p, i) => (i === 0 ? '' : `${p.op} `) + p.clause).join(' ');
   };
   // 연산검색 필드 선택 모달: 숫자=해당 행 필드 변경, 'add'=조건(행) 추가(다중 선택)
   const [opPickerFor, setOpPickerFor] = useState<number | 'add' | null>(null);
@@ -646,14 +664,32 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
                   <span className="truncate">{fieldLabelOf(r.field)}</span>
                   <span className="text-gray-400 text-xs2 shrink-0 ml-1">▾</span>
                 </button>
-                <input
-                  type="text"
-                  value={r.value}
-                  onChange={e => updateOpRow(i, { value: e.target.value })}
-                  onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
-                  placeholder="검색어 입력 (and / or / not, 와일드카드 * 사용 가능)"
-                  className="flex-1 min-w-0 h-9 px-3 border border-gray-300 rounded text-sm2 outline-none focus:border-blue-400"
-                />
+                {fieldTypeOf(r.field) === 'date-range' ? (
+                  <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                    <input
+                      type="date"
+                      value={r.dateFrom || ''}
+                      onChange={e => updateOpRow(i, { dateFrom: e.target.value })}
+                      className="flex-1 min-w-0 h-9 px-2 border border-gray-300 rounded text-sm2 outline-none focus:border-blue-400 font-mono"
+                    />
+                    <span className="text-gray-400 shrink-0">~</span>
+                    <input
+                      type="date"
+                      value={r.dateTo || ''}
+                      onChange={e => updateOpRow(i, { dateTo: e.target.value })}
+                      className="flex-1 min-w-0 h-9 px-2 border border-gray-300 rounded text-sm2 outline-none focus:border-blue-400 font-mono"
+                    />
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={r.value}
+                    onChange={e => updateOpRow(i, { value: e.target.value })}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
+                    placeholder={fieldHintOf(r.field)}
+                    className="flex-1 min-w-0 h-9 px-3 border border-gray-300 rounded text-sm2 outline-none focus:border-blue-400"
+                  />
+                )}
                 <button
                   onClick={() => removeOpRow(i)}
                   disabled={opRows.length <= 1}
@@ -703,8 +739,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
           <span className="flex items-center gap-1.5">
             <span className="text-brand-400 text-xs2">≡</span>
             항목별 검색필드
-            <span className="text-xs2 font-medium text-brand-400 bg-blue-100 px-1.5 py-0 rounded-full leading-5" title="현재 입력 가능한 검색필드 수">{fields.length}개</span>
-            {!fieldsOpen && <span className="text-xs2 font-normal text-gray-400">— 제목·초록·청구항·출원인 등 필드별 검색</span>}
+            {!fieldsOpen && <span className="text-xs2 font-normal text-gray-400">— 제목·초록·청구항·출원인 등 필드별 검색(추가 가능)</span>}
           </span>
           <span className="text-xs2 font-medium text-brand-400">{fieldsOpen ? '접기 ▲' : '펼치기 ▼'}</span>
         </button>
