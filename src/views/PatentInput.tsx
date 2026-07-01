@@ -836,14 +836,16 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
               ))}
             </div>
 
-            {/* 검색 필드 추가 (오버레이 모달) */}
-            <div className="mt-2 mx-4">
+            {/* 검색 필드 추가·확장 (키워트식 구분선 토글) */}
+            <div className="mt-3 mx-4 flex items-center gap-3">
+              <span className="flex-1 h-px bg-blue-100" />
               <button
                 onClick={() => { setPendingAddCodes(new Set(fields.map(f => f.code))); setAddFieldOpen(true); }}
-                className="w-full flex items-center justify-center gap-1 text-sm2 text-gray-400 hover:text-brand-400 py-1.5 border border-dashed border-gray-200 rounded hover:border-brand-300 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-blue-200 bg-blue-50 text-sm2 font-semibold text-brand-500 hover:bg-blue-100 hover:border-blue-400 transition-colors shrink-0"
               >
-                ⊕ 검색 필드 추가
+                <span className="text-base2 leading-none">＋</span> 검색 필드 추가·확장
               </button>
+              <span className="flex-1 h-px bg-blue-100" />
             </div>
           </div>
         )}
