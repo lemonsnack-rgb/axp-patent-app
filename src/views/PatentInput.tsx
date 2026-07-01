@@ -618,48 +618,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
         </div>
       </div>
 
-      {/* ── 검색 히스토리 ─────────────────────────── */}
-      {patentHistory.length > 0 && (
-        <div className="border-t border-gray-200">
-          <button
-            onClick={() => setHistoryOpen(v => !v)}
-            className="w-full flex items-center justify-between px-4 py-2 text-sm2 font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            <span className="flex items-center gap-1.5">
-              <span className="text-gray-400 text-xs2">🕘</span>
-              검색 히스토리
-              <span className="text-xs2 font-medium text-brand-400 bg-blue-50 px-1.5 py-0 rounded-full leading-5">{patentHistory.length}</span>
-            </span>
-            <span className="text-gray-400 text-xs2">{historyOpen ? '▲' : '▼'}</span>
-          </button>
-          {historyOpen && (
-            <div className="px-4 pb-3">
-              <div className="flex justify-end mb-1">
-                <button onClick={() => searchHistoryClear('patent')} className="text-xs2 text-gray-400 hover:text-red-500">전체 삭제</button>
-              </div>
-              <div className="space-y-0.5 max-h-48 overflow-y-auto scroll-thin">
-                {patentHistory.map(e => (
-                  <div key={e.id} className={clsx('group flex items-center gap-2 py-1 px-2 rounded hover:bg-gray-50', e.pinned && 'bg-amber-50/40')}>
-                    <button
-                      onClick={() => searchHistoryTogglePin(e.id)}
-                      className={clsx('shrink-0 leading-none', e.pinned ? 'text-amber-500' : 'text-gray-300 hover:text-amber-400')}
-                      title={e.pinned ? '저장 해제' : '검색 저장 (★)'}
-                    >★</button>
-                    <button onClick={() => rerun(e.query)} className="flex-1 min-w-0 text-left" title="이 검색 재실행">
-                      <div className="font-mono text-xs2 text-brand-400 truncate">{e.query}</div>
-                      <div className="text-xs2 text-gray-400">{histTime(e.at)}{e.pinned && ' · 저장됨'}</div>
-                    </button>
-                    <button onClick={() => rerun(e.query)} className="text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 shrink-0">재실행</button>
-                    <button onClick={() => searchHistoryRemove(e.id)} className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-500 rounded shrink-0 opacity-0 group-hover:opacity-100" title="삭제">×</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── 검색필드 섹션 (그룹 탭) ─────────────────────────── */}
+      {/* ── 검색필드 섹션 (검색창 바로 아래 — 입력이 검색식에 반영) ─────────────────────────── */}
       <div className="border-t border-gray-200">
 
         {/* 섹션 헤더 (토글) */}
@@ -779,6 +738,47 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
           </div>
         )}
       </div>
+
+      {/* ── 검색 히스토리 (검색필드 아래) ─────────────────────────── */}
+      {patentHistory.length > 0 && (
+        <div className="border-t border-gray-200">
+          <button
+            onClick={() => setHistoryOpen(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-2 text-sm2 font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <span className="flex items-center gap-1.5">
+              <span className="text-gray-400 text-xs2">🕘</span>
+              검색 히스토리
+              <span className="text-xs2 font-medium text-brand-400 bg-blue-50 px-1.5 py-0 rounded-full leading-5">{patentHistory.length}</span>
+            </span>
+            <span className="text-gray-400 text-xs2">{historyOpen ? '▲' : '▼'}</span>
+          </button>
+          {historyOpen && (
+            <div className="px-4 pb-3">
+              <div className="flex justify-end mb-1">
+                <button onClick={() => searchHistoryClear('patent')} className="text-xs2 text-gray-400 hover:text-red-500">전체 삭제</button>
+              </div>
+              <div className="space-y-0.5 max-h-48 overflow-y-auto scroll-thin">
+                {patentHistory.map(e => (
+                  <div key={e.id} className={clsx('group flex items-center gap-2 py-1 px-2 rounded hover:bg-gray-50', e.pinned && 'bg-amber-50/40')}>
+                    <button
+                      onClick={() => searchHistoryTogglePin(e.id)}
+                      className={clsx('shrink-0 leading-none', e.pinned ? 'text-amber-500' : 'text-gray-300 hover:text-amber-400')}
+                      title={e.pinned ? '저장 해제' : '검색 저장 (★)'}
+                    >★</button>
+                    <button onClick={() => rerun(e.query)} className="flex-1 min-w-0 text-left" title="이 검색 재실행">
+                      <div className="font-mono text-xs2 text-brand-400 truncate">{e.query}</div>
+                      <div className="text-xs2 text-gray-400">{histTime(e.at)}{e.pinned && ' · 저장됨'}</div>
+                    </button>
+                    <button onClick={() => rerun(e.query)} className="text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 shrink-0">재실행</button>
+                    <button onClick={() => searchHistoryRemove(e.id)} className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-500 rounded shrink-0 opacity-0 group-hover:opacity-100" title="삭제">×</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 검색 필드 추가 오버레이 (키워트 방식 — 영역별 선택 후 적용) */}
       {addFieldOpen && (

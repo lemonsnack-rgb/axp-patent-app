@@ -171,7 +171,36 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
         </div>
       </div>
 
-      {/* 검색 히스토리 */}
+      {/* 검색필드 패널 (검색창 바로 아래 — 입력이 검색식에 반영) */}
+      <div className="border-t border-gray-200">
+        <button onClick={() => setFieldsOpen(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-2 text-sm2 font-semibold text-gray-700 hover:bg-gray-50">
+          <span className="flex items-center gap-1.5">
+            <span className="text-gray-400 text-xs2">≡</span>
+            검색필드
+            <span className="text-xs2 font-medium text-brand-400 bg-blue-50 px-1.5 py-0 rounded-full leading-5">{fields.length}</span>
+          </span>
+          <span className="text-gray-400 text-xs2">{fieldsOpen ? '▲' : '▼'}</span>
+        </button>
+        {fieldsOpen && (
+          <div className="px-4 pb-3 pt-1 space-y-px">
+            {fields.map((f, idx) => (
+              <div key={f.code} className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-gray-50 group">
+                <span className="text-xs2 font-mono font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded shrink-0 min-w-[40px] text-center">{f.code}</span>
+                <span className="text-sm2 text-gray-700 shrink-0 w-[72px]">{f.label}</span>
+                <input type="text" value={f.value} onChange={e => updateField(idx, e.target.value)} placeholder={f.hint || ''}
+                  className="flex-1 min-w-0 px-2 py-1 border border-gray-200 rounded text-sm2 outline-none focus:border-blue-400" />
+                {(f.code === 'TI' || f.code === 'AB' || f.code === 'KWD') && (
+                  <button onClick={() => setFinderOpen({ fieldIdx: idx })}
+                    className="text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 shrink-0">키워드추천</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 검색 히스토리 (검색필드 아래) */}
       {paperHistory.length > 0 && (
         <div className="border-t border-gray-200">
           <button onClick={() => setHistoryOpen(v => !v)}
@@ -207,35 +236,6 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
           )}
         </div>
       )}
-
-      {/* 검색필드 패널 */}
-      <div className="border-t border-gray-200">
-        <button onClick={() => setFieldsOpen(v => !v)}
-          className="w-full flex items-center justify-between px-4 py-2 text-sm2 font-semibold text-gray-700 hover:bg-gray-50">
-          <span className="flex items-center gap-1.5">
-            <span className="text-gray-400 text-xs2">≡</span>
-            검색필드
-            <span className="text-xs2 font-medium text-brand-400 bg-blue-50 px-1.5 py-0 rounded-full leading-5">{fields.length}</span>
-          </span>
-          <span className="text-gray-400 text-xs2">{fieldsOpen ? '▲' : '▼'}</span>
-        </button>
-        {fieldsOpen && (
-          <div className="px-4 pb-3 pt-1 space-y-px">
-            {fields.map((f, idx) => (
-              <div key={f.code} className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-gray-50 group">
-                <span className="text-xs2 font-mono font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded shrink-0 min-w-[40px] text-center">{f.code}</span>
-                <span className="text-sm2 text-gray-700 shrink-0 w-[72px]">{f.label}</span>
-                <input type="text" value={f.value} onChange={e => updateField(idx, e.target.value)} placeholder={f.hint || ''}
-                  className="flex-1 min-w-0 px-2 py-1 border border-gray-200 rounded text-sm2 outline-none focus:border-blue-400" />
-                {(f.code === 'TI' || f.code === 'AB' || f.code === 'KWD') && (
-                  <button onClick={() => setFinderOpen({ fieldIdx: idx })}
-                    className="text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 shrink-0">키워드추천</button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* 안내 */}
       {paperHistory.length === 0 && (
