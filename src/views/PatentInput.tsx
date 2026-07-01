@@ -119,6 +119,26 @@ const FIELD_CATALOG: SField[] = [
   { code: 'SEQC', label: '서열내용',          value: '', type: 'text' },
 ];
 
+// 연산검색(행 기반 빌더)의 필드 선택 옵션 — 키워트 연산검색 방식
+const OP_FIELD_OPTIONS: { code: string; label: string }[] = [
+  { code: 'KEY',  label: '명칭+요약+독립항' },
+  { code: 'TAC',  label: '명칭+요약+전체청구항' },
+  { code: 'TI',   label: '발명의 명칭' },
+  { code: 'AB',   label: '요약' },
+  { code: 'CLI',  label: '독립청구항' },
+  { code: 'CLA',  label: '전체청구항' },
+  { code: 'DSC',  label: '상세설명' },
+  { code: 'AP',   label: '출원인' },
+  { code: 'INV',  label: '발명자' },
+  { code: 'AG',   label: '대리인' },
+  { code: 'IPCM', label: 'IPC' },
+  { code: 'CPCM', label: 'CPC' },
+  { code: 'AN',   label: '출원번호' },
+  { code: 'PN',   label: '공개/특허번호' },
+  { code: 'RN',   label: '등록번호' },
+];
+type OpRow = { op: 'AND' | 'OR' | 'NOT'; field: string; value: string };
+
 // 초기 표시 필드(데모 기본 18개) — 나머지는 '검색 필드 추가'로 확장
 const INITIAL_FIELD_CODES = ['TI', 'AB', 'CL', 'CLI', 'CLA', 'DSC', 'IPCM', 'CPCM', 'AP', 'APD', 'INV', 'AG', 'AN', 'PN', 'RN', 'AD', 'PD', 'RD'];
 const INITIAL_FIELDS: SField[] = FIELD_CATALOG.filter(f => INITIAL_FIELD_CODES.includes(f.code));
@@ -289,6 +309,19 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
   // 검색필드 섹션 — 기본 접힘
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [histPage, setHistPage] = useState(1);
+  // 연산검색 행 빌더 (키워트 연산검색)
+  const [opRows, setOpRows] = useState<OpRow[]>([
+    { op: 'AND', field: 'KEY', value: '' },
+    { op: 'AND', field: 'AP', value: '' },
+    { op: 'AND', field: 'DSC', value: '' },
+  ]);
+  const updateOpRow = (i: number, patch: Partial<OpRow>) => setOpRows(prev => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
+  const addOpRow = () => setOpRows(prev => [...prev, { op: 'AND', field: 'TI', value: '' }]);
+  const removeOpRow = (i: number) => setOpRows(prev => prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev);
+  const buildOpQuery = () => {
+    const withVal = opRows.filter(r => r.value.trim());
+    return withVal.map((r, i) => (i === 0 ? '' : `${r.op} `) + `${r.field}:(${r.value.trim()})`).join(' ');
+  };
   const [fields, setFields] = useState<SField[]>(INITIAL_FIELDS);
 
   // 파인더
@@ -338,6 +371,13 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
   });
 
   const handleSearch = () => {
+    // 연산검색(행 빌더): 각 행의 [연산자][필드][검색어]를 조합해 실행
+    if (mode === 'editor') {
+      const execQuery = buildOpQuery();
+      searchHistoryAdd('patent', execQuery);
+      onRun(execQuery, buildMeta());
+      return;
+    }
     // 목업: 검색어가 없어도 검색 버튼만 누르면 전체 결과가 나오도록 허용
     const fieldInputs: SFieldInput[] = fields.map(f => ({
       code: f.code, type: f.type, value: f.value, dateFrom: f.dateFrom, dateTo: f.dateTo,
@@ -540,13 +580,13 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
             <span className="text-xs2 font-semibold text-gray-500 shrink-0" title="검색어를 어떻게 입력할지 선택합니다">검색어 입력방식</span>
             <div className="inline-flex border border-gray-300 rounded-md overflow-hidden">
               <button
-                onClick={() => { setMode('normal'); setFieldsOpen(false); }}
+                onClick={() => setMode('normal')}
                 title="하나의 검색식(키워드)을 입력해 검색합니다"
                 className={clsx('px-3 py-1.5 text-sm2 font-semibold', mode === 'normal' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600')}
               >기본검색</button>
               <button
-                onClick={() => { setMode('editor'); setFieldsOpen(true); }}
-                title="제목·초록·청구항 등 항목별 검색필드를 조합해 검색합니다"
+                onClick={() => setMode('editor')}
+                title="연산자(AND/OR/NOT)로 항목별 검색어를 조합해 검색합니다"
                 className={clsx('px-3 py-1.5 text-sm2 font-semibold', mode === 'editor' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600')}
               >연산검색</button>
             </div>
@@ -575,30 +615,61 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
           )}
         </div>
 
-        {/* FormulaEditor */}
-        <FormulaEditor
-          value={formulaText}
-          onChange={setFormulaText}
-          rows={3}
-          placeholder="예: 하이브리드 and 자동차 | *수소 자동차*"
-        />
+        {/* 기본검색: 자유 검색식 입력창 */}
+        {mode === 'normal' && (
+          <FormulaEditor
+            value={formulaText}
+            onChange={setFormulaText}
+            rows={3}
+            placeholder="예: 하이브리드 and 자동차 | *수소 자동차*"
+          />
+        )}
 
-        {/* 편집기모드 연산자 버튼 */}
+        {/* 연산검색: 행 기반 빌더 (연산자 + 필드 선택 + 검색어) */}
         {mode === 'editor' && (
-          <div className="flex gap-1 flex-wrap">
-            {['AND', 'OR', 'NOT', '( )', '*', '?', 'ADJ', 'NEAR', '" "', '@'].map(op => (
-              <span key={op} className="px-1.5 py-0.5 bg-gray-100 text-xs2 text-gray-600 rounded font-mono cursor-default">{op}</span>
+          <div className="space-y-1.5">
+            {opRows.map((r, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                {i === 0 ? (
+                  <span className="w-16 shrink-0 text-xs2 text-gray-400 text-center">조건</span>
+                ) : (
+                  <select
+                    value={r.op}
+                    onChange={e => updateOpRow(i, { op: e.target.value as OpRow['op'] })}
+                    className="w-16 shrink-0 h-9 px-1.5 border border-gray-300 rounded text-sm2 bg-white outline-none focus:border-blue-400 font-medium"
+                  >
+                    <option value="AND">AND</option>
+                    <option value="OR">OR</option>
+                    <option value="NOT">NOT</option>
+                  </select>
+                )}
+                <select
+                  value={r.field}
+                  onChange={e => updateOpRow(i, { field: e.target.value })}
+                  className="w-44 shrink-0 h-9 px-2 border border-gray-300 rounded text-sm2 bg-white outline-none focus:border-blue-400"
+                >
+                  {OP_FIELD_OPTIONS.map(o => <option key={o.code} value={o.code}>{o.label}</option>)}
+                </select>
+                <input
+                  type="text"
+                  value={r.value}
+                  onChange={e => updateOpRow(i, { value: e.target.value })}
+                  onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
+                  placeholder="검색어 입력 (and / or / not, 와일드카드 * 사용 가능)"
+                  className="flex-1 min-w-0 h-9 px-3 border border-gray-300 rounded text-sm2 outline-none focus:border-blue-400"
+                />
+                <button
+                  onClick={() => removeOpRow(i)}
+                  disabled={opRows.length <= 1}
+                  className="w-8 h-8 shrink-0 flex items-center justify-center rounded border border-gray-300 text-gray-400 hover:text-red-500 hover:border-red-300 disabled:opacity-30"
+                  title="조건 삭제"
+                >−</button>
+              </div>
             ))}
-            {(['keyword', 'numfmt', 'ipc'] as FinderType[]).map(k => {
-              const labels: Record<string, string> = { keyword: '키워드 추천', numfmt: '번호표기법', ipc: 'IPC 코드찾기' };
-              return (
-                <button key={k}
-                  onClick={() => setFinderOpen({ type: k, fieldIdx: -1 })}
-                  className="px-1.5 py-0.5 text-xs2 bg-blue-50 text-brand-400 rounded hover:bg-blue-100">
-                  {labels[k]}
-                </button>
-              );
-            })}
+            <button
+              onClick={addOpRow}
+              className="inline-flex items-center gap-1 mt-0.5 px-3 h-8 rounded border border-dashed border-gray-300 text-sm2 text-gray-500 hover:text-brand-400 hover:border-brand-300"
+            >＋ 조건 추가</button>
           </div>
         )}
 
@@ -621,7 +692,8 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
         </div>
       </div>
 
-      {/* ── 검색필드 섹션 (검색창 바로 아래 — 입력이 검색식에 반영) ─────────────────────────── */}
+      {/* ── 검색필드 섹션 (기본검색 전용 — 항목별 입력, 전부 AND 조합) ─────────────────────────── */}
+      {mode === 'normal' && (
       <div className="border-t border-gray-200">
 
         {/* 섹션 헤더 (토글) — 접혀 있어도 눈에 띄도록 */}
@@ -745,6 +817,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
           </div>
         )}
       </div>
+      )}
 
       {/* ── 검색 히스토리 (검색필드 아래) ─────────────────────────── */}
       {patentHistory.length > 0 && (

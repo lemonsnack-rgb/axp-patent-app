@@ -3,7 +3,6 @@
 import { useState, useRef, useImperativeHandle, useEffect, forwardRef } from 'react';
 import clsx from 'clsx';
 import { Button } from '@muhayu/axp-ui';
-import { FinderModal } from '../components/FinderModal';
 import { accumulateQuery, applyScope, type SFieldInput } from '../features/search';
 import { useStore } from '../store';
 
@@ -59,7 +58,6 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [histPage, setHistPage] = useState(1);
   const [fields, setFields] = useState<PField[]>(DEFAULT_FIELDS);
-  const [finderOpen, setFinderOpen] = useState<{ fieldIdx: number } | null>(null);
 
   const updateField = (idx: number, value: string) =>
     setFields(prev => prev.map((f, i) => i === idx ? { ...f, value } : f));
@@ -193,10 +191,6 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
                 <span className="text-sm2 text-gray-700 shrink-0 w-[72px]">{f.label}</span>
                 <input type="text" value={f.value} onChange={e => updateField(idx, e.target.value)} placeholder={f.hint || ''}
                   className="flex-1 min-w-0 px-2 py-1 border border-gray-200 rounded text-sm2 outline-none focus:border-blue-400" />
-                {(f.code === 'TI' || f.code === 'AB' || f.code === 'KWD') && (
-                  <button onClick={() => setFinderOpen({ fieldIdx: idx })}
-                    className="text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 shrink-0">키워드추천</button>
-                )}
               </div>
             ))}
           </div>
@@ -266,18 +260,6 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
             </p>
           </div>
         </div>
-      )}
-
-      {finderOpen && (
-        <FinderModal
-          type="keyword"
-          onApply={val => {
-            const idx = finderOpen.fieldIdx;
-            updateField(idx, fields[idx].value ? `${fields[idx].value} OR ${val}` : val);
-            setFinderOpen(null);
-          }}
-          onClose={() => setFinderOpen(null)}
-        />
       )}
     </div>
   );
