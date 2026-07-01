@@ -249,7 +249,7 @@ function FormulaEditor({ value, onChange, rows = 3, placeholder = '' }: {
         rows={rows}
         spellCheck={false}
         placeholder={placeholder}
-        className="relative w-full resize-y rounded border border-gray-300 bg-transparent p-2 leading-6 text-transparent caret-gray-900 outline-none focus:border-blue-500 placeholder:text-gray-400"
+        className="relative block w-full resize-y rounded border border-gray-300 bg-transparent p-2 leading-6 text-transparent caret-gray-900 outline-none focus:border-blue-500 placeholder:text-gray-400"
       />
     </div>
   );
