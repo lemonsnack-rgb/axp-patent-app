@@ -236,7 +236,7 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
                       className={clsx('w-4 shrink-0 leading-none', e.pinned ? 'text-amber-500' : 'text-gray-300 hover:text-amber-400')}
                       title={e.pinned ? '저장 해제' : '검색 저장 (★)'}>★</button>
                     <button onClick={() => rerun(e.query)} className="flex-1 min-w-0 text-left font-mono text-xs2 text-brand-400 truncate" title="이 검색식으로 재검색">{e.query}</button>
-                    <span className="w-28 shrink-0 text-xs2 text-gray-400 font-mono">{histTime(e.at)}{e.pinned && ' · 저장'}</span>
+                    <span className="w-28 shrink-0 text-xs2 text-gray-400 font-mono">{histTime(e.at)}</span>
                     <button onClick={() => rerun(e.query)} className="w-[52px] shrink-0 text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 text-center">재검색</button>
                     <button onClick={() => searchHistoryRemove(e.id)} className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-500 rounded shrink-0 opacity-0 group-hover:opacity-100" title="삭제">×</button>
                   </div>
