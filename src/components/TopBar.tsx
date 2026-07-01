@@ -71,10 +71,10 @@ export function TopBar() {
           )}
         </div>
         <span className="text-md2 text-zinc-500 ml-2">
-          {label}
+          <span className="text-lg2 font-semibold text-zinc-800">{label}</span>
           {showTaskName && active && (
             <>
-              <span className="mx-1 text-zinc-300">/</span>
+              <span className="mx-1.5 text-zinc-300">/</span>
               {editing ? (
                 <input
                   ref={inputRef}
