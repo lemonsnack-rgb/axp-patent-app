@@ -631,12 +631,20 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
 
         {/* 기본검색: 자유 검색식 입력창 */}
         {mode === 'normal' && (
-          <FormulaEditor
-            value={formulaText}
-            onChange={setFormulaText}
-            rows={3}
-            placeholder="예: 하이브리드 and 자동차 | *수소 자동차*"
-          />
+          <div className="flex items-stretch gap-2">
+            <div className="flex-1 min-w-0">
+              <FormulaEditor
+                value={formulaText}
+                onChange={setFormulaText}
+                rows={3}
+                placeholder="예: 하이브리드 and 자동차 | *수소 자동차*"
+              />
+            </div>
+            <div className="shrink-0 w-[88px] flex flex-col gap-1.5">
+              <Button variant="filled" color="primary" size="sm" className="text-sm2 flex-1" disabled={!canSearch} onClick={handleSearch}>검색</Button>
+              <Button variant="outlined" color="primary" size="sm" className="text-sm2" onClick={resetAll}>초기화</Button>
+            </div>
+          </div>
         )}
 
         {/* 연산검색: 행 기반 빌더 (연산자 + 필드 선택 + 검색어) */}
@@ -718,11 +726,13 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
           </div>
         )}
 
-        {/* 초기화 / 검색 */}
-        <div className="flex justify-end gap-1.5">
-          <Button variant="outlined" color="primary" size="sm" className="text-sm2" onClick={resetAll}>초기화</Button>
-          <Button variant="filled" color="primary" size="sm" className="text-sm2" disabled={!canSearch} onClick={handleSearch}>검색</Button>
-        </div>
+        {/* 초기화 / 검색 — 연산검색은 행 빌더 하단에 배치(기본검색은 검색식 우측으로 이동) */}
+        {mode === 'editor' && (
+          <div className="flex justify-end gap-1.5">
+            <Button variant="outlined" color="primary" size="sm" className="text-sm2" onClick={resetAll}>초기화</Button>
+            <Button variant="filled" color="primary" size="sm" className="text-sm2" disabled={!canSearch} onClick={handleSearch}>검색</Button>
+          </div>
+        )}
       </div>
 
       {/* ── 검색필드 섹션 (기본검색 전용 — 항목별 입력, 전부 AND 조합) ─────────────────────────── */}
