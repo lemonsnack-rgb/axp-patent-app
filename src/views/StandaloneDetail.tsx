@@ -21,7 +21,6 @@ export function StandaloneDetail() {
           data={data}
           backLabel="탭 닫기"
           backIcon={false}
-          posLabel="상세 보기"
           onBack={() => window.close()}
           onSave={() => toast('저장은 검색 결과 화면에서 진행해 주세요.')}
         />

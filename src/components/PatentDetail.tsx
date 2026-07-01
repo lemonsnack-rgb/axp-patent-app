@@ -130,8 +130,26 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
       {/* ── 탭 + 2-column 본문 ── */}
       <div className="flex-1 flex min-h-0 overflow-hidden">
 
-        {/* 좌: 앵커 탭 + 스크롤 본문 */}
+        {/* 좌: 특허명(최상단) + 앵커 탭 + 스크롤 본문 */}
         <div className="flex-1 flex flex-col overflow-hidden">
+
+          {/* 특허명·기본사항 — 가장 상단 (탭보다 먼저) */}
+          <div className="px-6 pt-4 pb-3 border-b border-gray-200 shrink-0">
+            <div className="flex items-center gap-2 flex-wrap mb-1.5">
+              <Badge color={statusColor}>● {data.status}</Badge>
+              <Badge color="brand">{data.country}</Badge>
+              <span className="font-mono text-md2 font-semibold text-gray-600">{data.number}</span>
+              {data.grade && <Badge color="brand">평가 {data.grade}</Badge>}
+              <button
+                onClick={() => downloadPatentPdf(data)}
+                className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-300 text-sm2 text-gray-600 hover:border-brand-400 hover:text-brand-400 shrink-0"
+                title="특허 원문 PDF 다운로드"
+              >
+                <Icon name="doc" size={12} /> 원문 PDF ↓
+              </button>
+            </div>
+            <h2 className="text-xl font-bold text-gray-800 leading-snug">{data.title}</h2>
+          </div>
 
           {/* Sticky 앵커 탭 바 */}
           <div className="sticky top-0 z-20 flex items-center gap-0 bg-white border-b border-gray-200 overflow-x-auto scroll-thin shrink-0">
@@ -154,29 +172,11 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
           {/* 스크롤 본문 */}
           <div className="flex-1 overflow-y-auto scroll-thin px-6 py-4">
 
-            {/* 타이틀 */}
-            <div className="mb-4 pb-3 border-b border-gray-100">
-              <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                <Badge color={statusColor}>● {data.status}</Badge>
-                <Badge color="brand">{data.country}</Badge>
-                <span className="font-mono text-md2 font-semibold text-gray-600">{data.number}</span>
-                {data.grade && <Badge color="brand">평가 {data.grade}</Badge>}
-                <button
-                  onClick={() => downloadPatentPdf(data)}
-                  className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-300 text-sm2 text-gray-600 hover:border-brand-400 hover:text-brand-400 shrink-0"
-                  title="특허 원문 PDF 다운로드"
-                >
-                  <Icon name="doc" size={12} /> 원문 PDF ↓
-                </button>
-              </div>
-              <h2 className="text-xl font-bold text-gray-800 leading-snug">{data.title}</h2>
-            </div>
-
-            {/* 도면 (분할 리더 전용 — 본문 내) */}
+            {/* 도면 (분할 리더 전용 — 본문 내). 대표도면 우선 */}
             {embedded && (data.figures || []).length > 0 && (
               <div className="mb-4">
                 <div className="text-xs2 font-semibold text-gray-500 mb-1.5">도면 ({(data.figures || []).length})</div>
-                <div className="border border-gray-200 rounded-lg bg-gray-50 overflow-hidden" style={{ height: 220 }}>
+                <div className="border border-gray-200 rounded-lg bg-gray-50 overflow-hidden" style={{ height: 360 }}>
                   <DrawingsPanel figures={data.figures} refSigns={data.refSigns} />
                 </div>
               </div>
@@ -359,7 +359,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
 
         {/* 우: 도면 패널 (전체화면 전용 — 분할 리더에선 본문 내 표시) */}
         {!embedded && (
-        <div className="w-56 shrink-0 border-l border-gray-200 bg-gray-50 flex flex-col overflow-hidden">
+        <div className="w-96 shrink-0 border-l border-gray-200 bg-gray-50 flex flex-col overflow-hidden">
           <div className="px-3 py-2 border-b border-gray-200 bg-white shrink-0">
             <span className="text-sm2 font-bold text-gray-600">도면</span>
             <span className="ml-1.5 text-xs2 text-gray-400">({(data.figures || []).length})</span>
@@ -541,35 +541,59 @@ function DrawingsPanel({ figures, refSigns }: { figures?: { label: string; desc:
     <div className="flex flex-col flex-1 overflow-y-auto scroll-thin p-3">
       {/* 메인 도면 — 클릭 시 확대 */}
       <div className="bg-white rounded-xl border border-neutral-150 shadow-card mb-2 shrink-0 overflow-hidden">
-        <div className="px-3 pt-2 flex items-baseline gap-2">
+        <div className="px-3 pt-2 flex items-center gap-2">
+          {selected === 0 && <span className="text-xs2 font-semibold text-white bg-brand-400 rounded px-1.5 py-0.5 shrink-0">대표</span>}
           <span className="text-xs2 font-semibold text-gray-600 font-mono">{figs[selected]?.label}</span>
           <span className="text-xs2 text-gray-400 truncate flex-1">{figs[selected]?.desc}</span>
           <button onClick={() => setZoom(true)} className="text-xs2 text-brand-400 hover:underline shrink-0" title="도면 확대">⤢ 확대</button>
         </div>
         <button onClick={() => setZoom(true)} className="block w-full cursor-zoom-in" title="도면 확대">
-          <FigureSVG index={selected} className="w-full h-40" />
+          <FigureSVG index={selected} className="w-full h-56" />
         </button>
       </div>
 
-      {/* 썸네일 그리드 (3열) */}
-      <div className="grid grid-cols-3 gap-1">
-        {figs.map((f, i) => (
-          <button
-            key={i}
-            onClick={() => setSelected(i)}
-            onDoubleClick={() => { setSelected(i); setZoom(true); }}
-            className={clsx(
-              'rounded-md overflow-hidden border transition-all bg-white',
-              selected === i ? 'ring-2 ring-blue-400 border-blue-400' : 'border-gray-200 hover:border-gray-300',
-            )}
-          >
-            <FigureSVG index={i} className="w-full h-12" />
-            <div className="text-xs2 text-gray-500 font-mono truncate w-full text-center leading-tight py-0.5 border-t border-gray-100">
-              {f.label}
-            </div>
-          </button>
-        ))}
-      </div>
+      {/* 대표도면 */}
+      <div className="text-xs2 font-semibold text-gray-500 mt-2 mb-1.5">대표도면</div>
+      <button
+        onClick={() => setSelected(0)}
+        onDoubleClick={() => { setSelected(0); setZoom(true); }}
+        className={clsx(
+          'relative rounded-md overflow-hidden border transition-all bg-white w-1/2',
+          selected === 0 ? 'ring-2 ring-blue-400 border-blue-400' : 'border-gray-200 hover:border-gray-300',
+        )}
+      >
+        <span className="absolute top-1 left-1 z-10 text-xs2 font-semibold text-white bg-brand-400 rounded px-1 leading-tight">대표</span>
+        <FigureSVG index={0} className="w-full h-24" />
+        <div className="text-xs2 text-gray-500 font-mono truncate w-full text-center leading-tight py-0.5 border-t border-gray-100">{figs[0]?.label}</div>
+      </button>
+
+      {/* 그 외 도면 */}
+      {figs.length > 1 && (
+        <>
+          <div className="text-xs2 font-semibold text-gray-500 mt-3 mb-1.5">그 외 도면 ({figs.length - 1})</div>
+          <div className="grid grid-cols-3 gap-1">
+            {figs.slice(1).map((f, idx) => {
+              const i = idx + 1;
+              return (
+                <button
+                  key={i}
+                  onClick={() => setSelected(i)}
+                  onDoubleClick={() => { setSelected(i); setZoom(true); }}
+                  className={clsx(
+                    'rounded-md overflow-hidden border transition-all bg-white',
+                    selected === i ? 'ring-2 ring-blue-400 border-blue-400' : 'border-gray-200 hover:border-gray-300',
+                  )}
+                >
+                  <FigureSVG index={i} className="w-full h-14" />
+                  <div className="text-xs2 text-gray-500 font-mono truncate w-full text-center leading-tight py-0.5 border-t border-gray-100">
+                    {f.label}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {/* 부호의 설명 */}
       {signs.length > 0 && <RefSigns signs={signs} className="mt-3" />}
