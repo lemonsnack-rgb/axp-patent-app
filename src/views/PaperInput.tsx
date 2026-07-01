@@ -166,7 +166,7 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
         />
 
         <div className="flex justify-end gap-1.5">
-          <Button variant="outlined" color="primary" size="sm" className="text-sm2" onClick={resetAll}>◇ 초기화</Button>
+          <Button variant="outlined" color="primary" size="sm" className="text-sm2" onClick={resetAll}>초기화</Button>
           <Button variant="filled" color="primary" size="sm" className="text-sm2" disabled={!canSearch} onClick={handleSearch}>검색</Button>
         </div>
       </div>

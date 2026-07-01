@@ -12,7 +12,13 @@ import { Badge } from '../components/ui';
 import type { PatentResult } from '../types';
 import type { MetaFilter } from '../features/search';
 
-type SortKey = 'match' | 'recent' | 'old';
+// 정렬은 날짜 필드만 제공 — 출원일 외 공개일·등록일도 선택 가능
+type DateField = 'applicationDate' | 'publicationDate' | 'registerDate';
+const DATE_FIELDS: { key: DateField; label: string }[] = [
+  { key: 'applicationDate', label: '출원일' },
+  { key: 'publicationDate', label: '공개일' },
+  { key: 'registerDate', label: '등록일' },
+];
 
 interface AppliedFilter { facetKey: string; title: string; label: string }
 
@@ -72,7 +78,7 @@ interface Props {
 
 export function PatentResults({ onModify, onOpenDetail, onSave, onSaveMany, searchQuery, meta, onRefine, onCrossSearch }: Props) {
   const [refineTerm, setRefineTerm] = useState('');
-  const [sort, setSort] = useState<SortKey>('recent');
+  const [sortField, setSortField] = useState<DateField>('applicationDate');
   const [openFacet, setOpenFacet] = useState<string | null>(null);
   const [pendingFilters, setPendingFilters] = useState<Record<string, string[]>>({});
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilter[]>([]);
@@ -81,7 +87,6 @@ export function PatentResults({ onModify, onOpenDetail, onSave, onSaveMany, sear
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState<20 | 50 | 100 | 200>(20);
   const [checked, setChecked] = useState<Set<number>>(new Set());
-  const [sortCol, setSortCol] = useState<'applicationDate' | 'title'>('applicationDate');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   // 새 검색 시 패싯 해제 + 첫 페이지 + 선택/체크 초기화
@@ -105,13 +110,15 @@ export function PatentResults({ onModify, onOpenDetail, onSave, onSaveMany, sear
   const queryScoped = kwMatched.length > 0 ? kwMatched : PATENT_SEED;
   const metaScoped = applyMetaFilter(queryScoped, meta);
   const filtered = applyFacetFilters(metaScoped, appliedFilters);
-  const data = sort === 'match'
-    ? filtered
-    : [...filtered].sort((a, b) => {
-        const va = (a[sortCol] ?? '');
-        const vb = (b[sortCol] ?? '');
-        return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
-      });
+  // 날짜 필드(출원일/공개일/등록일) 기준 정렬. 값 없는 항목은 뒤로.
+  const data = [...filtered].sort((a, b) => {
+    const va = (a[sortField] ?? '');
+    const vb = (b[sortField] ?? '');
+    if (!va && !vb) return 0;
+    if (!va) return 1;
+    if (!vb) return -1;
+    return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+  });
   const count = data.length;
 
   // 오버레이 패널 키보드 네비게이션: ← 이전 / → 다음 / Esc 닫기
@@ -262,22 +269,23 @@ export function PatentResults({ onModify, onOpenDetail, onSave, onSaveMany, sear
           })}
           <Button variant="outlined" color="primary" size="xs" onClick={resetFilters} className="text-xs2 h-7 text-gray-400">필터 초기화</Button>
           <span className="flex-1" />
+          {/* 정렬: 날짜 필드 선택 + 방향 (출원일 외 공개일·등록일도 선택) */}
           <select
-            className="h-7 px-2 w-28 border border-gray-200 rounded text-xs2 bg-white outline-none hover:border-gray-300 focus:border-blue-400"
-            value={sort}
-            onChange={e => {
-              const v = e.target.value as SortKey;
-              setSort(v);
-              setPage(1);
-              if (v === 'match') return;
-              setSortCol('applicationDate');
-              setSortDir(v === 'old' ? 'asc' : 'desc');
-            }}
-            title="정렬 기준"
+            className="h-7 px-2 w-24 border border-gray-200 rounded text-xs2 bg-white outline-none hover:border-gray-300 focus:border-blue-400"
+            value={sortField}
+            onChange={e => { setSortField(e.target.value as DateField); setPage(1); }}
+            title="정렬 날짜 기준"
           >
-            <option value="match">매칭순</option>
-            <option value="recent">최신순</option>
-            <option value="old">오래된순</option>
+            {DATE_FIELDS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+          </select>
+          <select
+            className="h-7 px-2 w-24 border border-gray-200 rounded text-xs2 bg-white outline-none hover:border-gray-300 focus:border-blue-400"
+            value={sortDir}
+            onChange={e => { setSortDir(e.target.value as 'asc' | 'desc'); setPage(1); }}
+            title="정렬 방향"
+          >
+            <option value="desc">최신순</option>
+            <option value="asc">오래된순</option>
           </select>
           <select
             value={perPage}
@@ -360,13 +368,6 @@ export function PatentResults({ onModify, onOpenDetail, onSave, onSaveMany, sear
           }}
           onClearChecked={() => setChecked(new Set())}
           onSaveChecked={() => { onSaveMany?.(Array.from(checked).map(i => data[i]).filter(Boolean)); setChecked(new Set()); }}
-          sortCol={sortCol}
-          sortDir={sortDir}
-          onSort={(col) => {
-            setPage(1);
-            if (col === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-            else { setSortCol(col); setSortDir('desc'); }
-          }}
         />
       )}
     </div>
@@ -424,7 +425,7 @@ function FacetPopover({ group, selected, onToggle, onApply, onClose }: {
 }
 
 // ── 테이블 목록 + 우측 오버레이 상세 ──
-function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, page, onPageChange, totalCount, perPage, searchQuery, checked, onToggleCheck, onToggleAll, onClearChecked, onSaveChecked, sortCol, sortDir, onSort }: {
+function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, page, onPageChange, totalCount, perPage, searchQuery, checked, onToggleCheck, onToggleAll, onClearChecked, onSaveChecked }: {
   data: PatentResult[];
   selectedCard: number | null;
   onSelectCard: (i: number) => void;
@@ -440,9 +441,6 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
   onToggleAll: (all: boolean) => void;
   onClearChecked: () => void;
   onSaveChecked: () => void;
-  sortCol: 'applicationDate' | 'title';
-  sortDir: 'asc' | 'desc';
-  onSort: (col: 'applicationDate' | 'title') => void;
 }) {
   const totalPages = Math.ceil(totalCount / perPage);
   const startIdx = (page - 1) * perPage;
@@ -481,30 +479,17 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                   onChange={e => onToggleAll(e.target.checked)}
                 />
               </th>
-              <th className="w-10 px-2 py-2 text-center font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">No</th>
               <th className="w-16 px-2 py-2 text-center font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">상태</th>
-              <th className="w-40 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">문헌번호</th>
-              <th
-                className="w-24 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 cursor-pointer select-none hover:text-brand-400 whitespace-nowrap"
-                onClick={() => onSort('applicationDate')}
-              >
-                출원일 {sortCol === 'applicationDate' ? (sortDir === 'desc' ? '↓' : '↑') : '↕'}
-              </th>
-              <th
-                className="px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 cursor-pointer select-none hover:text-brand-400 whitespace-nowrap"
-                onClick={() => onSort('title')}
-              >
-                발명의 명칭 {sortCol === 'title' ? (sortDir === 'desc' ? '↓' : '↑') : '↕'}
-              </th>
+              <th className="w-52 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">문헌번호</th>
+              <th className="px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">발명의 명칭</th>
               <th className="w-32 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">출원인</th>
-              <th className="w-28 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">IPC</th>
-              <th className="w-16 px-2 py-2 text-center font-semibold text-gray-500 whitespace-nowrap">원문</th>
+              <th className="w-24 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">출원일</th>
+              <th className="w-28 px-2 py-2 text-left font-semibold text-gray-500 whitespace-nowrap">IPC</th>
             </tr>
           </thead>
           <tbody>
             {pageData.map((d, i) => {
               const absIdx = startIdx + i;
-              const rowNo = absIdx + 1;
               const isSelected = selectedCard === absIdx;
               const statusColor = getPatentStatusBadgeColor(d.status);
               return (
@@ -524,14 +509,19 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                       onChange={() => onToggleCheck(absIdx)}
                     />
                   </td>
-                  <td className="px-2 py-2 text-center text-xs2 text-gray-400 align-top">{rowNo}</td>
                   <td className="px-2 py-2 text-center align-top">
-                    <Badge color={statusColor} className="text-xs2">{d.status}</Badge>
+                    <Badge color={statusColor} className="text-xs2 whitespace-nowrap">{d.status}</Badge>
                   </td>
                   <td className="px-2 py-2 align-top">
-                    <div className="font-mono text-xs2 text-brand-400 leading-snug">{d.number}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-xs2 text-brand-400 leading-snug">{d.number}</span>
+                      <button
+                        onClick={e => { e.stopPropagation(); downloadPatentPdf(d); }}
+                        className="shrink-0 inline-flex items-center gap-0.5 h-5 px-1.5 rounded border border-red-200 bg-red-50 text-red-500 text-xs2 font-semibold hover:bg-red-100 hover:border-red-400"
+                        title="특허 원문 PDF 다운로드"
+                      ><Icon name="doc" size={11} /> PDF</button>
+                    </div>
                   </td>
-                  <td className="px-2 py-2 text-xs2 text-gray-600 font-mono align-top">{d.applicationDate}</td>
                   <td className="px-2 py-2 align-top">
                     <div className="flex items-start gap-1.5">
                       <button
@@ -549,16 +539,8 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                     </div>
                   </td>
                   <td className="px-2 py-2 text-xs2 text-gray-600 truncate max-w-[120px] align-top">{d.applicant}</td>
+                  <td className="px-2 py-2 text-xs2 text-gray-600 font-mono align-top">{d.applicationDate}</td>
                   <td className="px-2 py-2 text-xs2 text-gray-600 font-mono align-top">{d.ipc}</td>
-                  <td className="px-2 py-2 text-center align-top" onClick={e => e.stopPropagation()}>
-                    <button
-                      onClick={() => downloadPatentPdf(d)}
-                      className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded border border-gray-200 text-gray-400 hover:border-brand-400 hover:text-brand-400"
-                      title="특허 원문 PDF 다운로드"
-                    >
-                      <Icon name="doc" size={13} />
-                    </button>
-                  </td>
                 </tr>
               );
             })}
