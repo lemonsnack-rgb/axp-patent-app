@@ -214,11 +214,11 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
   const status = STATUS_SEQ[(domIdx + slot) % STATUS_SEQ.length];
   const year = 2024 - ((seq * 3) % 16); // 2008~2024 분포
   const nums = docNumber(cc, year, seq);
-  const isReg = status === '등록' || status === '소멸';
   const appDate = mkDate(year - 1, seq, seq * 2);
   const pubDate = mkDate(year, seq + 3, seq + 5);
-  const regDate = isReg ? mkDate(year, seq + 6, seq + 1) : '-';
-  const exp = isReg ? `${year - 1 + 20}-${appDate.slice(5)}` : '-';
+  // 데모: 모든 예시가 완전히 채워지도록 등록일·존속만료일을 항상 부여(정상 반영 검증용)
+  const regDate = mkDate(year, seq + 6, seq + 1);
+  const exp = `${year - 1 + 20}-${appDate.slice(5)}`;
   // device명과 중복되지 않는 자연스러운 접미 (slot 0은 접미 없음)
   const titleSuffix = ['', ' 및 그 동작 방법', ' 및 제어 방법', ' 및 그 제조 방법', '를 포함하는 시스템'][slot % 5];
   const { citing, cited } = buildCitations(dm, year, seq);
@@ -237,9 +237,9 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
     applicant, inventors: isEn ? 'A. Researcher, B. Engineer' : '김OO, 이OO',
     applicationNo: nums.appNo, applicationDate: appDate,
     publicationNo: nums.pubNo, publicationDate: pubDate,
-    registerNo: nums.regNo && isReg ? nums.regNo : '-', registerDate: regDate,
+    registerNo: nums.regNo || nums.number, registerDate: regDate,
     expirationDate: exp,
-    ipc: dm.ipc, cpc: cc === 'JP' ? '-' : dm.cpc,
+    ipc: dm.ipc, cpc: dm.cpc,
     rightStatus, rightChange: seq % 5 === 0 ? '있음 (권리 양도)' : '없음',
     grade: GRADES[seq % GRADES.length],
     trial, rejectionCount: status === '거절' ? 2 : status === '심사중' ? 1 : 0,
@@ -262,13 +262,14 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
     })(),
     applicantAddress: cc === 'KR' ? '서울특별시 강남구 테헤란로 152' : cc === 'US' ? '1 Innovation Way, San Jose, CA' : cc === 'JP' ? '東京都港区赤坂1-1-1' : cc === 'CN' ? '深圳市南山区科技园' : 'Hauptstraße 1, München',
     applicantCode: pad(120000000000 + seq * 7919, 12),
+    inventorAddress: cc === 'KR' ? '서울특별시 서초구 서초대로 396' : cc === 'US' ? '250 Tech Park Dr, Austin, TX' : cc === 'JP' ? '東京都千代田区丸の内2-4-1' : cc === 'CN' ? '北京市海淀区中关村大街1号' : 'Königstraße 10, Stuttgart',
     priorityDate: mkDate(year - 2, seq, seq), examRequestDate: mkDate(year - 1, seq + 1, seq + 2),
     terminationDate: status === '소멸' ? mkDate(year + 5, seq, seq) : undefined,
     description: isEn
       ? `The present invention relates to ${dm.titleEn.toLowerCase()}. Conventional approaches suffered from limited accuracy and robustness. ${dm.sKo}`
       : `본 발명은 ${dm.titleKo}에 관한 것이다. 종래 기술은 정확도와 견고성에 한계가 있었다. ${dm.sKo} ${dm.eKo}`,
     agent: cc === 'KR' ? '특허법인 다래' : cc === 'US' ? 'Wilson Sonsini Goodrich & Rosati' : cc === 'JP' ? '弁理士法人OOO' : 'Maucher Jenkins',
-    agentAddress: cc === 'KR' ? '서울특별시 강남구 테헤란로 152' : '—',
+    agentAddress: cc === 'KR' ? '서울특별시 강남구 테헤란로 152' : cc === 'US' ? '650 Page Mill Rd, Palo Alto, CA' : cc === 'JP' ? '東京都港区虎ノ門1-1-1' : cc === 'CN' ? '上海市浦东新区世纪大道100号' : 'Neuhauser Str. 20, München',
   };
 }
 
