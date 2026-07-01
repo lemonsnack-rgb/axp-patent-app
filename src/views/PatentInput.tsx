@@ -25,34 +25,114 @@ interface SField {
   dateTo?: string;
 }
 
-const DEFAULT_FIELDS: SField[] = [
-  { code: 'TI',   label: '발명의 명칭',       value: '', type: 'text',       hint: '예: 하이브리드 and 자동차 | *수소 자동차*' },
-  { code: 'AB',   label: '요약',              value: '', type: 'text',       hint: '예: 하이브리드 and 자동차 | "전기 자동차"' },
-  { code: 'CL',   label: '대표청구항',        value: '', type: 'text',       hint: '하이브리드 and 자동차' },
+// ── 전체 검색필드 카탈로그 (데모 http://10.77.0.244:8010/patents 기준 ~70개) ──
+const FIELD_CATALOG: SField[] = [
+  // 명칭·청구항·설명
+  { code: 'TI',   label: '발명의 명칭',       value: '', type: 'text', hint: '예: 하이브리드 and 자동차 | *수소 자동차*' },
+  { code: 'AB',   label: '요약',              value: '', type: 'text', hint: '예: 하이브리드 and 자동차 | "전기 자동차"' },
+  { code: 'CL',   label: '대표청구항',        value: '', type: 'text', hint: '하이브리드 and 자동차' },
   { code: 'CLI',  label: '독립청구항',        value: '', type: 'text' },
   { code: 'CLA',  label: '전체청구항',        value: '', type: 'text' },
-  { code: 'DSC',  label: '상세설명',          value: '', type: 'text',       hint: '딥러닝 and 검색 and 알고리즘' },
-  { code: 'IPCR', label: 'IPC (Main)',        value: '', type: 'ipc',  ipcScope: 'all', finderType: 'ipc', finderLabel: 'IPC 코드찾기', hint: 'H04L-009/18% | G06F*' },
-  { code: 'CPCR', label: 'CPC (Main)',        value: '', type: 'ipc',  ipcScope: 'all', finderType: 'ipc', finderLabel: 'CPC 코드찾기', hint: 'C12P-0007/02% | C01C*' },
-  { code: 'AP',   label: '출원인',            value: '', type: 'text',       hint: '엘지* | 119990527105' },
-  { code: 'APD',  label: '출원인 주소',       value: '', type: 'text',       hint: '서울 | 용산' },
-  { code: 'INV',  label: '발명자',            value: '', type: 'text',       hint: '김한국 | 김만*' },
-  { code: 'AG',   label: '대리인',            value: '', type: 'text',       hint: '특허법인* | 김남구' },
-  { code: 'AN',   label: '출원번호',          value: '', type: 'text',       hint: '1020080012345' },
-  { code: 'PN',   label: '공개번호/특허번호', value: '', type: 'text',       hint: '1020100012345' },
-  { code: 'RN',   label: '등록번호',          value: '', type: 'text',       hint: '1012345670000' },
+  { code: 'KC',   label: '문헌종류',          value: '', type: 'text' },
+  { code: 'KWD',  label: '키워드(KR)',        value: '', type: 'text' },
+  { code: 'DSC',  label: '상세설명',          value: '', type: 'text', hint: '딥러닝 and 검색 and 알고리즘' },
+  { code: 'TF',   label: '기술분야',          value: '', type: 'text' },
+  { code: 'BT',   label: '배경기술',          value: '', type: 'text' },
+  { code: 'IE',   label: '발명효과',          value: '', type: 'text' },
+  { code: 'SM',   label: '해결수단',          value: '', type: 'text' },
+  { code: 'SP',   label: '해결과제',          value: '', type: 'text' },
+  { code: 'DE',   label: '구체실시방식',      value: '', type: 'text' },
+  { code: 'DD',   label: '도면의 간단한 설명', value: '', type: 'text' },
+  // 번호·일자
+  { code: 'AN',   label: '출원번호',          value: '', type: 'text', hint: '1020080012345' },
+  { code: 'PN',   label: '공개번호/특허번호', value: '', type: 'text', hint: '1020100012345' },
+  { code: 'RN',   label: '등록번호',          value: '', type: 'text', hint: '1012345670000' },
+  { code: 'FN',   label: '공고번호',          value: '', type: 'text' },
   { code: 'AD',   label: '출원일',            value: '', type: 'date-range', dateFrom: '', dateTo: '', hint: '20080101 ~ 20081231' },
   { code: 'PD',   label: '공개일/특허일',     value: '', type: 'date-range', dateFrom: '', dateTo: '' },
   { code: 'RD',   label: '등록일',            value: '', type: 'date-range', dateFrom: '', dateTo: '' },
+  { code: 'FD',   label: '공고일',            value: '', type: 'date-range', dateFrom: '', dateTo: '' },
+  { code: 'PRN',  label: '우선권 번호',       value: '', type: 'text' },
+  { code: 'PRC',  label: '우선권 국가',       value: '', type: 'text' },
+  { code: 'PRD',  label: '우선권 주장일',     value: '', type: 'date-range', dateFrom: '', dateTo: '' },
+  { code: 'IPN',  label: '국제공개번호',      value: '', type: 'text' },
+  { code: 'IPD',  label: '국제공개일',        value: '', type: 'date-range', dateFrom: '', dateTo: '' },
+  { code: 'IAN',  label: '국제출원번호',      value: '', type: 'text' },
+  { code: 'IAD',  label: '국제출원일',        value: '', type: 'date-range', dateFrom: '', dateTo: '' },
+  { code: 'DC',   label: '지정국',            value: '', type: 'text' },
+  // 인명
+  { code: 'WAP',  label: '출원인 대표명화 코드', value: '', type: 'text' },
+  { code: 'AP',   label: '출원인',            value: '', type: 'text', hint: '엘지* | 119990527105' },
+  { code: 'APC',  label: '출원인 국적',       value: '', type: 'text' },
+  { code: 'APD',  label: '출원인 주소',       value: '', type: 'text', hint: '서울 | 용산' },
+  { code: 'INV',  label: '발명자',            value: '', type: 'text', hint: '김한국 | 김만*' },
+  { code: 'INVC', label: '발명자 국적',       value: '', type: 'text' },
+  { code: 'AG',   label: '대리인',            value: '', type: 'text', hint: '특허법인* | 김남구' },
+  { code: 'AGD',  label: '대리인 주소',       value: '', type: 'text' },
+  { code: 'EXN',  label: '심사관',            value: '', type: 'text' },
+  { code: 'AC',   label: '출원인 식별기호(JP)', value: '', type: 'text' },
+  { code: 'PCN',  label: '특허고객번호(KR)',  value: '', type: 'text' },
+  // 분류코드
+  { code: 'IPCM', label: 'IPC (Main)',        value: '', type: 'ipc', ipcScope: 'all', finderType: 'ipc', finderLabel: 'IPC 코드찾기', hint: 'H04L-009/18% | G06F*' },
+  { code: 'IPC',  label: 'IPC (All)',         value: '', type: 'ipc', ipcScope: 'all', finderType: 'ipc', finderLabel: 'IPC 코드찾기' },
+  { code: 'CPCM', label: 'CPC (Main)',        value: '', type: 'ipc', ipcScope: 'all', finderType: 'ipc', finderLabel: 'CPC 코드찾기', hint: 'C12P-0007/02% | C01C*' },
+  { code: 'CPC',  label: 'CPC (All)',         value: '', type: 'ipc', ipcScope: 'all', finderType: 'ipc', finderLabel: 'CPC 코드찾기' },
+  { code: 'UCM',  label: 'US Class (Main)',   value: '', type: 'text' },
+  { code: 'UC',   label: 'US Class (All)',    value: '', type: 'text' },
+  { code: 'FI',   label: 'FI (JP)',           value: '', type: 'text' },
+  { code: 'FTC',  label: 'F-term (JP)',       value: '', type: 'text' },
+  // 권리·실시권
+  { code: 'CAP',  label: '현재권리자',        value: '', type: 'text' },
+  { code: 'CAC',  label: '현재권리자 국적',   value: '', type: 'text' },
+  { code: 'ASY',  label: '양도유무(KR)',      value: '', type: 'text' },
+  { code: 'ASNO', label: '양도인',            value: '', type: 'text' },
+  { code: 'ASNE', label: '양수인',            value: '', type: 'text' },
+  { code: 'CAD',  label: '최근 양도일',       value: '', type: 'date-range', dateFrom: '', dateTo: '' },
+  { code: 'EL',   label: '실시권자(전용·KR)', value: '', type: 'text' },
+  { code: 'LRD',  label: '실시권/라이선스 등록일', value: '', type: 'date-range', dateFrom: '', dateTo: '' },
+  { code: 'LY',   label: '실시권 유무(KR)',   value: '', type: 'text' },
+  { code: 'JIC',  label: '심판유무',          value: '', type: 'text' },
+  { code: 'PLGE', label: '질권자',            value: '', type: 'text' },
+  // 인용·피인용
+  { code: 'BCC',  label: '특허인용 국가',     value: '', type: 'text' },
+  { code: 'BCN',  label: '특허인용 번호',     value: '', type: 'text' },
+  { code: 'FCC',  label: '특허피인용 국가',   value: '', type: 'text' },
+  { code: 'FCN',  label: '특허피인용 번호',   value: '', type: 'text' },
+  { code: 'NPCY', label: '비특허인용 유무',   value: '', type: 'text' },
+  { code: 'NPRD', label: '비특허 참고문헌',   value: '', type: 'text' },
+  // 국가연구개발(과제)
+  { code: 'NRTBT', label: '과제/연구사업 명칭', value: '', type: 'text' },
+  { code: 'NRTDO', label: '부처/주관기관 명칭', value: '', type: 'text' },
+  { code: 'NRTN',  label: '과제 고유번호',    value: '', type: 'text' },
+  { code: 'NRDS',  label: '과제 시작일',      value: '', type: 'date-range', dateFrom: '', dateTo: '' },
+  { code: 'NRDE',  label: '과제 종료일',      value: '', type: 'date-range', dateFrom: '', dateTo: '' },
+  // 표준·서열
+  { code: 'SEYN', label: '표준특허 유무',     value: '', type: 'text' },
+  { code: 'SEI',  label: '표준정보',          value: '', type: 'text' },
+  { code: 'SESO', label: '표준화기구',        value: '', type: 'text' },
+  { code: 'SET',  label: '표준기술명',        value: '', type: 'text' },
+  { code: 'SEN',  label: '표준번호',          value: '', type: 'text' },
+  { code: 'SED',  label: '선언(등재)자',      value: '', type: 'text' },
+  { code: 'SEDC', label: '선언(등재)자 국적', value: '', type: 'text' },
+  { code: 'SEDD', label: '선언일',            value: '', type: 'date-range', dateFrom: '', dateTo: '' },
+  { code: 'SEQY', label: '서열목록 유무',     value: '', type: 'text' },
+  { code: 'SEQC', label: '서열내용',          value: '', type: 'text' },
 ];
 
-// ── 검색필드 그룹 탭 ─────────────────────────────────────────
+// 초기 표시 필드(데모 기본 18개) — 나머지는 '검색 필드 추가'로 확장
+const INITIAL_FIELD_CODES = ['TI', 'AB', 'CL', 'CLI', 'CLA', 'DSC', 'IPCM', 'CPCM', 'AP', 'APD', 'INV', 'AG', 'AN', 'PN', 'RN', 'AD', 'PD', 'RD'];
+const INITIAL_FIELDS: SField[] = FIELD_CATALOG.filter(f => INITIAL_FIELD_CODES.includes(f.code));
+
+// ── 검색필드 그룹 탭 (데모 카탈로그 기준) ─────────────────────
 const FIELD_GROUPS = [
-  { id: '텍스트',   codes: ['TI', 'AB', 'CL', 'CLI', 'CLA', 'DSC'] },
-  { id: '분류코드', codes: ['IPCR', 'CPCR'] },
-  { id: '인명',     codes: ['AP', 'APD', 'INV', 'AG'] },
-  { id: '번호',     codes: ['AN', 'PN', 'RN'] },
-  { id: '일자',     codes: ['AD', 'PD', 'RD'] },
+  { id: '명칭·청구항·설명', codes: ['TI', 'AB', 'CL', 'CLI', 'CLA', 'KC', 'KWD', 'DSC', 'TF', 'BT', 'IE', 'SM', 'SP', 'DE', 'DD'] },
+  { id: '번호·일자',       codes: ['AN', 'PN', 'RN', 'FN', 'AD', 'PD', 'RD', 'FD', 'PRN', 'PRC', 'PRD', 'IPN', 'IPD', 'IAN', 'IAD', 'DC'] },
+  { id: '인명',            codes: ['WAP', 'AP', 'APC', 'APD', 'INV', 'INVC', 'AG', 'AGD', 'EXN', 'AC', 'PCN'] },
+  { id: '분류코드',        codes: ['IPCM', 'IPC', 'CPCM', 'CPC', 'UCM', 'UC', 'FI', 'FTC'] },
+  { id: '권리·실시권',     codes: ['CAP', 'CAC', 'ASY', 'ASNO', 'ASNE', 'CAD', 'EL', 'LRD', 'LY', 'JIC', 'PLGE'] },
+  { id: '인용',            codes: ['BCC', 'BCN', 'FCC', 'FCN', 'NPCY', 'NPRD'] },
+  { id: '국가R&D',         codes: ['NRTBT', 'NRTDO', 'NRTN', 'NRDS', 'NRDE'] },
+  { id: '표준·서열',       codes: ['SEYN', 'SEI', 'SESO', 'SET', 'SEN', 'SED', 'SEDC', 'SEDD', 'SEQY', 'SEQC'] },
 ] as const;
 
 // ── 토크나이저 ────────────────────────────────────────────────
@@ -208,8 +288,8 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
 
   // 검색필드 섹션 — 기본 접힘
   const [fieldsOpen, setFieldsOpen] = useState(false);
-  const [fieldGroup, setFieldGroup] = useState<string>('텍스트');
-  const [fields, setFields] = useState<SField[]>(DEFAULT_FIELDS);
+  const [fieldGroup, setFieldGroup] = useState<string>('명칭·청구항·설명');
+  const [fields, setFields] = useState<SField[]>(INITIAL_FIELDS);
 
   // 파인더
   const [finderOpen, setFinderOpen] = useState<{ type: FinderType; fieldIdx: number } | null>(null);
@@ -323,7 +403,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
 
   const resetAll = () => {
     setFormulaText('');
-    setFields(DEFAULT_FIELDS.map(f => ({ ...f, value: '', dateFrom: '', dateTo: '' })));
+    setFields(INITIAL_FIELDS.map(f => ({ ...f, value: '', dateFrom: '', dateTo: '' })));
   };
 
   // 현재 그룹 필드 (실제 fields 인덱스 포함)
@@ -703,20 +783,35 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
                 ⊕ 검색 필드 추가
               </button>
               {addFieldOpen && (
-                <div className="absolute z-20 left-0 right-0 bg-white border border-gray-200 rounded shadow-md mt-0.5 max-h-52 overflow-y-auto">
-                  {DEFAULT_FIELDS.filter(df => (groupCodes as readonly string[]).includes(df.code)).map(df => (
-                    <button
-                      key={df.code}
-                      onClick={() => {
-                        setFields(prev => [...prev, { ...df, value: '', dateFrom: '', dateTo: '' }]);
-                        setAddFieldOpen(false);
-                      }}
-                      className="w-full text-left flex items-center gap-2 px-3 py-1.5 text-sm2 hover:bg-gray-50"
-                    >
-                      <span className="text-xs2 font-mono font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded min-w-[40px] text-center shrink-0">{df.code}</span>
-                      <span className="text-gray-700">{df.label}</span>
-                    </button>
-                  ))}
+                <div className="absolute z-20 left-0 right-0 bg-white border border-gray-200 rounded shadow-md mt-0.5 max-h-80 overflow-y-auto">
+                  {(() => {
+                    const activeCodes = new Set(fields.map(f => f.code));
+                    return FIELD_GROUPS.map(g => {
+                      const addable = g.codes
+                        .map(code => FIELD_CATALOG.find(f => f.code === code))
+                        .filter((f): f is SField => !!f && !activeCodes.has(f.code));
+                      if (addable.length === 0) return null;
+                      return (
+                        <div key={g.id}>
+                          <div className="px-3 py-1 text-xs2 font-semibold text-gray-400 bg-gray-50 border-y border-gray-100 sticky top-0">{g.id}</div>
+                          {addable.map(df => (
+                            <button
+                              key={df.code}
+                              onClick={() => {
+                                setFields(prev => [...prev, { ...df, value: '', dateFrom: '', dateTo: '' }]);
+                                setFieldGroup(g.id);
+                                setAddFieldOpen(false);
+                              }}
+                              className="w-full text-left flex items-center gap-2 px-3 py-1.5 text-sm2 hover:bg-blue-50"
+                            >
+                              <span className="text-xs2 font-mono font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded min-w-[44px] text-center shrink-0">{df.code}</span>
+                              <span className="text-gray-700">{df.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               )}
             </div>
