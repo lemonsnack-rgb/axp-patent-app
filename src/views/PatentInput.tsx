@@ -293,6 +293,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
   // 파인더
   const [finderOpen, setFinderOpen] = useState<{ type: FinderType; fieldIdx: number } | null>(null);
   const [addFieldOpen, setAddFieldOpen] = useState(false);
+  const [pendingAddCodes, setPendingAddCodes] = useState<Set<string>>(new Set());
 
   // 국가 핸들러
   const toggleCountry = (code: string) => setCountries(prev => ({ ...prev, [code]: !prev[code] }));
@@ -766,49 +767,81 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
               ))}
             </div>
 
-            {/* 검색 필드 추가 */}
-            <div className="mt-2 mx-4 relative">
+            {/* 검색 필드 추가 (오버레이 모달) */}
+            <div className="mt-2 mx-4">
               <button
-                onClick={() => setAddFieldOpen(v => !v)}
+                onClick={() => { setPendingAddCodes(new Set()); setAddFieldOpen(true); }}
                 className="w-full flex items-center justify-center gap-1 text-sm2 text-gray-400 hover:text-brand-400 py-1.5 border border-dashed border-gray-200 rounded hover:border-brand-300 transition-colors"
               >
                 ⊕ 검색 필드 추가
               </button>
-              {addFieldOpen && (
-                <div className="absolute z-20 left-0 right-0 bg-white border border-gray-200 rounded shadow-md mt-0.5 max-h-80 overflow-y-auto">
-                  {(() => {
-                    const activeCodes = new Set(fields.map(f => f.code));
-                    return FIELD_GROUPS.map(g => {
-                      const addable = g.codes
-                        .map(code => FIELD_CATALOG.find(f => f.code === code))
-                        .filter((f): f is SField => !!f && !activeCodes.has(f.code));
-                      if (addable.length === 0) return null;
-                      return (
-                        <div key={g.id}>
-                          <div className="px-3 py-1 text-xs2 font-semibold text-gray-400 bg-gray-50 border-y border-gray-100 sticky top-0">{g.id}</div>
-                          {addable.map(df => (
-                            <button
-                              key={df.code}
-                              onClick={() => {
-                                setFields(prev => [...prev, { ...df, value: '', dateFrom: '', dateTo: '' }]);
-                                setAddFieldOpen(false);
-                              }}
-                              className="w-full text-left flex items-center gap-2 px-3 py-1.5 text-sm2 hover:bg-blue-50"
-                            >
-                              <span className="text-xs2 font-mono font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded min-w-[44px] text-center shrink-0">{df.code}</span>
-                              <span className="text-gray-700">{df.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              )}
             </div>
           </div>
         )}
       </div>
+
+      {/* 검색 필드 추가 오버레이 (키워트 방식 — 영역별 선택 후 적용) */}
+      {addFieldOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setAddFieldOpen(false)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[82vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 shrink-0">
+              <div className="text-base2 font-bold text-gray-800">검색 필드 추가</div>
+              <button onClick={() => setAddFieldOpen(false)} className="text-gray-400 hover:text-gray-700 text-lg leading-none">✕</button>
+            </div>
+            <div className="px-5 py-4 overflow-y-auto scroll-thin space-y-4 flex-1">
+              {(() => {
+                const activeCodes = new Set(fields.map(f => f.code));
+                return FIELD_GROUPS.map(g => (
+                  <div key={g.id}>
+                    <div className="text-sm2 font-semibold text-gray-600 mb-2 pb-1 border-b border-gray-100">{g.id}</div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                      {g.codes.map(code => {
+                        const df = FIELD_CATALOG.find(f => f.code === code);
+                        if (!df) return null;
+                        const added = activeCodes.has(df.code);
+                        const sel = pendingAddCodes.has(df.code);
+                        return (
+                          <button
+                            key={df.code}
+                            disabled={added}
+                            onClick={() => setPendingAddCodes(prev => { const n = new Set(prev); n.has(df.code) ? n.delete(df.code) : n.add(df.code); return n; })}
+                            className={clsx(
+                              'flex items-center gap-1.5 px-2 py-1.5 rounded border text-sm2 text-left transition-colors',
+                              added ? 'bg-gray-50 border-gray-200 text-gray-300 cursor-default'
+                                : sel ? 'bg-blue-50 border-blue-400 text-brand-400'
+                                : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300',
+                            )}
+                          >
+                            <span className="text-xs2 font-mono font-bold bg-gray-100 text-gray-500 px-1 py-0.5 rounded min-w-[42px] text-center shrink-0">{df.code}</span>
+                            <span className="truncate flex-1">{df.label}</span>
+                            {added ? <span className="text-xs2 shrink-0">추가됨</span> : sel ? <span className="text-xs2 shrink-0">✓</span> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 bg-gray-50 shrink-0">
+              <span className="text-sm2 text-gray-500">{pendingAddCodes.size}개 선택됨</span>
+              <div className="flex gap-2">
+                <Button variant="outlined" color="primary" size="sm" onClick={() => setAddFieldOpen(false)}>닫기</Button>
+                <Button
+                  variant="filled" color="primary" size="sm"
+                  disabled={pendingAddCodes.size === 0}
+                  onClick={() => {
+                    const toAdd = FIELD_CATALOG.filter(f => pendingAddCodes.has(f.code)).map(f => ({ ...f, value: '', dateFrom: '', dateTo: '' }));
+                    setFields(prev => [...prev, ...toAdd]);
+                    setAddFieldOpen(false);
+                    toast(`검색필드 ${toAdd.length}개 추가`);
+                  }}
+                >적용하기</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FinderModal */}
       {finderOpen && (
