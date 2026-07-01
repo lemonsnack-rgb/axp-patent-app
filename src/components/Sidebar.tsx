@@ -53,8 +53,9 @@ export function Sidebar() {
       className={clsx(
         'border-r border-zinc-200 bg-white flex flex-col shrink-0 transition-all duration-200 relative',
         sidebarCollapsed ? 'w-nav-c min-w-nav-c' : 'w-nav min-w-nav',
-        sidebarCollapsed && 'max-md:!w-0 max-md:!min-w-0 max-md:overflow-hidden max-md:border-0',
-        'max-md:z-30',
+        // 모바일: 콘텐츠를 밀어내지 않도록 오버레이(fixed)로 표시
+        'max-md:fixed max-md:top-[52px] max-md:left-0 max-md:bottom-0 max-md:z-30 max-md:w-nav max-md:min-w-nav max-md:shadow-2xl',
+        sidebarCollapsed ? 'max-md:-translate-x-full max-md:shadow-none' : 'max-md:translate-x-0',
       )}
     >
       <nav className="p-2 flex flex-col gap-0.5">
