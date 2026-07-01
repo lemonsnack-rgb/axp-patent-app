@@ -5,6 +5,7 @@ import clsx from 'clsx';
 import { Button } from '@muhayu/axp-ui';
 import { accumulateQuery, applyScope, type SFieldInput } from '../features/search';
 import { useStore } from '../store';
+import { Icon } from '../components/Icon';
 
 interface PField { code: string; label: string; value: string; hint?: string }
 
@@ -173,15 +174,18 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
       {/* 검색필드 패널 (검색창 바로 아래 — 입력이 검색식에 반영) */}
       <div className="border-t border-gray-200">
         <button onClick={() => setFieldsOpen(v => !v)}
-          className={clsx('w-full flex items-center justify-between px-4 py-2.5 text-sm2 font-semibold transition-colors',
-            fieldsOpen ? 'text-gray-700 hover:bg-gray-50' : 'text-brand-500 bg-blue-50/60 hover:bg-blue-50')}>
-          <span className="flex items-center gap-1.5">
-            <span className="text-brand-400 text-xs2">≡</span>
+          aria-expanded={fieldsOpen}
+          className={clsx('w-full flex items-center justify-between gap-2 px-4 py-2.5 text-sm2 font-semibold border-b transition-colors',
+            fieldsOpen ? 'text-gray-700 border-gray-100 hover:bg-gray-50' : 'text-brand-600 bg-blue-50 border-blue-100 hover:bg-blue-100')}>
+          <span className="flex items-center gap-1.5 min-w-0">
+            <Icon name="chevron-down" size={14} className={clsx('shrink-0 text-brand-400 transition-transform', fieldsOpen && 'rotate-180')} />
             항목별 검색필드
-            <span className="text-xs2 font-medium text-brand-400 bg-blue-100 px-1.5 py-0 rounded-full leading-5">{fields.length}</span>
-            {!fieldsOpen && <span className="text-xs2 font-normal text-gray-400">— 제목·초록·키워드·저자 등 필드별 검색</span>}
+            {!fieldsOpen && <span className="text-xs2 font-normal text-gray-500 truncate">— 제목·초록·키워드·저자 등 필드별 입력</span>}
           </span>
-          <span className="text-xs2 font-medium text-brand-400">{fieldsOpen ? '접기 ▲' : '펼치기 ▼'}</span>
+          <span className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-brand-300 bg-white text-xs2 font-semibold text-brand-500">
+            {fieldsOpen ? '접기' : '펼쳐서 입력'}
+            <Icon name="chevron-down" size={11} className={clsx('transition-transform', fieldsOpen && 'rotate-180')} />
+          </span>
         </button>
         {fieldsOpen && (
           <div className="px-4 pb-3 pt-1 space-y-px">
