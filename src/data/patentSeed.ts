@@ -176,7 +176,12 @@ function buildClaims(dm: Domain): { no: number; dependsOn?: number; text: string
     { no: 2, dependsOn: 1, text: `제2항. 제1항에 있어서, ${dm.deps[0]}을 특징으로 하는, ${dev}.` },
     { no: 3, dependsOn: 1, text: `제3항. 제1항에 있어서, ${dm.deps[1]}을 특징으로 하는, ${dev}.` },
     { no: 4, dependsOn: 2, text: `제4항. 제2항에 있어서, ${dm.deps[2]}을 특징으로 하는, ${dev}.` },
-    { no: 5, dependsOn: 1, text: `제5항. 제1항의 ${dev}를 이용하는, 동작 방법.` },
+    { no: 5, dependsOn: 1, text: `제5항. 제1항에 있어서, 상기 ${dev}는 ${dm.kw[0]} 데이터를 저장하는 메모리부를 더 포함하는 것을 특징으로 하는, ${dev}.` },
+    { no: 6, dependsOn: 1, text: `제6항. 제1항에 있어서, 상기 각 구성부는 상호 시간 동기화되어 동작하는 것을 특징으로 하는, ${dev}.` },
+    { no: 7, dependsOn: 1, text: `제7항. 제1항에 있어서, 상기 ${dev}의 처리 결과를 외부 장치로 전송하는 통신부를 더 포함하는, ${dev}.` },
+    { no: 8, text: `제8항. 제1 데이터를 획득하는 단계; 상기 제1 데이터를 전처리하는 단계; 및 전처리된 데이터로부터 결과를 산출하는 단계를 포함하는, ${dev}의 동작 방법.` },
+    { no: 9, dependsOn: 8, text: `제9항. 제8항에 있어서, ${dm.deps[0]}을 특징으로 하는, ${dev}의 동작 방법.` },
+    { no: 10, text: `제10항. 제8항의 방법을 컴퓨터에서 실행시키기 위한 프로그램이 기록된 컴퓨터로 읽을 수 있는 기록매체.` },
   ];
   return claims;
 }
@@ -213,29 +218,71 @@ function buildDetail(dm: Domain, isEn: boolean): { abstract: string; description
   const [p1, p2, p3] = dm.parts;
   const [d1, d2, d3] = dm.deps;
   if (isEn) {
-    const abstract = `${dm.abEn} The disclosed system comprises a first component (110), a second component (120), and a third component (130) operatively coupled to one another. Embodiments provide improved accuracy, robustness, and manufacturability over conventional approaches, and are validated across diverse operating conditions.`;
+    const abstract = `${dm.abEn} The disclosed system comprises a first component (110), a second component (120), and a third component (130) operatively coupled to one another. Embodiments provide improved accuracy, robustness, and manufacturability over conventional approaches, and are validated across diverse operating conditions, thereby achieving a favorable balance between processing speed and reliability.`;
     const description = [
-      `[0001] The present invention relates to ${dm.titleEn.toLowerCase()}, and more particularly to a system including a plurality of cooperating components.`,
-      `[0002] Conventional systems have suffered from limited accuracy and robustness, and it has been difficult to secure stable performance under diverse environmental conditions.`,
-      `[0003] An object of the present invention is to overcome these limitations and to provide a reliable and efficient solution.`,
-      `[0004] To achieve the above object, a system (100) according to an embodiment includes a first component (110), a second component (120), and a third component (130) operatively coupled to one another.`,
-      `[0005] In operation, the first component (110) acquires input data, the second component (120) performs preprocessing and transformation, and the third component (130) produces the final result. The components may be implemented in hardware, software, or a combination thereof.`,
-      `[0006] In one embodiment, additional features are provided to further improve performance. In another embodiment, alternative configurations are contemplated to suit particular applications.`,
-      `[0007] FIG. 1 illustrates the overall configuration of the system, and FIGS. 2 to 5 depict the operation of respective components and experimental results.`,
-      `[0008] According to the present invention, improved performance and practical industrial applicability are achieved, as demonstrated by the accompanying experimental data.`,
+      `[Technical Field]`,
+      `[0001] The present invention relates to ${dm.titleEn.toLowerCase()}, and more particularly to a system and a method of operating the same, the system including a plurality of components that cooperate to improve accuracy and robustness.`,
+      `[Background Art]`,
+      `[0002] In recent years, demand for ${dm.kw.slice(0, 2).join(' and ')} technologies has increased rapidly, and accordingly requirements for the performance and reliability of such systems have become more stringent.`,
+      `[0003] However, conventional systems have suffered from limited accuracy and robustness, and it has been difficult to secure stable performance under diverse environmental conditions.`,
+      `[0004] In particular, in the related art, processing speed and accuracy are in a trade-off relationship, which imposes constraints on applications requiring real-time operation.`,
+      `[Disclosure] [Technical Problem]`,
+      `[0005] The present invention has been made to solve the above-described problems of the related art, and an object thereof is to provide a reliable and efficient solution.`,
+      `[0006] The objects of the present invention are not limited to the objects mentioned above, and other objects not mentioned will be clearly understood by those skilled in the art from the following description.`,
+      `[Technical Solution]`,
+      `[0007] To achieve the above object, a system (100) according to an embodiment of the present invention includes a first component (110), a second component (120), and a third component (130) operatively coupled to one another.`,
+      `[0008] Specifically, the first component (110) acquires input data, the second component (120) performs preprocessing and transformation, and the third component (130) produces the final result. The components may be implemented in hardware, software, or a combination thereof.`,
+      `[Advantageous Effects]`,
+      `[0009] According to the present invention, improved performance and practical industrial applicability are achieved, as demonstrated by the accompanying experimental data.`,
+      `[Description of Drawings]`,
+      `[0010] FIG. 1 is a block diagram illustrating the overall configuration of the system, and FIGS. 2 to 5 illustrate detailed configurations, operations, and experimental results of the respective components.`,
+      `[Detailed Description]`,
+      `[0011] Hereinafter, embodiments of the present invention will be described in detail with reference to the accompanying drawings, such that those skilled in the art can readily implement the invention.`,
+      `[0012] Referring to FIG. 1, the system (100) includes the first component (110), the second component (120), and the third component (130).`,
+      `[0013] The first component (110) acquires input data from an external source and provides the acquired data to the second component (120). In one embodiment, the first component (110) may include a plurality of sensing or input units operating in synchronization with one another.`,
+      `[0014] The second component (120) preprocesses the data received from the first component (110) to remove noise and to normalize the data, and transforms the preprocessed data into a form suitable for subsequent processing.`,
+      `[0015] The third component (130) produces a final result based on the transformed data output from the second component (120), and may output the result to an external device via a communication unit.`,
+      `[0016] <Embodiment 1> In a first embodiment, the components are integrated on a single substrate to reduce latency.`,
+      `[0017] <Embodiment 2> In a second embodiment, the components are distributed across a plurality of devices connected over a network.`,
+      `[0018] <Experimental Example> The present inventors conducted experiments across multiple benchmark datasets, and confirmed that the proposed system consistently outperforms conventional approaches, as summarized in Table 1.`,
+      `[0019] <Modification> In another embodiment, at least one of the components may be replaced with an equivalent means performing the same function.`,
+      `[0020] Although the embodiments of the present invention have been described in detail above, the scope of the present invention is not limited thereto, and various modifications and improvements can be made by those skilled in the art without departing from the spirit of the invention.`,
     ].join('\n');
     return { abstract, description };
   }
-  const abstract = `${dm.abKo} 본 발명에 따른 ${dm.device}는 ${p1}, ${p2} 및 ${p3}를 포함하며, ${dm.sKo} 이를 통해 종래 기술 대비 성능과 신뢰성을 향상시키고, ${dm.eKo}`;
+  const abstract = `${dm.abKo} 본 발명에 따른 ${dm.device}는 ${p1}, ${p2} 및 ${p3}를 포함하며, ${dm.sKo} 이를 통해 종래 기술 대비 성능과 신뢰성을 향상시키고, 처리 속도와 정확도 사이의 균형을 달성한다. 본 발명에 따르면 ${dm.eKo}`;
   const description = [
-    `【0001】 본 발명은 ${dm.titleKo}에 관한 것으로, 보다 상세하게는 ${p1}, ${p2} 및 ${p3}를 포함하는 ${dm.device}에 관한 것이다.`,
-    `【0002】 종래의 ${dm.device}는 정확도와 견고성 측면에서 한계가 있었으며, 다양한 환경 조건에서 안정적인 성능을 확보하기 어려운 문제가 있었다.`,
-    `【0003】 본 발명이 해결하고자 하는 과제는 ${dm.pKo}`,
-    `【0004】 상기 과제를 해결하기 위하여, 본 발명의 일 실시예에 따른 ${dm.device}(100)는 ${p1}(110); ${p2}(120); 및 ${p3}(130)를 포함한다.`,
-    `【0005】 ${dm.sKo} 구체적으로, 제1 구성부(110)는 입력 데이터를 획득하고, 제2 구성부(120)는 전처리 및 변환을 수행하며, 제3 구성부(130)는 최종 결과를 산출한다.`,
-    `【0006】 일 실시예에서, ${d1}. 다른 실시예에서, ${d2}. 또 다른 실시예에서, ${d3}.`,
-    `【0007】 도 1은 ${dm.device}의 전체 구성을 나타내고, 도 2 내지 도 5는 각 구성부의 동작 및 실험 결과를 도시한다.`,
-    `【0008】 본 발명에 따르면 ${dm.eKo} 따라서 산업상 이용 가능성이 높다.`,
+    `[기술분야]`,
+    `【0001】 본 발명은 ${dm.titleKo}에 관한 것으로, 보다 상세하게는 ${p1}, ${p2} 및 ${p3}를 포함하는 ${dm.device} 및 그 동작 방법에 관한 것이다.`,
+    `[배경기술]`,
+    `【0002】 최근 ${dm.kw.slice(0, 2).join(' 및 ')} 기술의 수요가 급격히 증가함에 따라, ${dm.device}의 성능과 신뢰성에 대한 요구가 높아지고 있다.`,
+    `【0003】 그러나 종래의 ${dm.device}는 정확도와 견고성 측면에서 한계가 있었으며, 다양한 환경 조건에서 안정적인 성능을 확보하기 어려운 문제가 있었다.`,
+    `【0004】 특히 종래 기술은 처리 속도와 정확도가 상충(trade-off) 관계에 있어, 실시간성이 요구되는 응용 분야에 적용하기에 제약이 있었다.`,
+    `[선행기술문헌]`,
+    `【0005】 (특허문헌 1) 대한민국 공개특허공보 제10-XXXX-XXXXXXX호. (특허문헌 2) 미국 등록특허공보 US X,XXX,XXX B2.`,
+    `[발명의 개요] [해결하려는 과제]`,
+    `【0006】 본 발명은 상기와 같은 종래 기술의 문제점을 해결하기 위한 것으로, ${dm.pKo}`,
+    `【0007】 본 발명이 이루고자 하는 기술적 과제는 이상에서 언급한 과제로 제한되지 않으며, 언급되지 않은 또 다른 과제들은 아래의 기재로부터 통상의 기술자에게 명확하게 이해될 수 있을 것이다.`,
+    `[과제의 해결 수단]`,
+    `【0008】 상기 기술적 과제를 달성하기 위하여, 본 발명의 일 실시예에 따른 ${dm.device}(100)는 ${p1}(110); ${p2}(120); 및 ${p3}(130)를 포함한다.`,
+    `【0009】 ${dm.sKo}`,
+    `[발명의 효과]`,
+    `【0010】 본 발명에 따르면, ${dm.eKo}`,
+    `【0011】 본 발명의 효과는 이상에서 언급한 효과로 제한되지 않으며, 언급되지 않은 또 다른 효과들은 청구범위의 기재로부터 통상의 기술자에게 명확하게 이해될 수 있을 것이다.`,
+    `[도면의 간단한 설명]`,
+    `【0012】 도 1은 본 발명의 일 실시예에 따른 ${dm.device}의 전체 구성을 나타낸 블록도이다.`,
+    `【0013】 도 2 내지 도 5는 각각 ${dm.device}의 세부 구성 및 동작, 그리고 실험 결과를 도시한 도면이다.`,
+    `[발명을 실시하기 위한 구체적인 내용]`,
+    `【0014】 이하, 첨부된 도면을 참조하여 본 발명의 실시예를 통상의 기술자가 용이하게 실시할 수 있도록 상세히 설명한다.`,
+    `【0015】 도 1을 참조하면, ${dm.device}(100)는 ${p1}(110), ${p2}(120) 및 ${p3}(130)를 포함하여 구성된다.`,
+    `【0016】 제1 구성부(110)는 외부로부터 입력 데이터를 획득하여 제2 구성부(120)로 제공한다. 일 실시예에서, ${d1}.`,
+    `【0017】 제2 구성부(120)는 상기 제1 구성부(110)로부터 수신한 데이터의 노이즈를 제거하고 정규화한 후, 후속 처리에 적합한 형태로 변환한다. 일 실시예에서, ${d2}.`,
+    `【0018】 제3 구성부(130)는 상기 제2 구성부(120)에서 출력된 변환 데이터에 기초하여 최종 결과를 산출하며, 통신부를 통해 외부 장치로 결과를 출력할 수 있다. 일 실시예에서, ${d3}.`,
+    `【0019】 <실시예 1> 제1 실시예에서, 상기 구성부들은 단일 기판 상에 집적되어 지연 시간을 저감한다.`,
+    `【0020】 <실시예 2> 제2 실시예에서, 상기 구성부들은 네트워크로 연결된 복수의 장치에 분산 배치된다.`,
+    `【0021】 <실험예> 본 발명자들은 복수의 벤치마크 데이터셋에 대하여 실험을 수행하였으며, 그 결과 제안된 ${dm.device}가 종래 기술 대비 일관되게 우수한 성능을 나타냄을 확인하였다(표 1 참조).`,
+    `【0022】 <변형예> 다른 실시예에서, 상기 구성부 중 적어도 하나는 동일한 기능을 수행하는 균등 수단으로 대체될 수 있다.`,
+    `【0023】 이상에서 본 발명의 실시예에 대하여 상세하게 설명하였지만, 본 발명의 권리범위는 이에 한정되지 않고, 본 발명의 사상을 벗어나지 않는 범위에서 통상의 기술자에 의해 다양한 변형 및 개량이 가능하다.`,
   ].join('\n');
   return { abstract, description };
 }
