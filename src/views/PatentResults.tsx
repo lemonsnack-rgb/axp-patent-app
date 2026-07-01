@@ -480,7 +480,8 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                 />
               </th>
               <th className="w-16 px-2 py-2 text-center font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">상태</th>
-              <th className="w-52 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">문헌번호</th>
+              <th className="w-40 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">문헌번호</th>
+              <th className="w-14 px-2 py-2 text-center font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">원문</th>
               <th className="px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">발명의 명칭</th>
               <th className="w-32 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">출원인</th>
               <th className="w-24 px-2 py-2 text-left font-semibold text-gray-500 border-r border-gray-100 whitespace-nowrap">출원일</th>
@@ -513,14 +514,14 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                     <Badge color={statusColor} className="text-xs2 whitespace-nowrap">{d.status}</Badge>
                   </td>
                   <td className="px-2 py-2 align-top">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono text-xs2 text-brand-400 leading-snug">{d.number}</span>
-                      <button
-                        onClick={e => { e.stopPropagation(); downloadPatentPdf(d); }}
-                        className="shrink-0 inline-flex items-center gap-0.5 h-5 px-1.5 rounded border border-red-200 bg-red-50 text-red-500 text-xs2 font-semibold hover:bg-red-100 hover:border-red-400"
-                        title="특허 원문 PDF 다운로드"
-                      ><Icon name="doc" size={11} /> PDF</button>
-                    </div>
+                    <span className="font-mono text-xs2 text-brand-400 leading-snug">{d.number}</span>
+                  </td>
+                  <td className="px-2 py-2 text-center align-top" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => downloadPatentPdf(d)}
+                      className="inline-flex items-center justify-center text-red-500 hover:text-red-600"
+                      title="특허 원문 PDF 다운로드"
+                    ><Icon name="doc" size={15} /></button>
                   </td>
                   <td className="px-2 py-2 align-top">
                     <div className="flex items-start gap-1.5">
