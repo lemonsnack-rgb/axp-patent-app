@@ -166,8 +166,8 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
             className="flex-1 min-w-0 resize-y rounded border border-gray-300 p-2 font-mono text-sm leading-6 outline-none focus:border-blue-500 placeholder:text-gray-400"
           />
           <div className="shrink-0 w-[88px] flex flex-col gap-1.5">
-            <Button variant="filled" color="primary" size="sm" className="text-sm2 flex-1" disabled={!canSearch} onClick={handleSearch}>검색</Button>
-            <Button variant="outlined" color="primary" size="sm" className="text-sm2" onClick={resetAll}>초기화</Button>
+            <Button variant="filled" color="primary" size="sm" className="text-sm2 flex-1 !h-auto min-h-[36px]" disabled={!canSearch} onClick={handleSearch}>검색</Button>
+            <Button variant="outlined" color="primary" size="sm" className="text-sm2 shrink-0" onClick={resetAll}>초기화</Button>
           </div>
         </div>
       </div>

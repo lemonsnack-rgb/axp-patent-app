@@ -641,8 +641,8 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
               />
             </div>
             <div className="shrink-0 w-[88px] flex flex-col gap-1.5">
-              <Button variant="filled" color="primary" size="sm" className="text-sm2 flex-1" disabled={!canSearch} onClick={handleSearch}>검색</Button>
-              <Button variant="outlined" color="primary" size="sm" className="text-sm2" onClick={resetAll}>초기화</Button>
+              <Button variant="filled" color="primary" size="sm" className="text-sm2 flex-1 !h-auto min-h-[36px]" disabled={!canSearch} onClick={handleSearch}>검색</Button>
+              <Button variant="outlined" color="primary" size="sm" className="text-sm2 shrink-0" onClick={resetAll}>초기화</Button>
             </div>
           </div>
         )}
