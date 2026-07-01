@@ -162,11 +162,11 @@ interface Props {
 // 결과 화면의 "결과 내 검색"이 호출할 수 있도록 노출하는 핸들
 export interface PatentInputHandle { refine: (term: string) => void }
 
-// ── 스코프 탭 ────────────────────────────────────────────────
-const KEY_TABS: { id: ScopeTab; label: string }[] = [
-  { id: 'KEY_CLI', label: '명칭+요약+독립청구항' },
-  { id: 'KEY_CLA', label: '명칭+요약+전체청구항' },
-  { id: 'DSC',     label: '상세설명' },
+// ── 검색 범위 탭 (검색어를 어느 항목에서 찾을지) ──────────────
+const KEY_TABS: { id: ScopeTab; label: string; hint: string }[] = [
+  { id: 'KEY_CLI', label: '핵심 항목',   hint: '발명의 명칭·요약·독립청구항에서 검색 (가장 빠르고 정확)' },
+  { id: 'KEY_CLA', label: '청구항 전체', hint: '발명의 명칭·요약·전체청구항(독립+종속)에서 검색' },
+  { id: 'DSC',     label: '전문',        hint: '상세설명 본문 전체까지 포함해 검색 (가장 폭넓음)' },
 ];
 
 // ── Main ──────────────────────────────────────────────────────
@@ -449,33 +449,42 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
       {/* ── 검색식 입력 영역 ─────────────────────────────── */}
       <div className="p-4 space-y-2">
 
-        {/* 스코프 탭 + 모드 토글 */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex border border-gray-200 rounded-md overflow-hidden">
-            {KEY_TABS.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setKeyTab(tab.id)}
-                className={clsx(
-                  'px-3 py-1.5 text-sm2 font-medium border-r border-gray-200 last:border-r-0 transition-colors',
-                  keyTab === tab.id
-                    ? 'bg-brand-400 text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
+        {/* 검색 범위 + 입력 방식 */}
+        <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs2 font-semibold text-gray-500 shrink-0" title="검색어를 특허의 어느 부분에서 찾을지 선택합니다">검색 범위</span>
+            <div className="flex border border-gray-200 rounded-md overflow-hidden">
+              {KEY_TABS.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setKeyTab(tab.id)}
+                  title={tab.hint}
+                  className={clsx(
+                    'px-3 py-1.5 text-sm2 font-medium border-r border-gray-200 last:border-r-0 transition-colors',
+                    keyTab === tab.id
+                      ? 'bg-brand-400 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="inline-flex border border-gray-300 rounded-md overflow-hidden">
-            <button
-              onClick={() => setMode('normal')}
-              className={clsx('px-3 py-1.5 text-sm2 font-semibold', mode === 'normal' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600')}
-            >일반모드</button>
-            <button
-              onClick={() => setMode('editor')}
-              className={clsx('px-3 py-1.5 text-sm2 font-semibold', mode === 'editor' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600')}
-            >편집기모드</button>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs2 font-semibold text-gray-500 shrink-0" title="검색어 입력 방식을 선택합니다">입력 방식</span>
+            <div className="inline-flex border border-gray-300 rounded-md overflow-hidden">
+              <button
+                onClick={() => setMode('normal')}
+                title="키워드만 입력하면 자동으로 검색합니다 (초보자 권장)"
+                className={clsx('px-3 py-1.5 text-sm2 font-semibold', mode === 'normal' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600')}
+              >간편 검색</button>
+              <button
+                onClick={() => setMode('editor')}
+                title="AND·OR·NOT, 괄호, 와일드카드(*) 등 연산자로 검색식을 직접 작성합니다 (전문가용)"
+                className={clsx('px-3 py-1.5 text-sm2 font-semibold', mode === 'editor' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600')}
+              >검색식 직접작성</button>
+            </div>
           </div>
         </div>
 

@@ -5,6 +5,7 @@ import type { PatentResult, PatentCitation } from '../types';
 import { downloadPatentPdf } from '../features/patentPdf';
 import { Icon } from './Icon';
 import { Badge } from './ui';
+import { getPatentStatusDesc } from '../utils/badgeUtils';
 import { Button } from '@muhayu/axp-ui';
 
 export function parseKeywords(query: string): string[] {
@@ -138,7 +139,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
           {/* 특허명·기본사항 — 가장 상단 (탭보다 먼저) */}
           <div className="px-6 pt-4 pb-3 border-b border-gray-200 shrink-0">
             <div className="flex items-center gap-2 flex-wrap mb-1.5">
-              <Badge color={statusColor}>● {data.status}</Badge>
+              <span title={getPatentStatusDesc(data.status)} className="inline-block cursor-help"><Badge color={statusColor}>● {data.status}</Badge></span>
               <Badge color="brand">{data.country}</Badge>
               <span className="font-mono text-md2 font-semibold text-gray-600">{data.number}</span>
               {data.grade && <Badge color="brand">평가 {data.grade}</Badge>}

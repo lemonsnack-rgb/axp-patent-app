@@ -6,7 +6,7 @@ import { PATENT_FACET_GROUPS_BASE, type FacetGroup } from '../data/facetGroups';
 import { PatentDetail, parseKeywords, KW_COLORS } from '../components/PatentDetail';
 import { Icon } from '../components/Icon';
 import { toast, Button } from '@muhayu/axp-ui';
-import { getPatentStatusBadgeColor } from '../utils/badgeUtils';
+import { getPatentStatusBadgeColor, getPatentStatusDesc } from '../utils/badgeUtils';
 import { downloadPatentPdf } from '../features/patentPdf';
 import { Badge } from '../components/ui';
 import type { PatentResult } from '../types';
@@ -511,7 +511,9 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                     />
                   </td>
                   <td className="px-2 py-2 text-center align-top">
-                    <Badge color={statusColor} className="text-xs2 whitespace-nowrap">{d.status}</Badge>
+                    <span title={getPatentStatusDesc(d.status)} className="inline-block cursor-help">
+                      <Badge color={statusColor} className="text-xs2 whitespace-nowrap">{d.status}</Badge>
+                    </span>
                   </td>
                   <td className="px-2 py-2 align-top">
                     <span className="font-mono text-xs2 text-brand-400 leading-snug">{d.number}</span>
