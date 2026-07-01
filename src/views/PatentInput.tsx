@@ -540,17 +540,18 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
             <span className="text-xs2 font-semibold text-gray-500 shrink-0" title="검색어를 어떻게 입력할지 선택합니다">검색어 입력방식</span>
             <div className="inline-flex border border-gray-300 rounded-md overflow-hidden">
               <button
-                onClick={() => setMode('normal')}
-                title="키워드만 입력하면 자동으로 검색합니다 (초보자 권장)"
+                onClick={() => { setMode('normal'); setFieldsOpen(false); }}
+                title="하나의 검색식(키워드)을 입력해 검색합니다"
                 className={clsx('px-3 py-1.5 text-sm2 font-semibold', mode === 'normal' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600')}
-              >간편 검색</button>
+              >기본검색</button>
               <button
-                onClick={() => setMode('editor')}
-                title="AND·OR·NOT, 괄호, 와일드카드(*) 등 연산자로 검색식을 직접 작성합니다 (전문가용)"
+                onClick={() => { setMode('editor'); setFieldsOpen(true); }}
+                title="제목·초록·청구항 등 항목별 검색필드를 조합해 검색합니다"
                 className={clsx('px-3 py-1.5 text-sm2 font-semibold', mode === 'editor' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600')}
-              >검색식 직접작성</button>
+              >연산검색</button>
             </div>
           </div>
+          {mode === 'normal' && (
           <div className="flex items-center gap-1.5">
             <span className="text-xs2 font-semibold text-gray-500 shrink-0" title="검색어를 특허의 어느 부분에서 찾을지 선택합니다">검색 범위</span>
             <div className="flex border border-gray-200 rounded-md overflow-hidden">
@@ -571,6 +572,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
               ))}
             </div>
           </div>
+          )}
         </div>
 
         {/* FormulaEditor */}
