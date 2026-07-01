@@ -466,8 +466,8 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
         <Pagination current={page} total={totalPages} onChange={onPageChange} />
       </div>
 
-      {/* 테이블 (페이지 전체 스크롤) */}
-      <div className="bg-white">
+      {/* 테이블 (데스크톱) — 모바일에선 카드 리스트로 대체 */}
+      <div className="hidden md:block bg-white">
         <table className="w-full text-sm2 border-collapse">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -551,6 +551,42 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
         </table>
       </div>
 
+      {/* 모바일 카드 리스트 */}
+      <div className="md:hidden bg-white divide-y divide-gray-100">
+        {pageData.map((d, i) => {
+          const absIdx = startIdx + i;
+          const isSelected = selectedCard === absIdx;
+          const statusColor = getPatentStatusBadgeColor(d.status);
+          return (
+            <div
+              key={absIdx}
+              onClick={() => onSelectCard(absIdx)}
+              className={clsx('flex gap-2 px-3 py-2.5', isSelected ? 'bg-blue-50' : 'active:bg-gray-50')}
+            >
+              <input
+                type="checkbox"
+                onClick={e => e.stopPropagation()}
+                checked={checked.has(absIdx)}
+                onChange={() => onToggleCheck(absIdx)}
+                className="mt-1 shrink-0 form-checkbox text-brand-400 rounded w-4 h-4"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                  <span title={getPatentStatusDesc(d.status)}><Badge color={statusColor} className="text-xs2 whitespace-nowrap">{d.status}</Badge></span>
+                  <span className="font-mono text-xs2 text-brand-400">{d.number}</span>
+                </div>
+                <div className="text-sm2 font-medium text-gray-800 leading-snug">{highlightText(d.title, searchQuery)}</div>
+                <div className="text-xs2 text-gray-500 truncate mt-0.5">{d.applicant} · {d.applicationDate} · {d.ipc}</div>
+                <div className="flex items-center gap-3 mt-1.5">
+                  <button onClick={e => { e.stopPropagation(); downloadPatentPdf(d); }} className="text-xs2 text-red-500 inline-flex items-center gap-0.5"><Icon name="doc" size={12} /> 원문 PDF</button>
+                  <button onClick={e => { e.stopPropagation(); onOpenDetail(d.number); }} className="text-xs2 text-brand-400 inline-flex items-center gap-0.5">새 탭에서 열기 <Icon name="link" size={11} /></button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       {/* 하단 페이지네이션 */}
       <div className="flex justify-center py-2 border-t border-gray-100 bg-white shrink-0">
         <Pagination current={page} total={totalPages} onChange={onPageChange} />
@@ -558,7 +594,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
 
       {/* 우측 오버레이 상세 패널 (OpenAlex 방식 — 목록을 덮음) */}
       {selectedCard !== null && data[selectedCard] && (
-        <aside className="fixed top-[52px] right-0 bottom-0 z-40 w-[50%] min-w-[480px] max-w-[840px] border-l border-gray-200 bg-white flex flex-col overflow-hidden shadow-2xl">
+        <aside className="fixed top-[52px] right-0 bottom-0 z-40 w-full sm:w-[50%] sm:min-w-[480px] sm:max-w-[840px] border-l border-gray-200 bg-white flex flex-col overflow-hidden shadow-2xl">
           <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 border-b border-gray-200 shrink-0">
             <Button variant="outlined" color="primary" size="xs" className="px-1.5 disabled:opacity-30" disabled={selectedCard <= 0} onClick={() => onSelectCard(selectedCard - 1)} title="이전 (←)">◀</Button>
             <Button variant="outlined" color="primary" size="xs" className="px-1.5 disabled:opacity-30" disabled={selectedCard >= data.length - 1} onClick={() => onSelectCard(selectedCard + 1)} title="다음 (→)">▶</Button>

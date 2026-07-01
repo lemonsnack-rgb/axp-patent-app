@@ -510,7 +510,7 @@ export function PaperInlineDetail({
 }) {
   const altTitle = paper.language === 'KO' ? paper.titleEn : paper.titleKo;
   return (
-    <aside className="fixed top-[52px] right-0 bottom-0 z-40 w-[50%] min-w-[480px] max-w-[840px] border-l border-gray-200 bg-white flex flex-col overflow-hidden shadow-2xl">
+    <aside className="fixed top-[52px] right-0 bottom-0 z-40 w-full sm:w-[50%] sm:min-w-[480px] sm:max-w-[840px] border-l border-gray-200 bg-white flex flex-col overflow-hidden shadow-2xl">
       {/* 헤더 */}
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-100 shrink-0 bg-gray-50">
         <Button
