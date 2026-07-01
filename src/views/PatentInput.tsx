@@ -288,7 +288,6 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
 
   // 검색필드 섹션 — 기본 접힘
   const [fieldsOpen, setFieldsOpen] = useState(false);
-  const [fieldGroup, setFieldGroup] = useState<string>('명칭·청구항·설명');
   const [fields, setFields] = useState<SField[]>(INITIAL_FIELDS);
 
   // 파인더
@@ -406,11 +405,15 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
     setFields(INITIAL_FIELDS.map(f => ({ ...f, value: '', dateFrom: '', dateTo: '' })));
   };
 
-  // 현재 그룹 필드 (실제 fields 인덱스 포함)
-  const groupCodes = FIELD_GROUPS.find(g => g.id === fieldGroup)?.codes ?? [];
-  const visibleEntries = fields
-    .map((f, idx) => ({ f, idx }))
-    .filter(({ f }) => (groupCodes as readonly string[]).includes(f.code));
+  // 활성 검색필드를 섹션(그룹)별로 묶어 한 화면에 모두 표시 (탭으로 숨기지 않음)
+  const activeGroups = FIELD_GROUPS
+    .map(g => ({
+      id: g.id,
+      entries: fields
+        .map((f, idx) => ({ f, idx }))
+        .filter(({ f }) => (g.codes as readonly string[]).includes(f.code)),
+    }))
+    .filter(g => g.entries.length > 0);
 
   return (
     <div className="bg-white">
@@ -674,31 +677,17 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
         {fieldsOpen && (
           <div className="pb-3">
 
-            {/* 그룹 탭 */}
-            <div className="flex border-b border-gray-100 px-4 gap-0">
-              {FIELD_GROUPS.map(g => (
-                <button
-                  key={g.id}
-                  onClick={() => setFieldGroup(g.id)}
-                  className={clsx(
-                    'px-3 py-1.5 text-sm2 font-medium border-b-2 -mb-px transition-colors',
-                    fieldGroup === g.id
-                      ? 'border-brand-400 text-brand-400'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
-                  )}
-                >
-                  {g.id}
-                </button>
-              ))}
-            </div>
-
-            {/* 필드 목록 */}
-            <div className="px-4 pt-2 space-y-px">
-              {visibleEntries.map(({ f, idx }) => (
-                <div
-                  key={idx}
-                  className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-gray-50 group"
-                >
+            {/* 활성 검색필드 — 섹션(그룹)별로 한 화면에 모두 표시 */}
+            <div className="px-4 pt-2 space-y-3">
+              {activeGroups.map(group => (
+                <div key={group.id}>
+                  <div className="text-xs2 font-semibold text-gray-400 mb-1 pb-1 border-b border-gray-100">{group.id}</div>
+                  <div className="space-y-px">
+                  {group.entries.map(({ f, idx }) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-gray-50 group"
+                    >
                   {/* 코드 뱃지 */}
                   <span className="text-xs2 font-mono font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded shrink-0 min-w-[40px] text-center">
                     {f.code}
@@ -770,6 +759,9 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
                     className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 rounded shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                     title="필드 제거"
                   >×</button>
+                    </div>
+                  ))}
+                  </div>
                 </div>
               ))}
             </div>
@@ -799,7 +791,6 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
                               key={df.code}
                               onClick={() => {
                                 setFields(prev => [...prev, { ...df, value: '', dateFrom: '', dateTo: '' }]);
-                                setFieldGroup(g.id);
                                 setAddFieldOpen(false);
                               }}
                               className="w-full text-left flex items-center gap-2 px-3 py-1.5 text-sm2 hover:bg-blue-50"
