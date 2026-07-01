@@ -119,24 +119,7 @@ const FIELD_CATALOG: SField[] = [
   { code: 'SEQC', label: '서열내용',          value: '', type: 'text' },
 ];
 
-// 연산검색(행 기반 빌더)의 필드 선택 옵션 — 키워트 연산검색 방식
-const OP_FIELD_OPTIONS: { code: string; label: string }[] = [
-  { code: 'KEY',  label: '명칭+요약+독립항' },
-  { code: 'TAC',  label: '명칭+요약+전체청구항' },
-  { code: 'TI',   label: '발명의 명칭' },
-  { code: 'AB',   label: '요약' },
-  { code: 'CLI',  label: '독립청구항' },
-  { code: 'CLA',  label: '전체청구항' },
-  { code: 'DSC',  label: '상세설명' },
-  { code: 'AP',   label: '출원인' },
-  { code: 'INV',  label: '발명자' },
-  { code: 'AG',   label: '대리인' },
-  { code: 'IPCM', label: 'IPC' },
-  { code: 'CPCM', label: 'CPC' },
-  { code: 'AN',   label: '출원번호' },
-  { code: 'PN',   label: '공개/특허번호' },
-  { code: 'RN',   label: '등록번호' },
-];
+// 연산검색(행 기반 빌더)
 type OpRow = { op: 'AND' | 'OR' | 'NOT'; field: string; value: string };
 
 // 초기 표시 필드(데모 기본 18개) — 나머지는 '검색 필드 추가'로 확장
@@ -154,6 +137,17 @@ const FIELD_GROUPS = [
   { id: '국가R&D',         codes: ['NRTBT', 'NRTDO', 'NRTN', 'NRDS', 'NRDE'] },
   { id: '표준·서열',       codes: ['SEYN', 'SEI', 'SESO', 'SET', 'SEN', 'SED', 'SEDC', 'SEDD', 'SEQY', 'SEQC'] },
 ] as const;
+
+// 연산검색 필드 선택 모달 — 검색 범위 조합 + 전체 카탈로그(영역별)
+const OP_PICKER_GROUPS: { id: string; codes: string[] }[] = [
+  { id: '검색 범위', codes: ['KEY', 'TAC'] },
+  ...FIELD_GROUPS.map(g => ({ id: g.id, codes: [...g.codes] })),
+];
+function fieldLabelOf(code: string): string {
+  if (code === 'KEY') return '명칭+요약+독립항';
+  if (code === 'TAC') return '명칭+요약+전체청구항';
+  return FIELD_CATALOG.find(f => f.code === code)?.label ?? code;
+}
 
 // ── 토크나이저 ────────────────────────────────────────────────
 type TokenType = 'field' | 'operator' | 'colon' | 'paren' | 'keyword' | 'space';
@@ -316,12 +310,13 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
     { op: 'AND', field: 'DSC', value: '' },
   ]);
   const updateOpRow = (i: number, patch: Partial<OpRow>) => setOpRows(prev => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
-  const addOpRow = () => setOpRows(prev => [...prev, { op: 'AND', field: 'TI', value: '' }]);
   const removeOpRow = (i: number) => setOpRows(prev => prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev);
   const buildOpQuery = () => {
     const withVal = opRows.filter(r => r.value.trim());
     return withVal.map((r, i) => (i === 0 ? '' : `${r.op} `) + `${r.field}:(${r.value.trim()})`).join(' ');
   };
+  // 연산검색 필드 선택 모달: 숫자=해당 행 필드 변경, 'add'=조건(행) 추가(다중 선택)
+  const [opPickerFor, setOpPickerFor] = useState<number | 'add' | null>(null);
   const [fields, setFields] = useState<SField[]>(INITIAL_FIELDS);
 
   // 파인더
@@ -643,13 +638,14 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
                     <option value="NOT">NOT</option>
                   </select>
                 )}
-                <select
-                  value={r.field}
-                  onChange={e => updateOpRow(i, { field: e.target.value })}
-                  className="w-44 shrink-0 h-9 px-2 border border-gray-300 rounded text-sm2 bg-white outline-none focus:border-blue-400"
+                <button
+                  onClick={() => setOpPickerFor(i)}
+                  title="검색 필드 선택"
+                  className="w-44 shrink-0 h-9 px-2 border border-gray-300 rounded text-sm2 bg-white text-left flex items-center justify-between hover:border-blue-400"
                 >
-                  {OP_FIELD_OPTIONS.map(o => <option key={o.code} value={o.code}>{o.label}</option>)}
-                </select>
+                  <span className="truncate">{fieldLabelOf(r.field)}</span>
+                  <span className="text-gray-400 text-xs2 shrink-0 ml-1">▾</span>
+                </button>
                 <input
                   type="text"
                   value={r.value}
@@ -667,7 +663,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
               </div>
             ))}
             <button
-              onClick={addOpRow}
+              onClick={() => { setPendingAddCodes(new Set()); setOpPickerFor('add'); }}
               className="inline-flex items-center gap-1 mt-0.5 px-3 h-8 rounded border border-dashed border-gray-300 text-sm2 text-gray-500 hover:text-brand-400 hover:border-brand-300"
             >＋ 조건 추가</button>
           </div>
@@ -707,7 +703,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
           <span className="flex items-center gap-1.5">
             <span className="text-brand-400 text-xs2">≡</span>
             항목별 검색필드
-            <span className="text-xs2 font-medium text-brand-400 bg-blue-100 px-1.5 py-0 rounded-full leading-5">{fields.length}</span>
+            <span className="text-xs2 font-medium text-brand-400 bg-blue-100 px-1.5 py-0 rounded-full leading-5" title="현재 입력 가능한 검색필드 수">{fields.length}개</span>
             {!fieldsOpen && <span className="text-xs2 font-normal text-gray-400">— 제목·초록·청구항·출원인 등 필드별 검색</span>}
           </span>
           <span className="text-xs2 font-medium text-brand-400">{fieldsOpen ? '접기 ▲' : '펼치기 ▼'}</span>
@@ -873,6 +869,68 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* 연산검색 필드 선택 모달 (행 필드 변경 / 조건 추가) */}
+      {opPickerFor !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setOpPickerFor(null)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[82vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 shrink-0">
+              <div className="text-base2 font-bold text-gray-800">{opPickerFor === 'add' ? '검색 조건 추가 — 필드 선택' : '검색 필드 선택'}</div>
+              <button onClick={() => setOpPickerFor(null)} className="text-gray-400 hover:text-gray-700 text-lg leading-none">✕</button>
+            </div>
+            <div className="px-5 py-4 overflow-y-auto scroll-thin space-y-4 flex-1">
+              {OP_PICKER_GROUPS.map(g => (
+                <div key={g.id}>
+                  <div className="text-sm2 font-semibold text-gray-600 mb-2 pb-1 border-b border-gray-100">{g.id}</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                    {g.codes.map(code => {
+                      const sel = opPickerFor === 'add' && pendingAddCodes.has(code);
+                      return (
+                        <button
+                          key={code}
+                          onClick={() => {
+                            if (opPickerFor === 'add') {
+                              setPendingAddCodes(prev => { const n = new Set(prev); n.has(code) ? n.delete(code) : n.add(code); return n; });
+                            } else if (typeof opPickerFor === 'number') {
+                              updateOpRow(opPickerFor, { field: code });
+                              setOpPickerFor(null);
+                            }
+                          }}
+                          className={clsx(
+                            'flex items-center gap-1.5 px-2 py-1.5 rounded border text-sm2 text-left transition-colors',
+                            sel ? 'bg-blue-50 border-blue-400 text-brand-400' : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300',
+                          )}
+                        >
+                          {opPickerFor === 'add' && <input type="checkbox" checked={sel} readOnly tabIndex={-1} className="rounded border-gray-300 text-blue-600 pointer-events-none shrink-0" />}
+                          <span className="text-xs2 font-mono font-bold bg-gray-100 text-gray-500 px-1 py-0.5 rounded min-w-[42px] text-center shrink-0">{code}</span>
+                          <span className="truncate flex-1">{fieldLabelOf(code)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {opPickerFor === 'add' && (
+              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 bg-gray-50 shrink-0">
+                <span className="text-sm2 text-gray-500">{pendingAddCodes.size}개 선택</span>
+                <div className="flex gap-2">
+                  <Button variant="outlined" color="primary" size="sm" onClick={() => setOpPickerFor(null)}>닫기</Button>
+                  <Button
+                    variant="filled" color="primary" size="sm"
+                    disabled={pendingAddCodes.size === 0}
+                    onClick={() => {
+                      const codes = OP_PICKER_GROUPS.flatMap(g => g.codes).filter(c => pendingAddCodes.has(c));
+                      setOpRows(prev => [...prev, ...codes.map(c => ({ op: 'AND' as const, field: c, value: '' }))]);
+                      setOpPickerFor(null);
+                    }}
+                  >조건 추가</Button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
