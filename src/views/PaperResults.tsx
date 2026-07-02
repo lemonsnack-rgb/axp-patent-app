@@ -700,9 +700,9 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
       {/* 헤더 */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 bg-white shrink-0">
         <img src={CK_WORDMARK} alt="CK.Patent" className="h-6 w-auto object-contain" />
-        <Button variant="outlined" color="primary" size="sm" onClick={onClose}>탭 닫기</Button>
         <span className="flex-1" />
         <Button variant="filled" color="primary" size="sm" onClick={onSave}><Icon name="star" size={12} /> 라이브러리 저장</Button>
+        <Button variant="outlined" color="primary" size="sm" onClick={onClose}>탭 닫기</Button>
       </div>
 
       {/* 본문 — 중앙 정렬 + 데스크톱 2단 */}

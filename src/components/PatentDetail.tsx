@@ -364,14 +364,14 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
         {/* 헤더 — 논문 전체보기와 동일(닫기 + 저장 filled) */}
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 bg-white shrink-0">
           <img src={CK_WORDMARK} alt="CK.Patent" className="h-6 w-auto object-contain" />
-          <Button variant="outlined" color="primary" size="sm" onClick={onBack}>
-            {backIcon && <Icon name="arrow-left" size={13} />} {backLabel}
-          </Button>
           {onPrev && <Button variant="outlined" color="primary" size="sm" onClick={onPrev} title="이전">◀</Button>}
           {posLabel && <span className="text-sm2 text-gray-500 font-mono">{posLabel}</span>}
           {onNext && <Button variant="outlined" color="primary" size="sm" onClick={onNext} title="다음">▶</Button>}
           <span className="flex-1" />
           <Button variant="filled" color="primary" size="sm" onClick={onSave}><Icon name="star" size={12} /> 라이브러리 저장</Button>
+          <Button variant="outlined" color="primary" size="sm" onClick={onBack}>
+            {backIcon && <Icon name="arrow-left" size={13} />} {backLabel}
+          </Button>
         </div>
         {keywordBar}
         {/* 스크롤 페이지 — 가운데 정렬 문서 + 우측 도면 rail + 푸터 */}
