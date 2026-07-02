@@ -344,18 +344,22 @@ export function SpecView() {
             </div>
           )}
 
-          {/* Stepper — 에디터 컬럼 내부: 에디터 너비 기준으로 중앙 정렬 */}
-          <div className="relative flex items-center border-b border-ck-border shrink-0" style={{ height: 48 }}>
-            {(phase === 'flow' || phase === 'done') && (
-              <button
-                onClick={resetAnalysis}
-                className="absolute left-4 text-xs text-zinc-400 hover:text-red-500 transition-colors flex items-center gap-1 z-10"
-                title="처음부터 다시 시작"
-              >
-                ↺ 다시 시작
-              </button>
-            )}
-            <div className="flex items-center justify-center w-full overflow-x-auto scroll-thin px-2 md:px-24">
+          {/* Stepper — 3분할(다시시작 / 단계 / 진행표시)로 겹침 방지 */}
+          <div className="flex items-center border-b border-ck-border shrink-0 px-2 gap-1" style={{ height: 48 }}>
+            {/* 좌: 다시 시작 (고정 폭) */}
+            <div className="shrink-0 w-[76px] md:w-[84px]">
+              {(phase === 'flow' || phase === 'done') && (
+                <button
+                  onClick={resetAnalysis}
+                  className="text-xs text-zinc-400 hover:text-red-500 transition-colors flex items-center gap-1"
+                  title="처음부터 다시 시작"
+                >
+                  ↺ 다시 시작
+                </button>
+              )}
+            </div>
+            {/* 중앙: 단계 (스크롤) */}
+            <div className="flex-1 min-w-0 flex items-center justify-center overflow-x-auto scroll-thin">
               {STEPS.map((s, i) => {
                 const isDone = si(s.id) < si(curStep) && (phase === 'flow' || phase === 'done');
                 const active = s.id === curStep && (phase === 'flow' || phase === 'done');
@@ -401,12 +405,14 @@ export function SpecView() {
                 );
               })}
             </div>
-            {/* 진행 표시 (데스크톱·모바일 공통) */}
-            {(phase === 'flow' || phase === 'done') && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs2 font-medium text-zinc-400 pointer-events-none tabular-nums">
-                {STEPS.findIndex(s => s.id === curStep) + 1} / {STEPS.length}
-              </div>
-            )}
+            {/* 우: 진행 표시 (고정 폭) */}
+            <div className="shrink-0 w-[52px] text-right">
+              {(phase === 'flow' || phase === 'done') && (
+                <span className="text-xs2 font-medium text-zinc-400 tabular-nums">
+                  {STEPS.findIndex(s => s.id === curStep) + 1} / {STEPS.length}
+                </span>
+              )}
+            </div>
           </div>
 
         <div ref={flowRef} className="flex-1 overflow-y-auto scroll-thin bg-ck-bg">
@@ -783,7 +789,7 @@ export function SpecView() {
         {/* 모바일 전용: AI 어시스턴트 FAB */}
         {(phase === 'flow' || phase === 'done') && (
           <button
-            className="md:hidden fixed bottom-5 right-4 z-30 bg-brand-400 text-white rounded-full px-4 py-2.5 text-sm font-medium shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform"
+            className="md:hidden fixed bottom-20 right-4 z-30 bg-brand-400 text-white rounded-full px-4 py-2.5 text-sm font-medium shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform"
             onClick={() => setMobileGuideOpen(true)}
             aria-label="AI 어시스턴트 열기"
           >
