@@ -120,9 +120,6 @@ const FIELD_CATALOG: SField[] = [
   { code: 'SEQC', label: '서열내용',          value: '', type: 'text' },
 ];
 
-// 연산검색(행 기반 빌더)
-type OpRow = { op: 'AND' | 'OR' | 'NOT'; field: string; value: string; dateFrom?: string; dateTo?: string };
-
 // 초기 표시 필드(데모 기본 18개) — 나머지는 '검색 필드 추가'로 확장
 const INITIAL_FIELD_CODES = ['TI', 'AB', 'CL', 'CLI', 'CLA', 'DSC', 'IPCM', 'CPCM', 'AP', 'APD', 'INV', 'AG', 'AN', 'PN', 'RN', 'AD', 'PD', 'RD'];
 const INITIAL_FIELDS: SField[] = FIELD_CATALOG.filter(f => INITIAL_FIELD_CODES.includes(f.code));
@@ -138,25 +135,6 @@ const FIELD_GROUPS = [
   { id: '국가R&D',         codes: ['NRTBT', 'NRTDO', 'NRTN', 'NRDS', 'NRDE'] },
   { id: '표준·서열',       codes: ['SEYN', 'SEI', 'SESO', 'SET', 'SEN', 'SED', 'SEDC', 'SEDD', 'SEQY', 'SEQC'] },
 ] as const;
-
-// 연산검색 필드 선택 모달 — 검색 범위 조합 + 전체 카탈로그(영역별)
-const OP_PICKER_GROUPS: { id: string; codes: string[] }[] = [
-  { id: '검색 범위', codes: ['KEY', 'TAC'] },
-  ...FIELD_GROUPS.map(g => ({ id: g.id, codes: [...g.codes] })),
-];
-function fieldLabelOf(code: string): string {
-  if (code === 'KEY') return '명칭+요약+독립항';
-  if (code === 'TAC') return '명칭+요약+전체청구항';
-  return FIELD_CATALOG.find(f => f.code === code)?.label ?? code;
-}
-// 필드 타입 — 연산검색 입력형태(날짜=기간, ipc/텍스트=입력창)를 가변 적용
-function fieldTypeOf(code: string): 'text' | 'date-range' | 'ipc' {
-  if (code === 'KEY' || code === 'TAC') return 'text';
-  return FIELD_CATALOG.find(f => f.code === code)?.type ?? 'text';
-}
-function fieldHintOf(code: string): string {
-  return FIELD_CATALOG.find(f => f.code === code)?.hint ?? '검색어 입력 (and / or / not, 와일드카드 * 사용 가능)';
-}
 
 // ── 토크나이저 ────────────────────────────────────────────────
 type TokenType = 'field' | 'operator' | 'colon' | 'paren' | 'keyword' | 'space';
@@ -313,30 +291,6 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
   // 검색필드 섹션 — 기본 접힘
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [histPage, setHistPage] = useState(1);
-  // 연산검색 행 빌더 (키워트 연산검색)
-  const [opRows, setOpRows] = useState<OpRow[]>([
-    { op: 'AND', field: 'KEY', value: '' },
-    { op: 'AND', field: 'AP', value: '' },
-    { op: 'AND', field: 'DSC', value: '' },
-  ]);
-  const updateOpRow = (i: number, patch: Partial<OpRow>) => setOpRows(prev => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
-  const removeOpRow = (i: number) => setOpRows(prev => prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev);
-  const buildOpQuery = () => {
-    const parts = opRows.map(r => {
-      if (fieldTypeOf(r.field) === 'date-range') {
-        const from = (r.dateFrom || '').replace(/\D/g, '');
-        const to = (r.dateTo || '').replace(/\D/g, '');
-        if (!from && !to) return null;
-        return { op: r.op, clause: `${r.field}:([${from || '*'} ~ ${to || '*'}])` };
-      }
-      const v = r.value.trim();
-      if (!v) return null;
-      return { op: r.op, clause: `${r.field}:(${v})` };
-    }).filter((p): p is { op: OpRow['op']; clause: string } => !!p);
-    return parts.map((p, i) => (i === 0 ? '' : `${p.op} `) + p.clause).join(' ');
-  };
-  // 연산검색 필드 선택 모달: 숫자=해당 행 필드 변경, 'add'=조건(행) 추가(다중 선택)
-  const [opPickerFor, setOpPickerFor] = useState<number | 'add' | null>(null);
   const [fields, setFields] = useState<SField[]>(INITIAL_FIELDS);
 
   // 파인더
@@ -384,13 +338,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
   });
 
   const handleSearch = () => {
-    // 연산검색(행 빌더): 각 행의 [연산자][필드][검색어]를 조합해 실행
-    if (mode === 'editor') {
-      const execQuery = buildOpQuery();
-      searchHistoryAdd('patent', execQuery);
-      onRun(execQuery, buildMeta());
-      return;
-    }
+    // 일반/편집기 모드 모두 검색식(textarea/에디터) + 항목별 필드를 조합해 실행
     // 목업: 검색어가 없어도 검색 버튼만 누르면 전체 결과가 나오도록 허용
     const fieldInputs: SFieldInput[] = fields.map(f => ({
       code: f.code, type: f.type, value: f.value, dateFrom: f.dateFrom, dateTo: f.dateTo,
@@ -592,24 +540,8 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
       {/* ── 검색식 입력 영역 ─────────────────────────────── */}
       <div className="p-4 space-y-2">
 
-        {/* 검색어 입력방식(먼저) + 검색 범위 */}
+        {/* 검색 범위(두 모드 공통) + 검색어 입력방식(일반/편집기) — 데모(10.77.0.244) 모델 */}
         <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs2 font-semibold text-gray-500 shrink-0" title="검색어를 어떻게 입력할지 선택합니다">검색어 입력방식</span>
-            <div className="inline-flex border border-gray-300 rounded-md overflow-hidden">
-              <button
-                onClick={() => setMode('normal')}
-                title="하나의 검색식(키워드)을 입력해 검색합니다"
-                className={clsx('px-3 py-1.5 text-sm2 font-semibold', mode === 'normal' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600')}
-              >기본검색</button>
-              <button
-                onClick={() => setMode('editor')}
-                title="연산자(AND/OR/NOT)로 항목별 검색어를 조합해 검색합니다"
-                className={clsx('px-3 py-1.5 text-sm2 font-semibold', mode === 'editor' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600')}
-              >연산검색</button>
-            </div>
-          </div>
-          {mode === 'normal' && (
           <div className="flex items-center gap-1.5">
             <span className="text-xs2 font-semibold text-gray-500 shrink-0" title="검색어를 특허의 어느 부분에서 찾을지 선택합니다">검색 범위</span>
             <div className="flex border border-gray-200 rounded-md overflow-hidden">
@@ -630,93 +562,50 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
               ))}
             </div>
           </div>
-          )}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs2 font-semibold text-gray-500 shrink-0" title="검색식 입력 방식을 선택합니다">입력방식</span>
+            <div className="inline-flex border border-gray-300 rounded-md overflow-hidden">
+              <button
+                onClick={() => setMode('normal')}
+                title="여러 줄 검색식을 자유롭게 입력합니다"
+                className={clsx('px-3 py-1.5 text-sm2 font-semibold', mode === 'normal' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600')}
+              >일반모드</button>
+              <button
+                onClick={() => setMode('editor')}
+                title="구문 강조가 있는 검색식 편집기로 입력합니다"
+                className={clsx('px-3 py-1.5 text-sm2 font-semibold', mode === 'editor' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600')}
+              >편집기모드</button>
+            </div>
+          </div>
         </div>
 
-        {/* 기본검색: 자유 검색식 입력창 */}
-        {mode === 'normal' && (
-          <div className="flex items-stretch gap-2">
-            <div className="flex-1 min-w-0">
+        {/* 검색식 입력 (일반=단순 textarea / 편집기=구문강조 에디터) + 우측 검색·초기화 */}
+        <div className="flex items-stretch gap-2">
+          <div className="flex-1 min-w-0">
+            {mode === 'editor' ? (
               <FormulaEditor
                 value={formulaText}
                 onChange={setFormulaText}
                 rows={3}
                 placeholder="예: 하이브리드 and 자동차 | *수소 자동차*"
               />
-            </div>
-            <div className="shrink-0 w-[88px] flex flex-col gap-1.5">
-              <Button variant="filled" color="primary" size="sm" className="text-sm2 flex-1 !h-auto min-h-[36px]" disabled={!canSearch} onClick={handleSearch}>검색</Button>
-              <Button variant="outlined" color="primary" size="sm" className="text-sm2 shrink-0" onClick={resetAll}>초기화</Button>
-            </div>
+            ) : (
+              <textarea
+                value={formulaText}
+                onChange={e => setFormulaText(e.target.value)}
+                rows={3}
+                spellCheck={false}
+                placeholder="예: 하이브리드 and 자동차 | *수소 자동차*"
+                aria-label="특허 검색식 입력"
+                className="block w-full resize-y rounded border border-gray-300 p-2 font-mono text-sm leading-6 outline-none focus:border-blue-500 placeholder:text-gray-400"
+              />
+            )}
           </div>
-        )}
-
-        {/* 연산검색: 행 기반 빌더 (연산자 + 필드 선택 + 검색어) */}
-        {mode === 'editor' && (
-          <div className="space-y-1.5">
-            {opRows.map((r, i) => (
-              <div key={i} className="flex items-center gap-1.5">
-                {i === 0 ? (
-                  <span className="w-16 shrink-0 text-xs2 text-gray-400 text-center">조건</span>
-                ) : (
-                  <select
-                    value={r.op}
-                    onChange={e => updateOpRow(i, { op: e.target.value as OpRow['op'] })}
-                    className="w-16 shrink-0 h-9 px-1.5 border border-gray-300 rounded text-sm2 bg-white outline-none focus:border-blue-400 font-medium"
-                  >
-                    <option value="AND">AND</option>
-                    <option value="OR">OR</option>
-                    <option value="NOT">NOT</option>
-                  </select>
-                )}
-                <button
-                  onClick={() => setOpPickerFor(i)}
-                  title="검색 필드 선택"
-                  className="w-44 shrink-0 h-9 px-2 border border-gray-300 rounded text-sm2 bg-white text-left flex items-center justify-between hover:border-blue-400"
-                >
-                  <span className="truncate">{fieldLabelOf(r.field)}</span>
-                  <span className="text-gray-400 text-xs2 shrink-0 ml-1">▾</span>
-                </button>
-                {fieldTypeOf(r.field) === 'date-range' ? (
-                  <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                    <input
-                      type="date"
-                      value={r.dateFrom || ''}
-                      onChange={e => updateOpRow(i, { dateFrom: e.target.value })}
-                      className="flex-1 min-w-0 h-9 px-2 border border-gray-300 rounded text-sm2 outline-none focus:border-blue-400 font-mono"
-                    />
-                    <span className="text-gray-400 shrink-0">~</span>
-                    <input
-                      type="date"
-                      value={r.dateTo || ''}
-                      onChange={e => updateOpRow(i, { dateTo: e.target.value })}
-                      className="flex-1 min-w-0 h-9 px-2 border border-gray-300 rounded text-sm2 outline-none focus:border-blue-400 font-mono"
-                    />
-                  </div>
-                ) : (
-                  <input
-                    type="text"
-                    value={r.value}
-                    onChange={e => updateOpRow(i, { value: e.target.value })}
-                    onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
-                    placeholder={fieldHintOf(r.field)}
-                    className="flex-1 min-w-0 h-9 px-3 border border-gray-300 rounded text-sm2 outline-none focus:border-blue-400"
-                  />
-                )}
-                <button
-                  onClick={() => removeOpRow(i)}
-                  disabled={opRows.length <= 1}
-                  className="w-8 h-8 shrink-0 flex items-center justify-center rounded border border-gray-300 text-gray-400 hover:text-red-500 hover:border-red-300 disabled:opacity-30"
-                  title="조건 삭제"
-                >−</button>
-              </div>
-            ))}
-            <button
-              onClick={() => { setPendingAddCodes(new Set()); setOpPickerFor('add'); }}
-              className="inline-flex items-center gap-1 mt-0.5 px-3 h-8 rounded border border-dashed border-gray-300 text-sm2 text-gray-500 hover:text-brand-400 hover:border-brand-300"
-            >＋ 조건 추가</button>
+          <div className="shrink-0 w-[88px] flex flex-col gap-1.5">
+            <Button variant="filled" color="primary" size="sm" className="text-sm2 flex-1 !h-auto min-h-[36px]" disabled={!canSearch} onClick={handleSearch}>검색</Button>
+            <Button variant="outlined" color="primary" size="sm" className="text-sm2 shrink-0" onClick={resetAll}>초기화</Button>
           </div>
-        )}
+        </div>
 
         {/* 편집기모드 실시간 진단 (경고만, 실행은 막지 않음) [검색-11·12] */}
         {mode === 'editor' && formulaText.trim() && diagnose(formulaText).length > 0 && (
@@ -730,17 +619,10 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
           </div>
         )}
 
-        {/* 초기화 / 검색 — 연산검색은 행 빌더 하단에 배치(기본검색은 검색식 우측으로 이동) */}
-        {mode === 'editor' && (
-          <div className="flex justify-end gap-1.5">
-            <Button variant="outlined" color="primary" size="sm" className="text-sm2" onClick={resetAll}>초기화</Button>
-            <Button variant="filled" color="primary" size="sm" className="text-sm2" disabled={!canSearch} onClick={handleSearch}>검색</Button>
-          </div>
-        )}
       </div>
 
-      {/* ── 검색필드 섹션 (기본검색 전용 — 항목별 입력, 전부 AND 조합) ─────────────────────────── */}
-      {mode === 'normal' && (
+      {/* ── 검색필드 섹션 (두 모드 공통 — 항목별 입력, 전부 AND 조합) ─────────────────────────── */}
+      {(
       <div className="border-t border-gray-200">
 
         {/* 섹션 헤더 (아코디언 토글) — 클릭 가능함을 명확히 */}
@@ -925,68 +807,6 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
               )}
             </div>
           )}
-        </div>
-      )}
-
-      {/* 연산검색 필드 선택 모달 (행 필드 변경 / 조건 추가) */}
-      {opPickerFor !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setOpPickerFor(null)}>
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[82vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 shrink-0">
-              <div className="text-base2 font-bold text-gray-800">{opPickerFor === 'add' ? '검색 조건 추가 — 필드 선택' : '검색 필드 선택'}</div>
-              <button onClick={() => setOpPickerFor(null)} className="text-gray-400 hover:text-gray-700 text-lg leading-none">✕</button>
-            </div>
-            <div className="px-5 py-4 overflow-y-auto scroll-thin space-y-4 flex-1">
-              {OP_PICKER_GROUPS.map(g => (
-                <div key={g.id}>
-                  <div className="text-sm2 font-semibold text-gray-600 mb-2 pb-1 border-b border-gray-100">{g.id}</div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                    {g.codes.map(code => {
-                      const sel = opPickerFor === 'add' && pendingAddCodes.has(code);
-                      return (
-                        <button
-                          key={code}
-                          onClick={() => {
-                            if (opPickerFor === 'add') {
-                              setPendingAddCodes(prev => { const n = new Set(prev); n.has(code) ? n.delete(code) : n.add(code); return n; });
-                            } else if (typeof opPickerFor === 'number') {
-                              updateOpRow(opPickerFor, { field: code });
-                              setOpPickerFor(null);
-                            }
-                          }}
-                          className={clsx(
-                            'flex items-center gap-1.5 px-2 py-1.5 rounded border text-sm2 text-left transition-colors',
-                            sel ? 'bg-blue-50 border-blue-400 text-brand-400' : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300',
-                          )}
-                        >
-                          {opPickerFor === 'add' && <input type="checkbox" checked={sel} readOnly tabIndex={-1} className="rounded border-gray-300 text-blue-600 pointer-events-none shrink-0" />}
-                          <span className="text-xs2 font-mono font-bold bg-gray-100 text-gray-500 px-1 py-0.5 rounded min-w-[42px] text-center shrink-0">{code}</span>
-                          <span className="truncate flex-1">{fieldLabelOf(code)}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-            {opPickerFor === 'add' && (
-              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 bg-gray-50 shrink-0">
-                <span className="text-sm2 text-gray-500">{pendingAddCodes.size}개 선택</span>
-                <div className="flex gap-2">
-                  <Button variant="outlined" color="primary" size="sm" onClick={() => setOpPickerFor(null)}>닫기</Button>
-                  <Button
-                    variant="filled" color="primary" size="sm"
-                    disabled={pendingAddCodes.size === 0}
-                    onClick={() => {
-                      const codes = OP_PICKER_GROUPS.flatMap(g => g.codes).filter(c => pendingAddCodes.has(c));
-                      setOpRows(prev => [...prev, ...codes.map(c => ({ op: 'AND' as const, field: c, value: '' }))]);
-                      setOpPickerFor(null);
-                    }}
-                  >조건 추가</Button>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       )}
 
