@@ -777,6 +777,15 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     content: (blocks[s.id] ?? []).join('\n\n'),
   })).filter(s => s.content.trim());
 
+  // 내보내기용 도면 — 명세서에 포함(useForSpec)된 도면을 data URI로
+  const exportDrawings = drawings
+    .filter(d => d.included !== false && d.useForSpec && d.image?.file?.data)
+    .map((d, i) => ({
+      symbol: String(d.detail.symbol).replace(/\D/g, '') || String(i + 1),
+      name: d.detail.name,
+      dataUrl: `data:${d.image.file.media_type};base64,${d.image.file.data}`,
+    }));
+
   return (
     <>
     {editorPreviewOpen && (
@@ -897,12 +906,12 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
             <span>미리보기</span>
           </button>
-          <button onClick={() => exportDocx(task?.name ?? '명세서', editorPreviewSections)} title="DOCX 내보내기"
+          <button onClick={() => exportDocx(task?.name ?? '명세서', editorPreviewSections, exportDrawings)} title="DOCX 내보내기 (도면 포함)"
             className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 transition-colors text-zinc-600 text-xs2 font-medium">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><path d="M9 2v4h4"/><path d="M5 9h6M5 11h4"/></svg>
             <span>DOCX</span>
           </button>
-          <button onClick={() => exportPdf(task?.name ?? '명세서', editorPreviewSections)} title="PDF 내보내기 (인쇄)"
+          <button onClick={() => exportPdf(task?.name ?? '명세서', editorPreviewSections, exportDrawings)} title="PDF 내보내기 (도면 포함, 인쇄)"
             className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 transition-colors text-zinc-600 text-xs2 font-medium">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><path d="M9 2v4h4"/><path d="M5.5 9.5h5M5.5 11.5h3"/></svg>
             <span>PDF</span>

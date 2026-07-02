@@ -215,6 +215,16 @@ export function SpecView() {
     const p = { ...confirmed }; delete p[id];
     setConfirmed(p); setCurStep(id); setGuideStep(id);
   };
+  // 진행표시(Stepper) 클릭 이동 — 방문한 단계로 스크롤(확정 내용은 보존)
+  const gotoFlowStep = (id: StepId) => {
+    if (!(phase === 'flow' || phase === 'done') || si(id) > si(curStep)) return;
+    setGuideStep(id);
+    if (id === 'upload') { flowRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    requestAnimationFrame(() => {
+      flowRef.current?.querySelector<HTMLElement>(`[data-flowstep="${id}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
   const startFlow = (override?: { title: string; field: string; content: string }) => {
     const title   = override?.title   ?? diTitle.trim();
     const field   = override?.field   ?? diField.trim();
@@ -351,17 +361,23 @@ export function SpecView() {
                 const active = s.id === curStep && (phase === 'flow' || phase === 'done');
                 const locked = phase !== 'flow' && phase !== 'done' && s.id !== 'upload';
                 const prevDone = i > 0 && si(STEPS[i - 1].id) < si(curStep) && (phase === 'flow' || phase === 'done');
+                const navigable = (phase === 'flow' || phase === 'done') && si(s.id) <= si(curStep);
                 return (
                   <div key={s.id} className="flex items-center shrink-0">
                     {i > 0 && (
                       <div className={clsx('h-0.5 shrink-0 mx-1', prevDone ? 'bg-green-500' : 'bg-gray-200')}
                         style={{ width: 20 }} />
                     )}
-                    <div
+                    <button
+                      type="button"
+                      onClick={() => gotoFlowStep(s.id)}
+                      disabled={!navigable}
+                      title={navigable ? `${s.label}(으)로 이동` : locked ? '이전 단계를 먼저 완료하세요' : s.label}
                       className={clsx(
-                        'flex items-center gap-1.5 px-3 py-1 rounded-full border cursor-default select-none',
+                        'flex items-center gap-1.5 px-3 py-1 rounded-full border select-none transition-colors',
                         active && 'border-blue-200 bg-blue-50',
                         !active && 'border-transparent',
+                        navigable ? 'cursor-pointer hover:bg-gray-100' : 'cursor-default',
                         locked && 'opacity-60',
                       )}>
                       <span className={clsx(
@@ -380,14 +396,14 @@ export function SpecView() {
                         locked && 'text-gray-400',
                         !active && !isDone && !locked && 'text-gray-500',
                       )}>{s.label}</span>
-                    </div>
+                    </button>
                   </div>
                 );
               })}
             </div>
-            {/* 모바일 전용 진행 표시 */}
+            {/* 진행 표시 (데스크톱·모바일 공통) */}
             {(phase === 'flow' || phase === 'done') && (
-              <div className="md:hidden absolute right-3 top-1/2 -translate-y-1/2 text-xs2 text-zinc-400 pointer-events-none">
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs2 font-medium text-zinc-400 pointer-events-none tabular-nums">
                 {STEPS.findIndex(s => s.id === curStep) + 1} / {STEPS.length}
               </div>
             )}
@@ -534,7 +550,7 @@ export function SpecView() {
                   if (!isVisible(s.id)) return null;
                   const isDone = si(s.id) < si(curStep) && (phase === 'flow' || phase === 'done');
                   return (
-                    <div key={s.id} className="space-y-3">
+                    <div key={s.id} data-flowstep={s.id} className="space-y-3 scroll-mt-3">
                       <AiMsg text={
                         isSpecialStep(s.id) ? (
                           <><strong>{STEP_LABEL[s.id]}</strong><br />
