@@ -1,5 +1,6 @@
 // Sheet 3 사양 — 특허 상세 페이지
 import { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import type { PatentResult, PatentCitation } from '../types';
 import { downloadPatentPdf } from '../features/patentPdf';
@@ -118,7 +119,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
         <span className="font-mono text-md2 font-semibold text-gray-600">{data.number}</span>
         {data.grade && <Badge color="brand">평가 {data.grade}</Badge>}
       </div>
-      <h2 className="text-xl font-bold text-gray-800 leading-snug">{data.title}</h2>
+      <h2 className="text-2xl font-bold text-gray-800 leading-snug">{data.title}</h2>
       {/* 제목 하단 액션 링크 — 논문(원문 보기/본문 보기)과 동일 패턴 */}
       <div className="flex flex-wrap items-center gap-2 mt-3">
         <Button variant="filled" color="primary" size="sm" className="text-xs2 h-8" onClick={() => downloadPatentPdf(data)} title="특허 원문 PDF 다운로드">
@@ -729,8 +730,8 @@ function DrawingZoomModal({ figures, refSigns, index, onIndex, onClose }: {
   }, [index, figures.length, onIndex, onClose]);
 
   const fig = figures[index];
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-6" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-[80] bg-black/60 flex items-center justify-center p-6" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* 헤더 + 줌 컨트롤 */}
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 bg-gray-50 shrink-0">
@@ -788,7 +789,8 @@ function DrawingZoomModal({ figures, refSigns, index, onIndex, onClose }: {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

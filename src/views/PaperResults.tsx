@@ -710,13 +710,11 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
         <div className="mx-auto max-w-7xl px-6 lg:px-8 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             <main className="lg:col-span-8 min-w-0 space-y-6">
-          {/* 콘텐츠 카드 — 회색 페이지 위 흰색 영역(OpenAlex) */}
+          {/* 제목 카드(hero) — 특허와 동일: 제목 + 대등제목 + 하단 액션 링크 */}
           <div className="bg-white border border-gray-200 rounded-xl p-6 lg:p-8">
-          {/* 제목 — 원제목(원문) + 대등제목(다른 언어). 레이블 없음 */}
-          <header className="pb-4 mb-2 border-b border-gray-100">
-            <h1 className="text-3xl font-bold text-gray-900 leading-tight text-balance">{paper.title}</h1>
+            <h1 className="text-2xl font-bold text-gray-900 leading-snug text-balance">{paper.title}</h1>
             {altTitle && altTitle !== paper.title && (
-              <div className="text-lg text-gray-500 mt-2 leading-snug">{altTitle}</div>
+              <div className="text-base2 text-gray-500 mt-2 leading-snug">{altTitle}</div>
             )}
             {/* 링크 — 제목 하단 (원문/본문) */}
             <div className="flex flex-wrap items-center gap-2 mt-4">
@@ -734,62 +732,70 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
                 <Icon name="doc" size={12} /> 본문 보기 <span className="bg-gray-100 text-gray-500 rounded px-1">내부 전용</span>
               </button>
             </div>
-          </header>
-
-          {/* 메타데이터 — OpenAlex 방식: 레이블 값 명시적 구분 */}
-          <dl className="divide-y divide-gray-100">
-            <MetaRow label="저자명">
-              {paper.authors || '-'}
-              {paper.authorsEn && paper.authorsEn !== paper.authors && <span className="text-gray-400"> ({paper.authorsEn})</span>}
-            </MetaRow>
-            <MetaRow label="발행일">{pubDate(paper)}</MetaRow>
-            {paper.paperType === 'thesis' ? (
-              <MetaRow label="학위수여기관">{paper.institution || '-'}</MetaRow>
-            ) : (
-              <>
-                <MetaRow label="저널명">{paper.journal || '-'}</MetaRow>
-                <MetaRow label="저널명(영문)">{paper.journalEn || '-'}</MetaRow>
-              </>
-            )}
-            <MetaRow label="분야">{paper.field || '-'}</MetaRow>
-            <MetaRow label="키워드">
-              {paper.keywords && paper.keywords.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {paper.keywords.map(k => <span key={k} className="text-xs2 px-2 py-0.5 bg-blue-50 text-brand-400 border border-blue-100 rounded-full">{k}</span>)}
-                </div>
-              ) : '-'}
-            </MetaRow>
-            <MetaRow label="초록" block>{paper.abstract || '-'}</MetaRow>
-            <MetaRow label="영문초록" block>{paper.abstractEn || '-'}</MetaRow>
-          </dl>
           </div>
 
-          {/* 관련 논문 — 검색결과 상위(한 줄씩), 하단 */}
-          {related.length > 0 && (
-            <section className="bg-white border border-gray-200 rounded-xl p-6 lg:p-8">
-              <h2 className="text-base2 font-bold text-gray-800 mb-3">관련 논문 <span className="text-sm2 font-normal text-gray-400">· 검색결과 상위 {related.length}건</span></h2>
-              <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
-                {related.map((r, i) => (
-                  <button
-                    key={r.id}
-                    onClick={() => onOpenRelated?.(r.id)}
-                    disabled={!onOpenRelated}
-                    className="w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-blue-50/40 transition-colors disabled:cursor-default group"
-                  >
-                    <span className="text-xs2 font-mono text-gray-400 w-5 shrink-0 pt-0.5">{i + 1}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm2 font-semibold text-gray-800 group-hover:text-brand-400 truncate">{r.title}</div>
-                      <div className="text-xs2 text-gray-500 truncate mt-0.5">
-                        {paperMetaLine(r)}
-                      </div>
+          {/* 본문 카드 — 스크롤 시 압축 제목 고정(탭 없음), 메타데이터+관련논문 포함 */}
+          <div className="bg-white border border-gray-200 rounded-xl">
+            {/* 압축 제목 줄(sticky) — 특허와 동일 패턴, 탭만 없음 */}
+            <div className="sticky top-0 z-20 bg-white rounded-t-xl border-b border-gray-100 px-6 py-2.5 min-w-0">
+              <span className="block truncate text-sm2 font-semibold text-gray-700">{paper.title}</span>
+            </div>
+            <div className="p-6 lg:p-8 pt-5">
+              {/* 메타데이터 — OpenAlex 방식: 레이블 값 명시적 구분 */}
+              <dl className="divide-y divide-gray-100">
+                <MetaRow label="저자명">
+                  {paper.authors || '-'}
+                  {paper.authorsEn && paper.authorsEn !== paper.authors && <span className="text-gray-400"> ({paper.authorsEn})</span>}
+                </MetaRow>
+                <MetaRow label="발행일">{pubDate(paper)}</MetaRow>
+                {paper.paperType === 'thesis' ? (
+                  <MetaRow label="학위수여기관">{paper.institution || '-'}</MetaRow>
+                ) : (
+                  <>
+                    <MetaRow label="저널명">{paper.journal || '-'}</MetaRow>
+                    <MetaRow label="저널명(영문)">{paper.journalEn || '-'}</MetaRow>
+                  </>
+                )}
+                <MetaRow label="분야">{paper.field || '-'}</MetaRow>
+                <MetaRow label="키워드">
+                  {paper.keywords && paper.keywords.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {paper.keywords.map(k => <span key={k} className="text-xs2 px-2 py-0.5 bg-blue-50 text-brand-400 border border-blue-100 rounded-full">{k}</span>)}
                     </div>
-                    {r.field && <span className="shrink-0 text-xs2 px-1.5 py-0.5 bg-blue-50 text-brand-400 rounded self-center">{r.field}</span>}
-                    {onOpenRelated && <span className="shrink-0 text-xs2 text-gray-300 group-hover:text-brand-400 self-center">열기 →</span>}
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
+                  ) : '-'}
+                </MetaRow>
+                <MetaRow label="초록" block>{paper.abstract || '-'}</MetaRow>
+                <MetaRow label="영문초록" block>{paper.abstractEn || '-'}</MetaRow>
+              </dl>
+
+              {/* 관련 논문 — 검색결과 상위(한 줄씩) */}
+              {related.length > 0 && (
+                <section className="mt-6 pt-6 border-t border-gray-100">
+                  <h2 className="text-base2 font-bold text-gray-800 mb-3">관련 논문 <span className="text-sm2 font-normal text-gray-400">· 검색결과 상위 {related.length}건</span></h2>
+                  <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
+                    {related.map((r, i) => (
+                      <button
+                        key={r.id}
+                        onClick={() => onOpenRelated?.(r.id)}
+                        disabled={!onOpenRelated}
+                        className="w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-blue-50/40 transition-colors disabled:cursor-default group"
+                      >
+                        <span className="text-xs2 font-mono text-gray-400 w-5 shrink-0 pt-0.5">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm2 font-semibold text-gray-800 group-hover:text-brand-400 truncate">{r.title}</div>
+                          <div className="text-xs2 text-gray-500 truncate mt-0.5">
+                            {paperMetaLine(r)}
+                          </div>
+                        </div>
+                        {r.field && <span className="shrink-0 text-xs2 px-1.5 py-0.5 bg-blue-50 text-brand-400 rounded self-center">{r.field}</span>}
+                        {onOpenRelated && <span className="shrink-0 text-xs2 text-gray-300 group-hover:text-brand-400 self-center">열기 →</span>}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+          </div>
             </main>
 
             {/* 우측 — 인용정보 복사 영역 */}
