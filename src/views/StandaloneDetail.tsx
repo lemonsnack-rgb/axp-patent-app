@@ -16,15 +16,13 @@ export function StandaloneDetail() {
     const data = PATENT_SEED.find(p => p.number === params.key);
     if (!data) return <NotFound message={`특허를 찾을 수 없습니다: ${params.key}`} />;
     return (
-      <div className="flex flex-col h-screen overflow-hidden bg-white">
-        <PatentDetail
-          data={data}
-          backLabel="탭 닫기"
-          backIcon={false}
-          onBack={() => window.close()}
-          onSave={() => toast('저장은 검색 결과 화면에서 진행해 주세요.')}
-        />
-      </div>
+      <PatentDetail
+        data={data}
+        backLabel="탭 닫기"
+        backIcon={false}
+        onBack={() => window.close()}
+        onSave={() => toast('저장은 검색 결과 화면에서 진행해 주세요.')}
+      />
     );
   }
 

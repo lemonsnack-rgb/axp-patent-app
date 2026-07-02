@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import type { PatentResult, PatentCitation } from '../types';
 import { downloadPatentPdf } from '../features/patentPdf';
 import { Icon } from './Icon';
+import { DetailFooter } from './DetailFooter';
 import { Badge } from './ui';
 import { getPatentStatusDesc } from '../utils/badgeUtils';
 import { Button } from '@muhayu/axp-ui';
@@ -79,112 +80,87 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
     setActiveTab(key);
   };
 
-  return (
-    <div className="flex-1 flex flex-col bg-white overflow-hidden">
-
-      {/* ── 상단 액션 바 (전체화면 전용) ── */}
-      {!embedded && (
-      <div className="px-6 py-3 border-b border-gray-200 flex items-center gap-2 shrink-0">
-        <Button variant="outlined" color="primary" size="sm" onClick={onBack}>
-          {backIcon && <Icon name="arrow-left" size={13} />} {backLabel}
-        </Button>
-        {onPrev && <Button variant="outlined" color="primary" size="sm" onClick={onPrev} title="이전">◀</Button>}
-        {posLabel && <span className="text-sm2 text-gray-500 font-mono">{posLabel}</span>}
-        {onNext && <Button variant="outlined" color="primary" size="sm" onClick={onNext} title="다음">▶</Button>}
-        <div className="ml-auto flex items-center gap-1.5">
-          <Button variant="outlined" color="primary" size="sm" onClick={onSave}>
-            <Icon name="star" size={11} /> 라이브러리 저장
-          </Button>
-        </div>
+  // ── 키워드 하이라이터 바 (keywert 참고) ──
+  const keywordBar = searchQuery && parseKeywords(searchQuery).length > 0 ? (
+    <div className="shrink-0 bg-white border-b border-gray-200 px-4 py-2">
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-xs2 font-semibold text-gray-400 shrink-0">키워드</span>
+        {parseKeywords(searchQuery).map((kw, i) => {
+          const c = KW_COLORS[i % KW_COLORS.length];
+          return (
+            <span
+              key={kw}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-sm2 font-medium"
+              style={{ backgroundColor: c.bg, color: c.text, borderColor: c.border }}
+            >
+              <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.dot }} />
+              {kw}
+              <span className="text-xs2 opacity-60 font-mono ml-0.5">0/0</span>
+              <span className="flex gap-0.5 ml-0.5">
+                <button className="text-xs2 opacity-50 hover:opacity-100 leading-none">↑</button>
+                <button className="text-xs2 opacity-50 hover:opacity-100 leading-none">↓</button>
+              </span>
+            </span>
+          );
+        })}
+        <button className="ml-auto text-xs2 text-gray-400 hover:text-gray-600 shrink-0">- 접기</button>
       </div>
-      )}
+    </div>
+  ) : null;
 
-      {/* ── 키워드 하이라이터 바 (keywert 참고) ── */}
-      {searchQuery && parseKeywords(searchQuery).length > 0 && (
-        <div className="shrink-0 bg-white border-b border-gray-200 px-4 py-2">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs2 font-semibold text-gray-400 shrink-0">키워드</span>
-            {parseKeywords(searchQuery).map((kw, i) => {
-              const c = KW_COLORS[i % KW_COLORS.length];
-              return (
-                <span
-                  key={kw}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-sm2 font-medium"
-                  style={{ backgroundColor: c.bg, color: c.text, borderColor: c.border }}
-                >
-                  <span
-                    className="inline-block w-2 h-2 rounded-full shrink-0"
-                    style={{ backgroundColor: c.dot }}
-                  />
-                  {kw}
-                  <span className="text-xs2 opacity-60 font-mono ml-0.5">0/0</span>
-                  <span className="flex gap-0.5 ml-0.5">
-                    <button className="text-xs2 opacity-50 hover:opacity-100 leading-none">↑</button>
-                    <button className="text-xs2 opacity-50 hover:opacity-100 leading-none">↓</button>
-                  </span>
-                </span>
-              );
-            })}
-            <button className="ml-auto text-xs2 text-gray-400 hover:text-gray-600 shrink-0">- 접기</button>
-          </div>
-        </div>
-      )}
+  // ── 특허명·기본사항 + 제목 하단 액션 링크 (논문 상세와 동일 순서) ──
+  const titleBlock = (
+    <div className="px-6 pt-4 pb-3 border-b border-gray-200 shrink-0">
+      <div className="flex items-center gap-2 flex-wrap mb-1.5">
+        <span title={getPatentStatusDesc(data.status)} className="inline-block cursor-help"><Badge color={statusColor}>● {data.status}</Badge></span>
+        <Badge color="brand">{data.country}</Badge>
+        <span className="font-mono text-md2 font-semibold text-gray-600">{data.number}</span>
+        {data.grade && <Badge color="brand">평가 {data.grade}</Badge>}
+      </div>
+      <h2 className="text-xl font-bold text-gray-800 leading-snug">{data.title}</h2>
+      {/* 제목 하단 액션 링크 — 논문(원문 보기/본문 보기)과 동일 패턴 */}
+      <div className="flex flex-wrap items-center gap-2 mt-3">
+        <Button variant="filled" color="primary" size="sm" className="text-xs2 h-8" onClick={() => downloadPatentPdf(data)} title="특허 원문 PDF 다운로드">
+          <Icon name="doc" size={12} /> 원문 PDF 다운로드
+        </Button>
+      </div>
+    </div>
+  );
 
-      {/* ── 탭 + 2-column 본문 ── */}
-      <div className="flex-1 flex min-h-0 overflow-hidden">
+  // ── Sticky 앵커 탭 바 ──
+  const tabsBar = (
+    <div className="sticky top-0 z-20 flex items-center gap-0 bg-white border-b border-gray-200 overflow-x-auto scroll-thin shrink-0">
+      {TABS.map(tab => (
+        <button
+          key={tab.key}
+          onClick={() => scrollToSection(tab.ref, tab.key)}
+          className={clsx(
+            'px-3 py-2 text-sm2 font-medium whitespace-nowrap border-b-2 transition-colors shrink-0',
+            activeTab === tab.key
+              ? 'border-blue-400 text-blue-700 bg-blue-50/50'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50',
+          )}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
 
-        {/* 좌: 특허명(최상단) + 앵커 탭 + 스크롤 본문 */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+  // ── 도면 패널 (전체보기 우측 rail / 오버레이 본문 내 공용) ──
+  const drawingsAside = (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 8rem)' }}>
+      <div className="px-3 py-2 border-b border-gray-200 bg-white shrink-0">
+        <span className="text-sm2 font-bold text-gray-600">도면</span>
+        <span className="ml-1.5 text-xs2 text-gray-400">({(data.figures || []).length})</span>
+      </div>
+      <DrawingsPanel figures={data.figures} refSigns={data.refSigns} />
+    </div>
+  );
 
-          {/* 특허명·기본사항 — 가장 상단 (탭보다 먼저) */}
-          <div className="px-6 pt-4 pb-3 border-b border-gray-200 shrink-0">
-            <div className="flex items-center gap-2 flex-wrap mb-1.5">
-              <span title={getPatentStatusDesc(data.status)} className="inline-block cursor-help"><Badge color={statusColor}>● {data.status}</Badge></span>
-              <Badge color="brand">{data.country}</Badge>
-              <span className="font-mono text-md2 font-semibold text-gray-600">{data.number}</span>
-              {data.grade && <Badge color="brand">평가 {data.grade}</Badge>}
-              <button
-                onClick={() => downloadPatentPdf(data)}
-                className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-300 text-sm2 text-gray-600 hover:border-brand-400 hover:text-brand-400 shrink-0"
-                title="특허 원문 PDF 다운로드"
-              >
-                <Icon name="doc" size={12} /> 원문 PDF 다운로드
-              </button>
-            </div>
-            <h2 className="text-xl font-bold text-gray-800 leading-snug">{data.title}</h2>
-          </div>
-
-          {/* Sticky 앵커 탭 바 */}
-          <div className="sticky top-0 z-20 flex items-center gap-0 bg-white border-b border-gray-200 overflow-x-auto scroll-thin shrink-0">
-            {TABS.map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => scrollToSection(tab.ref, tab.key)}
-                className={clsx(
-                  'px-3 py-2 text-sm2 font-medium whitespace-nowrap border-b-2 transition-colors shrink-0',
-                  activeTab === tab.key
-                    ? 'border-blue-400 text-blue-700 bg-blue-50/50'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50',
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* 스크롤 본문 */}
-          <div className="flex-1 overflow-y-auto scroll-thin px-6 py-4">
-
-            {/* 도면 (분할 리더 전용 — 본문 내). 대표도면 우선 */}
-            {embedded && (data.figures || []).length > 0 && (
-              <div className="mb-4">
-                <div className="text-xs2 font-semibold text-gray-500 mb-1.5">도면 ({(data.figures || []).length})</div>
-                <div className="border border-gray-200 rounded-lg bg-gray-50 overflow-hidden" style={{ height: 360 }}>
-                  <DrawingsPanel figures={data.figures} refSigns={data.refSigns} />
-                </div>
-              </div>
-            )}
-
+  // ── 본문 섹션 (서지~기타) — 전체보기·오버레이 공용 ──
+  const sections = (
+    <>
             {/* 서지사항 */}
             <div ref={secBib}>
               <Section title="서지사항" icon="cal">
@@ -376,21 +352,69 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                 )}
               </Section>
             </div>
+    </>
+  );
 
-          </div>
+  // ── 전체보기(새 탭): 가운데 정렬 문서형 — 논문 상세와 동일 레이아웃 ──
+  if (!embedded) {
+    return (
+      <div className="flex flex-col h-screen overflow-hidden bg-zinc-50">
+        {/* 헤더 — 논문 전체보기와 동일(닫기 + 저장 filled) */}
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 bg-white shrink-0">
+          <Button variant="outlined" color="primary" size="sm" onClick={onBack}>
+            {backIcon && <Icon name="arrow-left" size={13} />} {backLabel}
+          </Button>
+          {onPrev && <Button variant="outlined" color="primary" size="sm" onClick={onPrev} title="이전">◀</Button>}
+          {posLabel && <span className="text-sm2 text-gray-500 font-mono">{posLabel}</span>}
+          {onNext && <Button variant="outlined" color="primary" size="sm" onClick={onNext} title="다음">▶</Button>}
+          <span className="flex-1" />
+          <Button variant="filled" color="primary" size="sm" onClick={onSave}><Icon name="star" size={12} /> 라이브러리 저장</Button>
         </div>
-
-        {/* 우: 도면 패널 (전체화면 전용 — 분할 리더에선 본문 내 표시) */}
-        {!embedded && (
-        <div className="w-[30rem] shrink-0 border-l border-gray-200 bg-gray-50 flex flex-col overflow-hidden">
-          <div className="px-3 py-2 border-b border-gray-200 bg-white shrink-0">
-            <span className="text-sm2 font-bold text-gray-600">도면</span>
-            <span className="ml-1.5 text-xs2 text-gray-400">({(data.figures || []).length})</span>
+        {keywordBar}
+        {/* 스크롤 페이지 — 가운데 정렬 문서 + 우측 도면 rail + 푸터 */}
+        <div className="flex-1 overflow-y-auto scroll-thin">
+          <div className="mx-auto max-w-7xl px-6 lg:px-8 py-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              <main className="lg:col-span-8 min-w-0 space-y-6">
+                {/* 제목 카드 */}
+                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">{titleBlock}</div>
+                {/* 본문 카드 — 앵커 탭(sticky) + 섹션 */}
+                <div className="bg-white border border-gray-200 rounded-xl">
+                  {tabsBar}
+                  <div className="px-6 pb-5">{sections}</div>
+                </div>
+              </main>
+              {/* 우측 rail — 도면 (논문 전체보기의 인용 rail과 동일 위치) */}
+              <aside className="lg:col-span-4 lg:sticky lg:top-6">
+                {drawingsAside}
+              </aside>
+            </div>
           </div>
-          <DrawingsPanel figures={data.figures} refSigns={data.refSigns} />
+          <DetailFooter />
         </div>
-        )}
+      </div>
+    );
+  }
 
+  // ── 오버레이 드로어(embedded): 단일 컬럼 ──
+  return (
+    <div className="flex-1 flex flex-col bg-white overflow-hidden">
+      {keywordBar}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {titleBlock}
+        {tabsBar}
+        <div className="flex-1 overflow-y-auto scroll-thin px-6 py-4">
+          {/* 도면 (드로어 전용 — 본문 내). 대표도면 우선 */}
+          {(data.figures || []).length > 0 && (
+            <div className="mb-4">
+              <div className="text-xs2 font-semibold text-gray-500 mb-1.5">도면 ({(data.figures || []).length})</div>
+              <div className="border border-gray-200 rounded-lg bg-gray-50 overflow-hidden" style={{ height: 360 }}>
+                <DrawingsPanel figures={data.figures} refSigns={data.refSigns} />
+              </div>
+            </div>
+          )}
+          {sections}
+        </div>
       </div>
     </div>
   );
