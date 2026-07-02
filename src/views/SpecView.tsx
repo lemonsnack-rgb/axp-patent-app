@@ -77,6 +77,12 @@ export function SpecView() {
   const handleSetMainView = (v: 'analysis' | 'editor') => setMainView(v);
   const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
   const [specFocusCtx, setSpecFocusCtx] = useState<FocusCtx | null>(null);
+  // AI 수정 등으로 포커스 컨텍스트가 설정되면 모바일에서 AI 패널을 자동으로 연다
+  // (데스크톱은 패널이 상시 표시되어 영향 없음)
+  const focusForAi = (ctx: FocusCtx | null) => {
+    setSpecFocusCtx(ctx);
+    if (ctx) setMobileGuideOpen(true);
+  };
   const guidePanelInputRef = useRef<HTMLTextAreaElement>(null);
   const [context, setContext] = useState<InventionContext>(
     savedSpec?.context ?? {
@@ -551,7 +557,7 @@ export function SpecView() {
                             candidates={titleCandidates}
                             gSel={gSel}
                             setGSel={setGSel}
-                            setFocusCtx={setSpecFocusCtx}
+                            setFocusCtx={focusForAi}
                             guidePanelInputRef={guidePanelInputRef}
                           />
                         )}
@@ -591,7 +597,7 @@ export function SpecView() {
                               dst.splice(toIdx ?? dst.length, 0, m);
                               return { ...p, [fromType]: src, [toType]: dst };
                             })}
-                            setFocusCtx={setSpecFocusCtx}
+                            setFocusCtx={focusForAi}
                             guidePanelInputRef={guidePanelInputRef}
                           />
                         )}
@@ -641,14 +647,14 @@ export function SpecView() {
                                 done={isDone}
                                 onConfirm={() => confirm('claims')}
                                 onUpdate={v => setGSel(p => ({ ...p, claims: v }))}
-                                onFocusContext={setSpecFocusCtx}
+                                onFocusContext={focusForAi}
                                 guidePanelInputRef={guidePanelInputRef}
                               />
                             )}
                             {s.id === 'midspec' && (
                               <MidspecPanel
                                 done={isDone}
-                                onFocusContext={setSpecFocusCtx}
+                                onFocusContext={focusForAi}
                                 guidePanelInputRef={guidePanelInputRef}
                                 sections={midspec ?? []}
                                 onUpdate={(next) => {
@@ -759,7 +765,7 @@ export function SpecView() {
             mobileOpen={mobileGuideOpen}
             onMobileClose={() => setMobileGuideOpen(false)}
             focusCtx={specFocusCtx}
-            setFocusCtx={setSpecFocusCtx}
+            setFocusCtx={focusForAi}
             chatInputRef={guidePanelInputRef}
           />
         )}
@@ -3116,12 +3122,12 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onFocusContext, 
       {/* 실시예 생성 버튼 */}
       {!done && onGoToEditor && (
         <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-          <p className="text-xs2 text-blue-700 font-semibold mb-1">실시예 설명 생성</p>
-          <p className="text-xs2 text-gray-500 mb-2.5">AI가 구성요소 및 도면 정보를 기반으로 실시예 내용을 생성하고 에디터로 이동합니다.</p>
+          <p className="text-xs2 text-blue-700 font-semibold mb-1">명세서 생성</p>
+          <p className="text-xs2 text-gray-500 mb-2.5">AI가 구성요소·도면·청구항을 기반으로 실시예를 포함한 명세서 초안을 생성하고 에디터로 이동합니다.</p>
           <button
             onClick={onGoToEditor}
             className="w-full py-2 text-sm2 font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
-          >실시예 생성 → 에디터로 이동</button>
+          >명세서 생성 →</button>
         </div>
       )}
     </div>
