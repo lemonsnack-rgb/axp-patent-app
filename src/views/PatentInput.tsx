@@ -1082,14 +1082,17 @@ function Chip({ active, onClick, children, size = 'sm' }: {
   return (
     <button
       onClick={onClick}
+      aria-pressed={!!active}
       className={clsx(
-        'inline-flex items-center h-7 rounded-full border transition-colors font-medium text-xs2',
+        'inline-flex items-center gap-0.5 h-7 rounded-full border transition-colors font-medium text-xs2',
         size === 'xs' ? 'px-2.5' : 'px-3',
         active
           ? 'bg-brand-400 text-white border-brand-400'
           : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-brand-400',
       )}
     >
+      {/* 색상 외 선택 표시(WCAG 1.4.1) — 활성 시 체크 */}
+      {active && <span aria-hidden className="-ml-0.5 leading-none font-bold">✓</span>}
       {children}
     </button>
   );

@@ -273,8 +273,11 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
 function Chip({ active, onClick, children }: { active?: boolean; onClick?: () => void; children: React.ReactNode }) {
   return (
     <button onClick={onClick}
-      className={clsx('inline-flex items-center h-7 rounded-full border transition-colors font-medium px-3 text-xs2',
+      aria-pressed={!!active}
+      className={clsx('inline-flex items-center gap-0.5 h-7 rounded-full border transition-colors font-medium px-3 text-xs2',
         active ? 'bg-brand-400 text-white border-brand-400' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-brand-400')}>
+      {/* 색상 외 선택 표시(WCAG 1.4.1) — 활성 시 체크 */}
+      {active && <span aria-hidden className="-ml-0.5 leading-none font-bold">✓</span>}
       {children}
     </button>
   );
