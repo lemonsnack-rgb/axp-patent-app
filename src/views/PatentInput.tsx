@@ -140,9 +140,9 @@ const FIELD_GROUPS = [
 type TokenType = 'field' | 'operator' | 'colon' | 'paren' | 'keyword' | 'space';
 interface Token { type: TokenType; text: string }
 
-const FIELD_RE = /^(TI|AB|CL[AI1]?|DSC|KEY|WPS|AP[D]?|INV|AG|AN|PN|RN|AD|PD|RD|IPC[RM]?|CPC[RM]?|TI_AB_CLI|TI_AB_CLA|DOCN|IDX)$/i;
-// 진단용 — 위 필드 + 범위코드(KEY_CLI/KEY_CLA) 포함
-const KNOWN_FIELD_RE = /^(TI|AB|CL[AI1]?|DSC|KEY(_CLI|_CLA)?|WPS|AP[D]?|INV|AG|AN|PN|RN|AD|PD|RD|IPC[RM]?|CPC[RM]?|TI_AB_CLI|TI_AB_CLA|DOCN|IDX)$/i;
+const FIELD_RE = /^(TI|AB|CL[AI1]?|DSC|KEY|TAC|WPS|AP[D]?|INV|AG|AN|PN|RN|AD|PD|RD|IPC[RM]?|CPC[RM]?|TI_AB_CLI|TI_AB_CLA|DOCN|IDX)$/i;
+// 진단용 — 위 필드 + 범위코드(KEY/TAC/DSC, 데모 표기) 포함
+const KNOWN_FIELD_RE = /^(TI|AB|CL[AI1]?|DSC|KEY|TAC|WPS|AP[D]?|INV|AG|AN|PN|RN|AD|PD|RD|IPC[RM]?|CPC[RM]?|TI_AB_CLI|TI_AB_CLA|DOCN|IDX)$/i;
 const OP_RE    = /^(and|or|not|adj\d*|near\d*)$/i;
 
 // 편집기모드 실시간 진단 — 경고만, 실행은 막지 않는다 [검색-11·12]
@@ -191,7 +191,7 @@ function tokenize(text: string): Token[] {
 const TOKEN_CLS: Record<TokenType, string> = {
   field:    'text-brand-400 font-medium',
   operator: 'text-brand-400 font-medium',
-  colon:    'text-red-600',
+  colon:    'text-slate-500',
   paren:    'text-slate-500',
   keyword:  'text-red-600',
   space:    'text-slate-700',
@@ -246,8 +246,8 @@ export interface PatentInputHandle { refine: (term: string) => void }
 
 // ── 검색 범위 탭 (검색어를 어느 항목에서 찾을지) ──────────────
 const KEY_TABS: { id: ScopeTab; label: string; hint: string }[] = [
-  { id: 'KEY_CLI', label: '명칭+요약+독립항',     hint: '발명의 명칭·요약·독립청구항에서 검색' },
-  { id: 'KEY_CLA', label: '명칭+요약+전체청구항', hint: '발명의 명칭·요약·전체청구항(독립+종속)에서 검색' },
+  { id: 'KEY', label: '명칭+요약+독립항',     hint: '발명의 명칭·요약·독립청구항에서 검색' },
+  { id: 'TAC', label: '명칭+요약+전체청구항', hint: '발명의 명칭·요약·전체청구항(독립+종속)에서 검색' },
   { id: 'DSC',     label: '상세설명',             hint: '상세설명 본문 전체에서 검색' },
 ];
 
@@ -280,7 +280,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
   const [statusInactive, setStatusInactive] = useState<string[]>([]);
 
   // 스코프 탭
-  const [keyTab, setKeyTab] = useState<ScopeTab>('KEY_CLI');
+  const [keyTab, setKeyTab] = useState<ScopeTab>('KEY');
 
   // 입력모드
   const [mode, setMode] = useState<'normal' | 'editor'>('normal');

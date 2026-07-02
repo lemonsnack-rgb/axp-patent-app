@@ -14,10 +14,10 @@ import { Button } from '@muhayu/axp-ui';
 export function parseKeywords(query: string): string[] {
   if (!query) return [];
   const cleaned = query
-    .replace(/[A-Z_]+=\(/g, ' ')
-    .replace(/[A-Z_]+=/g, ' ')
-    .replace(/\b(AND|OR|NOT|ADJ|NEAR|KEY)\b/gi, ' ')
-    .replace(/[():*?"]/g, ' ')
+    .replace(/[A-Z_]+\s*[:=]\s*\(/g, ' ')   // CODE:( 또는 CODE=( 제거
+    .replace(/[A-Z_]+\s*[:=]/g, ' ')        // CODE: 또는 CODE= 제거
+    .replace(/\b(AND|OR|NOT|ADJ|NEAR|KEY|TAC|DSC)\b/gi, ' ')
+    .replace(/[()[\]~:*?"]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   return [...new Set(

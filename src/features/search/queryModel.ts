@@ -1,7 +1,8 @@
 // 검색식 조립/누적/범위적용 순수 로직 — 「특허검색 동작방식」 §2~§3 구현.
 // 검색식 입력창 문자열은 보정하지 않는다 [검색-13]. 필드 입력값만 절 변환 시 trim.
 
-export type ScopeTab = 'KEY_CLI' | 'KEY_CLA' | 'DSC';
+// 범위코드 — 데모(10.77.0.244) 표기 통일: KEY(명칭+요약+독립항) / TAC(명칭+요약+전체청구항) / DSC(상세설명)
+export type ScopeTab = 'KEY' | 'TAC' | 'DSC';
 
 export interface SFieldInput {
   code: string;
@@ -28,11 +29,11 @@ export function fieldClause(f: SFieldInput): string | null {
     const from = (f.dateFrom || '').trim();
     const to = (f.dateTo || '').trim();
     if (!from && !to) return null;
-    return `${f.code}=[${from} ~ ${to}]`;
+    return `${f.code}:([${from} ~ ${to}])`;
   }
   const v = f.value.trim();
   if (!v) return null;
-  return `${f.code}=(${v})`;
+  return `${f.code}:(${v})`;
 }
 
 // 기존 검색식(current)에 필드 절들을 AND로 누적 [검색-60·61].
@@ -59,9 +60,9 @@ export function applyScope(query: string, scope: ScopeTab | string): string {
   // 선두 자유검색어 = 첫 boolean 연산자( AND/OR/NOT ) 또는 필드절 이전까지.
   const m = query.match(/^(.*?)(\s+(?:AND|OR|NOT)\s+.*)$/i);
   if (m) {
-    return `${scope}=(${m[1].trim()})${m[2]}`;
+    return `${scope}:(${m[1].trim()})${m[2]}`;
   }
-  return `${scope}=(${query.trim()})`;
+  return `${scope}:(${query.trim()})`;
 }
 
 // 검색식 또는 필드 입력 중 하나라도 값이 있으면 true [검색-51].
