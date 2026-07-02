@@ -69,9 +69,8 @@ const GUIDE_CANDS: Record<string, string[]> = {
 };
 
 export function SpecView() {
-  const { tasks, activeTaskId, taskUpdate, projects } = useStore();
+  const { tasks, activeTaskId, taskUpdate } = useStore();
   const task = activeTaskId ? tasks.find(t => t.id === activeTaskId) : null;
-  const projectName = task?.folderId ? (projects.find(p => p.id === task.folderId)?.name ?? '') : '';
   const savedSpec = task?.id ? loadSpecState(task.id) : null;
 
   const [mainView, setMainView] = useState<'analysis' | 'editor'>(savedSpec?.mainView ?? 'analysis');
@@ -111,7 +110,6 @@ export function SpecView() {
   );
   const [analyzing, setAnalyzing] = useState(false);
   const [loadingStage, setLoadingStage] = useState(0);
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
 
   const flowRef = useRef<HTMLDivElement>(null);
   const flowSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -124,7 +122,6 @@ export function SpecView() {
   // 자동 저장 — 400ms 디바운스
   useEffect(() => {
     if (!task?.id) return;
-    setSaveStatus('saving');
     if (flowSaveTimerRef.current) clearTimeout(flowSaveTimerRef.current);
     flowSaveTimerRef.current = setTimeout(() => {
       saveSpecState(task.id, {
@@ -138,7 +135,6 @@ export function SpecView() {
         midspec,
         mainView,
       });
-      setSaveStatus('saved');
     }, 400);
     return () => { if (flowSaveTimerRef.current) clearTimeout(flowSaveTimerRef.current); };
   }, [phase, curStep, confirmed, gSel, diTitle, diField, diContent,
@@ -332,15 +328,6 @@ export function SpecView() {
       <div className="flex-1 flex overflow-hidden min-h-0 relative">
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
 
-          {/* 저장 상태 (제목은 상단 TopBar에 표시되므로 중복 제거, 프로젝트만 맥락 표시) */}
-          {task && (
-            <div className="shrink-0 px-4 py-1 bg-white border-b border-gray-100 flex items-center gap-2 min-h-[26px]">
-              {projectName && <span className="text-xs2 text-gray-400 truncate max-w-[160px]">{projectName}</span>}
-              <span className={clsx('ml-auto text-xs2 shrink-0', saveStatus === 'saving' ? 'text-blue-400' : 'text-gray-300')}>
-                {saveStatus === 'saving' ? '저장 중...' : '저장됨'}
-              </span>
-            </div>
-          )}
 
           {/* Stepper — 3분할(다시시작 / 단계 / 진행표시)로 겹침 방지 */}
           <div className="flex items-center border-b border-ck-border shrink-0 px-2 gap-1" style={{ height: 48 }}>
