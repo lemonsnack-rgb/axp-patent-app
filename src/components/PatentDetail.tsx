@@ -379,21 +379,13 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
           <div className="mx-auto max-w-7xl px-6 lg:px-8 py-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               <main className="lg:col-span-8 min-w-0 space-y-6">
-                {/* 제목 카드 */}
-                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">{titleBlock}</div>
-                {/* 본문 카드 — 스크롤 시 제목+탭 고정(sticky) + 섹션 */}
-                <div className="bg-white border border-gray-200 rounded-xl">
-                  <div className="sticky top-0 z-20 bg-white rounded-t-xl">
-                    {/* 압축 제목 줄 — 스크롤 중에도 어떤 문헌인지 유지 */}
-                    <div className="flex items-center gap-2 px-4 pt-2.5 pb-1.5 border-b border-gray-100 min-w-0">
-                      <span title={getPatentStatusDesc(data.status)} className="shrink-0 cursor-help"><Badge color={statusColor}>● {data.status}</Badge></span>
-                      <span className="font-mono text-sm2 text-gray-500 shrink-0">{data.number}</span>
-                      <span className="truncate text-sm2 font-semibold text-gray-700">{data.title}</span>
-                    </div>
-                    {tabsBar}
-                  </div>
-                  <div className="px-6 pb-5">{sections}</div>
+                {/* 제목+탭 카드 — 스크롤 시 제목 영역 자체를 상단 고정(중복 압축제목 제거) */}
+                <div className="sticky top-0 z-20 bg-white border border-gray-200 rounded-xl overflow-hidden">
+                  {titleBlock}
+                  {tabsBar}
                 </div>
+                {/* 본문 섹션 카드 */}
+                <div className="bg-white border border-gray-200 rounded-xl px-6 py-4">{sections}</div>
               </main>
               {/* 우측 rail — 도면 (논문 전체보기의 인용 rail과 동일 위치) */}
               <aside className="lg:col-span-4 lg:sticky lg:top-6">

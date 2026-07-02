@@ -710,8 +710,8 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
         <div className="mx-auto max-w-7xl px-6 lg:px-8 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             <main className="lg:col-span-8 min-w-0 space-y-6">
-          {/* 제목 카드(hero) — 특허와 동일: 제목 + 대등제목 + 하단 액션 링크 */}
-          <div className="bg-white border border-gray-200 rounded-xl p-6 lg:p-8">
+          {/* 제목 카드(hero) — 스크롤 시 제목 영역 자체를 상단 고정 */}
+          <div className="sticky top-0 z-20 bg-white border border-gray-200 rounded-xl p-6 lg:p-8">
             <h1 className="text-2xl font-bold text-gray-900 leading-snug text-balance">{paper.title}</h1>
             {altTitle && altTitle !== paper.title && (
               <div className="text-base2 text-gray-500 mt-2 leading-snug">{altTitle}</div>
@@ -734,13 +734,9 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
             </div>
           </div>
 
-          {/* 본문 카드 — 스크롤 시 압축 제목 고정(탭 없음), 메타데이터+관련논문 포함 */}
+          {/* 본문 카드 — 메타데이터 + 관련논문 (압축 제목 제거, 제목은 상단 hero가 고정) */}
           <div className="bg-white border border-gray-200 rounded-xl">
-            {/* 압축 제목 줄(sticky) — 특허와 동일 패턴, 탭만 없음 */}
-            <div className="sticky top-0 z-20 bg-white rounded-t-xl border-b border-gray-100 px-6 py-2.5 min-w-0">
-              <span className="block truncate text-sm2 font-semibold text-gray-700">{paper.title}</span>
-            </div>
-            <div className="p-6 lg:p-8 pt-5">
+            <div className="p-6 lg:p-8">
               {/* 메타데이터 — OpenAlex 방식: 레이블 값 명시적 구분 */}
               <dl className="divide-y divide-gray-100">
                 <MetaRow label="저자명">
