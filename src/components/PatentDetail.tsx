@@ -128,9 +128,9 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
     </div>
   );
 
-  // ── Sticky 앵커 탭 바 ──
+  // ── 앵커 탭 바 (sticky 처리는 레이아웃별 래퍼가 담당) ──
   const tabsBar = (
-    <div className="sticky top-0 z-20 flex items-center gap-0 bg-white border-b border-gray-200 overflow-x-auto scroll-thin shrink-0">
+    <div className="flex items-center gap-0 bg-white border-b border-gray-200 overflow-x-auto scroll-thin shrink-0">
       {TABS.map(tab => (
         <button
           key={tab.key}
@@ -362,10 +362,10 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
       <div className="flex flex-col h-screen overflow-hidden bg-zinc-50">
         {/* 헤더 — 논문 전체보기와 동일(닫기 + 저장 filled) */}
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 bg-white shrink-0">
+          <img src={CK_WORDMARK} alt="CK.Patent" className="h-6 w-auto object-contain" />
           <Button variant="outlined" color="primary" size="sm" onClick={onBack}>
             {backIcon && <Icon name="arrow-left" size={13} />} {backLabel}
           </Button>
-          <img src={CK_WORDMARK} alt="CK.Patent" className="h-6 w-auto object-contain" />
           {onPrev && <Button variant="outlined" color="primary" size="sm" onClick={onPrev} title="이전">◀</Button>}
           {posLabel && <span className="text-sm2 text-gray-500 font-mono">{posLabel}</span>}
           {onNext && <Button variant="outlined" color="primary" size="sm" onClick={onNext} title="다음">▶</Button>}
@@ -380,9 +380,17 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               <main className="lg:col-span-8 min-w-0 space-y-6">
                 {/* 제목 카드 */}
                 <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">{titleBlock}</div>
-                {/* 본문 카드 — 앵커 탭(sticky) + 섹션 */}
+                {/* 본문 카드 — 스크롤 시 제목+탭 고정(sticky) + 섹션 */}
                 <div className="bg-white border border-gray-200 rounded-xl">
-                  {tabsBar}
+                  <div className="sticky top-0 z-20 bg-white rounded-t-xl">
+                    {/* 압축 제목 줄 — 스크롤 중에도 어떤 문헌인지 유지 */}
+                    <div className="flex items-center gap-2 px-4 pt-2.5 pb-1.5 border-b border-gray-100 min-w-0">
+                      <span title={getPatentStatusDesc(data.status)} className="shrink-0 cursor-help"><Badge color={statusColor}>● {data.status}</Badge></span>
+                      <span className="font-mono text-sm2 text-gray-500 shrink-0">{data.number}</span>
+                      <span className="truncate text-sm2 font-semibold text-gray-700">{data.title}</span>
+                    </div>
+                    {tabsBar}
+                  </div>
                   <div className="px-6 pb-5">{sections}</div>
                 </div>
               </main>
