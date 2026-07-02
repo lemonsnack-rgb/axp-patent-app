@@ -490,17 +490,19 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
               <Chip key={c.code} active={!!countries[c.code]} onClick={() => toggleCountry(c.code)} size="xs">{c.label}</Chip>
             ))}
             {extraCountries.map(cc => (
-              <span key={cc} className="inline-flex items-center gap-0.5 px-2 py-0 bg-brand-400 text-white rounded-full text-xs2 font-medium">
+              <span key={cc} className="inline-flex items-center h-7 gap-0.5 px-2.5 bg-brand-400 text-white rounded-full text-xs2 font-medium">
                 {cc}
-                <button onClick={() => removeExtraCountry(cc)} className="ml-0.5 hover:opacity-70 leading-none">×</button>
+                <button onClick={() => removeExtraCountry(cc)} aria-label={`${cc} 국가 제거`} className="ml-0.5 hover:opacity-70 leading-none">×</button>
               </span>
             ))}
-            <span
+            <button
+              type="button"
               onClick={() => setCountryPickerOpen(v => !v)}
-              className="cursor-pointer text-xs2 text-blue-600 hover:underline px-1"
+              aria-expanded={countryPickerOpen}
+              className="text-xs2 text-blue-600 hover:underline px-1"
             >
               + 국가설정 ({COUNTRY_ADDITIONAL.length})
-            </span>
+            </button>
           </div>
 
           <div className="w-px h-3.5 bg-gray-200 shrink-0" />
@@ -523,14 +525,14 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
             <div className="flex items-center gap-1">
               <input
                 type="date"
-                className="px-1 py-0 border border-gray-200 rounded text-xs2 h-5"
+                className="px-2 border border-gray-200 rounded text-xs2 h-7"
                 value={periodFrom}
                 onChange={e => { setPeriodFrom(e.target.value); onCustomDate(); }}
               />
               <span className="text-gray-400 text-xs2">~</span>
               <input
                 type="date"
-                className="px-1 py-0 border border-gray-200 rounded text-xs2 h-5"
+                className="px-2 border border-gray-200 rounded text-xs2 h-7"
                 value={periodTo}
                 onChange={e => { setPeriodTo(e.target.value); onCustomDate(); }}
               />
@@ -1081,8 +1083,8 @@ function Chip({ active, onClick, children, size = 'sm' }: {
     <button
       onClick={onClick}
       className={clsx(
-        'rounded-full border transition-colors font-medium',
-        size === 'xs' ? 'px-2 py-0 text-xs2' : 'px-2.5 py-0.5 text-sm2',
+        'inline-flex items-center h-7 rounded-full border transition-colors font-medium text-xs2',
+        size === 'xs' ? 'px-2.5' : 'px-3',
         active
           ? 'bg-brand-400 text-white border-brand-400'
           : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-brand-400',
