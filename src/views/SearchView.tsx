@@ -101,6 +101,7 @@ export function SearchView() {
       {/* 특허 검색 — 입력 + 인라인 결과 (단일 페이지 스크롤) */}
       {searchType === 'patent' && (
         <div className="flex-1 overflow-y-auto scroll-thin flex flex-col">
+          <h1 className="sr-only">특허 검색</h1>
           <PatentInput
             ref={patentInputRef}
             onRun={(q, meta) => { setSearchQuery(q); setCommittedMeta(meta); setPatentSearched(true); }}
@@ -127,6 +128,7 @@ export function SearchView() {
       {/* 논문 검색 — 입력 + 인라인 결과 (단일 페이지 스크롤) */}
       {searchType === 'paper' && (
         <div className="flex-1 overflow-y-auto scroll-thin flex flex-col">
+          <h1 className="sr-only">논문 검색</h1>
           <PaperInput
             ref={paperInputRef}
             onRun={q => { setPaperSearchQuery(q); setPaperSearched(true); }}

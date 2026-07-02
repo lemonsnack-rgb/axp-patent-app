@@ -249,6 +249,7 @@ function FormulaEditor({ value, onChange, rows = 3, placeholder = '' }: {
         rows={rows}
         spellCheck={false}
         placeholder={placeholder}
+        aria-label="특허 검색식 입력"
         className="relative block w-full resize-y rounded border border-gray-300 bg-transparent p-2 leading-6 text-transparent caret-gray-900 outline-none focus:border-blue-500 placeholder:text-gray-400"
       />
     </div>
@@ -355,14 +356,12 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
   };
 
   const toggleDocKind = (k: string) => setDocKinds(prev => prev.includes(k) ? prev.filter(x => x !== k) : [...prev, k]);
-  const togglePeriod = (p: string) => { setPeriodChip(prev => prev === p ? '' : p); setPeriodFrom(''); setPeriodTo(''); };
+  // 기간은 단일 선택(라디오형) — 선택만, 해제 없음(전체가 곧 기본값)
+  const togglePeriod = (p: string) => { setPeriodChip(p); setPeriodFrom(''); setPeriodTo(''); };
   const onCustomDate = () => setPeriodChip('');
 
-  const toggleAllStatus = () => {
-    const newAll = !statusAll;
-    setStatusAll(newAll);
-    if (newAll) { setStatusActive([]); setStatusInactive([]); }
-  };
+  // 상태 '전체'도 해제 불가 — 누르면 항상 전체로 초기화(빈 선택 방지)
+  const toggleAllStatus = () => { setStatusAll(true); setStatusActive([]); setStatusInactive([]); };
   const toggleStatusActive = (s: string) => {
     setStatusAll(false);
     setStatusActive(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
@@ -525,6 +524,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
             <div className="flex items-center gap-1">
               <input
                 type="date"
+                aria-label="기간 시작일"
                 className="px-2 border border-gray-200 rounded text-xs2 h-7"
                 value={periodFrom}
                 onChange={e => { setPeriodFrom(e.target.value); onCustomDate(); }}
@@ -532,6 +532,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
               <span className="text-gray-400 text-xs2">~</span>
               <input
                 type="date"
+                aria-label="기간 종료일"
                 className="px-2 border border-gray-200 rounded text-xs2 h-7"
                 value={periodTo}
                 onChange={e => { setPeriodTo(e.target.value); onCustomDate(); }}

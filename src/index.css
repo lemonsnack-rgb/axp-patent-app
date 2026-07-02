@@ -28,6 +28,10 @@
   }
   /* 버튼/링크는 outline 제거 후 ring으로 처리 */
   button:focus, a:focus, input:focus, select:focus, textarea:focus { outline: none; }
+  /* 고대비(Windows 고대비 등)에서는 box-shadow가 무시되므로 outline으로 보강 */
+  @media (forced-colors: active) {
+    :focus-visible { outline: 2px solid CanvasText !important; outline-offset: 1px; }
+  }
 }
 
 @layer utilities {

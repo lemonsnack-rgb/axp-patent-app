@@ -133,9 +133,11 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
         ))}
         <div className="flex items-center gap-1.5">
           <input type="number" placeholder="YYYY" value={yearFrom} onChange={e => { setYearFrom(e.target.value); setPeriodChip(''); }}
+            aria-label="발행연도 시작"
             className="w-20 px-2 border border-gray-200 rounded text-xs2 h-7 outline-none focus:border-blue-400" />
           <span className="text-gray-400 text-xs2">~</span>
           <input type="number" placeholder="YYYY" value={yearTo} onChange={e => { setYearTo(e.target.value); setPeriodChip(''); }}
+            aria-label="발행연도 종료"
             className="w-20 px-2 border border-gray-200 rounded text-xs2 h-7 outline-none focus:border-blue-400" />
         </div>
       </div>
@@ -163,6 +165,7 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
             rows={3}
             spellCheck={false}
             placeholder='예: 자율주행 and 라이다 | "object detection"'
+            aria-label="논문 검색식 입력"
             className="flex-1 min-w-0 resize-y rounded border border-gray-300 p-2 font-mono text-sm leading-6 outline-none focus:border-blue-500 placeholder:text-gray-400"
           />
           <div className="shrink-0 w-[88px] flex flex-col gap-1.5">
