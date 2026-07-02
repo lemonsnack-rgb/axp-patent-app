@@ -332,13 +332,11 @@ export function SpecView() {
       <div className="flex-1 flex overflow-hidden min-h-0 relative">
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
 
-          {/* 작업 컨텍스트 + 저장 상태 */}
+          {/* 저장 상태 (제목은 상단 TopBar에 표시되므로 중복 제거, 프로젝트만 맥락 표시) */}
           {task && (
             <div className="shrink-0 px-4 py-1 bg-white border-b border-gray-100 flex items-center gap-2 min-h-[26px]">
-              {projectName && <span className="text-xs2 text-gray-400 truncate max-w-[120px]">{projectName}</span>}
-              {projectName && <span className="text-xs2 text-gray-300">›</span>}
-              <span className="text-xs2 text-gray-600 font-medium truncate flex-1">{task.name}</span>
-              <span className={clsx('text-xs2 shrink-0', saveStatus === 'saving' ? 'text-blue-400' : 'text-gray-300')}>
+              {projectName && <span className="text-xs2 text-gray-400 truncate max-w-[160px]">{projectName}</span>}
+              <span className={clsx('ml-auto text-xs2 shrink-0', saveStatus === 'saving' ? 'text-blue-400' : 'text-gray-300')}>
                 {saveStatus === 'saving' ? '저장 중...' : '저장됨'}
               </span>
             </div>
@@ -346,15 +344,16 @@ export function SpecView() {
 
           {/* Stepper — 3분할(다시시작 / 단계 / 진행표시)로 겹침 방지 */}
           <div className="flex items-center border-b border-ck-border shrink-0 px-2 gap-1" style={{ height: 48 }}>
-            {/* 좌: 다시 시작 (고정 폭) */}
-            <div className="shrink-0 w-[76px] md:w-[84px]">
+            {/* 좌: 다시 시작 (아이콘, 폭 최소화) */}
+            <div className="shrink-0">
               {(phase === 'flow' || phase === 'done') && (
                 <button
                   onClick={resetAnalysis}
-                  className="text-xs text-zinc-400 hover:text-red-500 transition-colors flex items-center gap-1"
+                  className="w-7 h-7 flex items-center justify-center rounded-full text-base text-zinc-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                   title="처음부터 다시 시작"
+                  aria-label="처음부터 다시 시작"
                 >
-                  ↺ 다시 시작
+                  ↺
                 </button>
               )}
             </div>
@@ -369,8 +368,8 @@ export function SpecView() {
                 return (
                   <div key={s.id} className="flex items-center shrink-0">
                     {i > 0 && (
-                      <div className={clsx('h-0.5 shrink-0 mx-1', prevDone ? 'bg-green-500' : 'bg-gray-200')}
-                        style={{ width: 20 }} />
+                      <div className={clsx('h-0.5 shrink-0 mx-0.5', prevDone ? 'bg-green-500' : 'bg-gray-200')}
+                        style={{ width: 10 }} />
                     )}
                     <button
                       type="button"
@@ -378,7 +377,7 @@ export function SpecView() {
                       disabled={!navigable}
                       title={navigable ? `${s.label}(으)로 이동` : locked ? '이전 단계를 먼저 완료하세요' : s.label}
                       className={clsx(
-                        'flex items-center gap-1.5 px-3 py-1 rounded-full border select-none transition-colors',
+                        'flex items-center gap-1 px-2 py-1 rounded-full border select-none transition-colors',
                         active && 'border-blue-200 bg-blue-50',
                         !active && 'border-transparent',
                         navigable ? 'cursor-pointer hover:bg-gray-100' : 'cursor-default',
@@ -404,14 +403,6 @@ export function SpecView() {
                   </div>
                 );
               })}
-            </div>
-            {/* 우: 진행 표시 (고정 폭) */}
-            <div className="shrink-0 w-[52px] text-right">
-              {(phase === 'flow' || phase === 'done') && (
-                <span className="text-xs2 font-medium text-zinc-400 tabular-nums">
-                  {STEPS.findIndex(s => s.id === curStep) + 1} / {STEPS.length}
-                </span>
-              )}
             </div>
           </div>
 
