@@ -508,6 +508,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
 
           <div className="flex items-center gap-1 flex-wrap">
             <span className="text-xs2 font-semibold text-gray-500 shrink-0">문헌종류</span>
+            <Chip active={docKinds.length === 0} onClick={() => setDocKinds([])} size="xs">전체</Chip>
             {PATENT_DOC_KINDS.map(k => (
               <Chip key={k} active={docKinds.includes(k)} onClick={() => toggleDocKind(k)} size="xs">{k}</Chip>
             ))}
