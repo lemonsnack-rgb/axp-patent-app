@@ -5,6 +5,7 @@ import type { PatentResult, PatentCitation } from '../types';
 import { downloadPatentPdf } from '../features/patentPdf';
 import { Icon } from './Icon';
 import { DetailFooter } from './DetailFooter';
+import { CK_WORDMARK } from '../assets/ckLogo';
 import { Badge } from './ui';
 import { getPatentStatusDesc } from '../utils/badgeUtils';
 import { Button } from '@muhayu/axp-ui';
@@ -364,6 +365,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
           <Button variant="outlined" color="primary" size="sm" onClick={onBack}>
             {backIcon && <Icon name="arrow-left" size={13} />} {backLabel}
           </Button>
+          <img src={CK_WORDMARK} alt="CK.Patent" className="h-6 w-auto object-contain" />
           {onPrev && <Button variant="outlined" color="primary" size="sm" onClick={onPrev} title="이전">◀</Button>}
           {posLabel && <span className="text-sm2 text-gray-500 font-mono">{posLabel}</span>}
           {onNext && <Button variant="outlined" color="primary" size="sm" onClick={onNext} title="다음">▶</Button>}

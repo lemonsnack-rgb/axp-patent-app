@@ -6,6 +6,7 @@ import { PAPER_FACET_GROUPS } from '../data/facetGroups';
 import { Icon } from '../components/Icon';
 import { parseKeywords, KW_COLORS } from '../components/PatentDetail';
 import { DetailFooter } from '../components/DetailFooter';
+import { CK_WORDMARK } from '../assets/ckLogo';
 import { Badge, Card } from '../components/ui';
 import type { PaperResult } from '../types';
 import { Button, toast } from '@muhayu/axp-ui';
@@ -699,6 +700,7 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
       {/* 헤더 */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 bg-white shrink-0">
         <Button variant="outlined" color="primary" size="sm" onClick={onClose}>탭 닫기</Button>
+        <img src={CK_WORDMARK} alt="CK.Patent" className="h-6 w-auto object-contain" />
         <span className="flex-1" />
         <Button variant="filled" color="primary" size="sm" onClick={onSave}><Icon name="star" size={12} /> 라이브러리 저장</Button>
       </div>
