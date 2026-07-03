@@ -32,6 +32,12 @@
   @media (forced-colors: active) {
     :focus-visible { outline: 2px solid CanvasText !important; outline-offset: 1px; }
   }
+
+  /* 단계 전환 로딩 바 (인디터미네이트) */
+  @keyframes loading-indeterminate {
+    0%   { left: -40%; }
+    100% { left: 100%; }
+  }
 }
 
 @layer utilities {

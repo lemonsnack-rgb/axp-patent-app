@@ -116,6 +116,8 @@ export function SpecView() {
   );
   const [analyzing, setAnalyzing] = useState(false);
   const [loadingStage, setLoadingStage] = useState(0);
+  // 단계 전환(다음 단계 분석) 로딩 — 분석에 시간이 걸릴 수 있어 로딩 바 표시
+  const [stepLoading, setStepLoading] = useState<StepId | null>(null);
 
   const flowRef = useRef<HTMLDivElement>(null);
   const flowSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -209,9 +211,20 @@ export function SpecView() {
       });
     }
     const next = STEPS[si(id) + 1];
-    if (next) { setCurStep(next.id); setGuideStep(next.id); }
-    else setPhase('done');
-    setTimeout(() => flowRef.current?.scrollTo({ top: 99999, behavior: 'smooth' }), 50);
+    if (next) {
+      // 다음 단계 분석 로딩 표시 후 전환 (실제 AI 분석 지연 대응)
+      setStepLoading(next.id);
+      setTimeout(() => flowRef.current?.scrollTo({ top: 99999, behavior: 'smooth' }), 50);
+      setTimeout(() => {
+        setCurStep(next.id);
+        setGuideStep(next.id);
+        setStepLoading(null);
+        setTimeout(() => flowRef.current?.scrollTo({ top: 99999, behavior: 'smooth' }), 60);
+      }, 900);
+    } else {
+      setPhase('done');
+      setTimeout(() => flowRef.current?.scrollTo({ top: 99999, behavior: 'smooth' }), 50);
+    }
   };
   const reselect = (id: StepId) => {
     const p = { ...confirmed }; delete p[id];
@@ -695,6 +708,26 @@ export function SpecView() {
                     </div>
                   );
                 })}
+
+                {/* 다음 단계 분석 로딩 바 */}
+                {stepLoading && (
+                  <div className="rounded-xl border border-blue-100 bg-white px-4 py-4 shadow-card">
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <span className="inline-block animate-spin text-brand-400 leading-none">↻</span>
+                      <span className="text-sm2 font-semibold text-gray-700">
+                        {STEP_LABEL[stepLoading] ?? '다음 단계'} 분석 중…
+                      </span>
+                    </div>
+                    <div className="relative h-1.5 bg-blue-100 rounded-full overflow-hidden">
+                      <div
+                        className="absolute top-0 h-full w-2/5 bg-brand-400 rounded-full"
+                        style={{ animation: 'loading-indeterminate 1.1s ease-in-out infinite' }}
+                      />
+                    </div>
+                    <p className="text-xs2 text-gray-400 mt-2">AI가 항목을 분석하고 있습니다. 잠시만 기다려 주세요.</p>
+                  </div>
+                )}
+
                 {phase === 'done' && (
                   <div className="text-center py-8">
                     <Icon name="logo" size={40} className="text-brand-400 mx-auto mb-3" />
@@ -733,14 +766,14 @@ export function SpecView() {
               </div>
               <div className="flex items-center gap-2">
                 {phase === 'flow' && guideStep === 'drawings' && !confirmed['drawings'] && (
-                  <button onClick={() => confirm('drawings')} className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors">건너뛰기</button>
+                  <button onClick={() => confirm('drawings')} disabled={!!stepLoading} className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 disabled:opacity-40 transition-colors">건너뛰기</button>
                 )}
                 {/* 진행(다음)은 flow 단계에서만. midspec은 패널의 '에디터로' 버튼이 마무리, done은 완료 화면 버튼이 진입 — 중복 제거 */}
                 {phase === 'flow' && guideStep !== 'midspec' && (
                   !isSpecialStep(guideStep) ? (
-                    <button onClick={() => { const cur = gSel[guideStep]; if (cur?.trim()) confirm(guideStep); }} disabled={!gSel[guideStep]?.trim()} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 disabled:opacity-40 transition-colors">다음 →</button>
+                    <button onClick={() => { const cur = gSel[guideStep]; if (cur?.trim()) confirm(guideStep); }} disabled={!gSel[guideStep]?.trim() || !!stepLoading} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 disabled:opacity-40 transition-colors">{stepLoading ? '분석 중…' : '다음 →'}</button>
                   ) : (
-                    <button onClick={() => confirm(guideStep)} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 transition-colors">다음 →</button>
+                    <button onClick={() => confirm(guideStep)} disabled={!!stepLoading} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 disabled:opacity-40 transition-colors">{stepLoading ? '분석 중…' : '다음 →'}</button>
                   )
                 )}
               </div>
