@@ -148,16 +148,8 @@ export function SpecView() {
   }, [phase, curStep, confirmed, gSel, diTitle, diField, diContent,
       diProblem, diKeywords, titleCandidates, context, midspec, mainView, task?.id]);
 
-  // U7: 분석 진행 중 이탈 확인
-  useEffect(() => {
-    if (phase !== 'flow') return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = '분석이 진행 중입니다. 페이지를 떠나시겠습니까?';
-    };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [phase]);
+  // (제거) 분석 중 beforeunload 이탈 확인 — 진행 상태가 자동저장(400ms 디바운스)으로 보존되므로
+  // 경고 대화상자가 오히려 페이지 이동/자동화(CDP)를 블로킹시켜 제거함.
 
   const si = (id: StepId) => STEPS.findIndex(s => s.id === id);
   const isSpecialStep = (id: StepId) =>
