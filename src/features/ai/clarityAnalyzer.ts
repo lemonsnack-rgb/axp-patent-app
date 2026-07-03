@@ -34,9 +34,12 @@ export function generateIntentOptions(prompt: string): string[] {
 // ── 수정안 생성 (mock) ────────────────────────────────────────────────────────
 // 실제 구현 시 LLM API 호출로 교체
 export function generateMockModification(originalText: string, instruction: string): string {
-  const trimmed = instruction.slice(0, 20);
-  return originalText.replace(
-    /이다\.$/,
-    `이다. ${trimmed} 관점에서 보완했습니다.`
-  ) || `[${trimmed} 반영] ${originalText}`;
+  const trimmed = (instruction.slice(0, 20).trim()) || '요청';
+  // 이전 mock 보완 주석을 제거한 뒤 최신 지시를 반영 — 반복 수정 시에도 매번 변경이 보이도록
+  // (원문이 '이다.'로 끝나지 않아도 항상 수정된 결과를 반환)
+  const base = originalText
+    .replace(/\s*—\s*\([^()]*관점 보완\)\s*$/u, '')       // 새 형식 주석 제거
+    .replace(/\s*[^.]*관점에서 보완했습니다\.\s*$/u, '')   // 구 형식 주석 제거
+    .trimEnd();
+  return `${base} — (${trimmed} 관점 보완)`;
 }
