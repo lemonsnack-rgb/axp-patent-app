@@ -76,8 +76,7 @@ interface Props {
   onCrossSearch?: (keywords: string) => void;   // 검색식 이월 → 논문 [검색-212]
 }
 
-export function PatentResults({ onModify, onOpenDetail, onSave, onSaveMany, searchQuery, meta, onRefine, onCrossSearch }: Props) {
-  const [refineTerm, setRefineTerm] = useState('');
+export function PatentResults({ onOpenDetail, onSave, onSaveMany, searchQuery, meta, onCrossSearch }: Props) {
   const [sortField, setSortField] = useState<DateField>('applicationDate');
   const [openFacet, setOpenFacet] = useState<string | null>(null);
   const [pendingFilters, setPendingFilters] = useState<Record<string, string[]>>({});
@@ -210,19 +209,6 @@ export function PatentResults({ onModify, onOpenDetail, onSave, onSaveMany, sear
             {appliedQuery}
           </span>
           <Badge color="neutral" className="font-bold text-sm2 shrink-0">{count.toLocaleString()}건</Badge>
-          <Button variant="outlined" color="primary" size="xs" className="h-7" onClick={onModify}>
-            <Icon name="edit" size={11} /> 검색조건 수정
-          </Button>
-          {onRefine && (
-            <input
-              value={refineTerm}
-              onChange={e => setRefineTerm(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && refineTerm.trim()) { onRefine(refineTerm.trim()); setRefineTerm(''); } }}
-              placeholder="결과 내 검색 + (Enter)"
-              title="현재 검색식에 AND로 추가해 결과를 좁힙니다"
-              className="shrink-0 w-44 h-7 px-2 border border-gray-200 rounded text-xs2 outline-none focus:border-blue-400"
-            />
-          )}
           {onCrossSearch && searchQuery && (
             <Button variant="text" color="primary" size="xs" className="shrink-0 text-amber-600 h-7"
               title="이 검색 키워드로 논문 검색 (검색식 이월)"

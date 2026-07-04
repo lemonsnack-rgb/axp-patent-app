@@ -248,7 +248,7 @@ export interface PatentInputHandle { refine: (term: string) => void }
 const KEY_TABS: { id: ScopeTab; label: string; hint: string }[] = [
   { id: 'KEY', label: '명칭+요약+독립항',     hint: '발명의 명칭·요약·독립청구항에서 검색' },
   { id: 'TAC', label: '명칭+요약+전체청구항', hint: '발명의 명칭·요약·전체청구항(독립+종속)에서 검색' },
-  { id: 'DSC',     label: '상세설명',             hint: '상세설명 본문 전체에서 검색' },
+  { id: 'DSC',     label: '명칭+요약+전체청구항+상세설명', hint: '명칭·요약·전체청구항·상세설명 전문에서 검색(가장 넓은 범위)' },
 ];
 
 // ── Main ──────────────────────────────────────────────────────

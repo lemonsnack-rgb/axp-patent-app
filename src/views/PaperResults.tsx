@@ -25,7 +25,7 @@ interface Props {
   onCrossSearch?: (keywords: string) => void;   // 검색식 이월 → 특허 [검색-212]
 }
 
-export function PaperResults({ onModify, onSave, onSaveMany, onOpenDetail, searchQuery, onRefine, onCrossSearch }: Props) {
+export function PaperResults({ onSave, onSaveMany, onOpenDetail, searchQuery, onCrossSearch }: Props) {
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState<SortKey>('recent');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -33,7 +33,6 @@ export function PaperResults({ onModify, onSave, onSaveMany, onOpenDetail, searc
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilter[]>([]);
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
   const [appliedFilterRowVisible, setAppliedFilterRowVisible] = useState(false);
-  const [refineTerm, setRefineTerm] = useState('');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState<20 | 50 | 100>(20);
   const [openGroup, setOpenGroup] = useState<string | null>(null); // 드로어에 표시할 그룹(null=전체)
@@ -149,19 +148,6 @@ export function PaperResults({ onModify, onSave, onSaveMany, onOpenDetail, searc
           {appliedQuery}
         </span>
         <Badge color="neutral" className="font-bold text-sm2 shrink-0">{count.toLocaleString()}건</Badge>
-        <Button variant="outlined" color="primary" size="xs" className="h-7" onClick={onModify}>
-          <Icon name="edit" size={11} /> 검색조건 수정
-        </Button>
-        {onRefine && (
-          <input
-            value={refineTerm}
-            onChange={e => setRefineTerm(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && refineTerm.trim()) { onRefine(refineTerm.trim()); setRefineTerm(''); } }}
-            placeholder="결과 내 검색 + (Enter)"
-            title="현재 검색식에 AND로 추가해 결과를 좁힙니다"
-            className="shrink-0 w-44 h-7 px-2 border border-gray-200 rounded text-xs2 outline-none focus:border-blue-400"
-          />
-        )}
         {onCrossSearch && searchQuery && (
           <Button variant="text" color="primary" size="xs" className="shrink-0 text-amber-600"
             title="이 검색 키워드로 특허 검색 (검색식 이월)"
@@ -231,10 +217,10 @@ export function PaperResults({ onModify, onSave, onSaveMany, onOpenDetail, searc
           disabled={data.length === 0}
           title={data.length === 0 ? '결과가 없습니다' : `${data.length}건 CSV 다운로드`}
           onClick={() => {
-            const header = '제목,저자,저널,발행연도,DOI';
+            const header = '제목,저자,저널,발행연도';
             const esc = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`;
             const csv = [header, ...data.map(p => [
-              esc(p.title), esc(p.authors), esc(p.journal ?? ''), p.year ?? '', esc(p.doi ?? ''),
+              esc(p.title), esc(p.authors), esc(p.journal ?? ''), p.year ?? '',
             ].join(','))].join('\n');
             const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
             const a = document.createElement('a');
@@ -472,9 +458,6 @@ function ListResults({
                 </div>
                 {p.abstract && (
                   <div className="text-sm2 text-gray-600 line-clamp-2">{highlightText(p.abstract, searchQuery)}</div>
-                )}
-                {p.doi && (
-                  <div className="text-xs2 text-blue-500 mt-1 font-mono">DOI: {p.doi}</div>
                 )}
               </div>
             </div>
