@@ -543,7 +543,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
         {/* 검색 범위(두 모드 공통) + 검색어 입력방식(일반/편집기) — 데모(10.77.0.244) 모델 */}
         <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs2 font-semibold text-gray-500 shrink-0" title="검색어를 특허의 어느 부분에서 찾을지 선택합니다">검색 범위</span>
+            <span className="text-xs2 font-semibold text-gray-500 shrink-0" title="검색창에 입력한 키워드를 특허의 어느 부분에서 찾을지 선택합니다(항목별 상세검색과 구분)">검색어 범위</span>
             <div className="flex border border-gray-200 rounded-md overflow-hidden">
               {KEY_TABS.map(tab => (
                 <button
@@ -636,8 +636,8 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
         >
           <span className="flex items-center gap-1.5 min-w-0">
             <Icon name="chevron-down" size={14} className={clsx('shrink-0 text-brand-400 transition-transform', fieldsOpen && 'rotate-180')} />
-            항목별 검색필드
-            {!fieldsOpen && <span className="text-xs2 font-normal text-gray-500 truncate">— 제목·초록·청구항·출원인 등 필드별 입력(추가 가능)</span>}
+            항목별 상세검색
+            {!fieldsOpen && <span className="text-xs2 font-normal text-gray-500 truncate">— 제목·초록·청구항·출원인 등 필드별 조합(추가 가능)</span>}
           </span>
           <span className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-brand-300 bg-white text-xs2 font-semibold text-brand-500">
             {fieldsOpen ? '접기' : '펼쳐서 입력'}
