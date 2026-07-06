@@ -10,6 +10,7 @@ import { ClientsView } from './views/ClientsView';
 import { SearchView } from './views/SearchView';
 import { SpecView } from './views/SpecView';
 import { LoginView } from './components/LoginView';
+import { SpecOverlay } from './features/spec-overlay/SpecOverlay';
 import { StandaloneEditor } from './views/StandaloneEditor';
 import { StandaloneDetail } from './views/StandaloneDetail';
 import { isEditorTab } from './features/drawing-workflow/editorChannel';
@@ -82,6 +83,7 @@ export default function App() {
   return (
     <StoreProvider>
       <Shell />
+      <SpecOverlay />
     </StoreProvider>
   );
 }

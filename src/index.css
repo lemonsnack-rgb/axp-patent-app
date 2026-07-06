@@ -74,3 +74,29 @@
   .badge-gray   { @apply bg-zinc-100 text-zinc-600 border border-zinc-200; }
   .badge-violet { @apply bg-violet-50 text-violet-700 border border-violet-100; }
 }
+
+/* ── 기능명세 부착 미리보기(명세 모드) ── */
+.spec-mode [data-spec] {
+  outline: 2px dashed #6366f1 !important;
+  outline-offset: 1px;
+  cursor: help;
+  position: relative;
+}
+.spec-mode [data-spec]::before {
+  content: attr(data-spec);
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translateY(-100%);
+  background: #6366f1;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  padding: 0 4px;
+  border-radius: 3px 3px 0 0;
+  z-index: 60;
+  pointer-events: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+}

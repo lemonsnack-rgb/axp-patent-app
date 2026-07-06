@@ -422,7 +422,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
     <div className="bg-white">
 
       {/* ── 검색 설정 (2행 압축) ─────────────────────────────── */}
-      <div className="border-b border-gray-200 relative">
+      <div data-spec="PAT-INP-010" className="border-b border-gray-200 relative">
 
         {/* Row 1: 국가 | 문헌종류 */}
         <div className="flex items-center gap-2 px-4 py-1.5 border-b border-gray-100 flex-wrap">
@@ -542,7 +542,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
 
         {/* 검색 범위(두 모드 공통) + 검색어 입력방식(일반/편집기) — 데모(10.77.0.244) 모델 */}
         <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
-          <div className="flex items-center gap-1.5">
+          <div data-spec="PAT-INP-020" className="flex items-center gap-1.5">
             <span className="text-xs2 font-semibold text-gray-500 shrink-0" title="검색창에 입력한 키워드를 특허의 어느 부분에서 찾을지 선택합니다(항목별 상세검색과 구분)">검색어 범위</span>
             <div className="flex border border-gray-200 rounded-md overflow-hidden">
               {KEY_TABS.map(tab => (
@@ -562,7 +562,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
               ))}
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div data-spec="PAT-INP-030" className="flex items-center gap-1.5">
             <span className="text-xs2 font-semibold text-gray-500 shrink-0" title="검색식 입력 방식을 선택합니다">입력방식</span>
             <div className="inline-flex border border-gray-300 rounded-md overflow-hidden">
               <button
@@ -580,7 +580,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
         </div>
 
         {/* 검색식 입력 (일반=단순 textarea / 편집기=구문강조 에디터) + 우측 검색·초기화 */}
-        <div className="flex items-stretch gap-2">
+        <div data-spec="PAT-INP-040" className="flex items-stretch gap-2">
           <div className="flex-1 min-w-0">
             {mode === 'editor' ? (
               <FormulaEditor
@@ -623,7 +623,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
 
       {/* ── 검색필드 섹션 (두 모드 공통 — 항목별 입력, 전부 AND 조합) ─────────────────────────── */}
       {(
-      <div className="border-t border-gray-200">
+      <div data-spec="PAT-INP-050" className="border-t border-gray-200">
 
         {/* 섹션 헤더 (아코디언 토글) — 클릭 가능함을 명확히 */}
         <button
@@ -755,7 +755,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
 
       {/* ── 검색 히스토리 (검색필드 아래) ─────────────────────────── */}
       {patentHistory.length > 0 && (
-        <div className="border-t border-gray-200">
+        <div data-spec="PAT-INP-060" className="border-t border-gray-200">
           <button
             onClick={() => setHistoryOpen(v => !v)}
             className="w-full flex items-center justify-between px-4 py-2 text-sm2 font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
