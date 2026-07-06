@@ -384,7 +384,15 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                 {(data.rightChangeList?.length ?? 0) > 0 && (
                   <div className="border-t border-gray-100 pt-3">
                     <div className="text-sm2 font-semibold text-gray-500 mb-2">권리변동 이력</div>
-                    {data.rightChangeList!.map((r, i) => <Row key={i} k={`${r.date} · ${r.type}`} v={r.name} />)}
+                    <ul className="text-md2 text-gray-700 space-y-0.5">
+                      {data.rightChangeList!.map((r, i) => (
+                        <li key={i} className="flex items-center gap-2">
+                          <span className="text-gray-400 font-mono w-24 shrink-0">{r.date}</span>
+                          <span className="flex-1">{r.name}</span>
+                          <Badge color="neutral">{r.type}</Badge>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
                 {(data.rightTransferList?.length ?? 0) > 0 && (
