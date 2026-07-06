@@ -426,7 +426,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
 
         {/* Row 1: 국가 | 문헌종류 */}
         <div className="flex items-center gap-2 px-4 py-1.5 border-b border-gray-100 flex-wrap">
-          <div className="flex items-center gap-1 flex-wrap">
+          <div data-spec="PAT-INP-011" className="flex items-center gap-1 flex-wrap">
             <span className="text-xs2 font-semibold text-gray-500 shrink-0">국가</span>
             <Chip
               active={Object.values(countries).every(v => !v) && extraCountries.length === 0}
@@ -454,7 +454,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
 
           <div className="w-px h-3.5 bg-gray-200 shrink-0" />
 
-          <div className="flex items-center gap-1 flex-wrap">
+          <div data-spec="PAT-INP-012" className="flex items-center gap-1 flex-wrap">
             <span className="text-xs2 font-semibold text-gray-500 shrink-0">문헌종류</span>
             <Chip active={docKinds.length === 0} onClick={() => setDocKinds([])} size="xs">전체</Chip>
             {PATENT_DOC_KINDS.map(k => (
@@ -465,7 +465,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
 
         {/* Row 2: 기간 | 상태정보 */}
         <div className="flex items-center gap-2 px-4 py-1.5 flex-wrap">
-          <div className="flex items-center gap-1 flex-wrap">
+          <div data-spec="PAT-INP-013" className="flex items-center gap-1 flex-wrap">
             <span className="text-xs2 font-semibold text-gray-500 shrink-0">기간</span>
             {PATENT_PERIODS.map(p => (
               <Chip key={p.id} active={periodChip === p.id} onClick={() => togglePeriod(p.id)} size="xs">{p.label}</Chip>
@@ -491,7 +491,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
 
           <div className="w-px h-3.5 bg-gray-200 shrink-0" />
 
-          <div className="flex items-center gap-1 flex-wrap">
+          <div data-spec="PAT-INP-014" className="flex items-center gap-1 flex-wrap">
             <span className="text-xs2 font-semibold text-gray-500 shrink-0">상태</span>
             <Chip active={statusAll} onClick={toggleAllStatus} size="xs">전체</Chip>
             <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded border border-green-200 bg-green-50/50">
