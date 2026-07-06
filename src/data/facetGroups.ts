@@ -77,7 +77,7 @@ export const PATENT_FACET_GROUPS_BASE: FacetGroup[] = [
     ],
   },
   {
-    key: 'trial_dispute', title: '심판/소송 유무',
+    key: 'trial', title: '심판 유무',
     items: [
       { label: '있음', count: 87 },
       { label: '없음', count: 4705 },

@@ -117,7 +117,6 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
         <span title={getPatentStatusDesc(data.status)} className="inline-block cursor-help"><Badge color={statusColor}>● {data.status}</Badge></span>
         <Badge color="brand">{data.country}</Badge>
         <span className="font-mono text-md2 font-semibold text-gray-600">{data.number}</span>
-        {data.grade && <Badge color="brand">평가 {data.grade}</Badge>}
       </div>
       <h2 className="text-2xl font-bold text-gray-800 leading-snug">{data.title}</h2>
       {/* 제목 하단 액션 링크 — 논문(원문 보기/본문 보기)과 동일 패턴 */}
@@ -374,7 +373,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               </Section>
             </div>
 
-            {/* 기타정보 — 대리인 + 심판/소송 + 특허평가 통합 */}
+            {/* 기타정보 — 대리인 + 심판 통합 */}
             <div ref={secEtc}>
               <Section title="기타정보" icon="briefcase">
                 <table className="w-full text-md2 mb-3">
@@ -458,20 +457,10 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                     )}
                   </div>
                 )}
-                {((data.trial && data.trial !== '심판 없음') || (data.dispute && data.dispute !== '분쟁 없음')) && (
+                {data.trial && data.trial !== '심판 없음' && (
                   <div className="border-t border-gray-100 pt-3 mt-3">
-                    <div className="text-sm2 font-semibold text-gray-500 mb-2">심판/소송 정보</div>
-                    {data.trial && data.trial !== '심판 없음' && <Row k="심판" v={data.trial} />}
-                    {data.dispute && data.dispute !== '분쟁 없음' && <Row k="분쟁" v={data.dispute} />}
-                  </div>
-                )}
-                {data.grade && (
-                  <div className="border-t border-gray-100 pt-3">
-                    <div className="text-sm2 font-semibold text-gray-500 mb-2">특허평가</div>
-                    <div className="flex items-center gap-2 text-md2">
-                      <span className="text-gray-500 w-24">평가등급</span>
-                      <Badge color="brand">{data.grade}</Badge>
-                    </div>
+                    <div className="text-sm2 font-semibold text-gray-500 mb-2">심판 정보</div>
+                    <Row k="심판" v={data.trial} />
                   </div>
                 )}
               </Section>

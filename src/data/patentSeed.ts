@@ -148,7 +148,6 @@ const DOMAIN_COMPS: Record<string, [string, string, string]> = {
 
 const COUNTRY_SEQ: Array<'KR' | 'US' | 'JP' | 'CN' | 'EP'> = ['KR', 'US', 'JP', 'CN', 'EP'];
 const STATUS_SEQ = ['등록', '심사중', '공개', '거절', '소멸'] as const;
-const GRADES = ['AAA', 'AA', 'A', 'BBB', 'BB'];
 
 function pad(n: number, len: number): string { return String(n).padStart(len, '0'); }
 
@@ -307,7 +306,6 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
   const detail = buildDetail(dm, isEn);
 
   const rightStatus = status === '등록' ? '존속 중' : status === '소멸' ? '소멸' : status === '거절' ? '거절확정' : status === '심사중' ? '심사 중' : '공개';
-  const dispute = seq % 7 === 0 ? `분쟁 있음 (IPR${year}-${pad(seq, 4)})` : '분쟁 없음';
   const trial = seq % 9 === 0 ? `무효심판 계속 중 (${year}당${pad(seq, 4)})` : '심판 없음';
 
   return {
@@ -322,9 +320,8 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
     expirationDate: exp,
     ipc: dm.ipc, cpc: cc === 'JP' ? '-' : dm.cpc,
     rightStatus, rightChange: seq % 5 === 0 ? '있음 (권리 양도)' : '없음',
-    grade: GRADES[seq % GRADES.length],
     trial, rejectionCount: status === '거절' ? 2 : status === '심사중' ? 1 : 0,
-    applicantStandard: applicant, standardOrg: seq % 6 === 0 ? '3GPP' : '-', dispute,
+    applicantStandard: applicant, standardOrg: seq % 6 === 0 ? '3GPP' : '-',
     abstract: detail.abstract,
     repClaim: `제1항. ${dm.parts[0]}; ${dm.parts[1]}; 및 ${dm.parts[2]}를 포함하는, ${dm.device}.`,
     claims: buildClaims(dm),

@@ -98,12 +98,10 @@ export interface PatentResult {
   cpc: string;
   rightStatus?: string;
   rightChange?: string;
-  grade?: string;
   trial?: string;
   rejectionCount?: number;
   applicantStandard?: string;
   standardOrg?: string;
-  dispute?: string;
   abstract: string;
   repClaim: string;
   aiPurpose?: string;

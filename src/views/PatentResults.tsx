@@ -55,10 +55,10 @@ function applyFacetFilters(items: PatentResult[], filters: AppliedFilter[]): Pat
           const prefix = f.label.split(' ')[0].replace('-', ' ');
           return p.ipc.startsWith(prefix);
         }
-        case 'trial_dispute':
+        case 'trial':
           return f.label === '있음'
-            ? (p.dispute?.includes('있음') ?? false)
-            : (p.dispute?.includes('없음') ?? false);
+            ? !(p.trial?.includes('없음') ?? true)
+            : (p.trial?.includes('없음') ?? true);
         default: return true;
       }
     })
