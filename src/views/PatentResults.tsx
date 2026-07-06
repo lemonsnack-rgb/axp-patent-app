@@ -200,7 +200,7 @@ export function PatentResults({ onOpenDetail, onSave, onSaveMany, searchQuery, m
       {/* ── 상단 고정 툴바 (검색식·건수·필터·정렬) ── */}
       <div className="sticky top-0 z-20 bg-white shrink-0">
         {/* sri-header — 검색식(먼저) → 건수 */}
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 bg-white flex-wrap">
+        <div data-spec="PAT-LST-010" className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 bg-white flex-wrap">
           <span className="text-xs2 text-gray-400 font-semibold shrink-0">검색식</span>
           <span
             className="inline-flex items-center h-7 text-xs2 px-2.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-mono cursor-pointer hover:bg-blue-100 transition-colors max-w-md truncate"
@@ -220,7 +220,7 @@ export function PatentResults({ onOpenDetail, onSave, onSaveMany, searchQuery, m
 
         {/* filter-bar — 필터 칩 ... 정렬·페이지·CSV */}
         <div className="flex items-center gap-1.5 px-4 py-1.5 border-b border-gray-100 bg-gray-50 flex-wrap relative z-20">
-          <span className="text-xs2 font-semibold text-gray-500 mr-1">필터</span>
+          <span data-spec="PAT-LST-030" className="text-xs2 font-semibold text-gray-500 mr-1">필터</span>
           {PATENT_FACET_GROUPS_BASE.map(g => {
             const activeCount = appliedFilters.filter(f => f.facetKey === g.key).length;
             const isOpen = openFacet === g.key;
@@ -257,6 +257,7 @@ export function PatentResults({ onOpenDetail, onSave, onSaveMany, searchQuery, m
           <span className="flex-1" />
           {/* 정렬: 날짜 필드 선택 + 방향 (출원일 외 공개일·등록일도 선택) */}
           <select
+            data-spec="PAT-LST-040"
             className="h-7 px-2 w-24 border border-gray-200 rounded text-xs2 bg-white outline-none hover:border-gray-300 focus:border-blue-400"
             value={sortField}
             onChange={e => { setSortField(e.target.value as DateField); setPage(1); }}
@@ -284,6 +285,7 @@ export function PatentResults({ onOpenDetail, onSave, onSaveMany, searchQuery, m
             <option value={200}>200개씩 보기</option>
           </select>
           <Button
+            data-spec="PAT-LST-050"
             variant="outlined" color="primary" size="xs" className="text-xs2 h-7"
             disabled={count === 0}
             title={checked.size > 0 ? `${checked.size}건 CSV 다운로드` : `전체 ${count}건 CSV 다운로드`}
@@ -311,7 +313,7 @@ export function PatentResults({ onOpenDetail, onSave, onSaveMany, searchQuery, m
 
       {/* ── 결과 본문 ── */}
       {count === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-16 text-gray-400">
+        <div data-spec="PAT-LST-070" className="flex-1 flex flex-col items-center justify-center text-center px-6 py-16 text-gray-400">
           <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="mb-3 text-gray-300">
             <circle cx="11" cy="11" r="7" /><line x1="20" y1="20" x2="16.5" y2="16.5" />
           </svg>
@@ -440,7 +442,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
         {checked.size > 0 ? (
           <>
             <span className="text-sm2 font-semibold text-blue-700">{checked.size}건 선택</span>
-            <Button variant="filled" color="primary" size="xs" className="text-xs2 h-7" onClick={onSaveChecked}>
+            <Button data-spec="PAT-LST-060" variant="filled" color="primary" size="xs" className="text-xs2 h-7" onClick={onSaveChecked}>
               <Icon name="star" size={11} /> 선택 저장
             </Button>
             <button onClick={onClearChecked} className="text-xs2 text-gray-400 hover:text-red-500">선택 해제</button>
@@ -453,7 +455,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
       </div>
 
       {/* 테이블 (데스크톱) — 모바일에선 카드 리스트로 대체 */}
-      <div className="hidden md:block bg-white">
+      <div data-spec="PAT-LST-020" className="hidden md:block bg-white">
         <table className="w-full text-sm2 border-collapse">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -481,6 +483,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
               return (
                 <tr
                   key={absIdx}
+                  data-spec="PAT-LST-021"
                   onClick={() => onSelectCard(absIdx)}
                   className={clsx(
                     'border-b border-gray-100 cursor-pointer transition-colors',
@@ -490,6 +493,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                   <td className="px-2 py-2 text-center border-r border-gray-100 align-top" onClick={e => e.stopPropagation()}>
                     <input
                       type="checkbox"
+                      data-spec="PAT-LST-022"
                       className="form-checkbox text-brand-400 rounded w-3.5 h-3.5 mt-0.5"
                       checked={checked.has(absIdx)}
                       onChange={() => onToggleCheck(absIdx)}

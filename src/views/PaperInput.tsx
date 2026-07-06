@@ -126,7 +126,7 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
   return (
     <div className="bg-white">
       {/* 기간 */}
-      <div className="flex items-center gap-2 px-4 py-1.5 border-b border-gray-200 flex-wrap">
+      <div data-spec="PAP-INP-010" className="flex items-center gap-2 px-4 py-1.5 border-b border-gray-200 flex-wrap">
         <span className="text-xs2 font-semibold text-gray-500 shrink-0">발행연도</span>
         {PERIODS.map(p => (
           <Chip key={p.id} active={periodChip === p.id} onClick={() => { setPeriodChip(p.id); setYearFrom(''); setYearTo(''); }}>{p.label}</Chip>
@@ -145,7 +145,7 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
       {/* 검색식 영역 */}
       <div className="p-4 space-y-2">
         {/* 범위탭 — 검색창 자유어가 찾는 범위(항목별 상세검색과 구분) */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div data-spec="PAP-INP-020" className="flex items-center gap-2 flex-wrap">
           <span className="text-xs2 font-semibold text-gray-500 shrink-0" title="검색창에 입력한 키워드를 찾을 범위">검색어 범위</span>
           <div className="flex border border-gray-200 rounded-md overflow-hidden">
             {SCOPE_TABS.map(tab => (
@@ -159,7 +159,7 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
         </div>
 
         {/* 검색식 + 우측 액션 버튼 */}
-        <div className="flex items-stretch gap-2">
+        <div data-spec="PAP-INP-030" className="flex items-stretch gap-2">
           <textarea
             value={formulaText}
             onChange={e => setFormulaText(e.target.value)}
@@ -170,14 +170,14 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
             className="flex-1 min-w-0 resize-y rounded border border-gray-300 p-2 font-mono text-sm leading-6 outline-none focus:border-blue-500 placeholder:text-gray-400"
           />
           <div className="shrink-0 w-[88px] flex flex-col gap-1.5">
-            <Button variant="filled" color="primary" size="sm" className="text-sm2 flex-1 !h-auto min-h-[36px]" disabled={!canSearch} onClick={handleSearch}>검색</Button>
-            <Button variant="outlined" color="primary" size="sm" className="text-sm2 shrink-0" onClick={resetAll}>초기화</Button>
+            <Button data-spec="PAP-INP-031" variant="filled" color="primary" size="sm" className="text-sm2 flex-1 !h-auto min-h-[36px]" disabled={!canSearch} onClick={handleSearch}>검색</Button>
+            <Button data-spec="PAP-INP-032" variant="outlined" color="primary" size="sm" className="text-sm2 shrink-0" onClick={resetAll}>초기화</Button>
           </div>
         </div>
       </div>
 
       {/* 검색필드 패널 (검색창 바로 아래 — 입력이 검색식에 반영) */}
-      <div className="border-t border-gray-200">
+      <div data-spec="PAP-INP-040" className="border-t border-gray-200">
         <button onClick={() => setFieldsOpen(v => !v)}
           aria-expanded={fieldsOpen}
           className={clsx('w-full flex items-center justify-between gap-2 px-4 py-2.5 text-sm2 font-semibold border-b transition-colors',
@@ -208,7 +208,7 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
 
       {/* 검색 히스토리 (검색필드 아래) */}
       {paperHistory.length > 0 && (
-        <div className="border-t border-gray-200">
+        <div data-spec="PAP-INP-050" className="border-t border-gray-200">
           <button onClick={() => setHistoryOpen(v => !v)}
             className="w-full flex items-center justify-between px-4 py-2 text-sm2 font-semibold text-gray-700 hover:bg-gray-50">
             <span className="flex items-center gap-1.5">
@@ -235,13 +235,13 @@ export const PaperInput = forwardRef<PaperInputHandle, Props>(function PaperInpu
               <div>
                 {paperHistory.slice((histPage - 1) * 10, histPage * 10).map(e => (
                   <div key={e.id} className={clsx('group flex items-center gap-2 py-1.5 px-2 border-b border-gray-50 hover:bg-gray-50', e.pinned && 'bg-amber-50/40')}>
-                    <button onClick={() => searchHistoryTogglePin(e.id)}
+                    <button data-spec="PAP-INP-052" onClick={() => searchHistoryTogglePin(e.id)}
                       className={clsx('w-4 shrink-0 leading-none', e.pinned ? 'text-amber-500' : 'text-gray-300 hover:text-amber-400')}
                       title={e.pinned ? '저장 해제' : '검색 저장 (★)'}>★</button>
-                    <button onClick={() => rerun(e.query)} className="flex-1 min-w-0 text-left font-mono text-xs2 text-brand-400 truncate" title="이 검색식으로 재검색">{e.query}</button>
+                    <button data-spec="PAP-INP-051" onClick={() => rerun(e.query)} className="flex-1 min-w-0 text-left font-mono text-xs2 text-brand-400 truncate" title="이 검색식으로 재검색">{e.query}</button>
                     <span className="w-28 shrink-0 text-xs2 text-gray-400 font-mono">{histTime(e.at)}</span>
-                    <button onClick={() => rerun(e.query)} className="w-[52px] shrink-0 text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 text-center">재검색</button>
-                    <button onClick={() => searchHistoryRemove(e.id)} className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-500 rounded shrink-0 opacity-0 group-hover:opacity-100" title="삭제">×</button>
+                    <button data-spec="PAP-INP-051" onClick={() => rerun(e.query)} className="w-[52px] shrink-0 text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 text-center">재검색</button>
+                    <button data-spec="PAP-INP-053" onClick={() => searchHistoryRemove(e.id)} className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-500 rounded shrink-0 opacity-0 group-hover:opacity-100" title="삭제">×</button>
                   </div>
                 ))}
               </div>

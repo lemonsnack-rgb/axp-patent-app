@@ -140,7 +140,7 @@ export function PaperResults({ onSave, onSaveMany, onOpenDetail, searchQuery, on
       {/* ── sri-header ── */}
       <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 bg-white flex-wrap">
         {/* 검색식(먼저) → 건수 순서 */}
-        <span className="text-xs2 text-gray-400 font-semibold shrink-0">검색식</span>
+        <span data-spec="PAP-LST-010" className="text-xs2 text-gray-400 font-semibold shrink-0">검색식</span>
         <span
           className="inline-flex items-center h-7 text-xs2 px-2.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-mono cursor-pointer hover:bg-blue-100 transition-colors max-w-md truncate"
           title={appliedQuery}
@@ -159,7 +159,7 @@ export function PaperResults({ onSave, onSaveMany, onOpenDetail, searchQuery, on
 
       {/* ── filter-bar ── */}
       <div className="flex items-center gap-1.5 px-4 py-1.5 border-b border-gray-100 bg-gray-50 flex-wrap">
-        <span className="text-xs2 text-gray-500 font-semibold mr-1">필터</span>
+        <span data-spec="PAP-LST-030" className="text-xs2 text-gray-500 font-semibold mr-1">필터</span>
         {PAPER_FACET_GROUPS.map(g => (
           <Button
             key={g.key}
@@ -194,6 +194,7 @@ export function PaperResults({ onSave, onSaveMany, onOpenDetail, searchQuery, on
         <Button variant="outlined" color="primary" size="xs" onClick={resetFilters} className="text-xs2 h-7 text-gray-400">필터 초기화</Button>
         <span className="flex-1" />
         <select
+          data-spec="PAP-LST-040"
           className="h-7 px-2 w-32 border border-gray-200 rounded text-xs2 bg-white outline-none hover:border-gray-300 focus:border-blue-400"
           value={sort}
           onChange={e => setSort(e.target.value as SortKey)}
@@ -213,6 +214,7 @@ export function PaperResults({ onSave, onSaveMany, onOpenDetail, searchQuery, on
           <option value={100}>100개씩 보기</option>
         </select>
         <Button
+          data-spec="PAP-LST-050"
           variant="outlined" color="primary" size="xs" className="text-xs2 h-7"
           disabled={data.length === 0}
           title={data.length === 0 ? '결과가 없습니다' : `${data.length}건 CSV 다운로드`}
@@ -296,7 +298,7 @@ export function PaperResults({ onSave, onSaveMany, onOpenDetail, searchQuery, on
 
       {/* ── 본문 ── */}
       {count === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-16 text-gray-400">
+        <div data-spec="PAP-LST-070" className="flex-1 flex flex-col items-center justify-center text-center px-6 py-16 text-gray-400">
           <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="mb-3 text-gray-300">
             <circle cx="11" cy="11" r="7" /><line x1="20" y1="20" x2="16.5" y2="16.5" />
           </svg>
@@ -401,7 +403,7 @@ function ListResults({
   return (
     <div>
       {/* 목록 컬럼 — 패널은 오버레이라 목록 폭을 유지한다 */}
-      <div className="p-3 bg-gray-50">
+      <div data-spec="PAP-LST-020" className="p-3 bg-gray-50">
         {/* 선택 바 (체크박스 일괄 저장) */}
         <div className="flex items-center gap-2 px-1 pb-2">
           <label className="flex items-center gap-1.5 cursor-pointer text-sm2 text-gray-600 select-none">
@@ -411,7 +413,7 @@ function ListResults({
           {checkedIds.size > 0 && (
             <>
               <span className="text-sm2 font-semibold text-blue-700">{checkedIds.size}건 선택</span>
-              <Button variant="filled" color="primary" size="xs" className="text-xs2" onClick={onSaveChecked}>
+              <Button data-spec="PAP-LST-060" variant="filled" color="primary" size="xs" className="text-xs2" onClick={onSaveChecked}>
                 <Icon name="star" size={11} /> 선택 저장
               </Button>
               <button onClick={onClearChecked} className="text-xs2 text-gray-400 hover:text-red-500">선택 해제</button>
@@ -426,9 +428,10 @@ function ListResults({
             selected={selectedCard === i}
             className="!p-3 mb-2"
           >
-            <div className="flex gap-3 items-start">
+            <div data-spec="PAP-LST-021" className="flex gap-3 items-start">
               <input
                 type="checkbox"
+                data-spec="PAP-LST-022"
                 checked={checkedIds.has(p.id)}
                 onChange={() => onToggleId(p.id)}
                 onClick={e => e.stopPropagation()}
