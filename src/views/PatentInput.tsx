@@ -602,8 +602,8 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
             )}
           </div>
           <div className="shrink-0 w-[88px] flex flex-col gap-1.5">
-            <Button variant="filled" color="primary" size="sm" className="text-sm2 flex-1 !h-auto min-h-[36px]" disabled={!canSearch} onClick={handleSearch}>검색</Button>
-            <Button variant="outlined" color="primary" size="sm" className="text-sm2 shrink-0" onClick={resetAll}>초기화</Button>
+            <Button data-spec="PAT-INP-041" variant="filled" color="primary" size="sm" className="text-sm2 flex-1 !h-auto min-h-[36px]" disabled={!canSearch} onClick={handleSearch}>검색</Button>
+            <Button data-spec="PAT-INP-042" variant="outlined" color="primary" size="sm" className="text-sm2 shrink-0" onClick={resetAll}>초기화</Button>
           </div>
         </div>
 
@@ -785,14 +785,15 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
                 {patentHistory.slice((histPage - 1) * 10, histPage * 10).map(e => (
                   <div key={e.id} className={clsx('group flex items-center gap-2 py-1.5 px-2 border-b border-gray-50 hover:bg-gray-50', e.pinned && 'bg-amber-50/40')}>
                     <button
+                      data-spec="PAT-INP-062"
                       onClick={() => searchHistoryTogglePin(e.id)}
                       className={clsx('w-4 shrink-0 leading-none', e.pinned ? 'text-amber-500' : 'text-gray-300 hover:text-amber-400')}
                       title={e.pinned ? '저장 해제' : '검색 저장 (★)'}
                     >★</button>
-                    <button onClick={() => rerun(e.query)} className="flex-1 min-w-0 text-left font-mono text-xs2 text-brand-400 truncate" title="이 검색식으로 재검색">{e.query}</button>
+                    <button data-spec="PAT-INP-061" onClick={() => rerun(e.query)} className="flex-1 min-w-0 text-left font-mono text-xs2 text-brand-400 truncate" title="이 검색식으로 재검색">{e.query}</button>
                     <span className="w-28 shrink-0 text-xs2 text-gray-400 font-mono">{histTime(e.at)}</span>
-                    <button onClick={() => rerun(e.query)} className="w-[52px] shrink-0 text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 text-center">재검색</button>
-                    <button onClick={() => searchHistoryRemove(e.id)} className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-500 rounded shrink-0 opacity-0 group-hover:opacity-100" title="삭제">×</button>
+                    <button data-spec="PAT-INP-061" onClick={() => rerun(e.query)} className="w-[52px] shrink-0 text-xs2 px-2 py-0.5 border border-blue-200 bg-blue-50 text-brand-400 rounded hover:bg-blue-100 text-center">재검색</button>
+                    <button data-spec="PAT-INP-063" onClick={() => searchHistoryRemove(e.id)} className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-500 rounded shrink-0 opacity-0 group-hover:opacity-100" title="삭제">×</button>
                   </div>
                 ))}
               </div>
