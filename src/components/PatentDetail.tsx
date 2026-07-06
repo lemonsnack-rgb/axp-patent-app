@@ -168,11 +168,11 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                     <BibRow k="출원번호" v={data.applicationNo} mono k2="출원일" v2={data.applicationDate || '—'} />
                     <BibRow k="공개/공고번호" v={data.publicationNo} mono k2="공개/공고일" v2={data.publicationDate || '—'} />
                     <BibRow k="등록번호" v={data.registerNo && data.registerNo !== '-' ? data.registerNo : '—'} mono k2="등록일" v2={data.registerDate && data.registerDate !== '-' ? data.registerDate : '—'} />
-                    <BibRow k="문헌종류" v={docKind} k2="권리상태" v2={data.rightStatus ? <Badge color={statusColor}>{data.rightStatus}</Badge> : '—'} />
+                    <BibRow k="문헌종류" v={docKind} k2="권리상태" v2={data.rightStatus || '—'} />
                     <BibRow k="원출원번호" v={data.originalAppNo && data.originalAppNo !== '-' ? data.originalAppNo : '—'} mono k2="국제출원번호" v2={data.intlAppNo && data.intlAppNo !== '-' ? data.intlAppNo : '—'} />
                     <BibRow k="우선권주장일" v={data.priorityDate || '—'} k2="심사청구일" v2={data.examRequestDate || '—'} />
                     <BibRow k="존속기간(예상)만료일" v={data.expirationDate && data.expirationDate !== '-' ? data.expirationDate : '—'} k2="권리변동" v2={data.rightChange || '—'} />
-                    <BibRow k="최종처분상태" v={data.finalDisposal ? <Badge color={statusColor}>{data.finalDisposal}</Badge> : '—'} k2="청구항 수" v2={data.claimCount != null ? `${data.claimCount}개` : '—'} />
+                    <BibRow k="최종처분상태" v={data.finalDisposal || '—'} k2="청구항 수" v2={data.claimCount != null ? `${data.claimCount}개` : '—'} />
                     <BibRow k="출원구분" v={data.applicationFlag || '—'} k2="번역문 제출일" v2={data.translationSubmitDate || '—'} />
                     <BibRow k="도면 수" v={data.drawingCount != null ? `${data.drawingCount}건` : '—'} k2="실시권 등록일" v2={data.licenseRegDate || '—'} />
                     {((data.designatedCountries?.length ?? 0) > 0 || data.sequenceListing) &&
@@ -551,7 +551,7 @@ function Section({ title, icon, children }: { title: string; icon: any; children
   );
 }
 
-function BibRow({ k, v, mono, k2, v2 }: { k: string; v: React.ReactNode; mono?: boolean; k2: string; v2: React.ReactNode }) {
+function BibRow({ k, v, mono, k2, v2 }: { k: string; v: string; mono?: boolean; k2: string; v2: string }) {
   return (
     <tr className="border-b border-gray-100">
       <td className="text-gray-500 py-1.5 w-28 whitespace-nowrap pr-2">{k}</td>
