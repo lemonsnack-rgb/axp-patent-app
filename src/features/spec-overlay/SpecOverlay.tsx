@@ -37,6 +37,16 @@ export function SpecOverlay() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // 선택한 항목(같은 ID의 모든 요소)에 하이라이트 클래스 부여
+  useEffect(() => {
+    const CLS = 'spec-selected';
+    document.querySelectorAll('.' + CLS).forEach(el => el.classList.remove(CLS));
+    if (active && selected) {
+      document.querySelectorAll(`[data-spec="${selected}"]`).forEach(el => el.classList.add(CLS));
+    }
+    return () => document.querySelectorAll('.' + CLS).forEach(el => el.classList.remove(CLS));
+  }, [selected, active]);
+
   const entry = selected ? SPEC_CATALOG[selected] : null;
 
   return (
