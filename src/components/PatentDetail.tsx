@@ -184,7 +184,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                 </table>
                 {(data.priorityList?.length ?? 0) > 0 && (
                   <div className="mt-3">
-                    <div className="text-xs2 font-semibold text-gray-500 mb-1.5">우선권 주장</div>
+                    <div className="text-sm2 font-semibold text-gray-500 mb-2">우선권 주장</div>
                     <ul className="text-md2 text-gray-700 space-y-0.5">
                       {data.priorityList!.map((p, i) => (
                         <li key={i}><Badge color="brand">{p.country}</Badge> <span className="font-mono">{p.number}</span> · {p.date}</li>
@@ -193,7 +193,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                   </div>
                 )}
                 <div className="mt-3.5">
-                  <div className="text-xs2 font-semibold text-gray-500 mb-2">타임라인</div>
+                  <div className="text-sm2 font-semibold text-gray-500 mb-2">타임라인</div>
                   <Timeline items={timeline} />
                 </div>
               </Section>
@@ -442,7 +442,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                     {(data.usProvisional?.length ?? 0) > 0 && <Row k="가출원 번호(US)" v={data.usProvisional!.join(', ')} />}
                     {(data.usRelatedApps?.length ?? 0) > 0 && (
                       <div className="mt-1.5">
-                        <div className="text-sm2 text-gray-500 mb-1">관련출원(US)</div>
+                        <div className="text-sm2 font-semibold text-gray-500 mb-2">관련출원(US)</div>
                         <ul className="text-md2 text-gray-700 space-y-0.5">
                           {data.usRelatedApps!.map((u, i) => (
                             <li key={i} className="flex items-center gap-2">
@@ -521,7 +521,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
           {/* 도면 (드로어 전용 — 본문 내). 대표도면 우선 */}
           {(data.figures || []).length > 0 && (
             <div className="mb-4">
-              <div className="text-xs2 font-semibold text-gray-500 mb-1.5">도면 ({(data.figures || []).length})</div>
+              <div className="text-sm2 font-semibold text-gray-500 mb-2">도면 ({(data.figures || []).length})</div>
               <div className="border border-gray-200 rounded-lg bg-gray-50 overflow-hidden" style={{ height: 360 }}>
                 <DrawingsPanel figures={data.figures} refSigns={data.refSigns} />
               </div>
@@ -551,7 +551,7 @@ function BibRow({ k, v, mono, k2, v2 }: { k: string; v: string; mono?: boolean; 
     <tr className="border-b border-gray-100">
       <td className="text-gray-500 py-1.5 w-28 whitespace-nowrap pr-2">{k}</td>
       <td className={`text-gray-800 py-1.5 pr-3 ${mono ? 'font-mono' : ''}`}>{v}</td>
-      <td className="text-gray-500 py-1.5 w-24 whitespace-nowrap pr-2">{k2}</td>
+      <td className="text-gray-500 py-1.5 w-28 whitespace-nowrap pr-2">{k2}</td>
       <td className="text-gray-800 py-1.5">{v2}</td>
     </tr>
   );
@@ -560,14 +560,14 @@ function BibRow({ k, v, mono, k2, v2 }: { k: string; v: string; mono?: boolean; 
 function InfoRow({ k, v, mono, muted }: { k: string; v: string; mono?: boolean; muted?: boolean }) {
   return (
     <tr className="border-b border-gray-100">
-      <td className="text-gray-500 py-1.5 w-40 whitespace-nowrap pr-2">{k}</td>
+      <td className="text-gray-500 py-1.5 w-28 whitespace-nowrap pr-2">{k}</td>
       <td className={`py-1.5 ${mono ? 'font-mono' : ''} ${muted ? 'text-gray-400' : 'text-gray-800'}`}>{v}</td>
     </tr>
   );
 }
 
 function Row({ k, v }: { k: string; v: string }) {
-  return <div className="flex items-center gap-2 py-1 text-md2"><span className="text-gray-500 w-32">{k}</span><span>{v}</span></div>;
+  return <div className="flex items-center gap-2 py-1.5 text-md2"><span className="text-gray-500 w-28 shrink-0">{k}</span><span className="text-gray-800">{v}</span></div>;
 }
 
 // 상세설명 하위 섹션 (기술분야/배경기술/과제/해결수단/효과/구체적 내용)
