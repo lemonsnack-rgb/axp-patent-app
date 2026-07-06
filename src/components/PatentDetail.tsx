@@ -168,10 +168,10 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               <Section title="서지사항" icon="cal">
                 <table className="w-full text-md2">
                   <tbody>
-                    <BibRow k="문헌번호" v={data.number} mono k2="(문헌일)" v2={data.publicationDate || '—'} />
-                    <BibRow k="출원번호" v={data.applicationNo} mono k2="(출원일)" v2={data.applicationDate || '—'} />
-                    <BibRow k="공개/공고번호" v={data.publicationNo} mono k2="(공개/공고일)" v2={data.publicationDate || '—'} />
-                    <BibRow k="등록번호" v={data.registerNo && data.registerNo !== '-' ? data.registerNo : '—'} mono k2="(등록일)" v2={data.registerDate && data.registerDate !== '-' ? data.registerDate : '—'} />
+                    <BibRow k="문헌번호" v={data.number} mono k2="문헌일" v2={data.publicationDate || '—'} />
+                    <BibRow k="출원번호" v={data.applicationNo} mono k2="출원일" v2={data.applicationDate || '—'} />
+                    <BibRow k="공개/공고번호" v={data.publicationNo} mono k2="공개/공고일" v2={data.publicationDate || '—'} />
+                    <BibRow k="등록번호" v={data.registerNo && data.registerNo !== '-' ? data.registerNo : '—'} mono k2="등록일" v2={data.registerDate && data.registerDate !== '-' ? data.registerDate : '—'} />
                     <BibRow k="문헌종류" v={docKind} k2="권리상태" v2={data.rightStatus || '—'} />
                     <BibRow k="원출원번호" v={data.originalAppNo && data.originalAppNo !== '-' ? data.originalAppNo : '—'} mono k2="국제출원번호" v2={data.intlAppNo && data.intlAppNo !== '-' ? data.intlAppNo : '—'} />
                     <BibRow k="우선권주장일" v={data.priorityDate || '—'} k2="심사청구일" v2={data.examRequestDate || '—'} />
