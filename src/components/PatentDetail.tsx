@@ -173,10 +173,22 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                     <BibRow k="공개/공고번호" v={data.publicationNo} mono k2="(공개/공고일)" v2={data.publicationDate || '—'} />
                     <BibRow k="등록번호" v={data.registerNo && data.registerNo !== '-' ? data.registerNo : '—'} mono k2="(등록일)" v2={data.registerDate && data.registerDate !== '-' ? data.registerDate : '—'} />
                     <BibRow k="문헌종류" v={docKind} k2="권리상태" v2={data.rightStatus || '—'} />
+                    <BibRow k="원출원번호" v={data.originalAppNo && data.originalAppNo !== '-' ? data.originalAppNo : '—'} mono k2="국제출원번호" v2={data.intlAppNo && data.intlAppNo !== '-' ? data.intlAppNo : '—'} />
                     <BibRow k="우선권주장일" v={data.priorityDate || '—'} k2="심사청구일" v2={data.examRequestDate || '—'} />
                     <BibRow k="존속기간(예상)만료일" v={data.expirationDate && data.expirationDate !== '-' ? data.expirationDate : '—'} k2="권리변동" v2={data.rightChange || '—'} />
+                    <BibRow k="최종처분상태" v={data.finalDisposal || '—'} k2="청구항 수" v2={data.claimCount != null ? `${data.claimCount}개` : '—'} />
                   </tbody>
                 </table>
+                {(data.priorityList?.length ?? 0) > 0 && (
+                  <div className="mt-3">
+                    <div className="text-xs2 font-semibold text-gray-500 mb-1.5">우선권 주장</div>
+                    <ul className="text-md2 text-gray-700 space-y-0.5">
+                      {data.priorityList!.map((p, i) => (
+                        <li key={i}><Badge color="brand">{p.country}</Badge> <span className="font-mono">{p.number}</span> · {p.date}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <div className="mt-3.5">
                   <div className="text-xs2 font-semibold text-gray-500 mb-2">타임라인</div>
                   <Timeline items={timeline} />
@@ -192,8 +204,11 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                     <InfoRow k="출원인" v={data.applicant || '—'} />
                     <InfoRow k="출원인 주소" v={data.applicantAddress || '—'} muted={!data.applicantAddress} />
                     <InfoRow k={data.country === 'JP' ? '출원인식별기호 (JP)' : '특허고객번호 (KR)'} v={data.applicantCode || '—'} mono />
+                    <InfoRow k="대표출원인" v={data.repApplicant || '—'} muted={!data.repApplicant} />
                     <InfoRow k="발명자" v={data.inventors || '—'} />
                     <InfoRow k="발명자 주소" v={data.inventorAddress || '(예시) 동일 — 출원인 주소'} muted />
+                    <InfoRow k="대리인" v={data.agent || '—'} muted={!data.agent} />
+                    <InfoRow k="심사관" v={data.examiner || '—'} muted={!data.examiner} />
                   </tbody>
                 </table>
               </Section>
@@ -299,6 +314,21 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                           </span>
                         ))}
                       </div>
+                      {(data.familyList?.length ?? 0) > 0 && (
+                        <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden">
+                          <div className="bg-gray-50 px-3 py-1.5 text-xs2 font-semibold text-gray-600 border-b border-gray-200">패밀리 문헌</div>
+                          <ul className="divide-y divide-gray-50">
+                            {data.familyList!.filter(f => familyTab === 'all' || f.country === familyTab).map((f, i) => (
+                              <li key={i} className="flex items-baseline gap-2 px-3 py-1.5 text-sm2">
+                                <span className="shrink-0"><Badge color="brand">{f.country}</Badge></span>
+                                <span className="font-mono text-brand-400 shrink-0">{f.docNumber}</span>
+                                <span className="text-gray-400 shrink-0">{f.date}</span>
+                                <span className="text-gray-600 truncate">{f.title}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </>
                   );
                 })()}
@@ -312,6 +342,16 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                 <div className="mt-3">
                   <CiteBlock title={`피인용 (${(data.citedList ?? []).length || data.cited}건)`} list={data.citedList} />
                 </div>
+                {(data.priorArtDocs?.length ?? 0) > 0 && (
+                  <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-3.5">
+                    <div className="text-base2 font-bold text-gray-700 mb-2">선행기술문헌 ({data.priorArtDocs!.length}건)</div>
+                    <ul className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
+                      {data.priorArtDocs!.map((d, i) => (
+                        <li key={i}><span className="font-mono text-brand-400">{d.country} {d.number}</span></li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </Section>
             </div>
 
@@ -320,8 +360,8 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               <Section title="분류코드" icon="tag">
                 <table className="w-full text-md2">
                   <tbody>
-                    <InfoRow k="Original IPC" v={data.ipc || '—'} mono />
-                    <InfoRow k="Original CPC" v={data.cpc || '—'} mono />
+                    <InfoRow k="IPC" v={(data.ipcList?.length ? data.ipcList : [data.ipc]).filter(Boolean).join('  ·  ') || '—'} mono />
+                    <InfoRow k="CPC" v={(data.cpcList?.length ? data.cpcList : [data.cpc]).filter(v => v && v !== '-').join('  ·  ') || '—'} mono />
                   </tbody>
                 </table>
               </Section>
@@ -332,12 +372,48 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               <Section title="기타정보" icon="briefcase">
                 <table className="w-full text-md2 mb-3">
                   <tbody>
-                    <InfoRow k="대리인" v={data.agent || '—'} muted={!data.agent} />
                     <InfoRow k="대리인 주소" v={data.agentAddress || '—'} muted={!data.agentAddress} />
                   </tbody>
                 </table>
-                {((data.trial && data.trial !== '심판 없음') || (data.dispute && data.dispute !== '분쟁 없음')) && (
+                {(data.rightChangeList?.length ?? 0) > 0 && (
                   <div className="border-t border-gray-100 pt-3">
+                    <div className="text-sm2 font-semibold text-gray-500 mb-2">권리변동 이력</div>
+                    {data.rightChangeList!.map((r, i) => <Row key={i} k={`${r.date} · ${r.type}`} v={r.name} />)}
+                  </div>
+                )}
+                {(data.adminProcess?.length ?? 0) > 0 && (
+                  <div className="border-t border-gray-100 pt-3 mt-3">
+                    <div className="text-sm2 font-semibold text-gray-500 mb-2">행정처리(수발신) 이력</div>
+                    <ul className="text-md2 text-gray-700 space-y-0.5">
+                      {data.adminProcess!.map((a, i) => (
+                        <li key={i} className="flex items-center gap-2"><span className="text-gray-400 font-mono w-24 shrink-0">{a.date}</span><span className="flex-1">{a.docName}</span><Badge color="neutral">{a.status}</Badge></li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {(data.rnd?.length ?? 0) > 0 && (
+                  <div className="border-t border-gray-100 pt-3 mt-3">
+                    <div className="text-sm2 font-semibold text-gray-500 mb-2">국가 R&D 정보</div>
+                    {data.rnd!.map((r, i) => (
+                      <div key={i} className="text-md2 text-gray-700 mb-1.5">
+                        <div className="font-medium">{r.task} <span className="text-gray-400 font-mono text-sm2">({r.taskNo})</span></div>
+                        <div className="text-sm2 text-gray-500">{r.dept} · {r.project} · {r.institute} · {r.period}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {data.standard && (
+                  <div className="border-t border-gray-100 pt-3 mt-3">
+                    <div className="text-sm2 font-semibold text-gray-500 mb-2">표준특허</div>
+                    <Row k="표준화기구" v={data.standard.org} />
+                    <Row k="표준번호" v={data.standard.numbers} />
+                    <Row k="표준기술명" v={data.standard.techName} />
+                    <Row k="선언(등재)자" v={data.standard.declarants} />
+                    <Row k="선언일" v={data.standard.date} />
+                  </div>
+                )}
+                {((data.trial && data.trial !== '심판 없음') || (data.dispute && data.dispute !== '분쟁 없음')) && (
+                  <div className="border-t border-gray-100 pt-3 mt-3">
                     <div className="text-sm2 font-semibold text-gray-500 mb-2">심판/소송 정보</div>
                     {data.trial && data.trial !== '심판 없음' && <Row k="심판" v={data.trial} />}
                     {data.dispute && data.dispute !== '분쟁 없음' && <Row k="분쟁" v={data.dispute} />}

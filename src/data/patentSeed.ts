@@ -349,6 +349,40 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
     description: detail.description,
     agent: cc === 'KR' ? '특허법인 다래' : cc === 'US' ? 'Wilson Sonsini Goodrich & Rosati' : cc === 'JP' ? '弁理士法人OOO' : 'Maucher Jenkins',
     agentAddress: cc === 'KR' ? '서울특별시 강남구 테헤란로 152' : cc === 'US' ? '650 Page Mill Rd, Palo Alto, CA' : cc === 'JP' ? '東京都港区虎ノ門1-1-1' : cc === 'CN' ? '上海市浦东新区世纪大道100号' : 'Neuhauser Str. 20, München',
+    // ── 수집 DB 대조 보강 (목업) ──
+    finalDisposal: status === '등록' ? '설정등록' : status === '거절' ? '거절결정' : status === '소멸' ? '존속기간만료' : status === '심사중' ? '심사청구' : '출원공개',
+    claimCount: buildClaims(dm).length,
+    originalAppNo: seq % 4 === 0 ? nums.appNo.replace(/(\d)$/, m => String((Number(m) + 5) % 10)) : '-',
+    intlAppNo: cc === 'EP' || seq % 6 === 0 ? `PCT/${cc === 'US' ? 'US' : 'KR'}${year - 1}/${pad(50000 + seq * 13, 6)}` : '-',
+    intlAppDate: cc === 'EP' || seq % 6 === 0 ? mkDate(year - 1, seq, seq + 1) : '-',
+    examiner: isEn ? 'J. Smith' : '박심사',
+    repApplicant: applicant,
+    customerNo: cc === 'KR' ? pad(120000000000 + seq * 7919, 12) : '-',
+    ipcList: [dm.ipc, `${dm.ipc.slice(0, 4)}${(10 + seq % 80)}/${pad(seq % 90 + 10, 2)}`, `H04L ${9 + seq % 3}/${pad(seq % 40 + 10, 2)}`].filter((v, i, a) => a.indexOf(v) === i),
+    cpcList: cc === 'JP' ? [] : [dm.cpc, `${dm.cpc.slice(0, 4)}${2200 + seq % 90}/${pad(seq % 90 + 10, 2)}`].filter((v, i, a) => a.indexOf(v) === i),
+    priorityList: seq % 3 === 0 ? [{ country: cc, number: nums.appNo, date: mkDate(year - 2, seq, seq) }] : [],
+    familyList: Array.from({ length: 1 + (seq % 5) }, (_, i) => {
+      const fcc = ['KR', 'US', 'JP', 'CN', 'EP'][(seq + i) % 5];
+      const fy = year - (i % 3);
+      return { country: fcc, docNumber: docNumber(fcc, fy, seq * 7 + i).number, date: mkDate(fy, seq + i, seq + i + 2), title: isEn ? dm.titleEn : dm.titleKo };
+    }),
+    priorArtDocs: (seq % 2 === 0 && citing.length > 0)
+      ? [{ number: docNumber(cc === 'KR' ? 'KR' : 'US', year - 3, seq * 11).number, country: cc === 'KR' ? 'KR' : 'US' }]
+      : [],
+    rightChangeList: seq % 5 === 0 ? [{ type: '권리 양도', name: `${applicant} → OO기술지주(주)`, date: mkDate(year + 1, seq, seq) }] : [],
+    adminProcess: [
+      { docName: '출원서', date: appDate, status: '수리' },
+      ...(status !== '공개' ? [{ docName: '의견제출통지서', date: mkDate(year, seq + 4, seq), status: '발송' }] : []),
+      ...(isReg ? [{ docName: '등록결정서', date: regDate, status: '발송' }] : []),
+    ],
+    rnd: seq % 4 === 0 ? [{
+      taskNo: `${year - 1}-${pad(seq * 3, 6)}`, dept: '산업통상자원부', project: '차세대 핵심기술개발사업',
+      task: `${dm.titleKo} 원천기술 개발`, institute: applicant, period: `${year - 2}.03 ~ ${year}.02`,
+    }] : [],
+    standard: seq % 6 === 0 ? {
+      org: '3GPP', numbers: `TS 38.${300 + seq % 99}`, techName: `${dm.titleKo} 표준`,
+      declarants: applicant, date: mkDate(year, seq, seq),
+    } : undefined,
   };
 }
 

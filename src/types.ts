@@ -130,6 +130,24 @@ export interface PatentResult {
   description?: string;
   agent?: string;
   agentAddress?: string;
+  // ── 수집 DB 대조 보강 필드 (목업) — docs/상세페이지-수집필드-대조.md ──
+  finalDisposal?: string;                 // 최종 처분 상태
+  claimCount?: number;                    // 청구항 수
+  originalAppNo?: string;                 // 원출원번호
+  intlAppNo?: string;                     // 국제출원번호
+  intlAppDate?: string;                   // 국제출원일
+  examiner?: string;                      // 심사관
+  repApplicant?: string;                  // 대표출원인명
+  customerNo?: string;                    // 특허고객번호
+  ipcList?: string[];                     // IPC 전체 리스트
+  cpcList?: string[];                     // CPC 전체 리스트
+  priorityList?: { country: string; number: string; date: string }[];   // 우선권
+  familyList?: { country: string; docNumber: string; date: string; title: string }[];  // 패밀리 문헌
+  priorArtDocs?: { number: string; country: string }[];                  // 선행기술문헌
+  rightChangeList?: { type: string; name: string; date: string }[];      // 권리변동 이력
+  adminProcess?: { docName: string; date: string; status: string }[];    // 행정처리(수발신)
+  rnd?: { taskNo: string; dept: string; project: string; task: string; institute: string; period: string }[];  // 국가 R&D
+  standard?: { org: string; numbers: string; techName: string; declarants: string; date: string };             // 표준특허
 }
 
 export interface PatentCitation {
