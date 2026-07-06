@@ -592,21 +592,8 @@ function DescSub({ title, children }: { title: string; children: React.ReactNode
 }
 
 function TextBlock({ children }: { children: React.ReactNode }) {
-  const [translated, setTranslated] = useState(false);
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-      <div className="flex justify-end mb-1.5">
-        <Button
-          variant={translated ? 'filled' : 'outlined'} color="primary" size="xs"
-          onClick={() => setTranslated(v => !v)}
-          title="원문/자동번역 보기 전환"
-        >🌐 {translated ? '원문 보기' : '자동번역'}</Button>
-      </div>
-      {translated && (
-        <div className="mb-2 text-xs2 text-blue-700 bg-blue-50 border border-blue-100 rounded px-2.5 py-1.5">
-          자동번역 미리보기 — 외부 번역 서비스 연동 시 번역문이 이 영역에 표시됩니다. 현재는 원문을 표시합니다.
-        </div>
-      )}
       <div className="text-base2 text-gray-700 leading-relaxed whitespace-pre-line">{children}</div>
     </div>
   );
@@ -678,15 +665,15 @@ function addDays(s: string, n: number): string {
 
 function Timeline({ items }: { items: { label: string; date: string }[] }) {
   return (
-    <div className="flex items-start gap-0 overflow-x-auto pb-2">
+    <div className="flex flex-wrap items-start gap-x-1 gap-y-3 pb-1">
       {items.map((it, i) => (
         <div key={i} className="flex items-start">
-          <div className="flex flex-col items-center text-center min-w-[88px] px-1">
+          <div className="flex flex-col items-center text-center w-[88px] px-1">
             <div className={`w-2.5 h-2.5 rounded-full mb-1.5 ${it.date === '—' ? 'bg-gray-300' : 'bg-blue-500'}`} />
             <div className="text-xs2 font-semibold text-gray-500 mb-0.5">{it.label}</div>
             <div className="text-sm2 font-mono text-gray-700">{it.date}</div>
           </div>
-          {i < items.length - 1 && <div className="flex-1 min-w-4 h-px bg-gray-300 mt-2.5 mx-1" />}
+          {i < items.length - 1 && <div className="w-4 h-px bg-gray-300 mt-2.5" />}
         </div>
       ))}
     </div>
