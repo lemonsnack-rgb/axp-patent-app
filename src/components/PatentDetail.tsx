@@ -7,8 +7,7 @@ import { downloadPatentPdf } from '../features/patentPdf';
 import { Icon } from './Icon';
 import { DetailFooter } from './DetailFooter';
 import { CK_WORDMARK } from '../assets/ckLogo';
-import { Badge } from './ui';
-import { getPatentStatusDesc, getPatentStatusBadgeColor } from '../utils/badgeUtils';
+import { getPatentStatusDesc } from '../utils/badgeUtils';
 import { Button } from '@muhayu/axp-ui';
 
 export function parseKeywords(query: string): string[] {
@@ -45,7 +44,6 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
   backIcon?: boolean; // false면 화살표 숨김 (탭 닫기 등 복귀가 아닌 액션)
 }) {
   const timeline = buildTimeline(data);
-  const statusColor = getPatentStatusBadgeColor(data.status);
   // 문헌종류 — 등록/소멸은 등록특허공보, 그 외는 공개특허공보
   const docKind = (data.status === '등록' || data.status === '소멸') ? '등록특허공보' : '공개특허공보';
 
@@ -111,8 +109,9 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
   const titleBlock = (
     <div className="px-6 pt-4 pb-3 border-b border-gray-200 shrink-0">
       <div className="flex items-center gap-2 flex-wrap mb-1.5">
-        <span title={getPatentStatusDesc(data.status)} className="inline-block cursor-help"><Badge color={statusColor}>● {data.status}</Badge></span>
-        <Badge color="brand">{data.country}</Badge>
+        <span title={getPatentStatusDesc(data.status)} className="cursor-help font-semibold text-gray-700">{data.status}</span>
+        <span className="text-gray-300">·</span>
+        <span className="font-semibold text-gray-600">{data.country}</span>
         <span className="font-mono text-md2 font-semibold text-gray-600">{data.number}</span>
       </div>
       <h2 className="text-2xl font-bold text-gray-800 leading-snug">{data.title}</h2>
@@ -184,7 +183,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                     <div className="text-sm2 font-semibold text-gray-500 mb-2">우선권 주장</div>
                     <ul className="text-md2 text-gray-700 space-y-0.5">
                       {data.priorityList!.map((p, i) => (
-                        <li key={i}><Badge color="brand">{p.country}</Badge> <span className="font-mono">{p.number}</span> · {p.date}</li>
+                        <li key={i}><span className="font-mono text-gray-500">{p.country}</span> <span className="font-mono">{p.number}</span> · {p.date}</li>
                       ))}
                     </ul>
                   </div>
@@ -320,7 +319,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                           <ul className="divide-y divide-gray-50">
                             {data.familyList!.filter(f => familyTab === 'all' || f.country === familyTab).map((f, i) => (
                               <li key={i} className="flex items-baseline gap-2 px-3 py-1.5 text-sm2">
-                                <span className="shrink-0"><Badge color="brand">{f.country}</Badge></span>
+                                <span className="shrink-0 font-mono text-gray-500">{f.country}</span>
                                 <span className="font-mono text-brand-400 shrink-0">{f.docNumber}</span>
                                 <span className="text-gray-400 shrink-0">{f.date}</span>
                                 <span className="text-gray-600 truncate">{f.title}</span>
@@ -386,7 +385,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                         <li key={i} className="flex items-center gap-2">
                           <span className="text-gray-400 font-mono w-24 shrink-0">{r.date}</span>
                           <span className="flex-1">{r.name}</span>
-                          <Badge color="neutral">{r.type}</Badge>
+                          <span className="text-gray-500 shrink-0">{r.type}</span>
                         </li>
                       ))}
                     </ul>
@@ -411,7 +410,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                     <div className="text-sm2 font-semibold text-gray-500 mb-2">행정처리(수발신) 이력</div>
                     <ul className="text-md2 text-gray-700 space-y-0.5">
                       {data.adminProcess!.map((a, i) => (
-                        <li key={i} className="flex items-center gap-2"><span className="text-gray-400 font-mono w-24 shrink-0">{a.date}</span><span className="flex-1">{a.docName}</span><Badge color="neutral">{a.status}</Badge></li>
+                        <li key={i} className="flex items-center gap-2"><span className="text-gray-400 font-mono w-24 shrink-0">{a.date}</span><span className="flex-1">{a.docName}</span><span className="text-gray-500 shrink-0">{a.status}</span></li>
                       ))}
                     </ul>
                   </div>
@@ -454,7 +453,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                               <span className="font-mono text-gray-500 w-28 shrink-0">{u.regNo}</span>
                               <span className="text-gray-400 font-mono w-24 shrink-0">{u.date}</span>
                               <span className="flex-1">{u.classification}</span>
-                              <Badge color="neutral">{u.status}</Badge>
+                              <span className="text-gray-500 shrink-0">{u.status}</span>
                             </li>
                           ))}
                         </ul>

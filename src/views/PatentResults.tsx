@@ -6,7 +6,7 @@ import { PATENT_FACET_GROUPS_BASE, type FacetGroup } from '../data/facetGroups';
 import { PatentDetail, parseKeywords, KW_COLORS } from '../components/PatentDetail';
 import { Icon } from '../components/Icon';
 import { toast, Button } from '@muhayu/axp-ui';
-import { getPatentStatusBadgeColor, getPatentStatusDesc } from '../utils/badgeUtils';
+import { getPatentStatusDesc } from '../utils/badgeUtils';
 import { downloadPatentPdf } from '../features/patentPdf';
 import { Badge } from '../components/ui';
 import type { PatentResult } from '../types';
@@ -478,7 +478,6 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
             {pageData.map((d, i) => {
               const absIdx = startIdx + i;
               const isSelected = selectedCard === absIdx;
-              const statusColor = getPatentStatusBadgeColor(d.status);
               return (
                 <tr
                   key={absIdx}
@@ -497,9 +496,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
                     />
                   </td>
                   <td className="px-2 py-2 text-center align-top">
-                    <span title={getPatentStatusDesc(d.status)} className="inline-block cursor-help">
-                      <Badge color={statusColor} className="text-xs2 whitespace-nowrap">{d.status}</Badge>
-                    </span>
+                    <span title={getPatentStatusDesc(d.status)} className="cursor-help text-xs2 whitespace-nowrap font-medium text-gray-600">{d.status}</span>
                   </td>
                   <td className="px-2 py-2 align-top">
                     <span className="font-mono text-xs2 text-brand-400 leading-snug">{d.number}</span>
@@ -542,7 +539,6 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
         {pageData.map((d, i) => {
           const absIdx = startIdx + i;
           const isSelected = selectedCard === absIdx;
-          const statusColor = getPatentStatusBadgeColor(d.status);
           return (
             <div
               key={absIdx}
@@ -558,7 +554,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                  <span title={getPatentStatusDesc(d.status)}><Badge color={statusColor} className="text-xs2 whitespace-nowrap">{d.status}</Badge></span>
+                  <span title={getPatentStatusDesc(d.status)} className="text-xs2 whitespace-nowrap font-medium text-gray-600">{d.status}</span>
                   <span className="font-mono text-xs2 text-brand-400">{d.number}</span>
                 </div>
                 <div className="text-sm2 font-medium text-gray-800 leading-snug">{highlightText(d.title, searchQuery)}</div>
