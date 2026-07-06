@@ -457,7 +457,10 @@ function ListResults({
                   {paperMetaLine(p)}
                 </div>
                 {p.abstract && (
-                  <div className="text-sm2 text-gray-600 line-clamp-2">{highlightText(p.abstract, searchQuery)}</div>
+                  <div className="text-sm2 text-gray-600 line-clamp-2">
+                    <span className="font-semibold text-gray-400 mr-1">초록</span>
+                    {highlightText(p.abstract, searchQuery)}
+                  </div>
                 )}
               </div>
             </div>
