@@ -177,6 +177,10 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                     <BibRow k="우선권주장일" v={data.priorityDate || '—'} k2="심사청구일" v2={data.examRequestDate || '—'} />
                     <BibRow k="존속기간(예상)만료일" v={data.expirationDate && data.expirationDate !== '-' ? data.expirationDate : '—'} k2="권리변동" v2={data.rightChange || '—'} />
                     <BibRow k="최종처분상태" v={data.finalDisposal || '—'} k2="청구항 수" v2={data.claimCount != null ? `${data.claimCount}개` : '—'} />
+                    <BibRow k="출원구분" v={data.applicationFlag || '—'} k2="번역문 제출일" v2={data.translationSubmitDate || '—'} />
+                    <BibRow k="도면 수" v={data.drawingCount != null ? `${data.drawingCount}건` : '—'} k2="실시권 등록일" v2={data.licenseRegDate || '—'} />
+                    {((data.designatedCountries?.length ?? 0) > 0 || data.sequenceListing) &&
+                      <BibRow k="지정국" v={(data.designatedCountries?.length ?? 0) > 0 ? data.designatedCountries!.join(', ') : '—'} k2="서열목록" v2={data.sequenceListing ? '있음' : '—'} />}
                   </tbody>
                 </table>
                 {(data.priorityList?.length ?? 0) > 0 && (
@@ -362,6 +366,9 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                   <tbody>
                     <InfoRow k="IPC" v={(data.ipcList?.length ? data.ipcList : [data.ipc]).filter(Boolean).join('  ·  ') || '—'} mono />
                     <InfoRow k="CPC" v={(data.cpcList?.length ? data.cpcList : [data.cpc]).filter(v => v && v !== '-').join('  ·  ') || '—'} mono />
+                    {data.countryClassifications?.map((c, i) => (
+                      <InfoRow key={i} k={c.label} v={c.codes.join('  ·  ') || '—'} mono />
+                    ))}
                   </tbody>
                 </table>
               </Section>
@@ -379,6 +386,20 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                   <div className="border-t border-gray-100 pt-3">
                     <div className="text-sm2 font-semibold text-gray-500 mb-2">권리변동 이력</div>
                     {data.rightChangeList!.map((r, i) => <Row key={i} k={`${r.date} · ${r.type}`} v={r.name} />)}
+                  </div>
+                )}
+                {(data.rightTransferList?.length ?? 0) > 0 && (
+                  <div className="border-t border-gray-100 pt-3 mt-3">
+                    <div className="text-sm2 font-semibold text-gray-500 mb-2">권리이전 이력</div>
+                    <ul className="text-md2 text-gray-700 space-y-0.5">
+                      {data.rightTransferList!.map((r, i) => (
+                        <li key={i} className="flex items-center gap-2">
+                          <span className="text-gray-400 font-mono w-24 shrink-0">{r.date}</span>
+                          <span className="flex-1">{r.docName} <span className="text-gray-400">({r.before} → {r.after})</span></span>
+                          <span className="font-mono text-sm2 text-gray-400">{r.regNo}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
                 {(data.adminProcess?.length ?? 0) > 0 && (
@@ -410,6 +431,31 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                     <Row k="표준기술명" v={data.standard.techName} />
                     <Row k="선언(등재)자" v={data.standard.declarants} />
                     <Row k="선언일" v={data.standard.date} />
+                  </div>
+                )}
+                {(data.jpEdition || data.agentCategory || data.epFileRef || data.epFilingLanguage || (data.usProvisional?.length ?? 0) > 0 || (data.usRelatedApps?.length ?? 0) > 0) && (
+                  <div className="border-t border-gray-100 pt-3 mt-3">
+                    <div className="text-sm2 font-semibold text-gray-500 mb-2">국가별 추가정보</div>
+                    {data.jpEdition && <Row k="공보판(JP)" v={data.jpEdition} />}
+                    {data.agentCategory && <Row k="대리인 구분(JP)" v={data.agentCategory} />}
+                    {data.epFileRef && <Row k="출원인 정리번호(EP)" v={data.epFileRef} />}
+                    {data.epFilingLanguage && <Row k="출원/공개 언어(EP)" v={data.epFilingLanguage} />}
+                    {(data.usProvisional?.length ?? 0) > 0 && <Row k="가출원 번호(US)" v={data.usProvisional!.join(', ')} />}
+                    {(data.usRelatedApps?.length ?? 0) > 0 && (
+                      <div className="mt-1.5">
+                        <div className="text-sm2 text-gray-500 mb-1">관련출원(US)</div>
+                        <ul className="text-md2 text-gray-700 space-y-0.5">
+                          {data.usRelatedApps!.map((u, i) => (
+                            <li key={i} className="flex items-center gap-2">
+                              <span className="font-mono text-gray-500 w-28 shrink-0">{u.regNo}</span>
+                              <span className="text-gray-400 font-mono w-24 shrink-0">{u.date}</span>
+                              <span className="flex-1">{u.classification}</span>
+                              <Badge color="neutral">{u.status}</Badge>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 )}
                 {((data.trial && data.trial !== '심판 없음') || (data.dispute && data.dispute !== '분쟁 없음')) && (

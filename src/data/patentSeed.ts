@@ -349,40 +349,71 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
     description: detail.description,
     agent: cc === 'KR' ? '특허법인 다래' : cc === 'US' ? 'Wilson Sonsini Goodrich & Rosati' : cc === 'JP' ? '弁理士法人OOO' : 'Maucher Jenkins',
     agentAddress: cc === 'KR' ? '서울특별시 강남구 테헤란로 152' : cc === 'US' ? '650 Page Mill Rd, Palo Alto, CA' : cc === 'JP' ? '東京都港区虎ノ門1-1-1' : cc === 'CN' ? '上海市浦东新区世纪大道100号' : 'Neuhauser Str. 20, München',
-    // ── 수집 DB 대조 보강 (목업) ──
+    // ── 수집 DB 대조 보강 (목업) — 조건 규칙은 docs/목업-조건표.md 참조 ──
     finalDisposal: status === '등록' ? '설정등록' : status === '거절' ? '거절결정' : status === '소멸' ? '존속기간만료' : status === '심사중' ? '심사청구' : '출원공개',
     claimCount: buildClaims(dm).length,
-    originalAppNo: seq % 4 === 0 ? nums.appNo.replace(/(\d)$/, m => String((Number(m) + 5) % 10)) : '-',
-    intlAppNo: cc === 'EP' || seq % 6 === 0 ? `PCT/${cc === 'US' ? 'US' : 'KR'}${year - 1}/${pad(50000 + seq * 13, 6)}` : '-',
-    intlAppDate: cc === 'EP' || seq % 6 === 0 ? mkDate(year - 1, seq, seq + 1) : '-',
+    drawingCount: figuresFor(dm).length,
+    // 출원구분: EP=PCT 국내단계진입, CN(slot 3)=분할출원(원출원 존재), 그 외(KR/US/JP)=정상출원
+    applicationFlag: cc === 'EP' ? 'PCT 국내단계진입' : slot === 3 ? '분할출원' : '정상출원',
+    originalAppNo: slot === 3 ? nums.appNo.replace(/-(\d{7})/, (_, d) => `-${pad(Number(d) - 1000, 7)}`) : '-',
+    // 국제출원/지정국/EP커스텀: EP 문헌
+    intlAppNo: cc === 'EP' ? `PCT/EP${year - 1}/${pad(50000 + seq * 13, 6)}` : '-',
+    intlAppDate: cc === 'EP' ? mkDate(year - 1, seq, seq + 1) : '-',
+    designatedCountries: cc === 'EP' ? ['DE', 'FR', 'GB', 'IT', 'NL'] : [],
+    epFileRef: cc === 'EP' ? `P${pad(seq * 17, 6)}EP` : undefined,
+    epFilingLanguage: cc === 'EP' ? (seq % 3 === 0 ? 'de' : seq % 3 === 1 ? 'en' : 'fr') : undefined,
+    // 번역문 제출일: 외국어 문헌(비 KR)
+    translationSubmitDate: cc !== 'KR' ? mkDate(year, seq + 2, seq) : undefined,
     examiner: isEn ? 'J. Smith' : '박심사',
     repApplicant: applicant,
+    // 특허고객번호: KR
     customerNo: cc === 'KR' ? pad(120000000000 + seq * 7919, 12) : '-',
     ipcList: [dm.ipc, `${dm.ipc.slice(0, 4)}${(10 + seq % 80)}/${pad(seq % 90 + 10, 2)}`, `H04L ${9 + seq % 3}/${pad(seq % 40 + 10, 2)}`].filter((v, i, a) => a.indexOf(v) === i),
     cpcList: cc === 'JP' ? [] : [dm.cpc, `${dm.cpc.slice(0, 4)}${2200 + seq % 90}/${pad(seq % 90 + 10, 2)}`].filter((v, i, a) => a.indexOf(v) === i),
-    priorityList: seq % 3 === 0 ? [{ country: cc, number: nums.appNo, date: mkDate(year - 2, seq, seq) }] : [],
+    // 국가 고유 분류: JP=FI/FTERM/테마, US=UPC, EP=EPC
+    countryClassifications:
+      cc === 'JP' ? [{ label: 'FI', codes: [`${dm.ipc.slice(0, 4)},${300 + seq % 90}`] }, { label: 'F-term', codes: [`5B${pad(seq % 900, 3)}AA${seq % 90}`] }, { label: '테마', codes: [`5B${pad(seq % 900, 3)}`] }]
+      : cc === 'US' ? [{ label: 'UPC', codes: [`${300 + seq % 400}/${100 + seq % 800}`] }]
+      : cc === 'EP' ? [{ label: 'EPC', codes: [`${dm.ipc.slice(0, 4)}${10 + seq % 80}/${pad(seq % 90, 2)}`] }]
+      : [],
+    // US 관련출원·가출원: US
+    usRelatedApps: cc === 'US' ? [{ regNo: `US ${pad(9000000 + seq * 13, 7)}`, date: mkDate(year - 2, seq, seq), classification: 'Continuation', status: 'Granted' }] : [],
+    usProvisional: cc === 'US' ? [`US ${year - 2}/${pad(600000 + seq * 7, 6)}`] : [],
+    // JP 공보판·대리인구분: JP
+    jpEdition: cc === 'JP' ? (isReg ? '특허공보(B)' : '공개특허공보(A)') : undefined,
+    agentCategory: cc === 'JP' ? '弁理士' : undefined,
+    // 우선권: 해외(US/EP) 문헌은 자국 우선권 주장 흔함
+    priorityList: (cc === 'US' || cc === 'EP') ? [{ country: cc, number: nums.appNo, date: mkDate(year - 2, seq, seq) }] : [],
     familyList: Array.from({ length: 1 + (seq % 5) }, (_, i) => {
       const fcc = ['KR', 'US', 'JP', 'CN', 'EP'][(seq + i) % 5];
       const fy = year - (i % 3);
       return { country: fcc, docNumber: docNumber(fcc, fy, seq * 7 + i).number, date: mkDate(fy, seq + i, seq + i + 2), title: isEn ? dm.titleEn : dm.titleKo };
     }),
-    priorArtDocs: (seq % 2 === 0 && citing.length > 0)
+    // 선행기술문헌: 인용문헌이 있는 문헌(대부분)에 함께 표시
+    priorArtDocs: citing.length > 0
       ? [{ number: docNumber(cc === 'KR' ? 'KR' : 'US', year - 3, seq * 11).number, country: cc === 'KR' ? 'KR' : 'US' }]
       : [],
-    rightChangeList: seq % 5 === 0 ? [{ type: '권리 양도', name: `${applicant} → OO기술지주(주)`, date: mkDate(year + 1, seq, seq) }] : [],
+    // 권리변동/권리이전/실시권: 등록·소멸(권리 발생) 문헌
+    rightChangeList: isReg ? [{ type: '권리 양도', name: `${applicant} → OO기술지주(주)`, date: mkDate(year + 1, seq, seq) }] : [],
+    rightTransferList: isReg ? [{ date: mkDate(year + 1, seq, seq), regNo: nums.regNo, docName: '권리이전등록신청서', before: applicant, after: 'OO기술지주(주)' }] : [],
+    licenseRegDate: isReg && seq % 2 === 0 ? mkDate(year + 2, seq, seq) : undefined,
     adminProcess: [
       { docName: '출원서', date: appDate, status: '수리' },
       ...(status !== '공개' ? [{ docName: '의견제출통지서', date: mkDate(year, seq + 4, seq), status: '발송' }] : []),
       ...(isReg ? [{ docName: '등록결정서', date: regDate, status: '발송' }] : []),
     ],
-    rnd: seq % 4 === 0 ? [{
+    // 국가 R&D: KR 문헌 중 짝수 seq(국내 과제 지원분)
+    rnd: cc === 'KR' && seq % 2 === 0 ? [{
       taskNo: `${year - 1}-${pad(seq * 3, 6)}`, dept: '산업통상자원부', project: '차세대 핵심기술개발사업',
       task: `${dm.titleKo} 원천기술 개발`, institute: applicant, period: `${year - 2}.03 ~ ${year}.02`,
     }] : [],
+    // 표준특허: 표준화기구(3GPP) 관련 문헌(seq%6)
     standard: seq % 6 === 0 ? {
       org: '3GPP', numbers: `TS 38.${300 + seq % 99}`, techName: `${dm.titleKo} 표준`,
       declarants: applicant, date: mkDate(year, seq, seq),
     } : undefined,
+    // 서열목록: 바이오/서열 문헌(seq%7)
+    sequenceListing: seq % 7 === 0,
   };
 }
 

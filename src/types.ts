@@ -148,6 +148,21 @@ export interface PatentResult {
   adminProcess?: { docName: string; date: string; status: string }[];    // 행정처리(수발신)
   rnd?: { taskNo: string; dept: string; project: string; task: string; institute: string; period: string }[];  // 국가 R&D
   standard?: { org: string; numbers: string; techName: string; declarants: string; date: string };             // 표준특허
+  // ── 추가 보강 (P3 + 국가고유, 목업) ──
+  applicationFlag?: string;               // 출원 구분(정상/분할/변경/PCT국내단계)
+  translationSubmitDate?: string;         // 번역문 제출일 (외국어/PCT)
+  licenseRegDate?: string;                // 실시권(라이선스) 등록일 (등록 문헌)
+  drawingCount?: number;                  // 도면 수
+  sequenceListing?: boolean;              // 서열목록 유무 (바이오)
+  designatedCountries?: string[];         // 지정국 (EP/국제출원)
+  rightTransferList?: { date: string; regNo: string; docName: string; before: string; after: string }[]; // 권리이전 이력
+  countryClassifications?: { label: string; codes: string[] }[];  // 국가 고유 분류: JP FI/FTERM/테마, US UPC, EP EPC
+  usRelatedApps?: { regNo: string; date: string; classification: string; status: string }[];  // US 관련출원
+  usProvisional?: string[];               // US 가출원 번호
+  jpEdition?: string;                     // JP 공보판
+  agentCategory?: string;                 // 대리인 구분(JP)
+  epFileRef?: string;                     // EP 출원인 정리번호
+  epFilingLanguage?: string;              // EP 출원/공개 언어
 }
 
 export interface PatentCitation {
