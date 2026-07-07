@@ -617,50 +617,6 @@ function pubDate(p: PaperResult): string {
   return p.month != null ? `${p.year}. ${p.month}` : `${p.year}`;
 }
 
-function apaCitation(p: PaperResult): string {
-  return `${p.authors} (${p.year ?? 'n.d.'}). ${p.title}.${p.journal ? ` ${p.journal}.` : ''}${p.doi ? ` https://doi.org/${p.doi}` : ''}`;
-}
-function mlaCitation(p: PaperResult): string {
-  return `${p.authors}. "${p.title}." ${p.journal ?? ''}${p.journal ? ', ' : ''}${p.year ?? 'n.d.'}.`;
-}
-function chicagoCitation(p: PaperResult): string {
-  return `${p.authors}. "${p.title}." ${p.journal ?? ''} (${p.year ?? 'n.d.'}).${p.doi ? ` https://doi.org/${p.doi}.` : ''}`;
-}
-function harvardCitation(p: PaperResult): string {
-  return `${p.authors} (${p.year ?? 'n.d.'}) '${p.title}', ${p.journal ?? ''}.`;
-}
-function bibtexCitation(p: PaperResult): string {
-  const key = (p.authors.split(/[,\s]/)[0] || 'ref') + (p.year ?? '');
-  return `@article{${key},\n  title={${p.title}},\n  author={${p.authors}},\n  journal={${p.journal ?? ''}},\n  year={${p.year ?? ''}}${p.doi ? `,\n  doi={${p.doi}}` : ''}\n}`;
-}
-function citationList(p: PaperResult): { label: string; text: string; mono?: boolean }[] {
-  return [
-    { label: 'APA', text: apaCitation(p) },
-    { label: 'MLA', text: mlaCitation(p) },
-    { label: 'Chicago', text: chicagoCitation(p) },
-    { label: 'Harvard', text: harvardCitation(p) },
-    { label: 'BibTeX', text: bibtexCitation(p), mono: true },
-  ];
-}
-
-function CitationRow({ label, text, mono }: { label: string; text: string; mono?: boolean }) {
-  return (
-    <div className="border border-gray-200 rounded-md overflow-hidden">
-      <div className="flex items-center justify-between bg-gray-50 px-2 py-1 border-b border-gray-100">
-        <span className="text-xs2 font-semibold text-gray-500">{label}</span>
-        <button
-          className="text-xs2 text-brand-400 hover:underline"
-          onClick={() => navigator.clipboard?.writeText(text).then(
-            () => toast.success(`${label} 인용 복사됨`),
-            () => toast('복사에 실패했습니다.'),
-          )}
-        >복사</button>
-      </div>
-      <pre className={clsx('px-2 py-1.5 text-xs2 text-gray-700 whitespace-pre-wrap break-words', mono && 'font-mono')}>{text}</pre>
-    </div>
-  );
-}
-
 // 관련 논문 — 같은 분야 우선, 공유 키워드 수로 정렬 (자기 자신 제외)
 // 관련 논문 = 검색결과 상위 N건 (유사도가 아닌 검색결과 순서)
 function relatedPapers(paper: PaperResult, all: PaperResult[], n = 10): PaperResult[] {
@@ -689,9 +645,8 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
 
       {/* 본문 — 중앙 정렬 + 데스크톱 2단 */}
       <div className="flex-1 overflow-y-auto scroll-thin">
-        <div className="mx-auto max-w-7xl px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            <main className="lg:col-span-8 min-w-0 space-y-6">
+        <div className="mx-auto max-w-4xl px-6 lg:px-8 py-8">
+            <main className="min-w-0 space-y-6">
           {/* 제목 카드(hero) — 스크롤 시 제목 영역 자체를 상단 고정 */}
           <div className="sticky top-0 z-20 bg-white border border-gray-200 rounded-xl p-6 lg:p-8">
             <h1 className="text-2xl font-bold text-gray-900 leading-snug text-balance">{paper.title}</h1>
@@ -775,17 +730,6 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
             </div>
           </div>
             </main>
-
-            {/* 우측 — 인용정보 복사 영역 */}
-            <aside className="lg:col-span-4 lg:sticky lg:top-6">
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <div className="text-xs2 font-bold text-gray-500 uppercase tracking-wide mb-3">인용</div>
-                <div className="space-y-2">
-                  {citationList(paper).map(c => <CitationRow key={c.label} label={c.label} text={c.text} mono={c.mono} />)}
-                </div>
-              </div>
-            </aside>
-          </div>
         </div>
 
         {/* 푸터 */}
