@@ -588,13 +588,6 @@ export function PaperInlineDetail({
             <MetaRow label="영문초록" block>{paper.abstractEn || '-'}</MetaRow>
           </dl>
         </div>
-        {/* 인용 */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="text-xs2 font-bold text-gray-500 uppercase tracking-wide mb-3">인용</div>
-          <div className="space-y-2">
-            {citationList(paper).map(c => <CitationRow key={c.label} label={c.label} text={c.text} mono={c.mono} />)}
-          </div>
-        </div>
       </div>
     </aside>
   );

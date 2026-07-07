@@ -197,6 +197,21 @@ const TOKEN_CLS: Record<TokenType, string> = {
   space:    'text-slate-700',
 };
 
+// ── 기간 칩 → 실제 날짜 범위 ───────────────────────────────────
+// '5y'/'10y'/'20y' 프리셋을 "현재연도 포함 최근 n개 연도의 1월 1일 ~ 오늘"로 변환한다.
+// 시작연도 = 현재연도 - (n-1). 예) 2026년에 '5y' → 2022-01-01 ~ 오늘
+//   (연도 라벨 2022·2023·2024·2025·2026 = 정확히 5개 연도).
+// 'all' 또는 미매칭이면 날짜 필터 없음(빈 문자열).
+function resolvePeriodDates(chip: string): { from: string; to: string } {
+  const m = /^(\d+)y$/.exec(chip);
+  if (!m) return { from: '', to: '' };
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const from = `${now.getFullYear() - (Number(m[1]) - 1)}0101`;
+  const to = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+  return { from, to };
+}
+
 // ── FormulaEditor ─────────────────────────────────────────────
 function FormulaEditor({ value, onChange, rows = 3, placeholder = '' }: {
   value: string;
@@ -330,12 +345,18 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
     setFields(prev => prev.map((f, i) => i === idx ? { ...f, ...patch } : f));
 
   // [검색-40·41] 현재 메타필터 선택값 묶음
-  const buildMeta = (): MetaFilter => ({
-    countries: Object.keys(countries).filter(k => countries[k]),
-    docKinds,
-    statusAll, statusActive, statusInactive,
-    periodChip, periodFrom, periodTo,
-  });
+  const buildMeta = (): MetaFilter => {
+    // 프리셋 칩('5y' 등)은 실제 날짜 범위로 환산. 일자 직접입력이 있으면 그 값 우선.
+    const preset = resolvePeriodDates(periodChip);
+    return {
+      countries: Object.keys(countries).filter(k => countries[k]),
+      docKinds,
+      statusAll, statusActive, statusInactive,
+      periodChip,
+      periodFrom: periodFrom || preset.from,
+      periodTo: periodTo || preset.to,
+    };
+  };
 
   const handleSearch = () => {
     // 일반/편집기 모드 모두 검색식(textarea/에디터) + 항목별 필드를 조합해 실행
