@@ -645,8 +645,9 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
 
       {/* 본문 — 중앙 정렬 + 데스크톱 2단 */}
       <div className="flex-1 overflow-y-auto scroll-thin">
-        <div className="mx-auto max-w-4xl px-6 lg:px-8 py-8">
-            <main className="min-w-0 space-y-6">
+        <div className="mx-auto max-w-7xl px-6 lg:px-8 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <main className="lg:col-span-8 min-w-0 space-y-6">
           {/* 제목 카드(hero) — 스크롤 시 제목 영역 자체를 상단 고정 */}
           <div className="sticky top-0 z-20 bg-white border border-gray-200 rounded-xl p-6 lg:p-8">
             <h1 className="text-2xl font-bold text-gray-900 leading-snug text-balance">{paper.title}</h1>
@@ -671,7 +672,7 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
             </div>
           </div>
 
-          {/* 본문 카드 — 메타데이터 + 관련논문 (압축 제목 제거, 제목은 상단 hero가 고정) */}
+          {/* 본문 카드 — 메타데이터 (압축 제목 제거, 제목은 상단 hero가 고정) */}
           <div className="bg-white border border-gray-200 rounded-xl">
             <div className="p-6 lg:p-8">
               {/* 메타데이터 — OpenAlex 방식: 레이블 값 명시적 구분 */}
@@ -700,36 +701,44 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
                 <MetaRow label="초록" block>{paper.abstract || '-'}</MetaRow>
                 <MetaRow label="영문초록" block>{paper.abstractEn || '-'}</MetaRow>
               </dl>
-
-              {/* 관련 논문 — 검색결과 상위(한 줄씩) */}
-              {related.length > 0 && (
-                <section className="mt-6 pt-6 border-t border-gray-100">
-                  <h2 className="text-base2 font-bold text-gray-800 mb-3">관련 논문 <span className="text-sm2 font-normal text-gray-400">· 검색결과 상위 {related.length}건</span></h2>
-                  <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
+            </div>
+          </div>
+            </main>
+            {/* 우측 rail — 관련 논문 (특허 전체보기의 도면 rail과 동일 위치) */}
+            <aside className="lg:col-span-4 lg:sticky lg:top-6">
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 8rem)' }}>
+                <div className="px-3 py-2 border-b border-gray-200 bg-white shrink-0 flex items-baseline gap-1.5">
+                  <span className="text-sm2 font-bold text-gray-600">관련 논문</span>
+                  {related.length > 0 && <span className="text-xs2 text-gray-400">검색결과 상위 {related.length}건</span>}
+                </div>
+                {related.length > 0 ? (
+                  <div className="overflow-y-auto scroll-thin divide-y divide-gray-100">
                     {related.map((r, i) => (
                       <button
                         key={r.id}
                         onClick={() => onOpenRelated?.(r.id)}
                         disabled={!onOpenRelated}
-                        className="w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-blue-50/40 transition-colors disabled:cursor-default group"
+                        className="w-full text-left flex items-start gap-2.5 px-3 py-2.5 hover:bg-blue-50/40 transition-colors disabled:cursor-default group"
                       >
-                        <span className="text-xs2 font-mono text-gray-400 w-5 shrink-0 pt-0.5">{i + 1}</span>
+                        <span className="text-xs2 font-mono text-gray-400 w-4 shrink-0 pt-0.5">{i + 1}</span>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm2 font-semibold text-gray-800 group-hover:text-brand-400 truncate">{r.title}</div>
-                          <div className="text-xs2 text-gray-500 truncate mt-0.5">
-                            {paperMetaLine(r)}
-                          </div>
+                          <div className="text-sm2 font-semibold text-gray-800 group-hover:text-brand-400 leading-snug line-clamp-2">{r.title}</div>
+                          <div className="text-xs2 text-gray-500 truncate mt-0.5">{paperMetaLine(r)}</div>
+                          {r.field && <span className="inline-block mt-1 text-xs2 px-1.5 py-0.5 bg-blue-50 text-brand-400 rounded">{r.field}</span>}
                         </div>
-                        {r.field && <span className="shrink-0 text-xs2 px-1.5 py-0.5 bg-blue-50 text-brand-400 rounded self-center">{r.field}</span>}
-                        {onOpenRelated && <span className="shrink-0 text-xs2 text-gray-300 group-hover:text-brand-400 self-center">열기 →</span>}
                       </button>
                     ))}
                   </div>
-                </section>
-              )}
-            </div>
+                ) : (
+                  /* 빈 상태 — 특허 도면 rail의 '도면 없음'과 동일 패턴 */
+                  <div className="flex flex-col items-center justify-center py-12 px-4 text-gray-300">
+                    <Icon name="doc" size={28} className="mb-2" />
+                    <div className="text-sm2 text-gray-400 text-center">관련 논문이 없습니다</div>
+                  </div>
+                )}
+              </div>
+            </aside>
           </div>
-            </main>
         </div>
 
         {/* 푸터 */}

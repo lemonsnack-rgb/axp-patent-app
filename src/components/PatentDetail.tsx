@@ -517,7 +517,6 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
   // ── 오버레이 드로어(embedded): 단일 컬럼 ──
   return (
     <div className="flex-1 flex flex-col bg-white overflow-hidden">
-      {keywordBar}
       <div className="flex-1 flex flex-col overflow-hidden">
         {titleBlock}
         {tabsBar}
