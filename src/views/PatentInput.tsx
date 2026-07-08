@@ -38,9 +38,7 @@ const FIELD_CATALOG: SField[] = [
   { code: 'KWD',  label: '키워드(KR)',        value: '', type: 'text' },
   { code: 'DSC',  label: '상세설명',          value: '', type: 'text', hint: '딥러닝 and 검색 and 알고리즘' },
   { code: 'TF',   label: '기술분야',          value: '', type: 'text' },
-  { code: 'BT',   label: '배경기술',          value: '', type: 'text' },
   { code: 'IE',   label: '발명효과',          value: '', type: 'text' },
-  { code: 'SM',   label: '해결수단',          value: '', type: 'text' },
   { code: 'SP',   label: '해결과제',          value: '', type: 'text' },
   { code: 'DE',   label: '구체실시방식',      value: '', type: 'text' },
   { code: 'DD',   label: '도면의 간단한 설명', value: '', type: 'text' },
@@ -100,7 +98,7 @@ const FIELD_CATALOG: SField[] = [
   { code: 'FCC',  label: '특허피인용 국가',   value: '', type: 'text' },
   { code: 'FCN',  label: '특허피인용 번호',   value: '', type: 'text' },
   { code: 'NPCY', label: '비특허인용 유무',   value: '', type: 'text' },
-  { code: 'NPRD', label: '비특허 참고문헌',   value: '', type: 'text' },
+  { code: 'NPCT', label: '비특허인용 명칭+저자', value: '', type: 'text' },
   // 국가연구개발(과제)
   { code: 'NRTBT', label: '과제/연구사업 명칭', value: '', type: 'text' },
   { code: 'NRTDO', label: '부처/주관기관 명칭', value: '', type: 'text' },
@@ -126,12 +124,12 @@ const INITIAL_FIELDS: SField[] = FIELD_CATALOG.filter(f => INITIAL_FIELD_CODES.i
 
 // ── 검색필드 그룹 탭 (데모 카탈로그 기준) ─────────────────────
 const FIELD_GROUPS = [
-  { id: '명칭·청구항·설명', codes: ['TI', 'AB', 'CL', 'CLI', 'CLA', 'KC', 'KWD', 'DSC', 'TF', 'BT', 'IE', 'SM', 'SP', 'DE', 'DD'] },
+  { id: '명칭·청구항·설명', codes: ['TI', 'AB', 'CL', 'CLI', 'CLA', 'KC', 'KWD', 'DSC', 'TF', 'IE', 'SP', 'DE', 'DD'] },
   { id: '번호·일자',       codes: ['AN', 'PN', 'RN', 'FN', 'AD', 'PD', 'RD', 'FD', 'PRN', 'PRC', 'PRD', 'IPN', 'IPD', 'IAN', 'IAD', 'DC'] },
   { id: '인명',            codes: ['WAP', 'AP', 'APC', 'APD', 'INV', 'INVC', 'AG', 'AGD', 'EXN', 'AC', 'PCN'] },
   { id: '분류코드',        codes: ['IPCM', 'IPC', 'CPCM', 'CPC', 'UCM', 'UC', 'FI', 'FTC'] },
   { id: '권리·실시권',     codes: ['CAP', 'CAC', 'ASY', 'ASNO', 'ASNE', 'CAD', 'EL', 'LRD', 'LY', 'JIC', 'PLGE'] },
-  { id: '인용',            codes: ['BCC', 'BCN', 'FCC', 'FCN', 'NPCY', 'NPRD'] },
+  { id: '인용',            codes: ['BCC', 'BCN', 'FCC', 'FCN', 'NPCY', 'NPCT'] },
   { id: '국가R&D',         codes: ['NRTBT', 'NRTDO', 'NRTN', 'NRDS', 'NRDE'] },
   { id: '표준·서열',       codes: ['SEYN', 'SEI', 'SESO', 'SET', 'SEN', 'SED', 'SEDC', 'SEDD', 'SEQY', 'SEQC'] },
 ] as const;
