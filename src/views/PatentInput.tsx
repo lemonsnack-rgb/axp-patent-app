@@ -17,7 +17,7 @@ interface SField {
   code: string;
   label: string;
   value: string;
-  type: 'text' | 'date-range' | 'ipc';
+  type: 'text' | 'date-range' | 'ipc' | 'bool';
   ipcScope?: 'all' | 'current';
   finderType?: FinderType;
   finderLabel?: string;
@@ -83,21 +83,21 @@ const FIELD_CATALOG: SField[] = [
   // 권리·실시권
   { code: 'CAP',  label: '현재권리자',        value: '', type: 'text' },
   { code: 'CAC',  label: '현재권리자 국적',   value: '', type: 'text' },
-  { code: 'ASY',  label: '양도유무(KR)',      value: '', type: 'text' },
+  { code: 'ASY',  label: '양도유무(KR)',      value: '', type: 'bool' },
   { code: 'ASNO', label: '양도인',            value: '', type: 'text' },
   { code: 'ASNE', label: '양수인',            value: '', type: 'text' },
   { code: 'CAD',  label: '최근 양도일',       value: '', type: 'date-range', dateFrom: '', dateTo: '' },
   { code: 'EL',   label: '실시권자(전용·KR)', value: '', type: 'text' },
   { code: 'LRD',  label: '실시권/라이선스 등록일', value: '', type: 'date-range', dateFrom: '', dateTo: '' },
-  { code: 'LY',   label: '실시권 유무(KR)',   value: '', type: 'text' },
-  { code: 'JIC',  label: '심판유무',          value: '', type: 'text' },
+  { code: 'LY',   label: '실시권 유무(KR)',   value: '', type: 'bool' },
+  { code: 'JIC',  label: '심판/소송 유무',    value: '', type: 'bool' },
   { code: 'PLGE', label: '질권자',            value: '', type: 'text' },
   // 인용·피인용
   { code: 'BCC',  label: '특허인용 국가',     value: '', type: 'text' },
   { code: 'BCN',  label: '특허인용 번호',     value: '', type: 'text' },
   { code: 'FCC',  label: '특허피인용 국가',   value: '', type: 'text' },
   { code: 'FCN',  label: '특허피인용 번호',   value: '', type: 'text' },
-  { code: 'NPCY', label: '비특허인용 유무',   value: '', type: 'text' },
+  { code: 'NPCY', label: '비특허인용 유무',   value: '', type: 'bool' },
   { code: 'NPCT', label: '비특허인용 명칭+저자', value: '', type: 'text' },
   // 국가연구개발(과제)
   { code: 'NRTBT', label: '과제/연구사업 명칭', value: '', type: 'text' },
@@ -106,7 +106,7 @@ const FIELD_CATALOG: SField[] = [
   { code: 'NRDS',  label: '과제 시작일',      value: '', type: 'date-range', dateFrom: '', dateTo: '' },
   { code: 'NRDE',  label: '과제 종료일',      value: '', type: 'date-range', dateFrom: '', dateTo: '' },
   // 표준·서열
-  { code: 'SEYN', label: '표준특허 유무',     value: '', type: 'text' },
+  { code: 'SEYN', label: '표준특허 유무',     value: '', type: 'bool' },
   { code: 'SEI',  label: '표준정보',          value: '', type: 'text' },
   { code: 'SESO', label: '표준화기구',        value: '', type: 'text' },
   { code: 'SET',  label: '표준기술명',        value: '', type: 'text' },
@@ -114,7 +114,7 @@ const FIELD_CATALOG: SField[] = [
   { code: 'SED',  label: '선언(등재)자',      value: '', type: 'text' },
   { code: 'SEDC', label: '선언(등재)자 국적', value: '', type: 'text' },
   { code: 'SEDD', label: '선언일',            value: '', type: 'date-range', dateFrom: '', dateTo: '' },
-  { code: 'SEQY', label: '서열목록 유무',     value: '', type: 'text' },
+  { code: 'SEQY', label: '서열목록 유무',     value: '', type: 'bool' },
   { code: 'SEQC', label: '서열내용',          value: '', type: 'text' },
 ];
 
@@ -705,6 +705,16 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
                         className="flex-1 min-w-0 px-2 py-1 border border-gray-200 rounded text-sm2 outline-none focus:border-blue-400"
                       />
                     </div>
+                  ) : f.type === 'bool' ? (
+                    <label className="flex items-center gap-1.5 flex-1 min-w-0 text-sm2 text-gray-600 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={f.value === 'Y'}
+                        onChange={e => updateField(idx, { value: e.target.checked ? 'Y' : '' })}
+                        className="form-checkbox text-brand-400 rounded w-4 h-4"
+                      />
+                      있음(Y)
+                    </label>
                   ) : f.type === 'date-range' ? (
                     <div className="flex items-center gap-1.5 flex-1 min-w-0">
                       <input

@@ -6,7 +6,7 @@ export type ScopeTab = 'KEY' | 'TAC' | 'DSC';
 
 export interface SFieldInput {
   code: string;
-  type: 'text' | 'date-range' | 'ipc';
+  type: 'text' | 'date-range' | 'ipc' | 'bool';
   value: string;
   dateFrom?: string;
   dateTo?: string;
@@ -30,6 +30,10 @@ export function fieldClause(f: SFieldInput): string | null {
     const to = (f.dateTo || '').trim();
     if (!from && !to) return null;
     return `${f.code}:([${from} ~ ${to}])`;
+  }
+  // Y/N(유무) 필드 — 체크 시에만 절 생성(CODE:(Y)), 미체크는 조건 없음
+  if (f.type === 'bool') {
+    return f.value === 'Y' ? `${f.code}:(Y)` : null;
   }
   const v = f.value.trim();
   if (!v) return null;
