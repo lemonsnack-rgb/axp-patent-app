@@ -31,9 +31,13 @@ export function fieldClause(f: SFieldInput): string | null {
     if (!from && !to) return null;
     return `${f.code}:([${from} ~ ${to}])`;
   }
-  // Y/N(유무) 필드 — 체크 시에만 절 생성(CODE:(Y)), 미체크는 조건 없음
+  // 유무(Y/N) 필드 — 있음/없음 각각 선택. 한쪽만 선택 시 그 조건, 둘 다/둘 다 아님=전체(조건 없음)
   if (f.type === 'bool') {
-    return f.value === 'Y' ? `${f.code}:(Y)` : null;
+    const y = f.value.includes('Y');
+    const n = f.value.includes('N');
+    if (y && !n) return `${f.code}:(Y)`;
+    if (n && !y) return `${f.code}:(N)`;
+    return null;
   }
   const v = f.value.trim();
   if (!v) return null;

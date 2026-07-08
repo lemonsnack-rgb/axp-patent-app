@@ -706,15 +706,27 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
                       />
                     </div>
                   ) : f.type === 'bool' ? (
-                    <label className="flex items-center gap-1.5 flex-1 min-w-0 text-sm2 text-gray-600 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={f.value === 'Y'}
-                        onChange={e => updateField(idx, { value: e.target.checked ? 'Y' : '' })}
-                        className="form-checkbox text-brand-400 rounded w-4 h-4"
-                      />
-                      있음(Y)
-                    </label>
+                    <div className="flex items-center gap-3 flex-1 min-w-0 text-sm2 text-gray-600">
+                      <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={f.value.includes('Y')}
+                          onChange={e => updateField(idx, { value: e.target.checked ? (f.value.includes('Y') ? f.value : f.value + 'Y') : f.value.replace('Y', '') })}
+                          className="form-checkbox text-brand-400 rounded w-4 h-4"
+                        />
+                        있음
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={f.value.includes('N')}
+                          onChange={e => updateField(idx, { value: e.target.checked ? (f.value.includes('N') ? f.value : f.value + 'N') : f.value.replace('N', '') })}
+                          className="form-checkbox text-brand-400 rounded w-4 h-4"
+                        />
+                        없음
+                      </label>
+                      <span className="text-xs2 text-gray-400">둘 다·미선택 = 전체</span>
+                    </div>
                   ) : f.type === 'date-range' ? (
                     <div className="flex items-center gap-1.5 flex-1 min-w-0">
                       <input
