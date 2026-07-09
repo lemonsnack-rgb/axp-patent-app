@@ -17,7 +17,8 @@ interface SField {
   code: string;
   label: string;
   value: string;
-  type: 'text' | 'date-range' | 'ipc' | 'bool';
+  type: 'text' | 'date-range' | 'ipc' | 'bool' | 'multi';
+  options?: { value: string; label: string }[];   // type 'multi' — 다중 선택 후보
   ipcScope?: 'all' | 'current';
   finderType?: FinderType;
   finderLabel?: string;
@@ -25,6 +26,15 @@ interface SField {
   dateFrom?: string;
   dateTo?: string;
 }
+
+// ── 다중 선택 필드 후보값 (정본 검색필드 시트: multi/enum) ──
+const COUNTRY_OPTS = COUNTRY_LIST.map(c => ({ value: c.code, label: c.label }));
+const KIND_OPTS = [
+  { value: 'A', label: 'A 공개' }, { value: 'A1', label: 'A1 공개' },
+  { value: 'B1', label: 'B1 등록' }, { value: 'B2', label: 'B2 등록' },
+  { value: 'U', label: 'U 실용공개' }, { value: 'Y1', label: 'Y1 실용등록' },
+];
+const ORG_OPTS = ['ETSI', 'ISO', 'IEC', 'ITU', 'IEEE', '3GPP', 'JEDEC'].map(o => ({ value: o, label: o }));
 
 // ── 전체 검색필드 카탈로그 (데모 http://10.77.0.244:8010/patents 기준 ~70개) ──
 const FIELD_CATALOG: SField[] = [
@@ -34,7 +44,7 @@ const FIELD_CATALOG: SField[] = [
   { code: 'CL',   label: '대표청구항',        value: '', type: 'text', hint: '하이브리드 and 자동차' },
   { code: 'CLI',  label: '독립청구항',        value: '', type: 'text' },
   { code: 'CLA',  label: '전체청구항',        value: '', type: 'text' },
-  { code: 'KC',   label: '문헌종류',          value: '', type: 'text' },
+  { code: 'KC',   label: '문헌종류',          value: '', type: 'multi', options: KIND_OPTS },
   { code: 'KWD',  label: '키워드(KR)',        value: '', type: 'text' },
   { code: 'DSC',  label: '상세설명',          value: '', type: 'text', hint: '딥러닝 and 검색 and 알고리즘' },
   { code: 'TF',   label: '기술분야',          value: '', type: 'text' },
@@ -52,20 +62,20 @@ const FIELD_CATALOG: SField[] = [
   { code: 'RD',   label: '등록일',            value: '', type: 'date-range', dateFrom: '', dateTo: '' },
   { code: 'FD',   label: '공고일',            value: '', type: 'date-range', dateFrom: '', dateTo: '' },
   { code: 'PRN',  label: '우선권 번호',       value: '', type: 'text' },
-  { code: 'PRC',  label: '우선권 국가',       value: '', type: 'text' },
+  { code: 'PRC',  label: '우선권 국가',       value: '', type: 'multi', options: COUNTRY_OPTS },
   { code: 'PRD',  label: '우선권 주장일',     value: '', type: 'date-range', dateFrom: '', dateTo: '' },
   { code: 'IPN',  label: '국제공개번호',      value: '', type: 'text' },
   { code: 'IPD',  label: '국제공개일',        value: '', type: 'date-range', dateFrom: '', dateTo: '' },
   { code: 'IAN',  label: '국제출원번호',      value: '', type: 'text' },
   { code: 'IAD',  label: '국제출원일',        value: '', type: 'date-range', dateFrom: '', dateTo: '' },
-  { code: 'DC',   label: '지정국',            value: '', type: 'text' },
+  { code: 'DC',   label: '지정국',            value: '', type: 'multi', options: COUNTRY_OPTS },
   // 인명
   { code: 'WAP',  label: '출원인 대표명화 코드', value: '', type: 'text' },
   { code: 'AP',   label: '출원인',            value: '', type: 'text', hint: '엘지* | 119990527105' },
-  { code: 'APC',  label: '출원인 국적',       value: '', type: 'text' },
+  { code: 'APC',  label: '출원인 국적',       value: '', type: 'multi', options: COUNTRY_OPTS },
   { code: 'APD',  label: '출원인 주소',       value: '', type: 'text', hint: '서울 | 용산' },
   { code: 'INV',  label: '발명자',            value: '', type: 'text', hint: '김한국 | 김만*' },
-  { code: 'INVC', label: '발명자 국적',       value: '', type: 'text' },
+  { code: 'INVC', label: '발명자 국적',       value: '', type: 'multi', options: COUNTRY_OPTS },
   { code: 'AG',   label: '대리인',            value: '', type: 'text', hint: '특허법인* | 김남구' },
   { code: 'AGD',  label: '대리인 주소',       value: '', type: 'text' },
   { code: 'EXN',  label: '심사관',            value: '', type: 'text' },
@@ -82,7 +92,7 @@ const FIELD_CATALOG: SField[] = [
   { code: 'FTC',  label: 'F-term (JP)',       value: '', type: 'text' },
   // 권리·실시권
   { code: 'CAP',  label: '현재권리자',        value: '', type: 'text' },
-  { code: 'CAC',  label: '현재권리자 국적',   value: '', type: 'text' },
+  { code: 'CAC',  label: '현재권리자 국적',   value: '', type: 'multi', options: COUNTRY_OPTS },
   { code: 'ASY',  label: '양도유무(KR)',      value: '', type: 'bool' },
   { code: 'ASNO', label: '양도인',            value: '', type: 'text' },
   { code: 'ASNE', label: '양수인',            value: '', type: 'text' },
@@ -93,9 +103,9 @@ const FIELD_CATALOG: SField[] = [
   { code: 'JIC',  label: '심판/소송 유무',    value: '', type: 'bool' },
   { code: 'PLGE', label: '질권자',            value: '', type: 'text' },
   // 인용·피인용
-  { code: 'BCC',  label: '특허인용 국가',     value: '', type: 'text' },
+  { code: 'BCC',  label: '특허인용 국가',     value: '', type: 'multi', options: COUNTRY_OPTS },
   { code: 'BCN',  label: '특허인용 번호',     value: '', type: 'text' },
-  { code: 'FCC',  label: '특허피인용 국가',   value: '', type: 'text' },
+  { code: 'FCC',  label: '특허피인용 국가',   value: '', type: 'multi', options: COUNTRY_OPTS },
   { code: 'FCN',  label: '특허피인용 번호',   value: '', type: 'text' },
   { code: 'NPCY', label: '비특허인용 유무',   value: '', type: 'bool' },
   { code: 'NPCT', label: '비특허인용 명칭+저자', value: '', type: 'text' },
@@ -108,11 +118,11 @@ const FIELD_CATALOG: SField[] = [
   // 표준·서열
   { code: 'SEYN', label: '표준특허 유무',     value: '', type: 'bool' },
   { code: 'SEI',  label: '표준정보',          value: '', type: 'text' },
-  { code: 'SESO', label: '표준화기구',        value: '', type: 'text' },
+  { code: 'SESO', label: '표준화기구',        value: '', type: 'multi', options: ORG_OPTS },
   { code: 'SET',  label: '표준기술명',        value: '', type: 'text' },
   { code: 'SEN',  label: '표준번호',          value: '', type: 'text' },
   { code: 'SED',  label: '선언(등재)자',      value: '', type: 'text' },
-  { code: 'SEDC', label: '선언(등재)자 국적', value: '', type: 'text' },
+  { code: 'SEDC', label: '선언(등재)자 국적', value: '', type: 'multi', options: COUNTRY_OPTS },
   { code: 'SEDD', label: '선언일',            value: '', type: 'date-range', dateFrom: '', dateTo: '' },
   { code: 'SEQY', label: '서열목록 유무',     value: '', type: 'bool' },
   { code: 'SEQC', label: '서열내용',          value: '', type: 'text' },
@@ -704,6 +714,24 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
                         placeholder={f.hint || ''}
                         className="flex-1 min-w-0 px-2 py-1 border border-gray-200 rounded text-sm2 outline-none focus:border-blue-400"
                       />
+                    </div>
+                  ) : f.type === 'multi' ? (
+                    <div className="flex items-center gap-1 flex-1 min-w-0 flex-wrap">
+                      {(f.options || []).map(opt => {
+                        const sel = f.value.split(',').map(s => s.trim()).filter(Boolean);
+                        const on = sel.includes(opt.value);
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => updateField(idx, { value: (on ? sel.filter(x => x !== opt.value) : [...sel, opt.value]).join(',') })}
+                            className={clsx(
+                              'px-2 py-0.5 rounded-full border text-xs2 transition-colors',
+                              on ? 'bg-brand-400 text-white border-brand-400' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400',
+                            )}
+                          >{opt.label}</button>
+                        );
+                      })}
                     </div>
                   ) : f.type === 'bool' ? (
                     <div className="flex items-center gap-3 flex-1 min-w-0 text-sm2 text-gray-600">

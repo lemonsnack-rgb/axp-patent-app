@@ -6,7 +6,7 @@ export type ScopeTab = 'KEY' | 'TAC' | 'DSC';
 
 export interface SFieldInput {
   code: string;
-  type: 'text' | 'date-range' | 'ipc' | 'bool';
+  type: 'text' | 'date-range' | 'ipc' | 'bool' | 'multi';
   value: string;
   dateFrom?: string;
   dateTo?: string;
@@ -39,6 +39,12 @@ export function fieldClause(f: SFieldInput): string | null {
     if (y && !n) return `${f.code}:(있음)`;
     if (n && !y) return `${f.code}:(없음)`;
     return null;
+  }
+  // 다중 선택(국가·문헌종류·표준화기구 등) — 선택값을 OR로 결합. 비면 null(전체)
+  if (f.type === 'multi') {
+    const vals = f.value.split(',').map(s => s.trim()).filter(Boolean);
+    if (!vals.length) return null;
+    return `${f.code}:(${vals.join(' OR ')})`;
   }
   const v = f.value.trim();
   if (!v) return null;
