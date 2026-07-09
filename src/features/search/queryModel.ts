@@ -31,12 +31,13 @@ export function fieldClause(f: SFieldInput): string | null {
     if (!from && !to) return null;
     return `${f.code}:([${from} ~ ${to}])`;
   }
-  // 유무(Y/N) 필드 — 있음/없음 각각 선택. 한쪽만 선택 시 그 조건, 둘 다/둘 다 아님=전체(조건 없음)
+  // 유무 필드 — 있음/없음 각각 선택. 한쪽만 선택 시 그 조건, 둘 다/둘 다 아님=전체(조건 없음)
+  // 내부 상태는 'Y'/'N' 플래그로 추적하되, 검색식에는 Y/N 대신 '있음'/'없음'으로 표기한다.
   if (f.type === 'bool') {
     const y = f.value.includes('Y');
     const n = f.value.includes('N');
-    if (y && !n) return `${f.code}:(Y)`;
-    if (n && !y) return `${f.code}:(N)`;
+    if (y && !n) return `${f.code}:(있음)`;
+    if (n && !y) return `${f.code}:(없음)`;
     return null;
   }
   const v = f.value.trim();
