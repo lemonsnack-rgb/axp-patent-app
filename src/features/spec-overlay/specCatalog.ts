@@ -160,6 +160,28 @@ export const SPEC_CATALOG: Record<string, SpecEntry> = {
   'PAT-LST-060': { id: 'PAT-LST-060', screen: '특허 · 결과 목록', component: '다중 선택 저장', display: '체크박스 + 선택 저장 버튼', interaction: '라이브러리 일괄 저장', precondition: '체크박스 1개 이상 선택', postcondition: '선택 특허를 라이브러리에 저장하고 체크 해제' },
   'PAT-LST-070': { id: 'PAT-LST-070', screen: '특허 · 결과 목록', component: '상태 표시(로딩/0건/오류)', display: '로딩·0건 안내·오류 메시지', interaction: '—', precondition: '검색 실행됨', postcondition: '응답 대기=로딩 · 0건=안내 · 실패=오류 메시지' },
 
+  // ── 특허 · 상세페이지 ──
+  'PAT-DET-010': { id: 'PAT-DET-010', screen: '특허 · 상세페이지', component: '헤더 액션 바 (영역)', display: '전체보기=로고·이전/다음·위치(n/총)·라이브러리 저장·탭 닫기 / 오버레이=이전/다음·위치·새 탭·저장·닫기', interaction: '↓ 액션별', precondition: '상세 진입', postcondition: '개별 액션(PAT-DET-011~013) 참조' },
+  'PAT-DET-011': { id: 'PAT-DET-011', screen: '특허 · 상세페이지', component: '이전/다음 네비', display: '◀ ▶ + 위치(n/총)', interaction: '클릭(← →)', precondition: '목록 맥락 존재(인접 문서)', postcondition: '이전/다음 문서로 전환' },
+  'PAT-DET-012': { id: 'PAT-DET-012', screen: '특허 · 상세페이지', component: '라이브러리 저장', display: '저장 버튼', interaction: '클릭', precondition: '—', postcondition: '현재 문서를 라이브러리에 저장' },
+  'PAT-DET-013': { id: 'PAT-DET-013', screen: '특허 · 상세페이지', component: '닫기 / 새 탭 전체보기', display: '탭 닫기(전체보기)·닫기(오버레이)·새 탭(오버레이)', interaction: '클릭(Esc)', precondition: '—', postcondition: '오버레이 닫기(목록 복귀) / 새 탭으로 전체보기 열기' },
+  'PAT-DET-020': { id: 'PAT-DET-020', screen: '특허 · 상세페이지', component: '제목 영역', display: '상태(평문) · 국가 · 문헌번호 · 발명의 명칭', interaction: '—', precondition: '상세 진입', postcondition: '문헌 식별 정보 표시' },
+  'PAT-DET-021': { id: 'PAT-DET-021', screen: '특허 · 상세페이지', component: '원문 PDF 다운로드', display: '버튼', interaction: '클릭', precondition: '—', postcondition: '원문 PDF 다운로드(⚠목업 원문 URL 미정의)' },
+  'PAT-DET-030': { id: 'PAT-DET-030', screen: '특허 · 상세페이지', component: '키워드 하이라이터 바', display: '검색어 키워드 칩(색상) + 이동(↑↓) + 접기', interaction: '검색어 유입 시 표시 · 본문 내 키워드 강조', precondition: '검색에서 진입(검색어 존재)', postcondition: '본문 키워드 하이라이트(client)' },
+  'PAT-DET-040': { id: 'PAT-DET-040', screen: '특허 · 상세페이지', component: '앵커 탭 바', display: '서지·인명·요약·상세설명·청구범위·패밀리·인용·피인용·분류·기타', interaction: '탭 클릭', precondition: '상세 진입', postcondition: '해당 섹션으로 스크롤 · 활성 탭 표시' },
+  'PAT-DET-050': { id: 'PAT-DET-050', screen: '특허 · 상세페이지', component: '서지사항', display: '문헌/출원/공개·공고/등록 번호·일자 · 원출원·국제출원 · 우선권주장일·심사청구일 · 존속만료·권리변동 · 최종처분·청구항수 · 출원구분·번역문 · 도면수·실시권등록일 · 지정국·서열목록 + 우선권 주장 목록 + 타임라인', interaction: '정독(스크롤)', precondition: '상세 진입', postcondition: '서지 표·우선권·타임라인 표시' },
+  'PAT-DET-060': { id: 'PAT-DET-060', screen: '특허 · 상세페이지', component: '인명정보', display: '출원인/주소 · 특허고객번호(KR)·식별기호(JP) · 대표출원인 · 발명자/주소 · 대리인 · 심사관', interaction: '정독', precondition: '상세 진입', postcondition: '인명 표 표시' },
+  'PAT-DET-070': { id: 'PAT-DET-070', screen: '특허 · 상세페이지', component: '요약', display: '요약 본문', interaction: '정독', precondition: '상세 진입', postcondition: '요약 표시' },
+  'PAT-DET-080': { id: 'PAT-DET-080', screen: '특허 · 상세페이지', component: '상세설명', display: '기술분야·배경기술·해결하려는 과제·과제의 해결수단·발명의 효과·도면의 설명·구체적 내용', interaction: '정독', precondition: '상세 진입', postcondition: '상세설명(명세서 하위섹션) 표시' },
+  'PAT-DET-090': { id: 'PAT-DET-090', screen: '특허 · 상세페이지', component: '청구범위 (영역)', display: '청구항(독립/종속 구조)', interaction: '↓ 액션별', precondition: '상세 진입', postcondition: '청구항 표시' },
+  'PAT-DET-091': { id: 'PAT-DET-091', screen: '특허 · 상세페이지', component: '독립항/전체청구항 토글', display: '독립항 · 전체청구항 버튼', interaction: '클릭', precondition: '—', postcondition: '독립항만 / 전체 청구항 목록 전환' },
+  'PAT-DET-100': { id: 'PAT-DET-100', screen: '특허 · 상세페이지', component: '패밀리 정보 (영역)', display: '국가별 건수 pill + 패밀리 문헌 목록(국가·번호·일자·명칭)', interaction: '↓ 국가 탭', precondition: '상세 진입', postcondition: '패밀리 표시' },
+  'PAT-DET-101': { id: 'PAT-DET-101', screen: '특허 · 상세페이지', component: '국가 탭 필터', display: '전체 / 국가별 탭', interaction: '클릭', precondition: '패밀리 존재', postcondition: '선택 국가 패밀리만 필터 표시' },
+  'PAT-DET-110': { id: 'PAT-DET-110', screen: '특허 · 상세페이지', component: '인용·피인용', display: '인용·피인용 목록(특허/비특허) + 선행기술문헌', interaction: '정독', precondition: '상세 진입', postcondition: '인용/피인용·선행기술 표시' },
+  'PAT-DET-120': { id: 'PAT-DET-120', screen: '특허 · 상세페이지', component: '분류코드', display: 'IPC · CPC · 국가고유(FI/F-term/테마·UPC·EPC)', interaction: '정독', precondition: '상세 진입', postcondition: '분류 표시' },
+  'PAT-DET-130': { id: 'PAT-DET-130', screen: '특허 · 상세페이지', component: '기타정보', display: '대리인 주소 · 권리변동 이력 · 권리이전 이력 · 행정처리(수발신) · 국가 R&D · 표준특허 · 심판', interaction: '정독', precondition: '상세 진입', postcondition: '있는 항목만 조건부 표시' },
+  'PAT-DET-140': { id: 'PAT-DET-140', screen: '특허 · 상세페이지', component: '도면 패널', display: '대표도면 + 썸네일 목록 + 확대 뷰어 + 도면부호 설명', interaction: '도면 선택·확대', precondition: '도면 존재', postcondition: '선택 도면 확대 표시(⚠목업 도면 API 미정의)' },
+
   // ── 논문 · 검색어 입력 ──
   'PAP-INP-010': { id: 'PAP-INP-010', screen: '논문 · 검색어 입력', component: '발행연도 필터', display: '전체/최근1·5·10년 + 연도 from~to (국가 필터 없음)', interaction: '프리셋/범위 선택', precondition: '화면 진입', postcondition: 'yearFrom/yearTo(또는 years[]) 반영' },
   'PAP-INP-020': { id: 'PAP-INP-020', screen: '논문 · 검색어 입력', component: '검색어 범위 탭', display: '제목+초록 / 제목+초록+전문', interaction: '탭 전환', precondition: '화면 진입', postcondition: '선두 자유어 적용 범위 변경' },

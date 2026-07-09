@@ -79,7 +79,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
 
   // ── 키워드 하이라이터 바 (keywert 참고) ──
   const keywordBar = searchQuery && parseKeywords(searchQuery).length > 0 ? (
-    <div className="shrink-0 bg-white border-b border-gray-200 px-4 py-2">
+    <div data-spec="PAT-DET-030" className="shrink-0 bg-white border-b border-gray-200 px-4 py-2">
       <div className="flex items-center gap-1.5 flex-wrap">
         <span className="text-xs2 font-semibold text-gray-400 shrink-0">키워드</span>
         {parseKeywords(searchQuery).map((kw, i) => {
@@ -107,7 +107,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
 
   // ── 특허명·기본사항 + 제목 하단 액션 링크 (논문 상세와 동일 순서) ──
   const titleBlock = (
-    <div className="px-6 pt-4 pb-3 border-b border-gray-200 shrink-0">
+    <div data-spec="PAT-DET-020" className="px-6 pt-4 pb-3 border-b border-gray-200 shrink-0">
       <div className="flex items-center gap-2 flex-wrap mb-1.5">
         <span title={getPatentStatusDesc(data.status)} className="cursor-help font-semibold text-gray-700">{data.status}</span>
         <span className="text-gray-300">·</span>
@@ -117,7 +117,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
       <h2 className="text-2xl font-bold text-gray-800 leading-snug">{data.title}</h2>
       {/* 제목 하단 액션 링크 — 논문(원문 보기/본문 보기)과 동일 패턴 */}
       <div className="flex flex-wrap items-center gap-2 mt-3">
-        <Button variant="filled" color="primary" size="sm" className="text-xs2 h-8" onClick={() => downloadPatentPdf(data)} title="특허 원문 PDF 다운로드">
+        <Button data-spec="PAT-DET-021" variant="filled" color="primary" size="sm" className="text-xs2 h-8" onClick={() => downloadPatentPdf(data)} title="특허 원문 PDF 다운로드">
           <Icon name="doc" size={12} /> 원문 PDF 다운로드
         </Button>
       </div>
@@ -126,7 +126,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
 
   // ── 앵커 탭 바 (sticky 처리는 레이아웃별 래퍼가 담당) ──
   const tabsBar = (
-    <div className="flex items-center gap-0 bg-white border-b border-gray-200 overflow-x-auto scroll-thin shrink-0">
+    <div data-spec="PAT-DET-040" className="flex items-center gap-0 bg-white border-b border-gray-200 overflow-x-auto scroll-thin shrink-0">
       {TABS.map(tab => (
         <button
           key={tab.key}
@@ -146,7 +146,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
 
   // ── 도면 패널 (전체보기 우측 rail / 오버레이 본문 내 공용) ──
   const drawingsAside = (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 8rem)' }}>
+    <div data-spec="PAT-DET-140" className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 8rem)' }}>
       <div className="px-3 py-2 border-b border-gray-200 bg-white shrink-0">
         <span className="text-sm2 font-bold text-gray-600">도면</span>
         <span className="ml-1.5 text-xs2 text-gray-400">({(data.figures || []).length})</span>
@@ -159,7 +159,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
   const sections = (
     <>
             {/* 서지사항 */}
-            <div ref={secBib}>
+            <div ref={secBib} data-spec="PAT-DET-050">
               <Section title="서지사항" icon="cal">
                 <table className="w-full text-md2">
                   <tbody>
@@ -196,7 +196,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
             </div>
 
             {/* 인명정보 */}
-            <div ref={secPerson}>
+            <div ref={secPerson} data-spec="PAT-DET-060">
               <Section title="인명정보" icon="user">
                 <table className="w-full text-md2">
                   <tbody>
@@ -214,14 +214,14 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
             </div>
 
             {/* 요약 */}
-            <div ref={secAbstract}>
+            <div ref={secAbstract} data-spec="PAT-DET-070">
               <Section title="요약" icon="doc">
                 <TextBlock>{data.abstract || '—'}</TextBlock>
               </Section>
             </div>
 
             {/* 상세설명 — 표준 구조(기술분야·배경기술·과제·해결수단·효과·도면의 설명·구체적 내용) */}
-            <div ref={secDesc}>
+            <div ref={secDesc} data-spec="PAT-DET-080">
               <Section title="상세설명" icon="book">
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3.5">
                   <DescSub title="기술분야">{`본 발명은 ${data.title}에 관한 것으로, 해당 기술분야의 장치 및 방법에 관한 것이다.`}</DescSub>
@@ -245,9 +245,9 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
             </div>
 
             {/* 청구범위 */}
-            <div ref={secClaim}>
+            <div ref={secClaim} data-spec="PAT-DET-090">
               <Section title="청구범위" icon="target">
-                <div className="flex items-center gap-1 mb-2.5">
+                <div data-spec="PAT-DET-091" className="flex items-center gap-1 mb-2.5">
                   <button
                     onClick={() => setClaimMode('independent')}
                     className={clsx('px-2.5 py-0.5 rounded text-sm2 font-medium border', claimMode === 'independent' ? 'bg-blue-400 text-white border-blue-400' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400')}
@@ -284,7 +284,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
             </div>
 
             {/* 패밀리정보 — 국가 탭 필터 */}
-            <div ref={secFamily}>
+            <div ref={secFamily} data-spec="PAT-DET-100">
               <Section title="패밀리 정보" icon="grid">
                 {(() => {
                   const families = renderFamilyPills(data.family);
@@ -292,7 +292,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                   const filtered = familyTab === 'all' ? families : families.filter(([cc]) => cc === familyTab);
                   return (
                     <>
-                      <div className="flex items-center gap-0 border-b border-gray-100 mb-3 overflow-x-auto scroll-thin">
+                      <div data-spec="PAT-DET-101" className="flex items-center gap-0 border-b border-gray-100 mb-3 overflow-x-auto scroll-thin">
                         {[['all', `전체(${total})`] as [string, string], ...families.map(([cc, n]) => [cc, `${cc}(${n})`] as [string, string])].map(([key, label]) => (
                           <button
                             key={key}
@@ -335,7 +335,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
             </div>
 
             {/* 인용·피인용 — 구조화된 목록 */}
-            <div ref={secCite}>
+            <div ref={secCite} data-spec="PAT-DET-110">
               <Section title="인용·피인용" icon="link">
                 <CiteBlock title={`인용 (${(data.citingList ?? []).length || data.citing}건)`} list={data.citingList} />
                 <div className="mt-3">
@@ -355,7 +355,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
             </div>
 
             {/* 분류코드 */}
-            <div ref={secClass}>
+            <div ref={secClass} data-spec="PAT-DET-120">
               <Section title="분류코드" icon="tag">
                 <table className="w-full text-md2">
                   <tbody>
@@ -370,7 +370,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
             </div>
 
             {/* 기타정보 — 대리인 + 심판 통합 */}
-            <div ref={secEtc}>
+            <div ref={secEtc} data-spec="PAT-DET-130">
               <Section title="기타정보" icon="briefcase">
                 <table className="w-full text-md2 mb-3">
                   <tbody>
@@ -477,14 +477,14 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
     return (
       <div className="flex flex-col h-screen overflow-hidden bg-zinc-50">
         {/* 헤더 — 논문 전체보기와 동일(닫기 + 저장 filled) */}
-        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 bg-white shrink-0">
+        <div data-spec="PAT-DET-010" className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 bg-white shrink-0">
           <img src={CK_WORDMARK} alt="CK.Patent" className="h-6 w-auto object-contain" />
-          {onPrev && <Button variant="outlined" color="primary" size="sm" onClick={onPrev} title="이전">◀</Button>}
-          {posLabel && <span className="text-sm2 text-gray-500 font-mono">{posLabel}</span>}
-          {onNext && <Button variant="outlined" color="primary" size="sm" onClick={onNext} title="다음">▶</Button>}
+          {onPrev && <Button data-spec="PAT-DET-011" variant="outlined" color="primary" size="sm" onClick={onPrev} title="이전">◀</Button>}
+          {posLabel && <span data-spec="PAT-DET-011" className="text-sm2 text-gray-500 font-mono">{posLabel}</span>}
+          {onNext && <Button data-spec="PAT-DET-011" variant="outlined" color="primary" size="sm" onClick={onNext} title="다음">▶</Button>}
           <span className="flex-1" />
-          <Button variant="filled" color="primary" size="sm" onClick={onSave}><Icon name="star" size={12} /> 라이브러리 저장</Button>
-          <Button variant="outlined" color="primary" size="sm" onClick={onBack}>
+          <Button data-spec="PAT-DET-012" variant="filled" color="primary" size="sm" onClick={onSave}><Icon name="star" size={12} /> 라이브러리 저장</Button>
+          <Button data-spec="PAT-DET-013" variant="outlined" color="primary" size="sm" onClick={onBack}>
             {backIcon && <Icon name="arrow-left" size={13} />} {backLabel}
           </Button>
         </div>
@@ -523,7 +523,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
         <div className="flex-1 overflow-y-auto scroll-thin px-6 py-4">
           {/* 도면 (드로어 전용 — 본문 내). 대표도면 우선 */}
           {(data.figures || []).length > 0 && (
-            <div className="mb-4">
+            <div data-spec="PAT-DET-140" className="mb-4">
               <div className="text-sm2 font-semibold text-gray-500 mb-2">도면 ({(data.figures || []).length})</div>
               <div className="border border-gray-200 rounded-lg bg-gray-50 overflow-hidden" style={{ height: 360 }}>
                 <DrawingsPanel figures={data.figures} refSigns={data.refSigns} />
