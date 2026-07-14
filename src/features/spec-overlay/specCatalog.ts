@@ -215,6 +215,6 @@ export const SPEC_CATALOG: Record<string, SpecEntry> = {
   'COM-050': { id: 'COM-050', screen: '공통 · 횡단', component: '특허 ↔ 논문 교차검색', display: 'client(별도 API 없음)', interaction: '공통·횡단 기능', precondition: '현재 검색어 존재', postcondition: '반대 도메인 검색으로 검색어 이관·화면 전환' },
   'COM-060': { id: 'COM-060', screen: '공통 · 횡단', component: 'CSV 내보내기', display: 'client', interaction: '공통·횡단 기능', precondition: '결과 1건 이상', postcondition: '현재 hits → CSV 생성·다운로드' },
   'COM-070': { id: 'COM-070', screen: '공통 · 횡단', component: '로딩/0건/오류 상태', display: 'client + 응답 성공/실패', interaction: '공통·횡단 기능', precondition: '검색 실행됨', postcondition: '응답 대기=로딩 · 0건=안내 · 실패=오류 메시지' },
-  'COM-080': { id: 'COM-080', screen: '공통 · 횡단', component: '서비스 푸터', display: 'CK.Patent · 이용약관 · 개인정보처리방침 · 연락처 · FAQ · 저작권 표기', interaction: '링크 클릭 → 해당 콘텐츠 페이지 이동', precondition: '로그인 후 전 화면 하단 상시 노출', postcondition: 'CK.Patent를 하나의 서비스로 인지 · 정책/연락처/FAQ 진입' },
+  'COM-080': { id: 'COM-080', screen: '공통 · 횡단', component: '서비스 푸터(단일 규칙)', display: 'CK.Patent · 이용약관 · 개인정보처리방침 · 연락처 · FAQ · 저작권', interaction: '링크 클릭 → 해당 콘텐츠 페이지 이동', precondition: '단일 컴포넌트를 모든 최상위 화면 하단에 1회', postcondition: '앱 내부(Shell)·새 탭 상세 전체보기 동일 적용 / 오버레이 드로어는 부모 푸터로 대체 / 구 DetailFooter 일원화' },
   'COM-081': { id: 'COM-081', screen: '공통 · 횡단', component: '정책·FAQ 콘텐츠 페이지 (영역 확보)', display: '이용약관·개인정보처리방침·연락처(자리표시자) · FAQ(SEO/GEO/AEO 대비 골격)', interaction: '푸터 링크 진입 · 홈으로 복귀', precondition: '푸터에서 진입', postcondition: '확정 문구는 muhayu 제공본으로 대체 예정 · FAQ는 콘텐츠 순차 작성(현재 영역만)' },
 };

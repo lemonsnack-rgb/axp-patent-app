@@ -5,7 +5,7 @@ import clsx from 'clsx';
 import type { PatentResult, PatentCitation } from '../types';
 import { downloadPatentPdf } from '../features/patentPdf';
 import { Icon } from './Icon';
-import { DetailFooter } from './DetailFooter';
+import { SiteFooter } from './SiteFooter';
 import { CK_WORDMARK } from '../assets/ckLogo';
 import { getPatentStatusDesc } from '../utils/badgeUtils';
 import { Button } from '@muhayu/axp-ui';
@@ -508,7 +508,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               </aside>
             </div>
           </div>
-          <DetailFooter />
+          <SiteFooter />
         </div>
       </div>
     );

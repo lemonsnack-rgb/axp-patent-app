@@ -5,7 +5,7 @@ import { PAPER_SEED } from '../data/patentSeed';
 import { PAPER_FACET_GROUPS } from '../data/facetGroups';
 import { Icon } from '../components/Icon';
 import { parseKeywords, KW_COLORS } from '../components/PatentDetail';
-import { DetailFooter } from '../components/DetailFooter';
+import { SiteFooter } from '../components/SiteFooter';
 import { CK_WORDMARK } from '../assets/ckLogo';
 import { Badge, Card } from '../components/ui';
 import type { PaperResult } from '../types';
@@ -741,8 +741,8 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
           </div>
         </div>
 
-        {/* 푸터 */}
-        <DetailFooter />
+        {/* 푸터 — 전역 서비스 푸터 일원화(COM-080) */}
+        <SiteFooter />
       </div>
     </div>
   );

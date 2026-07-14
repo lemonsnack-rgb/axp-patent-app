@@ -302,3 +302,8 @@ export function useStore() {
   if (!v) throw new Error('useStore must be used inside StoreProvider');
   return v;
 }
+
+// StoreProvider 밖(새 탭 독립 화면 등)에서도 안전하게 접근 — 없으면 null.
+export function useOptionalStore() {
+  return useContext(Ctx);
+}

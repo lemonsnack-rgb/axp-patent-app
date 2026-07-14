@@ -75,16 +75,35 @@ export function PrivacyView() {
   );
 }
 
+function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-3 py-1.5 border-b border-gray-100">
+      <span className="w-40 shrink-0 text-sm2 font-semibold text-gray-500">{label}</span>
+      <span className="text-md2 text-gray-800">{children}</span>
+    </div>
+  );
+}
+
 export function ContactView() {
   return (
-    <ContentShell title="연락처" subtitle="문의 및 고객지원">
-      <PendingNotice />
-      <div className="grid gap-3">
-        <Placeholder label="운영사" />
-        <Placeholder label="이메일" />
-        <Placeholder label="전화" />
-        <Placeholder label="주소" />
-        <Placeholder label="고객지원 운영시간" />
+    <ContentShell title="연락처" subtitle="운영사 · 고객지원 안내">
+      <div>
+        <div className="text-base2 font-bold text-gray-700 mb-2">운영사 정보</div>
+        <InfoRow label="회사">㈜무하유 (muhayu)</InfoRow>
+        <InfoRow label="대표이사">신동호</InfoRow>
+        <InfoRow label="주소">서울시 성동구 성수일로8길 5, 서울숲 SK V1 A동 2층 (04793)</InfoRow>
+        <InfoRow label="사업자등록번호">206-86-55577</InfoRow>
+        <InfoRow label="통신판매업신고">제2011-서울성동-0831호</InfoRow>
+      </div>
+      <div>
+        <div className="text-base2 font-bold text-gray-700 mb-2">고객지원</div>
+        <InfoRow label="이메일">help@copykiller.com</InfoRow>
+        <InfoRow label="마케팅 문의">marketing@muhayu.com</InfoRow>
+        <InfoRow label="전화 / 팩스">T. 02-6233-8400 &nbsp; F. 02-6233-8420</InfoRow>
+        <InfoRow label="운영시간">평일 10:00~17:00 (주말·공휴일 휴무)</InfoRow>
+      </div>
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm2 text-amber-800">
+        ⚠ CK.Patent 전용 지원 채널(문의 폼·기관/대학 도입문의 등)은 오픈 시 확정·연결 예정입니다.
       </div>
     </ContentShell>
   );
