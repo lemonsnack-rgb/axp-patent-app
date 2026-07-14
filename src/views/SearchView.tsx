@@ -123,7 +123,7 @@ export function SearchView() {
               />
             </div>
           )}
-          <SiteFooter />
+          <div className="mt-auto"><SiteFooter /></div>
         </div>
       )}
 
@@ -150,7 +150,7 @@ export function SearchView() {
               />
             </div>
           )}
-          <SiteFooter />
+          <div className="mt-auto"><SiteFooter /></div>
         </div>
       )}
 

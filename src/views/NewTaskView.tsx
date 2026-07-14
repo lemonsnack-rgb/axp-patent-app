@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '../store';
 import { Card, Input } from '../components/ui';
+import { SiteFooter } from '../components/SiteFooter';
 import { Button } from '@muhayu/axp-ui';
 
 // 검색은 사이드바 메뉴(특허/논문 검색)로 분리되어, 작업 생성 = 명세서 단일.
@@ -67,6 +68,10 @@ export function NewTaskView() {
           <Button variant="filled" color="primary" size="sm" onClick={submit}>명세서 작성 시작</Button>
         </div>
       </Card>
+      {/* 서비스 푸터 — 하단 고정(빈 공간 채움), px-8 상쇄해 풀블리드 */}
+      <div className="mt-auto -mx-8 self-stretch">
+        <SiteFooter />
+      </div>
     </div>
   );
 }
