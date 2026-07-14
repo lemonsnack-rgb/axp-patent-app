@@ -78,7 +78,12 @@ export type AppMode =
   | 'library'
   | 'clients'
   | 'search'
-  | 'spec';
+  | 'spec'
+  // 서비스 기본 콘텐츠(푸터 링크 진입) — 정책·연락처·FAQ
+  | 'terms'
+  | 'privacy'
+  | 'contact'
+  | 'faq';
 
 export interface PatentResult {
   number: string;

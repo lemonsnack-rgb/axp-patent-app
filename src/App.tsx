@@ -9,6 +9,8 @@ import { LibraryView } from './views/LibraryView';
 import { ClientsView } from './views/ClientsView';
 import { SearchView } from './views/SearchView';
 import { SpecView } from './views/SpecView';
+import { TermsView, PrivacyView, ContactView, FaqView } from './views/InfoPages';
+import { SiteFooter } from './components/SiteFooter';
 import { LoginView } from './components/LoginView';
 import { SpecOverlay } from './features/spec-overlay/SpecOverlay';
 import { StandaloneEditor } from './views/StandaloneEditor';
@@ -55,8 +57,14 @@ function Shell() {
           {mode === 'clients' && <ClientsView />}
           {mode === 'search'  && <SearchView />}
           {mode === 'spec'    && <SpecView />}
+          {mode === 'terms'   && <TermsView />}
+          {mode === 'privacy' && <PrivacyView />}
+          {mode === 'contact' && <ContactView />}
+          {mode === 'faq'     && <FaqView />}
         </main>
       </div>
+      {/* 전역 서비스 푸터 — CK.Patent를 하나의 서비스로(이용약관·개인정보·연락처·FAQ) */}
+      <SiteFooter />
     </div>
   );
 }
