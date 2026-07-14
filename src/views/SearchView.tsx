@@ -6,6 +6,7 @@ import { PatentInput, type PatentInputHandle } from './PatentInput';
 import { PatentResults } from './PatentResults';
 import { PaperInput, type PaperInputHandle } from './PaperInput';
 import { PaperResults } from './PaperResults';
+import { SiteFooter } from '../components/SiteFooter';
 import { useStore } from '../store';
 import { toast } from '@muhayu/axp-ui';
 import type { PatentResult, PaperResult } from '../types';
@@ -122,6 +123,7 @@ export function SearchView() {
               />
             </div>
           )}
+          <SiteFooter />
         </div>
       )}
 
@@ -148,6 +150,7 @@ export function SearchView() {
               />
             </div>
           )}
+          <SiteFooter />
         </div>
       )}
 

@@ -4,6 +4,7 @@ import { toast, Button } from '@muhayu/axp-ui';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
 import { Input } from '../components/ui';
+import { SiteFooter } from '../components/SiteFooter';
 import clsx from 'clsx';
 import type { Project } from '../types';
 
@@ -30,7 +31,8 @@ export function HomeView() {
     });
 
   return (
-    <div className="flex-1 overflow-y-auto scroll-thin p-6 bg-zinc-50">
+    <div className="flex-1 overflow-y-auto scroll-thin bg-zinc-50 flex flex-col">
+      <div className="p-6 flex-1">
       <div className="flex items-center gap-2 mb-6 ml-auto justify-end">
         <div className="relative">
           <Icon name="search" size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -69,6 +71,8 @@ export function HomeView() {
       </div>
 
       <NewProjectModal open={newOpen} onClose={() => setNewOpen(false)} />
+      </div>
+      <SiteFooter />
     </div>
   );
 }

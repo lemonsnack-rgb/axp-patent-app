@@ -3,6 +3,7 @@
 // 임의의 약관 문구·연락처·링크를 생성하지 않는다(자리표시자로만 영역 확보). (공통·횡단 COM-081)
 import { useStore } from '../store';
 import { Icon } from '../components/Icon';
+import { SiteFooter } from '../components/SiteFooter';
 
 function ContentShell({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   const { setMode } = useStore();
@@ -20,6 +21,7 @@ function ContentShell({ title, subtitle, children }: { title: string; subtitle?:
             {children}
           </div>
         </div>
+        <SiteFooter />
       </div>
     </div>
   );
