@@ -50,7 +50,6 @@ function applyFacetFilters(items: PatentResult[], filters: AppliedFilter[]): Pat
           const yr = p.applicationDate?.slice(0, 4) ?? '';
           return f.label === '2020 이전' ? parseInt(yr) <= 2020 : yr === f.label;
         }
-        case 'applicant_top': return p.applicant.includes(f.label);
         case 'ipc_top': {
           const prefix = f.label.split(' ')[0].replace('-', ' ');
           return p.ipc.startsWith(prefix);

@@ -1,4 +1,5 @@
-// 패싯 그룹 정의 — Sheet 2 (기본 7그룹) + Sheet 4 (확장 9 카테고리) + 논문 패싯
+// 패싯 그룹 정의 — 기본 결과 필터(국가·권리상태·출원연도·IPC·심판) + 확장 카테고리 + 논문 패싯
+// 출원인 대표명화(applicant_top)는 이번 텀 미구현으로 기본 필터에서 제외됨
 
 export interface FacetItem {
   label: string;
@@ -16,7 +17,7 @@ export interface FacetGroup {
   items: FacetItem[];
 }
 
-// Sheet 2: 기본 결과 필터 (7그룹)
+// 기본 결과 필터
 export const PATENT_FACET_GROUPS_BASE: FacetGroup[] = [
   {
     key: 'country', title: '국가',
@@ -56,16 +57,7 @@ export const PATENT_FACET_GROUPS_BASE: FacetGroup[] = [
       { label: '2020 이전', count: 1631 },
     ],
   },
-  {
-    key: 'applicant_top', title: '출원인 대표명화', badge: '상위 5개',
-    items: [
-      { label: '삼성전자',   count: 387 },
-      { label: '현대자동차', count: 224 },
-      { label: 'LG전자',     count: 198 },
-      { label: 'Waymo LLC',  count: 142 },
-      { label: 'Toyota',     count: 105 },
-    ],
-  },
+  // 출원인 대표명화(applicant_top) 패싯 — 이번 텀 미구현으로 제거
   {
     key: 'ipc_top', title: 'IPC', badge: '상위 5개',
     items: [
