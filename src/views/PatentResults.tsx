@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import clsx from 'clsx';
 import { PATENT_SEED } from '../data/patentSeed';
-import { PATENT_FACET_GROUPS_BASE, type FacetGroup } from '../data/facetGroups';
+import { PATENT_FACET_GROUPS_BASE, IPC_FACET_ITEMS, type FacetGroup, type FacetItem } from '../data/facetGroups';
 import { PatentDetail, parseKeywords, KW_COLORS } from '../components/PatentDetail';
 import { Icon } from '../components/Icon';
 import { toast, Button } from '@muhayu/axp-ui';
@@ -20,7 +20,28 @@ const DATE_FIELDS: { key: DateField; label: string }[] = [
   { key: 'registerDate', label: '등록일' },
 ];
 
-interface AppliedFilter { facetKey: string; title: string; label: string }
+interface AppliedFilter { facetKey: string; title: string; label: string; mode?: 'main' | 'all' }
+
+// 중복제거 모드 — 검색은 문헌번호 기준. 동일 출원번호(1건의 출원)가 공개+등록 문헌으로 함께 잡힐 수 있어
+// 출원번호로 묶어 한 건만 남긴다. reg=등록 우선 / pub=공개 우선 / none=사용안함.
+type DedupMode = 'none' | 'reg' | 'pub';
+
+// 등록계 문헌 여부(등록특허공보). 등록·소멸은 등록문헌, 그 외는 공개문헌.
+const isRegisteredDoc = (p: PatentResult) => p.status === '등록' || p.status === '소멸';
+
+function applyDedup(items: PatentResult[], mode: DedupMode): PatentResult[] {
+  if (mode === 'none') return items;
+  const winner = new Map<string, PatentResult>();
+  for (const p of items) {
+    const key = p.applicationNo || p.number;
+    const cur = winner.get(key);
+    if (!cur) { winner.set(key, p); continue; }
+    const pReg = isRegisteredDoc(p), curReg = isRegisteredDoc(cur);
+    if (mode === 'reg' && pReg && !curReg) winner.set(key, p);
+    else if (mode === 'pub' && !pReg && curReg) winner.set(key, p);
+  }
+  return items.filter(p => winner.get(p.applicationNo || p.number) === p);
+}
 
 // 메타필터(국가·문헌종류·상태·기간)를 결과에 적용 [검색-41].
 function applyMetaFilter(items: PatentResult[], meta?: MetaFilter | null): PatentResult[] {
@@ -50,9 +71,15 @@ function applyFacetFilters(items: PatentResult[], filters: AppliedFilter[]): Pat
           const yr = p.applicationDate?.slice(0, 4) ?? '';
           return f.label === '2020 이전' ? parseInt(yr) <= 2020 : yr === f.label;
         }
+        case 'doc_kind':
+          return f.label === '등록특허' ? isRegisteredDoc(p) : !isRegisteredDoc(p);
         case 'ipc_top': {
           const prefix = f.label.split(' ')[0].replace('-', ' ');
-          return p.ipc.startsWith(prefix);
+          // Main=최신 대표 IPC(p.ipc)만 / All=개정이력 포함 전체 IPC(p.ipcList 중 하나라도)
+          const codes = f.mode === 'main'
+            ? [p.ipc]
+            : (p.ipcList && p.ipcList.length ? p.ipcList : [p.ipc]);
+          return codes.some(c => (c || '').startsWith(prefix));
         }
         case 'trial':
           return f.label === '있음'
@@ -78,6 +105,8 @@ interface Props {
 export function PatentResults({ onOpenDetail, onSave, onSaveMany, searchQuery, meta, onCrossSearch }: Props) {
   const [sortField, setSortField] = useState<DateField>('applicationDate');
   const [openFacet, setOpenFacet] = useState<string | null>(null);
+  const [ipcMode, setIpcMode] = useState<'main' | 'all'>('all');   // IPC 패싯 Main/All 토글(기본 All)
+  const [dedup, setDedup] = useState<DedupMode>('none');            // 중복제거(사용안함/등록 우선/공개 우선)
   const [pendingFilters, setPendingFilters] = useState<Record<string, string[]>>({});
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilter[]>([]);
   const [selectedCard, setSelectedCard] = useState<number | null>(null);  // 기본: 목록만 노출
@@ -95,6 +124,8 @@ export function PatentResults({ onOpenDetail, onSave, onSaveMany, searchQuery, m
     setPage(1);
     setSelectedCard(null);
     setChecked(new Set());
+    setDedup('none');
+    setIpcMode('all');
   }, [searchQuery]);
 
   // 결과 데이터 — 검색어 키워드 매칭 ∩ 메타필터 ∩ 패싯 → 정렬
@@ -107,7 +138,8 @@ export function PatentResults({ onOpenDetail, onSave, onSaveMany, searchQuery, m
       });
   const queryScoped = kwMatched.length > 0 ? kwMatched : PATENT_SEED;
   const metaScoped = applyMetaFilter(queryScoped, meta);
-  const filtered = applyFacetFilters(metaScoped, appliedFilters);
+  const faceted = applyFacetFilters(metaScoped, appliedFilters);
+  const filtered = applyDedup(faceted, dedup);   // 중복제거 적용(출원번호 기준)
   // 날짜 필드(출원일/공개일/등록일) 기준 정렬. 값 없는 항목은 뒤로.
   const data = [...filtered].sort((a, b) => {
     const va = (a[sortField] ?? '');
@@ -154,7 +186,12 @@ export function PatentResults({ onOpenDetail, onSave, onSaveMany, searchQuery, m
     const newApplied: AppliedFilter[] = [];
     for (const g of PATENT_FACET_GROUPS_BASE) {
       for (const label of (pendingFilters[g.key] || [])) {
-        newApplied.push({ facetKey: g.key, title: g.title, label });
+        if (g.key === 'ipc_top') {
+          // IPC는 현재 토글(Main/All)을 함께 기록 → 매칭 의미·칩 라벨 구분
+          newApplied.push({ facetKey: g.key, title: `IPC(${ipcMode === 'main' ? 'Main' : 'All'})`, label, mode: ipcMode });
+        } else {
+          newApplied.push({ facetKey: g.key, title: g.title, label });
+        }
       }
     }
     setAppliedFilters(newApplied);
@@ -215,6 +252,23 @@ export function PatentResults({ onOpenDetail, onSave, onSaveMany, searchQuery, m
               → 논문으로
             </Button>
           )}
+          <span className="flex-1" />
+          {/* 중복제거 — 동일 출원번호(공개+등록 문헌)를 한 건으로. 문헌번호 기준 검색 특성 대응 */}
+          <span data-spec="PAT-LST-080" className="inline-flex items-center gap-1 shrink-0">
+            <span className="text-xs2 text-gray-400 mr-0.5" title="검색은 문헌번호 기준이라 동일 출원이 공개·등록 문헌으로 함께 잡힙니다. 출원번호로 묶어 한 건만 남깁니다.">중복제거</span>
+            {([['none', '사용안함'], ['reg', '등록 우선'], ['pub', '공개 우선']] as [DedupMode, string][]).map(([m, label]) => (
+              <button
+                key={m}
+                onClick={() => { setDedup(m); setPage(1); }}
+                className={clsx(
+                  'h-6 px-2 rounded text-xs2 border transition-colors',
+                  dedup === m
+                    ? 'bg-brand-400 text-white border-brand-400'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-brand-400',
+                )}
+              >{label}</button>
+            ))}
+          </span>
         </div>
 
         {/* filter-bar — 필터 칩 ... 정렬·페이지·CSV */}
@@ -243,6 +297,8 @@ export function PatentResults({ onOpenDetail, onSave, onSaveMany, searchQuery, m
                 {isOpen && (
                   <FacetPopover
                     group={g}
+                    items={g.key === 'ipc_top' ? IPC_FACET_ITEMS[ipcMode] : undefined}
+                    modeToggle={g.key === 'ipc_top' ? { mode: ipcMode, onChange: setIpcMode } : undefined}
                     selected={pendingFilters[g.key] || []}
                     onToggle={(label) => togglePendingFilter(g.key, label)}
                     onApply={applyFilters}
@@ -362,15 +418,17 @@ export function PatentResults({ onOpenDetail, onSave, onSaveMany, searchQuery, m
 }
 
 // ── 패싯 칩 스코프 팝오버 (해당 패싯 값+건수만) ──
-function FacetPopover({ group, selected, onToggle, onApply, onClose }: {
+function FacetPopover({ group, items: itemsOverride, modeToggle, selected, onToggle, onApply, onClose }: {
   group: FacetGroup;
+  items?: FacetItem[];
+  modeToggle?: { mode: 'main' | 'all'; onChange: (m: 'main' | 'all') => void };
   selected: string[];
   onToggle: (label: string) => void;
   onApply: () => void;
   onClose: () => void;
 }) {
   const [q, setQ] = useState('');
-  const items = group.items.filter(it => it.label !== '전체');
+  const items = (itemsOverride ?? group.items).filter(it => it.label !== '전체');
   const searchable = items.length > 8;
   const shown = q.trim()
     ? items.filter(it => it.label.toLowerCase().includes(q.trim().toLowerCase()))
@@ -381,6 +439,24 @@ function FacetPopover({ group, selected, onToggle, onApply, onClose }: {
         <span className="text-sm2 font-semibold text-gray-700">{group.title}</span>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xs2 leading-none">✕</button>
       </div>
+      {modeToggle && (
+        // IPC Main/All 토글 — Main=최신 대표 IPC만 / All=개정이력 포함 전체 IPC
+        <div data-spec="PAT-LST-031" className="flex items-center gap-1 mb-1.5">
+          {([['main', 'Main'], ['all', 'All']] as ['main' | 'all', string][]).map(([m, label]) => (
+            <button
+              key={m}
+              onClick={() => modeToggle.onChange(m)}
+              title={m === 'main' ? '최신 대표 IPC만 집계' : '개정이력 포함 전체 IPC 집계'}
+              className={clsx(
+                'flex-1 h-6 rounded text-xs2 border transition-colors',
+                modeToggle.mode === m
+                  ? 'bg-blue-50 text-brand-400 border-blue-400 font-semibold'
+                  : 'bg-white text-gray-500 border-gray-200 hover:border-blue-400',
+              )}
+            >{label}</button>
+          ))}
+        </div>
+      )}
       {searchable && (
         <input
           value={q}

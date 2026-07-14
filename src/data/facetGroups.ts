@@ -46,6 +46,15 @@ export const PATENT_FACET_GROUPS_BASE: FacetGroup[] = [
     ],
   },
   {
+    // 특허구분(공개/등록) — 검색이 문헌번호 기준이라 동일 출원이 공개+등록 문헌으로 모두 잡힘.
+    // 이 축으로 문헌종류를 좁힌다(중복제거 컨트롤과 함께 사용).
+    key: 'doc_kind', title: '공개/등록',
+    items: [
+      { label: '공개특허', count: 2891 },
+      { label: '등록특허', count: 1901 },
+    ],
+  },
+  {
     key: 'app_year', title: '출원연도',
     items: [
       { label: '2026', count: 89 },
@@ -58,14 +67,18 @@ export const PATENT_FACET_GROUPS_BASE: FacetGroup[] = [
     ],
   },
   // 출원인 대표명화(applicant_top) 패싯 — 이번 텀 미구현으로 제거
+  // IPC 패싯은 Main/All 토글을 가진다(아래 IPC_FACET_ITEMS 참조). group.items는 기본(All).
   {
-    key: 'ipc_top', title: 'IPC', badge: '상위 5개',
+    key: 'ipc_top', title: 'IPC', badge: 'Main/All',
     items: [
-      { label: 'G01S-017 (LiDAR)',     count: 1245 },
-      { label: 'G06V-020 (Vision)',    count: 876 },
-      { label: 'B60W-030 (Vehicle)',   count: 654 },
-      { label: 'G05D-001 (Control)',   count: 432 },
+      // 기본 = All (개정이력 포함 — 한 문헌의 여러 판 IPC를 모두 집계 → 코드·건수 많음)
+      { label: 'G01S-017 (LiDAR)',      count: 1245 },
+      { label: 'G06V-020 (Vision)',     count: 876 },
+      { label: 'B60W-030 (Vehicle)',    count: 654 },
+      { label: 'G05D-001 (Control)',    count: 432 },
       { label: 'G01C-021 (Navigation)', count: 287 },
+      { label: 'H04W-004 (Telematics)', count: 214 },
+      { label: 'G08G-001 (Traffic)',    count: 176 },
     ],
   },
   {
@@ -76,6 +89,20 @@ export const PATENT_FACET_GROUPS_BASE: FacetGroup[] = [
     ],
   },
 ];
+
+// IPC 패싯 Main/All 토글용 아이템 세트.
+//  - All  = 문헌에 반영된 IPC를 개정판 전체 집계(한 문헌이 여러 코드로 잡힘 → 코드·건수 많음). 필드 `IPC`.
+//  - Main = 최신 대표 IPC만 집계(문헌당 1개). 필드 `IPCM`. 코드·건수가 All의 부분집합.
+export const IPC_FACET_ITEMS: { all: FacetItem[]; main: FacetItem[] } = {
+  all: PATENT_FACET_GROUPS_BASE.find(g => g.key === 'ipc_top')!.items,
+  main: [
+    { label: 'G01S-017 (LiDAR)',      count: 812 },
+    { label: 'G06V-020 (Vision)',     count: 534 },
+    { label: 'B60W-030 (Vehicle)',    count: 398 },
+    { label: 'G05D-001 (Control)',    count: 251 },
+    { label: 'G01C-021 (Navigation)', count: 143 },
+  ],
+};
 
 // Sheet 4: 전체 검색필터 (확장 9 카테고리)
 export const PATENT_FACET_GROUPS_EXT: FacetGroup[] = [

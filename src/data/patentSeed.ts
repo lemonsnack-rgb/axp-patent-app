@@ -414,9 +414,28 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
   };
 }
 
-export const PATENT_SEED: PatentResult[] = DOMAINS.flatMap((dm, di) =>
-  Array.from({ length: 5 }, (_, slot) => buildPatent(dm, di, slot)),
-);
+export const PATENT_SEED: PatentResult[] = (() => {
+  const base = DOMAINS.flatMap((dm, di) =>
+    Array.from({ length: 5 }, (_, slot) => buildPatent(dm, di, slot)),
+  );
+  // 중복제거 시연용 — 검색이 문헌번호 기준이므로 동일 출원번호(1건의 출원)가
+  // '공개특허공보' + '등록특허공보' 두 문헌으로 함께 노출되는 사례를 추가한다. [목업]
+  const twins = base
+    .filter(p => p.status === '등록' && p.publicationNo && p.publicationNo !== '-')
+    .slice(0, 6)
+    .map((p): PatentResult => ({
+      ...p,
+      number: p.publicationNo,       // 공개 문헌번호 (동일 출원의 공개 단계 문헌)
+      status: '공개',
+      rightStatus: '공개',
+      registerNo: '-', registerDate: '-',
+      finalDisposal: '출원공개',
+      rightChange: '없음',
+      rightChangeList: [], rightTransferList: [], licenseRegDate: undefined,
+      // applicationNo·applicationDate·publicationDate는 원(등록) 문헌과 동일 → 중복제거 대상
+    }));
+  return [...base, ...twins];
+})();
 
 // ──────────────────────────────────────────────────────────────────────────
 // 논문 시드 — 분야·언어·연도·피인용 다양화 (30건)
