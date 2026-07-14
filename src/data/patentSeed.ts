@@ -147,7 +147,9 @@ const DOMAIN_COMPS: Record<string, [string, string, string]> = {
 };
 
 const COUNTRY_SEQ: Array<'KR' | 'US' | 'JP' | 'CN' | 'EP'> = ['KR', 'US', 'JP', 'CN', 'EP'];
-const STATUS_SEQ = ['등록', '심사중', '공개', '거절', '소멸'] as const;
+// 발생 가능한 권리상태 전종 — 패싯의 모든 값이 결과로 출력되도록 커버.
+// (공개/심사중/등록예정/등록 = active계, 거절/소멸/포기/취하/취소/각하 = inactive계)
+const STATUS_SEQ = ['공개', '심사중', '등록예정', '등록', '거절', '소멸', '포기', '취하', '취소', '각하'] as const;
 
 function pad(n: number, len: number): string { return String(n).padStart(len, '0'); }
 
@@ -289,8 +291,8 @@ function buildDetail(dm: Domain, isEn: boolean): { abstract: string; description
 function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
   const seq = domIdx * 5 + slot;
   const cc = COUNTRY_SEQ[slot % COUNTRY_SEQ.length];
-  const status = STATUS_SEQ[(domIdx + slot) % STATUS_SEQ.length];
-  const year = 2024 - ((seq * 3) % 16); // 2008~2024 분포
+  const status = STATUS_SEQ[seq % STATUS_SEQ.length];   // seq 0~49 → 10개 상태 각 5건 균등
+  const year = 2026 - ((seq * 3) % 17); // 2010~2026 분포(2025·2026 포함 → 연도 패싯 전값 커버)
   const nums = docNumber(cc, year, seq);
   const isReg = status === '등록' || status === '소멸';
   const appDate = mkDate(year - 1, seq, seq * 2);
@@ -305,7 +307,17 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
   const isEn = cc === 'US' || cc === 'EP';
   const detail = buildDetail(dm, isEn);
 
-  const rightStatus = status === '등록' ? '존속 중' : status === '소멸' ? '소멸' : status === '거절' ? '거절확정' : status === '심사중' ? '심사 중' : '공개';
+  const rightStatus =
+    status === '등록' ? '존속 중' :
+    status === '소멸' ? '소멸' :
+    status === '거절' ? '거절확정' :
+    status === '심사중' ? '심사 중' :
+    status === '등록예정' ? '등록결정(등록료 납부 전)' :
+    status === '포기' ? '포기' :
+    status === '취하' ? '취하' :
+    status === '취소' ? '취소' :
+    status === '각하' ? '각하' :
+    '공개';
   const trial = seq % 9 === 0 ? `무효심판 계속 중 (${year}당${pad(seq, 4)})` : '심판 없음';
 
   return {
@@ -347,7 +359,17 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
     agent: cc === 'KR' ? '특허법인 다래' : cc === 'US' ? 'Wilson Sonsini Goodrich & Rosati' : cc === 'JP' ? '弁理士法人OOO' : 'Maucher Jenkins',
     agentAddress: cc === 'KR' ? '서울특별시 강남구 테헤란로 152' : cc === 'US' ? '650 Page Mill Rd, Palo Alto, CA' : cc === 'JP' ? '東京都港区虎ノ門1-1-1' : cc === 'CN' ? '上海市浦东新区世纪大道100号' : 'Neuhauser Str. 20, München',
     // ── 수집 DB 대조 보강 (목업) — 조건 규칙은 docs/목업-조건표.md 참조 ──
-    finalDisposal: status === '등록' ? '설정등록' : status === '거절' ? '거절결정' : status === '소멸' ? '존속기간만료' : status === '심사중' ? '심사청구' : '출원공개',
+    finalDisposal:
+      status === '등록' ? '설정등록' :
+      status === '거절' ? '거절결정' :
+      status === '소멸' ? '존속기간만료' :
+      status === '심사중' ? '심사청구' :
+      status === '등록예정' ? '등록결정' :
+      status === '포기' ? '포기서 제출' :
+      status === '취하' ? '취하서 제출' :
+      status === '취소' ? '취소결정' :
+      status === '각하' ? '각하결정' :
+      '출원공개',
     claimCount: buildClaims(dm).length,
     drawingCount: figuresFor(dm).length,
     // 출원구분: EP=PCT 국내단계진입, CN(slot 3)=분할출원(원출원 존재), 그 외(KR/US/JP)=정상출원
@@ -421,8 +443,8 @@ export const PATENT_SEED: PatentResult[] = (() => {
   // 중복제거 시연용 — 검색이 문헌번호 기준이므로 동일 출원번호(1건의 출원)가
   // '공개특허공보' + '등록특허공보' 두 문헌으로 함께 노출되는 사례를 추가한다. [목업]
   const twins = base
-    .filter(p => p.status === '등록' && p.publicationNo && p.publicationNo !== '-')
-    .slice(0, 6)
+    .filter(p => (p.status === '등록' || p.status === '소멸') && p.publicationNo && p.publicationNo !== '-')
+    .slice(0, 8)
     .map((p): PatentResult => ({
       ...p,
       number: p.publicationNo,       // 공개 문헌번호 (동일 출원의 공개 단계 문헌)

@@ -74,12 +74,12 @@ function applyFacetFilters(items: PatentResult[], filters: AppliedFilter[]): Pat
         case 'doc_kind':
           return f.label === '등록특허' ? isRegisteredDoc(p) : !isRegisteredDoc(p);
         case 'ipc_top': {
-          const prefix = f.label.split(' ')[0].replace('-', ' ');
-          // Main=최신 대표 IPC(p.ipc)만 / All=개정이력 포함 전체 IPC(p.ipcList 중 하나라도)
+          const sub = f.label.split(' ')[0];   // 라벨 선두 토큰 = IPC 서브클래스(예: 'H04L')
+          // Main=최신 대표 IPC(p.ipc)만 / All=개정이력·부가 포함 전체 IPC(p.ipcList 중 하나라도)
           const codes = f.mode === 'main'
             ? [p.ipc]
             : (p.ipcList && p.ipcList.length ? p.ipcList : [p.ipc]);
-          return codes.some(c => (c || '').startsWith(prefix));
+          return codes.some(c => (c || '').startsWith(sub));
         }
         case 'trial':
           return f.label === '있음'

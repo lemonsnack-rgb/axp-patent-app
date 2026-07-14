@@ -68,17 +68,21 @@ export const PATENT_FACET_GROUPS_BASE: FacetGroup[] = [
   },
   // 출원인 대표명화(applicant_top) 패싯 — 이번 텀 미구현으로 제거
   // IPC 패싯은 Main/All 토글을 가진다(아래 IPC_FACET_ITEMS 참조). group.items는 기본(All).
+  // 라벨 선두 토큰(IPC 서브클래스)으로 시드 코드와 매칭한다(예: 'H04L' → 'H04L 9/32').
   {
     key: 'ipc_top', title: 'IPC', badge: 'Main/All',
     items: [
-      // 기본 = All (개정이력 포함 — 한 문헌의 여러 판 IPC를 모두 집계 → 코드·건수 많음)
-      { label: 'G01S-017 (LiDAR)',      count: 1245 },
-      { label: 'G06V-020 (Vision)',     count: 876 },
-      { label: 'B60W-030 (Vehicle)',    count: 654 },
-      { label: 'G05D-001 (Control)',    count: 432 },
-      { label: 'G01C-021 (Navigation)', count: 287 },
-      { label: 'H04W-004 (Telematics)', count: 214 },
-      { label: 'G08G-001 (Traffic)',    count: 176 },
+      // 기본 = All (개정이력·부가 분류 포함 — 한 문헌의 여러 IPC를 모두 집계 → 코드·건수 많음)
+      { label: 'H04L (데이터 전송)',      count: 56 },
+      { label: 'H01L (반도체·디스플레이)', count: 10 },
+      { label: 'G01S (라이다·측위)',       count: 5 },
+      { label: 'H01M (이차전지)',          count: 5 },
+      { label: 'H04W (무선통신)',          count: 5 },
+      { label: 'G06V (영상인식)',          count: 5 },
+      { label: 'A61B (의료영상)',          count: 5 },
+      { label: 'C01B (탄소소재)',          count: 5 },
+      { label: 'C25B (수전해)',            count: 5 },
+      { label: 'B25J (로봇)',              count: 5 },
     ],
   },
   {
@@ -94,13 +98,19 @@ export const PATENT_FACET_GROUPS_BASE: FacetGroup[] = [
 //  - All  = 문헌에 반영된 IPC를 개정판 전체 집계(한 문헌이 여러 코드로 잡힘 → 코드·건수 많음). 필드 `IPC`.
 //  - Main = 최신 대표 IPC만 집계(문헌당 1개). 필드 `IPCM`. 코드·건수가 All의 부분집합.
 export const IPC_FACET_ITEMS: { all: FacetItem[]; main: FacetItem[] } = {
+  // All = group.items(위) 그대로 — H04L 등 부가·개정 분류 포함(문헌당 여러 코드)
   all: PATENT_FACET_GROUPS_BASE.find(g => g.key === 'ipc_top')!.items,
+  // Main = 최신 대표 IPC(문헌당 1개)만 → All의 부분집합. H04L 등 부가분류는 빠짐
   main: [
-    { label: 'G01S-017 (LiDAR)',      count: 812 },
-    { label: 'G06V-020 (Vision)',     count: 534 },
-    { label: 'B60W-030 (Vehicle)',    count: 398 },
-    { label: 'G05D-001 (Control)',    count: 251 },
-    { label: 'G01C-021 (Navigation)', count: 143 },
+    { label: 'H01L (반도체·디스플레이)', count: 10 },
+    { label: 'G01S (라이다·측위)',       count: 5 },
+    { label: 'H01M (이차전지)',          count: 5 },
+    { label: 'H04W (무선통신)',          count: 5 },
+    { label: 'G06V (영상인식)',          count: 5 },
+    { label: 'A61B (의료영상)',          count: 5 },
+    { label: 'C01B (탄소소재)',          count: 5 },
+    { label: 'C25B (수전해)',            count: 5 },
+    { label: 'B25J (로봇)',              count: 5 },
   ],
 };
 

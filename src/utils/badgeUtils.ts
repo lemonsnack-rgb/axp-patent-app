@@ -14,6 +14,11 @@ export const PATENT_STATUS_DESC: Record<string, string> = {
   '거절': '거절 — 심사 결과 거절결정된 상태',
   '소멸': '소멸 — 존속기간 만료·포기·취소 등으로 권리가 소멸된 상태',
   '출원': '출원 — 출원이 접수된 상태',
+  '등록예정': '등록예정 — 등록결정 후 등록료 납부(설정등록) 이전 단계',
+  '포기': '포기 — 출원인이 출원을 포기한 상태(권리 미발생)',
+  '취하': '취하 — 출원인이 출원을 취하한 상태(권리 미발생)',
+  '취소': '취소 — 심판·결정 등으로 출원/권리가 취소된 상태',
+  '각하': '각하 — 절차상 요건 미비로 출원이 각하된 상태',
 };
 export function getPatentStatusDesc(status: string): string {
   return PATENT_STATUS_DESC[status] || status;
