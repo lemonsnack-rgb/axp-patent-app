@@ -1403,12 +1403,12 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                                   <div className="flex gap-1.5 mt-2" data-spec="SPC-EDT-032">
                                     {p.status === 'pending' ? (
                                       <>
-                                        <button onClick={() => acceptProposal(m.id, pi)} className="flex-1 py-1 text-xs2 font-semibold bg-brand-400 text-white rounded-lg hover:bg-brand-400">✓ 적용</button>
-                                        <button onClick={() => declineProposal(m.id, pi)} className="flex-1 py-1 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50">✕ 거절</button>
+                                        <button onClick={() => acceptProposal(m.id, pi)} className="flex-1 py-1 text-xs2 font-semibold bg-brand-400 text-white rounded-lg hover:bg-brand-400">✓ 반영</button>
+                                        <button onClick={() => declineProposal(m.id, pi)} className="flex-1 py-1 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50">✕ 무시</button>
                                       </>
                                     ) : (
                                       <span className={clsx('text-xs2 font-semibold', p.status === 'accepted' ? 'text-blue-600' : 'text-zinc-400')}>
-                                        {p.status === 'accepted' ? '✓ 적용됨' : '✕ 거절됨'}
+                                        {p.status === 'accepted' ? '✓ 반영됨' : '✕ 무시됨'}
                                       </span>
                                     )}
                                   </div>
