@@ -217,4 +217,13 @@ export const SPEC_CATALOG: Record<string, SpecEntry> = {
   'COM-070': { id: 'COM-070', screen: '공통 · 횡단', component: '로딩/0건/오류 상태', display: 'client + 응답 성공/실패', interaction: '공통·횡단 기능', precondition: '검색 실행됨', postcondition: '응답 대기=로딩 · 0건=안내 · 실패=오류 메시지' },
   'COM-080': { id: 'COM-080', screen: '공통 · 횡단', component: '서비스 푸터(단일 규칙 · copykiller 통일)', display: 'copykiller.com 통일 리치 푸터 — ㈜무하유 회사정보/고객센터/콘텐츠(SNS) 3단 + 정책링크(개인정보처리방침·이용약관·연락처·FAQ) + Copyright © MUHAYU Inc. Since 2011', interaction: '정책/연락처/FAQ 링크 → 서비스 내 페이지', precondition: '각 페이지 스크롤 최하단에 1회(검색·결과·상세·정책·FAQ·홈)', postcondition: '오버레이 드로어 제외 · 새 탭 독립화면은 앱으로 이동 · 구 DetailFooter 폐지·일원화' },
   'COM-081': { id: 'COM-081', screen: '공통 · 횡단', component: '정책·FAQ 콘텐츠 페이지 (영역 확보)', display: '이용약관·개인정보처리방침·연락처(자리표시자) · FAQ(SEO/GEO/AEO 대비 골격)', interaction: '푸터 링크 진입 · 홈으로 복귀', precondition: '푸터에서 진입', postcondition: '확정 문구는 muhayu 제공본으로 대체 예정 · FAQ는 콘텐츠 순차 작성(현재 영역만)' },
+
+  // ── 명세서 · 대화형 수정 에이전트 (SpecEditor 챗) ──
+  'SPC-EDT-010': { id: 'SPC-EDT-010', screen: '명세서 · 대화형 수정', component: 'AI 어시스턴트 패널 (영역)', display: '우측 챗 패널 — 대화 히스토리 + 입력창. 좌측 본문 블록 선택과 연동', interaction: '단락 선택 후 명령 입력', precondition: '명세서 에디터 진입', postcondition: '의도 라우팅→의도별 응답(수정제안/플랜/답변/방향확인/미지원)' },
+  'SPC-EDT-030': { id: 'SPC-EDT-030', screen: '명세서 · 대화형 수정', component: 'AI 응답 메시지(의도 배지)', display: '의도 배지(수정제안/플랜/방향확인/답변/미지원) + 답변 텍스트', interaction: '정독', precondition: '명령 전송됨', postcondition: '라우팅된 의도로 응답 렌더 · 히스토리 축적' },
+  'SPC-EDT-031': { id: 'SPC-EDT-031', screen: '명세서 · 대화형 수정', component: '수정 제안 카드', display: 'action 배지(치환/재작성/삽입/삭제) · 대상 블록 · 한줄 요약 · diff(원문→수정)', interaction: '정독', precondition: 'intent=edit', postcondition: '블록 단위 수정 제안 표시' },
+  'SPC-EDT-032': { id: 'SPC-EDT-032', screen: '명세서 · 대화형 수정', component: 'Accept / Decline', display: 'Accept·Decline 버튼 / 반영됨·거절됨 상태', interaction: '클릭', precondition: '제안 status=pending', postcondition: 'Accept=해당 블록에 반영(accepted) · Decline=declined · 미선택=pending' },
+  'SPC-EDT-033': { id: 'SPC-EDT-033', screen: '명세서 · 대화형 수정', component: '방향 선택지(clarify)', display: '방향 선택 칩', interaction: '칩 클릭', precondition: 'intent=clarify(모호한 지시)', postcondition: '선택 방향으로 수정 제안 생성/답변' },
+  'SPC-EDT-040': { id: 'SPC-EDT-040', screen: '명세서 · 대화형 수정', component: '플랜 진행(PlanProgress)', display: 'Step X of Y · 스텝 목록 · Continue/Stop', interaction: 'Continue(다음 스텝 실행)/Stop', precondition: 'intent=plan(다단계 지시) · 청구항 수정(독립→종속)', postcondition: '스텝별 수정 제안 생성 · 진행 중 입력 잠금 · Stop 시 중단' },
+  'SPC-EDT-050': { id: 'SPC-EDT-050', screen: '명세서 · 대화형 수정', component: '명령 입력창', display: '텍스트 입력(Enter 전송) · 선택 단락 수 표시 · 플랜 중 잠금 안내', interaction: '입력·전송', precondition: '—', postcondition: '의도 라우팅 실행. 플랜 진행 중엔 비활성' },
 };

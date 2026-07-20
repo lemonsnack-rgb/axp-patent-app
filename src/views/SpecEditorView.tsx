@@ -15,7 +15,10 @@ import { openEditorTab } from '../features/drawing-workflow/editorChannel';
 import { loadSpecState, saveSpecState } from '../features/spec/specStore';
 import { PreviewModal } from '../components/PreviewModal';
 import type { PreviewSection } from '../components/PreviewModal';
-import { analyzePromptClarity, generateIntentOptions, generateMockModification } from '../features/ai/clarityAnalyzer';
+import {
+  routeIntent, buildProposal, EDIT_ACTION_LABEL, INTENT_LABEL,
+  type EditProposal, type PlanStepDef, type AgentIntent,
+} from '../features/ai/specAgentMock';
 import { exportDocx } from '../utils/exportDocx';
 import { exportPdf } from '../utils/exportPdf';
 
@@ -369,17 +372,17 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
   // 모바일 AI 패널 오픈 상태
   const [mobileAiOpen, setMobileAiOpen] = useState(false);
 
-  // 채팅 UI
+  // 채팅 UI — 개발노트 ChatMessage 정합(intent / edit_proposals / plan)
   type ChatMsg = {
     id: number;
     role: 'user' | 'ai';
     text: string;
-    proposed?: string;                                       // 표시용 (단일/병합 미리보기)
-    refs?: { sid: SectionId; idx: number }[];                // AI 대상 단락 전체 (배치)
-    proposals?: { sid: SectionId; idx: number; text: string }[]; // 단락별 수정안 (적용 대상)
-    intentOptions?: string[];       // 패턴 B: 방향 선택지
-    selectedIntent?: string;        // 패턴 B: 선택된 방향
-    sourceMsg?: string;             // 재생성용 원본 메시지
+    intent?: AgentIntent;                                    // 라우팅된 의도 (edit/clarify/answer/plan/terminate)
+    refs?: { sid: SectionId; idx: number }[];                // 대상 단락
+    proposals?: EditProposal[];                              // 블록 수정 제안 (action·diff·status)
+    intentOptions?: string[];                                // clarify 선택지
+    sourceMsg?: string;                                      // 재생성/플랜용 원본 지시
+    plan?: { steps: PlanStepDef[]; current: number; status: 'running' | 'stopped' | 'done' };
   };
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -520,24 +523,50 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     if (sel?.sid === sid && sel?.idx === idx) setSel({ sid, idx: j });
   };
 
-  // ── 배치 수정안 일괄 적용 (단일 undo 단위) ────────────────────────────
-  const applyProposals = (proposals: { sid: SectionId; idx: number; text: string }[]) => {
-    if (!proposals.length) return;
-    setUndoStack(p => [...p.slice(-20), blocks]);
+  // ── 제안 상태 변경 (Accept/Decline/Pending) ───────────────────────────
+  const setProposalStatus = (msgId: number, pi: number, status: EditProposal['status']) => {
+    setChatMessages(prev => prev.map(m =>
+      m.id === msgId ? { ...m, proposals: m.proposals?.map((p, i) => i === pi ? { ...p, status } : p) } : m,
+    ));
+  };
+
+  // ── 단일 제안 Accept → 블록 반영 (action별: 치환/재작성/삽입/삭제) ──────
+  const acceptProposal = (msgId: number, pi: number) => {
+    const m = chatMessages.find(x => x.id === msgId);
+    const p = m?.proposals?.[pi];
+    if (!p) return;
+    setUndoStack(s => [...s.slice(-20), blocks]);
     setRedoStack([]);
-    setBlocks(p => {
-      const next = { ...p } as Record<SectionId, string[]>;
-      proposals.forEach(pr => {
-        next[pr.sid] = next[pr.sid].map((b, i) => i === pr.idx ? pr.text : b);
-      });
+    setBlocks(prev => {
+      const sid = p.sid as SectionId;
+      const arr = [...(prev[sid] || [])];
+      if (p.action === 'DELETE') arr.splice(p.idx, 1);
+      else if (p.action === 'INSERT') arr.splice(p.idx + 1, 0, p.target);
+      else arr[p.idx] = p.target;   // REPLACE / REWRITE
+      const next = { ...prev, [sid]: arr } as Record<SectionId, string[]>;
       if (task?.id) {
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-        saveTimerRef.current = setTimeout(() =>
-          saveSpecState(task.id, { editorBlocks: next as any }), 500
-        );
+        saveTimerRef.current = setTimeout(() => saveSpecState(task.id, { editorBlocks: next as any }), 500);
       }
       return next;
     });
+    setProposalStatus(msgId, pi, 'accepted');
+  };
+  const declineProposal = (msgId: number, pi: number) => setProposalStatus(msgId, pi, 'declined');
+
+  // ── AI 메시지 push 헬퍼 ────────────────────────────────────────────────
+  const pushAi = (partial: Omit<ChatMsg, 'id' | 'role'>) => {
+    setChatMessages(prev => [...prev, { id: ++msgIdRef.current, role: 'ai', ...partial }]);
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+  };
+  // ── 선택 단락별 수정 제안 생성(edit) ───────────────────────────────────
+  const pushEditProposals = (instruction: string, refs: { sid: SectionId; idx: number }[]) => {
+    const proposals = refs.map(r => buildProposal(
+      r.sid, r.idx,
+      EDITOR_SECTIONS.find(s => s.id === r.sid)?.label ?? r.sid,
+      blocks[r.sid]?.[r.idx] || '', instruction,
+    ));
+    pushAi({ text: `요청하신 내용을 반영하여 ${proposals.length}건의 수정을 제안합니다.`, intent: 'edit', proposals, refs, sourceMsg: instruction });
   };
 
   const undo = () => {
@@ -620,38 +649,12 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     return `"${docTitle}" 명세서를 기준으로 답변드립니다.\n\n${question.slice(0, 40)}에 관해서는, 발명의 핵심 기술 특징이 각 섹션에 일관되게 반영되어 있는지 확인하는 것이 중요합니다. 구체적인 단락 수정이 필요하면 해당 단락을 선택 후 명령을 입력해 주세요.`;
   };
 
-  // ── AI 수정 실행 (방향 확정 후) ────────────────────────────────────────
-  const runModification = (
-    instruction: string,
-    refs: { sid: SectionId; idx: number }[],
-    sourceMsg: string,
-    selectedIntent?: string,
-  ) => {
-    // 선택된 단락마다 개별 수정안 생성 (배치)
-    const proposals = refs.map(r => ({
-      sid: r.sid,
-      idx: r.idx,
-      text: generateMockModification(blocks[r.sid]?.[r.idx] || '', instruction),
-    }));
-    const secLabel = refs.length === 1
-      ? (EDITOR_SECTIONS.find(s => s.id === refs[0].sid)?.label ?? '') + ' 단락의'
-      : `${refs.length}개 단락의`;
-    const label = selectedIntent ? `[${selectedIntent}] 방향으로 수정했습니다.` : `${secLabel} 수정안입니다.`;
-    setChatMessages(prev => [...prev, {
-      id: ++msgIdRef.current, role: 'ai', text: label,
-      proposed: proposals.map(p => p.text).join('\n\n'),
-      proposals, refs, sourceMsg, selectedIntent,
-    }]);
-    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-  };
-
-  // ── 채팅 전송 ──────────────────────────────────────────────────────────
+  // ── 채팅 전송 — 의도 라우팅 후 의도별 처리 ─────────────────────────────
   const sendChat = (override?: string) => {
     const msg = (override ?? chatInput).trim();
     if (!msg) return;
     if (!override) setChatInput('');
 
-    // selSet 기반 컨텍스트 결정 — 선택 단락 전체를 refs로 캡처, 미선택 시 전체 문서 Q&A
     const refs: { sid: SectionId; idx: number }[] = [];
     selSet.forEach(key => {
       const dashIdx = key.indexOf('-');
@@ -665,47 +668,66 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
 
     setTimeout(() => {
       setAiThinking(false);
-      if (refs.length === 0) {
-        // 전체 문서 대상 Q&A 모드
-        const aiText = generateWholeDocReply(msg);
-        setChatMessages(prev => [...prev, { id: ++msgIdRef.current, role: 'ai', text: aiText }]);
-        setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-        return;
-      }
-      // 명확도 판단 (TODO: API 교체)
-      const clarity = analyzePromptClarity(msg);
-      if (clarity === 'direct') {
-        runModification(msg, refs, msg);
+      const route = routeIntent(msg, { hasSelection: refs.length > 0 });
+      if (route.intent === 'terminate' || route.intent === 'answer') {
+        pushAi({ text: route.answer ?? generateWholeDocReply(msg), intent: route.intent });
+      } else if (route.intent === 'clarify') {
+        pushAi({ text: '어떤 방향으로 진행할까요?', intent: 'clarify', intentOptions: route.clarifyOptions, refs, sourceMsg: msg });
+      } else if (route.intent === 'plan') {
+        pushAi({ text: `요청을 ${route.planSteps!.length}단계 플랜으로 나눴습니다. 순서대로 진행하세요.`, intent: 'plan', refs, sourceMsg: msg, plan: { steps: route.planSteps!, current: 0, status: 'running' } });
+      } else if (refs.some(r => r.sid === 'claims')) {
+        // 청구항 수정 — 개발노트: 독립항 → 종속항 순으로 고정 파이프라인 (전체 세트 단위)
+        pushAi({
+          text: '청구항 수정은 독립항 → 종속항 순으로 검토합니다.', intent: 'plan',
+          refs: refs.filter(r => r.sid === 'claims'), sourceMsg: msg,
+          plan: {
+            steps: [
+              { title: '독립항 검토·수정', instruction: `${msg} (독립항 기준)` },
+              { title: '종속항 검토·수정', instruction: `${msg} (종속항 반영)` },
+            ], current: 0, status: 'running',
+          },
+        });
       } else {
-        const options = generateIntentOptions(msg);
-        setChatMessages(prev => [...prev, {
-          id: ++msgIdRef.current, role: 'ai',
-          text: '어떤 방향으로 수정할까요?',
-          intentOptions: options, refs, sourceMsg: msg,
-        }]);
-        setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+        pushEditProposals(msg, refs);
       }
-    }, 600);
+    }, 500);
   };
 
-  // ── 방향 선택 (패턴 B) ─────────────────────────────────────────────────
-  const selectIntent = (msgId: number, intent: string) => {
-    const msg = chatMessages.find(m => m.id === msgId);
-    if (!msg?.refs?.length) return;
-    // 선택지 메시지를 선택 완료 상태로 변경
-    setChatMessages(prev => prev.map(m =>
-      m.id === msgId ? { ...m, intentOptions: undefined, selectedIntent: intent, text: `[${intent}] 방향 선택됨` } : m
-    ));
-    setTimeout(() => runModification(intent, msg.refs!, msg.sourceMsg || intent, intent), 400);
+  // ── clarify 선택지 선택 → 해당 방향으로 진행 ───────────────────────────
+  const selectIntent = (msgId: number, opt: string) => {
+    const m = chatMessages.find(x => x.id === msgId);
+    setChatMessages(prev => prev.map(x => x.id === msgId ? { ...x, intentOptions: undefined, text: `[${opt}] 선택됨` } : x));
+    setTimeout(() => {
+      if (m?.refs?.length) pushEditProposals(m.sourceMsg ? `${m.sourceMsg} · ${opt}` : opt, m.refs);
+      else pushAi({ text: generateWholeDocReply(m?.sourceMsg || opt), intent: 'answer' });
+    }, 300);
+  };
+
+  // ── 플랜: 다음 스텝 실행 / 중단 ────────────────────────────────────────
+  const advancePlan = (msgId: number) => {
+    const m = chatMessages.find(x => x.id === msgId);
+    const plan = m?.plan;
+    if (!plan || plan.status !== 'running') return;
+    const step = plan.steps[plan.current];
+    const refs = m?.refs ?? [];
+    if (refs.length) pushEditProposals(step.instruction, refs);
+    else pushAi({ text: `(플랜 ${plan.current + 1}/${plan.steps.length}) "${step.title}" — 본문에서 대상 단락을 선택하면 수정 제안을 생성합니다.`, intent: 'answer' });
+    const nextIdx = plan.current + 1;
+    setChatMessages(prev => prev.map(x => x.id === msgId ? { ...x, plan: { ...plan, current: nextIdx, status: nextIdx >= plan.steps.length ? 'done' : 'running' } } : x));
+  };
+  const stopPlan = (msgId: number) => {
+    setChatMessages(prev => prev.map(x => x.id === msgId && x.plan ? { ...x, plan: { ...x.plan, status: 'stopped' } } : x));
   };
 
   // ── 다시 생성 ──────────────────────────────────────────────────────────
   const regenerate = (msg: ChatMsg) => {
-    if (!msg.refs?.length) return;
-    const instruction = msg.selectedIntent || msg.sourceMsg || '다시 생성';
+    if (!msg.refs?.length || !msg.sourceMsg) return;
     setChatMessages(prev => prev.filter(m => m.id !== msg.id));
-    setTimeout(() => runModification(instruction, msg.refs!, instruction, msg.selectedIntent), 400);
+    setTimeout(() => pushEditProposals(msg.sourceMsg!, msg.refs!), 300);
   };
+
+  // 플랜 진행 중이면 새 입력 차단 (개발노트: 진행 중 입력 막기)
+  const planRunning = chatMessages.some(m => m.plan?.status === 'running');
 
   // ── 표 삽입 ─────────────────────────────────────────────────────────────
   const insertTable = () => {
@@ -1188,7 +1210,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             onClick={() => setMobileAiOpen(false)}
           />
         )}
-        <aside className={clsx(
+        <aside data-spec="SPC-EDT-010" className={clsx(
           'bg-white flex-col overflow-hidden',
           'md:flex md:relative md:shrink-0 md:border-l md:border-zinc-200',
           'md:w-[360px] md:min-w-[320px]',
@@ -1294,11 +1316,25 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                         {m.text}
                       </div>
                     ) : (
-                      <div className="rounded-xl text-xs2 leading-relaxed max-w-[85%] bg-zinc-100 text-zinc-800 overflow-hidden">
-                        <p className="px-3 pt-2.5 pb-1.5">{m.text}</p>
-                        {/* 패턴 B: 방향 선택지 */}
+                      <div data-spec="SPC-EDT-030" className="rounded-xl text-xs2 leading-relaxed max-w-[88%] bg-zinc-100 text-zinc-800 overflow-hidden">
+                        {/* 의도 배지 */}
+                        {m.intent && (
+                          <div className="px-3 pt-2">
+                            <span className={clsx('inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold',
+                              m.intent === 'edit' ? 'bg-blue-100 text-blue-700'
+                              : m.intent === 'plan' ? 'bg-violet-100 text-violet-700'
+                              : m.intent === 'clarify' ? 'bg-amber-100 text-amber-700'
+                              : m.intent === 'terminate' ? 'bg-gray-200 text-gray-500'
+                              : 'bg-emerald-100 text-emerald-700')}>
+                              {INTENT_LABEL[m.intent]}
+                            </span>
+                          </div>
+                        )}
+                        <p className="px-3 pt-1.5 pb-1.5 whitespace-pre-wrap">{m.text}</p>
+
+                        {/* clarify 방향 선택지 */}
                         {m.intentOptions && (
-                          <div className="flex flex-wrap gap-1.5 px-2.5 pb-2.5">
+                          <div data-spec="SPC-EDT-033" className="flex flex-wrap gap-1.5 px-2.5 pb-2.5">
                             {m.intentOptions.map((opt, i) => (
                               <button key={i}
                                 onClick={() => selectIntent(m.id, opt)}
@@ -1308,33 +1344,76 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             ))}
                           </div>
                         )}
-                        {/* 패턴 A / 패턴 B 결과: 수정안 (단일/배치) */}
+
+                        {/* 플랜 진행 (PlanProgress: Step X of Y · Continue/Stop) */}
+                        {m.plan && (
+                          <div data-spec="SPC-EDT-040" className="mx-2.5 mb-2.5 rounded-lg bg-white border border-violet-200 p-2.5">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-xs2 font-semibold text-violet-700">
+                                플랜 · Step {Math.min(m.plan.current + (m.plan.status === 'done' ? 0 : 1), m.plan.steps.length)} of {m.plan.steps.length}
+                              </span>
+                              <span className="text-[10px] text-zinc-400">{m.plan.status === 'running' ? '진행 중' : m.plan.status === 'stopped' ? '중단됨' : '완료'}</span>
+                            </div>
+                            <ol className="space-y-0.5 mb-2">
+                              {m.plan.steps.map((st, si) => (
+                                <li key={si} className={clsx('flex items-start gap-1.5 text-xs2',
+                                  si < m.plan!.current ? 'text-zinc-400 line-through'
+                                  : si === m.plan!.current && m.plan!.status === 'running' ? 'text-zinc-800 font-semibold'
+                                  : 'text-zinc-500')}>
+                                  <span className="shrink-0">{si < m.plan!.current ? '✓' : `${si + 1}.`}</span>
+                                  <span>{st.title}</span>
+                                </li>
+                              ))}
+                            </ol>
+                            {m.plan.status === 'running' && (
+                              <div className="flex gap-1.5">
+                                <button onClick={() => advancePlan(m.id)} className="flex-1 py-1.5 text-xs2 font-semibold bg-violet-600 text-white rounded-lg hover:bg-violet-700">▶ {m.plan.current + 1}단계 실행 (Continue)</button>
+                                <button onClick={() => stopPlan(m.id)} className="px-3 py-1.5 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50">■ Stop</button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* 수정 제안 카드 (블록 단위 · action·diff·Accept/Decline) */}
                         {m.proposals && m.proposals.length > 0 && (
                           <>
                             <div className="mx-2.5 mb-2 space-y-1.5">
-                              {m.proposals.map((p, pi) => {
-                                const secLabel = EDITOR_SECTIONS.find(s => s.id === p.sid)?.short ?? p.sid;
-                                return (
-                                  <div key={pi} className="rounded-lg bg-white border border-zinc-200 p-2.5">
-                                    <p className="text-xs2 font-semibold text-zinc-400 mb-1">
-                                      수정안{m.proposals!.length > 1 ? ` · ${secLabel} ${p.idx + 1}` : ''}
-                                    </p>
-                                    <p className="text-xs2 text-zinc-800 leading-relaxed whitespace-pre-wrap">{p.text}</p>
+                              {m.proposals.map((p, pi) => (
+                                <div key={pi} data-spec="SPC-EDT-031" className="rounded-lg bg-white border border-zinc-200 p-2.5">
+                                  <div className="flex items-center gap-1.5 mb-1">
+                                    <span className={clsx('px-1.5 py-0.5 rounded text-[10px] font-bold',
+                                      p.action === 'DELETE' ? 'bg-red-100 text-red-600'
+                                      : p.action === 'INSERT' ? 'bg-emerald-100 text-emerald-700'
+                                      : p.action === 'REWRITE' ? 'bg-amber-100 text-amber-700'
+                                      : 'bg-blue-100 text-blue-700')}>
+                                      {EDIT_ACTION_LABEL[p.action]}
+                                    </span>
+                                    <span className="text-[11px] text-zinc-500 truncate">{p.targetDesc}</span>
                                   </div>
-                                );
-                              })}
+                                  <p className="text-[11px] text-zinc-400 mb-1.5">{p.summary}</p>
+                                  {p.action !== 'INSERT' && p.source && (
+                                    <p className="text-xs2 leading-relaxed rounded px-2 py-1 mb-1 bg-red-50 text-red-700 line-through whitespace-pre-wrap">{p.source}</p>
+                                  )}
+                                  {p.action !== 'DELETE' && (
+                                    <p className="text-xs2 leading-relaxed rounded px-2 py-1 bg-emerald-50 text-emerald-800 whitespace-pre-wrap">{p.target}</p>
+                                  )}
+                                  <div className="flex gap-1.5 mt-2" data-spec="SPC-EDT-032">
+                                    {p.status === 'pending' ? (
+                                      <>
+                                        <button onClick={() => acceptProposal(m.id, pi)} className="flex-1 py-1 text-xs2 font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700">✓ Accept</button>
+                                        <button onClick={() => declineProposal(m.id, pi)} className="flex-1 py-1 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50">✕ Decline</button>
+                                      </>
+                                    ) : (
+                                      <span className={clsx('text-xs2 font-semibold', p.status === 'accepted' ? 'text-blue-600' : 'text-zinc-400')}>
+                                        {p.status === 'accepted' ? '✓ 반영됨 (Accepted)' : '✕ 거절됨 (Declined)'}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                            <div className="flex gap-1.5 px-2.5 pb-2.5">
-                              <button
-                                onClick={() => applyProposals(m.proposals!)}
-                                className="flex-1 py-1.5 text-xs2 font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                                ✓ {m.proposals.length > 1 ? `${m.proposals.length}개 일괄 적용` : '적용'}
-                              </button>
-                              <button
-                                onClick={() => regenerate(m)}
-                                className="px-3 py-1.5 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors">
-                                ↺ 다시 생성
-                              </button>
+                            <div className="px-2.5 pb-2.5">
+                              <button onClick={() => regenerate(m)} className="text-xs2 font-semibold text-zinc-500 hover:text-blue-600">↺ 다시 생성</button>
                             </div>
                           </>
                         )}
@@ -1361,14 +1440,20 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           </div>
 
           {/* 하단 채팅 입력창 */}
-          <div className="border-t border-zinc-200 px-3 py-2.5 shrink-0 bg-white">
+          <div data-spec="SPC-EDT-050" className="border-t border-zinc-200 px-3 py-2.5 shrink-0 bg-white">
+            {planRunning && (
+              <div className="mb-2 text-[11px] text-violet-600 bg-violet-50 border border-violet-200 rounded px-2 py-1">
+                플랜 진행 중입니다 — 스텝을 실행(Continue)하거나 중단(Stop)한 뒤 입력할 수 있습니다.
+              </div>
+            )}
             <div className="flex gap-2 items-end">
               <Textarea
                 ref={chatTextareaRef}
                 className="flex-1 px-3 py-2"
-                placeholder={selSet.size > 0 ? `선택한 ${selSet.size}개 단락에 대해 명령하세요...` : "명령을 입력하세요... (Enter 전송)"}
+                placeholder={planRunning ? '플랜 진행 중 — 입력 잠금' : selSet.size > 0 ? `선택한 ${selSet.size}개 단락에 대해 명령하세요...` : "명령을 입력하세요... (Enter 전송)"}
                 value={chatInput}
                 rows={2}
+                disabled={planRunning}
                 onChange={e => setChatInput(e.target.value)}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -1380,7 +1465,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
               />
               <button
                 onClick={() => sendChat()}
-                disabled={!chatInput.trim()}
+                disabled={!chatInput.trim() || planRunning}
                 className="shrink-0 w-8 h-8 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center transition-colors">
                 <svg viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" width="13" height="13">
                   <path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z" fill="white" stroke="none"/>
