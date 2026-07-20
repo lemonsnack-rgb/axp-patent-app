@@ -226,4 +226,11 @@ export const SPEC_CATALOG: Record<string, SpecEntry> = {
   'SPC-EDT-033': { id: 'SPC-EDT-033', screen: '명세서 · 대화형 수정', component: '방향 선택지(clarify)', display: '방향 선택 칩', interaction: '칩 클릭', precondition: 'intent=clarify(모호한 지시)', postcondition: '선택 방향으로 수정 제안 생성/답변' },
   'SPC-EDT-040': { id: 'SPC-EDT-040', screen: '명세서 · 대화형 수정', component: '플랜 진행(PlanProgress)', display: 'Step X of Y · 스텝 목록 · Continue/Stop', interaction: 'Continue(다음 스텝 실행)/Stop', precondition: 'intent=plan(다단계 지시) · 청구항 수정(독립→종속)', postcondition: '스텝별 수정 제안 생성 · 진행 중 입력 잠금 · Stop 시 중단' },
   'SPC-EDT-050': { id: 'SPC-EDT-050', screen: '명세서 · 대화형 수정', component: '명령 입력창', display: '텍스트 입력(Enter 전송) · 선택 단락 수 표시 · 플랜 중 잠금 안내', interaction: '입력·전송', precondition: '—', postcondition: '의도 라우팅 실행. 플랜 진행 중엔 비활성' },
+
+  // ── 명세서 · 작성 플로우 AI 어시스턴트(GuidePanel) — 단일 섹션 대상, 동일 에이전트 UX ──
+  'SPC-AST-010': { id: 'SPC-AST-010', screen: '명세서 · AI 어시스턴트(작성 플로우)', component: 'AI 어시스턴트 챗 (영역)', display: '가이드 패널 우측 챗 — 선택 섹션(focus) 대상', interaction: '섹션 선택 후 명령 입력', precondition: '작성 플로우(분석) 진입', postcondition: '의도 라우팅 → 의도별 응답(단일 섹션 수정/답변/방향확인/미지원)' },
+  'SPC-AST-030': { id: 'SPC-AST-030', screen: '명세서 · AI 어시스턴트(작성 플로우)', component: 'AI 응답(의도 배지)', display: '의도 배지(수정제안/방향확인/답변/미지원) + 답변', interaction: '정독', precondition: '명령 전송됨', postcondition: '라우팅 의도로 렌더' },
+  'SPC-AST-031': { id: 'SPC-AST-031', screen: '명세서 · AI 어시스턴트(작성 플로우)', component: '수정 제안 카드', display: 'action 배지(치환/재작성/삽입/삭제) · 대상 섹션 · 요약 · diff(원문→수정)', interaction: '정독', precondition: '섹션 선택 + edit 의도', postcondition: '단일 섹션 수정 제안' },
+  'SPC-AST-032': { id: 'SPC-AST-032', screen: '명세서 · AI 어시스턴트(작성 플로우)', component: 'Accept / Decline', display: 'Accept·Decline·다시생성 / 반영됨·거절됨', interaction: '클릭', precondition: '제안 status=pending', postcondition: 'Accept=섹션에 반영 · Decline=거절 · 다시생성' },
+  'SPC-AST-033': { id: 'SPC-AST-033', screen: '명세서 · AI 어시스턴트(작성 플로우)', component: '방향 선택지(clarify)', display: '방향 선택 칩', interaction: '칩 클릭', precondition: 'clarify 의도(모호)', postcondition: '선택 방향으로 수정 제안' },
 };

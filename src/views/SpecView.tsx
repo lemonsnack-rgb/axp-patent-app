@@ -25,7 +25,10 @@ import type {
   InventionContext, MidspecSection, InventionDescriptionItem, Drawing,
 } from '../features/spec/types';
 import { loadSpecState, saveSpecState } from '../features/spec/specStore';
-import { analyzePromptClarity, generateIntentOptions, generateMockModification } from '../features/ai/clarityAnalyzer';
+import {
+  routeIntent, buildProposal, EDIT_ACTION_LABEL, INTENT_LABEL,
+  type EditProposal, type AgentIntent,
+} from '../features/ai/specAgentMock';
 
 type StepId = SpecStepId;
 const STEPS: StepConfig[] = [
@@ -828,13 +831,11 @@ type GuideChatMsg = {
   id: number;
   role: 'user' | 'ai';
   text: string;
-  proposed?: string;
-  applyFn?: () => void;
-  intentOptions?: string[];
-  selectedIntent?: string;
+  intent?: AgentIntent;                 // 라우팅된 의도
+  proposal?: EditProposal;              // 단일 섹션 수정 제안(action·diff·status)
+  intentOptions?: string[];             // clarify 선택지
   sourceMsg?: string;
   sourceFocusCtx?: FocusCtx;
-  applied?: boolean;
 };
 
 // ── 텍스트 선택 AI 수정 팝오버 ──────────────────────────────────────────────
@@ -1317,25 +1318,15 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
     '도면': '도면은 발명의 구성요소를 시각화하며, 각 부호(100, 200...)로 연결됩니다.',
   };
 
-  const runGuideModification = (
-    instruction: string,
-    ctx: FocusCtx,
-    sourceMsg: string,
-    selectedIntent?: string,
-  ) => {
-    const proposed = generateMockModification(ctx.text, instruction);
-    const label = selectedIntent ? `[${selectedIntent}] 방향으로 수정했습니다.` : `${ctx.label} 수정안입니다.`;
-    setGuideChatMsgs(prev => [...prev, {
-      id: ++guideChatIdRef.current,
-      role: 'ai',
-      text: label,
-      proposed,
-      applyFn: () => ctx.apply(proposed),
-      sourceMsg,
-      selectedIntent,
-      sourceFocusCtx: ctx,
-    }]);
+  const pushGuideAi = (partial: Omit<GuideChatMsg, 'id' | 'role'>) => {
+    setGuideChatMsgs(prev => [...prev, { id: ++guideChatIdRef.current, role: 'ai', ...partial }]);
     setTimeout(() => guideChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+  };
+
+  // 단일 섹션(focusCtx) 수정 제안 생성 (action·diff·status)
+  const runGuideEdit = (instruction: string, ctx: FocusCtx, sourceMsg: string) => {
+    const proposal = buildProposal('section', 0, ctx.label, ctx.text, instruction);
+    pushGuideAi({ text: '요청하신 내용을 반영한 수정 제안입니다.', intent: 'edit', proposal, sourceMsg, sourceFocusCtx: ctx });
   };
 
   const sendGuideChat = (override?: string) => {
@@ -1347,48 +1338,60 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
     setGuideChatMsgs(prev => [...prev, { id: ++guideChatIdRef.current, role: 'user', text: msg }]);
 
     setTimeout(() => {
-      if (!capturedCtx) {
-        const matchKey = Object.keys(QA_REPLIES).find(k => msg.includes(k));
-        const aiText = matchKey
-          ? QA_REPLIES[matchKey]
-          : `"${msg.slice(0, 20)}"에 대해 답변드립니다. 텍스트 영역을 클릭하면 AI가 해당 내용을 수정해드릴 수 있습니다.`;
-        setGuideChatMsgs(prev => [...prev, { id: ++guideChatIdRef.current, role: 'ai', text: aiText }]);
-        setTimeout(() => guideChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+      const route = routeIntent(msg, { hasSelection: !!capturedCtx });
+      if (route.intent === 'terminate') { pushGuideAi({ text: route.answer ?? '요청하신 작업은 지원하지 않습니다.', intent: 'terminate' }); return; }
+      if (route.intent === 'plan') {
+        // 어시스턴트 모드는 단일 섹션 대상 — 다단계 플랜은 명세서 에디터에서 진행
+        pushGuideAi({ text: '여러 단계 작업(플랜)은 명세서 에디터의 AI 어시스턴트에서 진행해 주세요. 여기서는 선택한 섹션 하나를 수정합니다.', intent: 'answer' });
         return;
       }
-      // 명확도 판단 (TODO: API 교체)
-      const clarity = analyzePromptClarity(msg);
-      if (clarity === 'direct') {
-        runGuideModification(msg, capturedCtx, msg);
-      } else {
-        const options = generateIntentOptions(msg);
-        setGuideChatMsgs(prev => [...prev, {
-          id: ++guideChatIdRef.current,
-          role: 'ai',
-          text: '어떤 방향으로 수정할까요?',
-          intentOptions: options,
-          sourceMsg: msg,
-          sourceFocusCtx: capturedCtx,
-        }]);
-        setTimeout(() => guideChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+      if (route.intent === 'answer') {
+        const matchKey = capturedCtx ? null : Object.keys(QA_REPLIES).find(k => msg.includes(k));
+        const aiText = route.answer
+          ?? (matchKey ? QA_REPLIES[matchKey]
+            : capturedCtx ? `"${capturedCtx.label}" 섹션 기준으로 답변드립니다. 수정을 원하면 수정 방향을 지시해 주세요.`
+            : `"${msg.slice(0, 20)}"에 대해 답변드립니다. 텍스트 영역을 클릭하면 해당 내용을 수정해드릴 수 있습니다.`);
+        pushGuideAi({ text: aiText, intent: 'answer' });
+        return;
       }
+      if (!capturedCtx) {
+        pushGuideAi({ text: '수정할 섹션을 먼저 클릭해 선택해 주세요. 또는 전체 문서 기준으로 답변드릴까요?', intent: 'clarify', intentOptions: ['전체 문서 기준으로 답변'], sourceMsg: msg });
+        return;
+      }
+      if (route.intent === 'clarify') {
+        pushGuideAi({ text: '어떤 방향으로 수정할까요?', intent: 'clarify', intentOptions: route.clarifyOptions, sourceMsg: msg, sourceFocusCtx: capturedCtx });
+        return;
+      }
+      runGuideEdit(msg, capturedCtx, msg);
     }, 500);
   };
 
-  const selectGuideIntent = (msgId: number, intent: string) => {
+  const selectGuideIntent = (msgId: number, opt: string) => {
     const msg = guideChatMsgs.find(m => m.id === msgId);
-    if (!msg?.sourceFocusCtx) return;
-    setGuideChatMsgs(prev => prev.map(m =>
-      m.id === msgId ? { ...m, intentOptions: undefined, selectedIntent: intent, text: `[${intent}] 방향 선택됨` } : m
-    ));
-    setTimeout(() => runGuideModification(intent, msg.sourceFocusCtx!, msg.sourceMsg || intent, intent), 400);
+    setGuideChatMsgs(prev => prev.map(m => m.id === msgId ? { ...m, intentOptions: undefined, text: `[${opt}] 선택됨` } : m));
+    setTimeout(() => {
+      if (msg?.sourceFocusCtx) runGuideEdit(msg.sourceMsg ? `${msg.sourceMsg} · ${opt}` : opt, msg.sourceFocusCtx, msg.sourceMsg || opt);
+      else pushGuideAi({ text: '전체 문서 기준 상세 답변·수정은 명세서 에디터의 AI 어시스턴트에서 제공됩니다.', intent: 'answer' });
+    }, 300);
   };
 
+  // 제안 Accept/Decline
+  const acceptGuideProposal = (msgId: number) => {
+    const m = guideChatMsgs.find(x => x.id === msgId);
+    const p = m?.proposal, ctx = m?.sourceFocusCtx;
+    if (!p || !ctx) return;
+    const applied = p.action === 'DELETE' ? '' : p.target;
+    ctx.apply(applied);
+    setFocusCtx(focusCtx ? { ...focusCtx, text: applied } : null);
+    setGuideChatMsgs(prev => prev.map(x => x.id === msgId && x.proposal ? { ...x, proposal: { ...x.proposal, status: 'accepted' } } : x));
+  };
+  const declineGuideProposal = (msgId: number) =>
+    setGuideChatMsgs(prev => prev.map(x => x.id === msgId && x.proposal ? { ...x, proposal: { ...x.proposal, status: 'declined' } } : x));
+
   const regenerateGuideChat = (msg: GuideChatMsg) => {
-    if (!msg.sourceFocusCtx) return;
-    const instruction = msg.selectedIntent || msg.sourceMsg || '다시 생성';
+    if (!msg.sourceFocusCtx || !msg.sourceMsg) return;
     setGuideChatMsgs(prev => prev.filter(m => m.id !== msg.id));
-    setTimeout(() => runGuideModification(instruction, msg.sourceFocusCtx!, instruction, msg.selectedIntent), 400);
+    setTimeout(() => runGuideEdit(msg.sourceMsg!, msg.sourceFocusCtx!, msg.sourceMsg!), 300);
   };
 
   // 리사이즈 핸들 — 원본 artifact-resize-handle 동일
@@ -1523,7 +1526,7 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
 
 
       {/* 채팅 영역 — flex-1로 남은 공간 차지 */}
-      <div className="flex-1 border-t border-ck-border ml-1.5 bg-white flex flex-col overflow-hidden">
+      <div data-spec="SPC-AST-010" className="flex-1 border-t border-ck-border ml-1.5 bg-white flex flex-col overflow-hidden">
         {/* 메시지 이력 */}
         {guideChatMsgs.length > 0 && (
           <div className="flex-1 overflow-y-auto scroll-thin px-3 py-2 space-y-2 bg-zinc-50">
@@ -1538,11 +1541,22 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
                     {m.text}
                   </div>
                 ) : (
-                  <div className="rounded-xl text-xs2 leading-relaxed max-w-[85%] bg-zinc-200 text-zinc-800 overflow-hidden">
-                    <p className="px-2.5 pt-1.5 pb-1">{m.text}</p>
-                    {/* 패턴 B: 방향 선택지 */}
+                  <div data-spec="SPC-AST-030" className="rounded-xl text-xs2 leading-relaxed max-w-[85%] bg-zinc-200 text-zinc-800 overflow-hidden">
+                    {m.intent && (
+                      <div className="px-2.5 pt-1.5">
+                        <span className={clsx('inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold',
+                          m.intent === 'edit' ? 'bg-blue-100 text-blue-700'
+                          : m.intent === 'clarify' ? 'bg-amber-100 text-amber-700'
+                          : m.intent === 'terminate' ? 'bg-gray-200 text-gray-500'
+                          : 'bg-emerald-100 text-emerald-700')}>
+                          {INTENT_LABEL[m.intent]}
+                        </span>
+                      </div>
+                    )}
+                    <p className="px-2.5 pt-1 pb-1 whitespace-pre-wrap">{m.text}</p>
+                    {/* clarify 방향 선택지 */}
                     {m.intentOptions && (
-                      <div className="flex flex-wrap gap-1 px-2.5 pb-2">
+                      <div data-spec="SPC-AST-033" className="flex flex-wrap gap-1 px-2.5 pb-2">
                         {m.intentOptions.map((opt, i) => (
                           <button key={i}
                             onClick={() => selectGuideIntent(m.id, opt)}
@@ -1552,33 +1566,40 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
                         ))}
                       </div>
                     )}
-                    {/* 수정안 + 적용/다시생성 */}
-                    {m.proposed && (
+                    {/* 수정 제안 카드 (action·diff·Accept/Decline) */}
+                    {m.proposal && (
                       <>
-                        <div className="mx-2 mb-1.5 rounded-lg bg-white border border-zinc-300 p-2">
-                          <p className="text-xs2 font-semibold text-zinc-400 mb-0.5">수정안</p>
-                          <p className="text-xs2 text-zinc-800 leading-relaxed whitespace-pre-wrap">{m.proposed}</p>
+                        <div data-spec="SPC-AST-031" className="mx-2 mb-1.5 rounded-lg bg-white border border-zinc-300 p-2">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className={clsx('px-1.5 py-0.5 rounded text-[10px] font-bold',
+                              m.proposal.action === 'DELETE' ? 'bg-red-100 text-red-600'
+                              : m.proposal.action === 'INSERT' ? 'bg-emerald-100 text-emerald-700'
+                              : m.proposal.action === 'REWRITE' ? 'bg-amber-100 text-amber-700'
+                              : 'bg-blue-100 text-blue-700')}>
+                              {EDIT_ACTION_LABEL[m.proposal.action]}
+                            </span>
+                            <span className="text-[11px] text-zinc-500 truncate">{m.proposal.targetDesc}</span>
+                          </div>
+                          <p className="text-[11px] text-zinc-400 mb-1">{m.proposal.summary}</p>
+                          {m.proposal.action !== 'INSERT' && m.proposal.source && (
+                            <p className="text-xs2 rounded px-2 py-1 mb-1 bg-red-50 text-red-700 line-through whitespace-pre-wrap">{m.proposal.source}</p>
+                          )}
+                          {m.proposal.action !== 'DELETE' && (
+                            <p className="text-xs2 rounded px-2 py-1 bg-emerald-50 text-emerald-800 whitespace-pre-wrap">{m.proposal.target}</p>
+                          )}
                         </div>
-                        <div className="flex gap-1 px-2 pb-2">
-                          <button
-                            disabled={m.applied}
-                            onClick={() => {
-                              m.applyFn?.();
-                              setFocusCtx(focusCtx ? { ...focusCtx, text: m.proposed! } : null);
-                              setGuideChatMsgs(prev => prev.map(msg => msg.id === m.id ? { ...msg, applied: true } : msg));
-                            }}
-                            className={clsx(
-                              'flex-1 py-1 text-xs2 font-semibold rounded-lg transition-colors',
-                              m.applied ? 'bg-green-100 text-green-700 cursor-default' : 'bg-brand-400 text-white hover:bg-brand-400',
-                            )}
-                          >
-                            {m.applied ? '✓ 적용됨' : '✓ 적용'}
-                          </button>
-                          <button
-                            onClick={() => regenerateGuideChat(m)}
-                            className="px-2.5 py-1 text-xs2 text-zinc-500 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors">
-                            ↺ 다시 생성
-                          </button>
+                        <div data-spec="SPC-AST-032" className="flex gap-1 px-2 pb-2">
+                          {m.proposal.status === 'pending' ? (
+                            <>
+                              <button onClick={() => acceptGuideProposal(m.id)} className="flex-1 py-1 text-xs2 font-semibold rounded-lg bg-brand-400 text-white hover:bg-brand-400">✓ Accept</button>
+                              <button onClick={() => declineGuideProposal(m.id)} className="flex-1 py-1 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50">✕ Decline</button>
+                              <button onClick={() => regenerateGuideChat(m)} className="px-2 py-1 text-xs2 text-zinc-500 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50" title="다시 생성">↺</button>
+                            </>
+                          ) : (
+                            <span className={clsx('text-xs2 font-semibold px-1', m.proposal.status === 'accepted' ? 'text-green-700' : 'text-zinc-400')}>
+                              {m.proposal.status === 'accepted' ? '✓ 반영됨 (Accepted)' : '✕ 거절됨 (Declined)'}
+                            </span>
+                          )}
                         </div>
                       </>
                     )}
