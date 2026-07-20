@@ -1591,13 +1591,13 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
                         <div data-spec="SPC-AST-032" className="flex gap-1 px-2 pb-2">
                           {m.proposal.status === 'pending' ? (
                             <>
-                              <button onClick={() => acceptGuideProposal(m.id)} className="flex-1 py-1 text-xs2 font-semibold rounded-lg bg-brand-400 text-white hover:bg-brand-400">✓ Accept</button>
-                              <button onClick={() => declineGuideProposal(m.id)} className="flex-1 py-1 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50">✕ Decline</button>
+                              <button onClick={() => acceptGuideProposal(m.id)} className="flex-1 py-1 text-xs2 font-semibold rounded-lg bg-brand-400 text-white hover:bg-brand-400">✓ 적용</button>
+                              <button onClick={() => declineGuideProposal(m.id)} className="flex-1 py-1 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50">✕ 거절</button>
                               <button onClick={() => regenerateGuideChat(m)} className="px-2 py-1 text-xs2 text-zinc-500 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50" title="다시 생성">↺</button>
                             </>
                           ) : (
                             <span className={clsx('text-xs2 font-semibold px-1', m.proposal.status === 'accepted' ? 'text-green-700' : 'text-zinc-400')}>
-                              {m.proposal.status === 'accepted' ? '✓ 반영됨 (Accepted)' : '✕ 거절됨 (Declined)'}
+                              {m.proposal.status === 'accepted' ? '✓ 적용됨' : '✕ 거절됨'}
                             </span>
                           )}
                         </div>

@@ -1353,7 +1353,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                           <div data-spec="SPC-EDT-040" className="mx-2.5 mb-2.5 rounded-lg bg-white border border-violet-200 p-2.5">
                             <div className="flex items-center justify-between mb-1.5">
                               <span className="text-xs2 font-semibold text-violet-700">
-                                플랜 · Step {Math.min(m.plan.current + (m.plan.status === 'done' ? 0 : 1), m.plan.steps.length)} of {m.plan.steps.length}
+                                플랜 · {Math.min(m.plan.current + (m.plan.status === 'done' ? 0 : 1), m.plan.steps.length)} / {m.plan.steps.length} 단계
                               </span>
                               <span className="text-[10px] text-zinc-400">{m.plan.status === 'running' ? '진행 중' : m.plan.status === 'stopped' ? '중단됨' : '완료'}</span>
                             </div>
@@ -1370,8 +1370,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             </ol>
                             {m.plan.status === 'running' && (
                               <div className="flex gap-1.5">
-                                <button onClick={() => advancePlan(m.id)} className="flex-1 py-1.5 text-xs2 font-semibold bg-violet-600 text-white rounded-lg hover:bg-violet-700">▶ {m.plan.current + 1}단계 실행 (Continue)</button>
-                                <button onClick={() => stopPlan(m.id)} className="px-3 py-1.5 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50">■ Stop</button>
+                                <button onClick={() => advancePlan(m.id)} className="flex-1 py-1.5 text-xs2 font-semibold bg-violet-600 text-white rounded-lg hover:bg-violet-700">▶ {m.plan.current + 1}단계 진행</button>
+                                <button onClick={() => stopPlan(m.id)} className="px-3 py-1.5 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50">■ 중단</button>
                               </div>
                             )}
                           </div>
@@ -1403,12 +1403,12 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                                   <div className="flex gap-1.5 mt-2" data-spec="SPC-EDT-032">
                                     {p.status === 'pending' ? (
                                       <>
-                                        <button onClick={() => acceptProposal(m.id, pi)} className="flex-1 py-1 text-xs2 font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700">✓ Accept</button>
-                                        <button onClick={() => declineProposal(m.id, pi)} className="flex-1 py-1 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50">✕ Decline</button>
+                                        <button onClick={() => acceptProposal(m.id, pi)} className="flex-1 py-1 text-xs2 font-semibold bg-brand-400 text-white rounded-lg hover:bg-brand-400">✓ 적용</button>
+                                        <button onClick={() => declineProposal(m.id, pi)} className="flex-1 py-1 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50">✕ 거절</button>
                                       </>
                                     ) : (
                                       <span className={clsx('text-xs2 font-semibold', p.status === 'accepted' ? 'text-blue-600' : 'text-zinc-400')}>
-                                        {p.status === 'accepted' ? '✓ 반영됨 (Accepted)' : '✕ 거절됨 (Declined)'}
+                                        {p.status === 'accepted' ? '✓ 적용됨' : '✕ 거절됨'}
                                       </span>
                                     )}
                                   </div>
@@ -1446,7 +1446,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           <div data-spec="SPC-EDT-050" className="border-t border-zinc-200 px-3 py-2.5 shrink-0 bg-white">
             {planRunning && (
               <div className="mb-2 text-[11px] text-violet-600 bg-violet-50 border border-violet-200 rounded px-2 py-1">
-                플랜 진행 중입니다 — 스텝을 실행(Continue)하거나 중단(Stop)한 뒤 입력할 수 있습니다.
+                플랜 진행 중입니다 — 단계를 진행하거나 중단한 뒤 입력할 수 있습니다.
               </div>
             )}
             <div className="flex gap-2 items-end">
