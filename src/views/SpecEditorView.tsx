@@ -669,17 +669,16 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     setTimeout(() => {
       setAiThinking(false);
       const route = routeIntent(msg, { hasSelection: refs.length > 0 });
+      // 청구항 언급 시 — 청구항은 전용 에디터라 selSet 선택 없이도 '독립항→종속항' 파이프라인으로 처리(전체 세트 단위)
+      const mentionsClaims = /청구항|독립항|종속항|claim/i.test(msg) || refs.some(r => r.sid === 'claims');
       if (route.intent === 'terminate' || route.intent === 'answer') {
         pushAi({ text: route.answer ?? generateWholeDocReply(msg), intent: route.intent });
-      } else if (route.intent === 'clarify') {
-        pushAi({ text: '어떤 방향으로 진행할까요?', intent: 'clarify', intentOptions: route.clarifyOptions, refs, sourceMsg: msg });
-      } else if (route.intent === 'plan') {
-        pushAi({ text: `요청을 ${route.planSteps!.length}단계 플랜으로 나눴습니다. 순서대로 진행하세요.`, intent: 'plan', refs, sourceMsg: msg, plan: { steps: route.planSteps!, current: 0, status: 'running' } });
-      } else if (refs.some(r => r.sid === 'claims')) {
+      } else if (mentionsClaims) {
         // 청구항 수정 — 개발노트: 독립항 → 종속항 순으로 고정 파이프라인 (전체 세트 단위)
+        const claimRefs = (blocks['claims'] && blocks['claims'].length) ? [{ sid: 'claims' as SectionId, idx: 0 }] : [];
         pushAi({
           text: '청구항 수정은 독립항 → 종속항 순으로 검토합니다.', intent: 'plan',
-          refs: refs.filter(r => r.sid === 'claims'), sourceMsg: msg,
+          refs: claimRefs, sourceMsg: msg,
           plan: {
             steps: [
               { title: '독립항 검토·수정', instruction: `${msg} (독립항 기준)` },
@@ -687,6 +686,10 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             ], current: 0, status: 'running',
           },
         });
+      } else if (route.intent === 'clarify') {
+        pushAi({ text: '어떤 방향으로 진행할까요?', intent: 'clarify', intentOptions: route.clarifyOptions, refs, sourceMsg: msg });
+      } else if (route.intent === 'plan') {
+        pushAi({ text: `요청을 ${route.planSteps!.length}단계 플랜으로 나눴습니다. 순서대로 진행하세요.`, intent: 'plan', refs, sourceMsg: msg, plan: { steps: route.planSteps!, current: 0, status: 'running' } });
       } else {
         pushEditProposals(msg, refs);
       }
