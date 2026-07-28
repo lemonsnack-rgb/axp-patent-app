@@ -3,6 +3,7 @@ import { PATENT_SEED, PAPER_SEED } from '../data/patentSeed';
 import { PatentDetail } from '../components/PatentDetail';
 import { PaperDetailFull } from './PaperResults';
 import { getDetailParams } from '../features/detailTab';
+import { SpecOverlay } from '../features/spec-overlay/SpecOverlay';
 import { toast, Button } from '@muhayu/axp-ui';
 
 export function StandaloneDetail() {
@@ -16,13 +17,17 @@ export function StandaloneDetail() {
     const data = PATENT_SEED.find(p => p.number === params.key);
     if (!data) return <NotFound message={`특허를 찾을 수 없습니다: ${params.key}`} />;
     return (
-      <PatentDetail
-        data={data}
-        backLabel="탭 닫기"
-        backIcon={false}
-        onBack={() => window.close()}
-        onSave={() => toast('저장은 검색 결과 화면에서 진행해 주세요.')}
-      />
+      <>
+        <PatentDetail
+          data={data}
+          backLabel="탭 닫기"
+          backIcon={false}
+          onBack={() => window.close()}
+          onSave={() => toast('저장은 검색 결과 화면에서 진행해 주세요.')}
+        />
+        {/* 전체보기(새 탭)도 명세 모드·수집필드 모드를 쓸 수 있게 오버레이 마운트 */}
+        <SpecOverlay />
+      </>
     );
   }
 

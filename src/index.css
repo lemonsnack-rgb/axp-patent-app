@@ -112,3 +112,30 @@
 .spec-mode [data-spec].spec-selected::before {
   background: #4f46e5;
 }
+
+/* ── 수집필드 모드 ── 각 표시값 바로 아래에 수집 DB 컬럼(테이블.컬럼)을 인라인 표시.
+   정본: docs/UI-수집필드-매핑표.md. data-col 값이 '⚠'로 시작하면 파생·목업·미정(호박색). */
+body.field-mode [data-col]::after {
+  content: attr(data-col);
+  display: block;
+  margin-top: 2px;
+  padding: 0 3px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #3730a3;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 3px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+body.field-mode [data-col^="⚠"]::after {
+  color: #92400e;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+/* inline 요소(span·strong)에서도 뱃지가 줄바꿈되도록 */
+body.field-mode span[data-col],
+body.field-mode strong[data-col] { display: inline-block; }

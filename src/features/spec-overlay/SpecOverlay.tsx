@@ -6,6 +6,7 @@ import { SPEC_CATALOG } from './specCatalog';
 export function SpecOverlay() {
   const [active, setActive] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  const [fieldMode, setFieldMode] = useState(false);
 
   // 명세 모드 on/off → body 클래스 토글(외곽선·뱃지는 CSS가 처리)
   useEffect(() => {
@@ -13,6 +14,13 @@ export function SpecOverlay() {
     else { document.body.classList.remove('spec-mode'); setSelected(null); }
     return () => document.body.classList.remove('spec-mode');
   }, [active]);
+
+  // 수집필드 모드 on/off → data-col 뱃지 표시(명세 모드와 독립 토글)
+  useEffect(() => {
+    if (fieldMode) document.body.classList.add('field-mode');
+    else document.body.classList.remove('field-mode');
+    return () => document.body.classList.remove('field-mode');
+  }, [fieldMode]);
 
   // 명세 모드에서 data-spec 요소 클릭 → 원래 동작 차단하고 명세 조회
   useEffect(() => {
@@ -51,15 +59,26 @@ export function SpecOverlay() {
 
   return (
     <>
-      <button
-        onClick={() => setActive(v => !v)}
-        className={`fixed bottom-4 left-4 z-[100] px-3 py-2 rounded-full shadow-lg text-xs2 font-bold transition-colors ${
-          active ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-indigo-300 hover:bg-indigo-50'
-        }`}
-        title="기능명세 부착 미리보기 (개발/리뷰용). 켜면 요소에 명세 ID가 표시되고, 클릭하면 명세를 조회합니다."
-      >
-        {active ? '● 명세 모드 ON (클릭하여 조회)' : '명세 모드'}
-      </button>
+      <div className="fixed bottom-4 left-4 z-[100] flex items-center gap-2">
+        <button
+          onClick={() => setActive(v => !v)}
+          className={`px-3 py-2 rounded-full shadow-lg text-xs2 font-bold transition-colors ${
+            active ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-indigo-300 hover:bg-indigo-50'
+          }`}
+          title="기능명세 부착 미리보기 (개발/리뷰용). 켜면 요소에 명세 ID가 표시되고, 클릭하면 명세를 조회합니다."
+        >
+          {active ? '● 명세 모드 ON (클릭하여 조회)' : '명세 모드'}
+        </button>
+        <button
+          onClick={() => setFieldMode(v => !v)}
+          className={`px-3 py-2 rounded-full shadow-lg text-xs2 font-bold transition-colors ${
+            fieldMode ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-indigo-300 hover:bg-indigo-50'
+          }`}
+          title="수집필드 모드 (개발/리뷰용). 켜면 특허 상세페이지의 각 표시값 아래에 수집 DB 컬럼(테이블.컬럼)이 표시됩니다. 호박색=계산·파싱 파생 또는 목업/미정. 정본: docs/UI-수집필드-매핑표.md"
+        >
+          {fieldMode ? '● 수집필드 ON' : '수집필드'}
+        </button>
+      </div>
 
       {entry && (
         <div className="fixed inset-y-0 right-0 z-[101] w-full sm:w-[380px] bg-white border-l border-gray-200 shadow-2xl flex flex-col">

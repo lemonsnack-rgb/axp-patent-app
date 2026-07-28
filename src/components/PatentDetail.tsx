@@ -24,6 +24,15 @@ export function parseKeywords(query: string): string[] {
   )].slice(0, 10);
 }
 
+// 국가 고유 분류(라벨 → 수집 컬럼) — 수집필드 모드 뱃지용
+const COUNTRY_CLASS_COL: Record<string, string> = {
+  'FI': 'JP FI.fi_code',
+  'F-term': 'JP FTERM.fterm_code',
+  '테마': 'JP TEMA.tema_code',
+  'UPC': 'US UPC.upc_code',
+  'EPC': 'EP EPC.epc_code',
+};
+
 export const KW_COLORS = [
   { dot: '#ef4444', bg: '#fef2f2', text: '#dc2626', border: '#fecaca' },
   { dot: '#f59e0b', bg: '#fffbeb', text: '#d97706', border: '#fde68a' },
@@ -109,14 +118,14 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
   const titleBlock = (
     <div data-spec="PAT-DET-020" className="px-6 pt-4 pb-3 border-b border-gray-200 shrink-0">
       <div className="flex items-center gap-2 flex-wrap mb-1.5">
-        <span title={getPatentStatusDesc(data.status)} className="cursor-help font-semibold text-gray-700">{data.status}</span>
+        <span data-col="bibliographic.register_status" title={getPatentStatusDesc(data.status)} className="cursor-help font-semibold text-gray-700">{data.status}</span>
         <span className="text-gray-300">·</span>
-        <span className="font-semibold text-gray-600">{data.country}</span>
-        <span className="font-mono text-md2 font-semibold text-gray-600">{data.number}</span>
+        <span data-col="bibliographic.country_code" className="font-semibold text-gray-600">{data.country}</span>
+        <span data-col="bibliographic.literature_number" className="font-mono text-md2 font-semibold text-gray-600">{data.number}</span>
       </div>
-      <h2 className="text-2xl font-bold text-gray-800 leading-snug">{data.title}</h2>
+      <h2 data-col="bibliographic.invention_title (+ _eng)" className="text-2xl font-bold text-gray-800 leading-snug">{data.title}</h2>
       {/* 제목 하단 액션 링크 — 논문(원문 보기/본문 보기)과 동일 패턴 */}
-      <div className="flex flex-wrap items-center gap-2 mt-3">
+      <div data-col="⚠미정 · 원문 PDF URL 컬럼 확인 필요" className="flex flex-wrap items-center gap-2 mt-3">
         <Button data-spec="PAT-DET-021" variant="filled" color="primary" size="sm" className="text-xs2 h-8" onClick={() => downloadPatentPdf(data)} title="특허 원문 PDF 다운로드">
           <Icon name="doc" size={12} /> 원문 PDF 다운로드
         </Button>
@@ -163,25 +172,37 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               <Section title="서지사항" icon="cal">
                 <table className="w-full text-md2">
                   <tbody>
-                    <BibRow k="문헌번호" v={data.number} mono k2="문헌일" v2={data.publicationDate || '—'} />
-                    <BibRow k="출원번호" v={data.applicationNo} mono k2="출원일" v2={data.applicationDate || '—'} />
-                    <BibRow k="공개/공고번호" v={data.publicationNo} mono k2="공개/공고일" v2={data.publicationDate || '—'} />
-                    <BibRow k="등록번호" v={data.registerNo && data.registerNo !== '-' ? data.registerNo : '—'} mono k2="등록일" v2={data.registerDate && data.registerDate !== '-' ? data.registerDate : '—'} />
-                    <BibRow k="문헌종류" v={docKind} k2="권리상태" v2={data.rightStatus || '—'} />
-                    <BibRow k="원출원번호" v={data.originalAppNo && data.originalAppNo !== '-' ? data.originalAppNo : '—'} mono k2="국제출원번호" v2={data.intlAppNo && data.intlAppNo !== '-' ? data.intlAppNo : '—'} />
-                    <BibRow k="우선권주장일" v={data.priorityDate || '—'} k2="심사청구일" v2={data.examRequestDate || '—'} />
-                    <BibRow k="존속기간(예상)만료일" v={data.expirationDate && data.expirationDate !== '-' ? data.expirationDate : '—'} k2="권리변동" v2={data.rightChange || '—'} />
-                    <BibRow k="최종처분상태" v={data.finalDisposal || '—'} k2="청구항 수" v2={data.claimCount != null ? `${data.claimCount}개` : '—'} />
-                    <BibRow k="출원구분" v={data.applicationFlag || '—'} k2="번역문 제출일" v2={data.translationSubmitDate || '—'} />
-                    <BibRow k="도면 수" v={data.drawingCount != null ? `${data.drawingCount}건` : '—'} k2="실시권 등록일" v2={data.licenseRegDate || '—'} />
+                    <BibRow k="문헌번호" v={data.number} mono k2="문헌일" v2={data.publicationDate || '—'}
+                      col="bibliographic.literature_number" col2="bibliographic.open_date" />
+                    <BibRow k="출원번호" v={data.applicationNo} mono k2="출원일" v2={data.applicationDate || '—'}
+                      col="bibliographic.application_number" col2="bibliographic.application_date" />
+                    <BibRow k="공개/공고번호" v={data.publicationNo} mono k2="공개/공고일" v2={data.publicationDate || '—'}
+                      col="bibliographic.open_number / publication_number" col2="bibliographic.publication_date" />
+                    <BibRow k="등록번호" v={data.registerNo && data.registerNo !== '-' ? data.registerNo : '—'} mono k2="등록일" v2={data.registerDate && data.registerDate !== '-' ? data.registerDate : '—'}
+                      col="bibliographic.register_number" col2="bibliographic.register_date" />
+                    <BibRow k="문헌종류" v={docKind} k2="권리상태" v2={data.rightStatus || '—'}
+                      col="⚠현재 status 파생 · bibliographic.document_kind" col2="bibliographic.register_status + custom.legal_status" />
+                    <BibRow k="원출원번호" v={data.originalAppNo && data.originalAppNo !== '-' ? data.originalAppNo : '—'} mono k2="국제출원번호" v2={data.intlAppNo && data.intlAppNo !== '-' ? data.intlAppNo : '—'}
+                      col="bibliographic.original_application_number" col2="bibliographic.international_application_number" />
+                    <BibRow k="우선권주장일" v={data.priorityDate || '—'} k2="심사청구일" v2={data.examRequestDate || '—'}
+                      col="priority.priority_application_date" col2="bibliographic.original_examination_request_date" />
+                    <BibRow k="존속기간(예상)만료일" v={data.expirationDate && data.expirationDate !== '-' ? data.expirationDate : '—'} k2="권리변동" v2={data.rightChange || '—'}
+                      col="⚠파생 · 등록일 + 20년(수집 컬럼 없음)" col2="custom.has_ownership_change" />
+                    <BibRow k="최종처분상태" v={data.finalDisposal || '—'} k2="청구항 수" v2={data.claimCount != null ? `${data.claimCount}개` : '—'}
+                      col="bibliographic.final_disposal" col2="bibliographic.claim_count / KPA_BIBLIOGRAPHIC.claim_count" />
+                    <BibRow k="출원구분" v={data.applicationFlag || '—'} k2="번역문 제출일" v2={data.translationSubmitDate || '—'}
+                      col="bibliographic.application_flag" col2="bibliographic.translation_submit_date" />
+                    <BibRow k="도면 수" v={data.drawingCount != null ? `${data.drawingCount}건` : '—'} k2="실시권 등록일" v2={data.licenseRegDate || '—'}
+                      col="KPA_BIBLIOGRAPHIC.drawing_count" col2="custom.license_registration_date" />
                     {((data.designatedCountries?.length ?? 0) > 0 || data.sequenceListing) &&
-                      <BibRow k="지정국" v={(data.designatedCountries?.length ?? 0) > 0 ? data.designatedCountries!.join(', ') : '—'} k2="서열목록" v2={data.sequenceListing ? '있음' : '—'} />}
+                      <BibRow k="지정국" v={(data.designatedCountries?.length ?? 0) > 0 ? data.designatedCountries!.join(', ') : '—'} k2="서열목록" v2={data.sequenceListing ? '있음' : '—'}
+                        col="DESIGNATED_COUNTRY.designated_country / EP DSGN.national_name" col2="custom.sequence_listing_yn" />}
                   </tbody>
                 </table>
                 {(data.priorityList?.length ?? 0) > 0 && (
                   <div className="mt-3">
                     <div className="text-sm2 font-semibold text-gray-500 mb-2">우선권 주장</div>
-                    <ul className="text-md2 text-gray-700 space-y-0.5">
+                    <ul data-col="priority.(priority_application_country_code · number · date) / JP PRIR" className="text-md2 text-gray-700 space-y-0.5">
                       {data.priorityList!.map((p, i) => (
                         <li key={i}><span className="font-mono text-gray-500">{p.country}</span> <span className="font-mono">{p.number}</span> · {p.date}</li>
                       ))}
@@ -190,7 +211,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                 )}
                 <div className="mt-3.5">
                   <div className="text-sm2 font-semibold text-gray-500 mb-2">타임라인</div>
-                  <Timeline items={timeline} />
+                  <div data-col="⚠파생 · 위 일자 컬럼 조합(client)"><Timeline items={timeline} /></div>
                 </div>
               </Section>
             </div>
@@ -200,14 +221,14 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               <Section title="인명정보" icon="user">
                 <table className="w-full text-md2">
                   <tbody>
-                    <InfoRow k="출원인" v={data.applicant || '—'} />
-                    <InfoRow k="출원인 주소" v={data.applicantAddress || '—'} muted={!data.applicantAddress} />
-                    <InfoRow k={data.country === 'JP' ? '출원인식별기호 (JP)' : '특허고객번호 (KR)'} v={data.applicantCode || '—'} mono />
-                    <InfoRow k="대표출원인" v={data.repApplicant || '—'} muted={!data.repApplicant} />
-                    <InfoRow k="발명자" v={data.inventors || '—'} />
-                    <InfoRow k="발명자 주소" v={data.inventorAddress || '(예시) 동일 — 출원인 주소'} muted />
-                    <InfoRow k="대리인" v={data.agent || '—'} muted={!data.agent} />
-                    <InfoRow k="심사관" v={data.examiner || '—'} muted={!data.examiner} />
+                    <InfoRow k="출원인" v={data.applicant || '—'} col="related_person[APPLICANT].name" />
+                    <InfoRow k="출원인 주소" v={data.applicantAddress || '—'} muted={!data.applicantAddress} col="related_person[APPLICANT].address" />
+                    <InfoRow k={data.country === 'JP' ? '출원인식별기호 (JP)' : '특허고객번호 (KR)'} v={data.applicantCode || '—'} mono col="representative_applicant.patent_customer_number / custom(JP).applicant_identifier" />
+                    <InfoRow k="대표출원인" v={data.repApplicant || '—'} muted={!data.repApplicant} col="representative_applicant.representative_applicant_name" />
+                    <InfoRow k="발명자" v={data.inventors || '—'} col="related_person[INVENTOR].name" />
+                    <InfoRow k="발명자 주소" v={data.inventorAddress || '(예시) 동일 — 출원인 주소'} muted col="related_person[INVENTOR].address" />
+                    <InfoRow k="대리인" v={data.agent || '—'} muted={!data.agent} col="related_person[AGENT].name" />
+                    <InfoRow k="심사관" v={data.examiner || '—'} muted={!data.examiner} col="related_person[EXAMINER].name / custom.examiners" />
                   </tbody>
                 </table>
               </Section>
@@ -216,7 +237,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
             {/* 요약 */}
             <div ref={secAbstract} data-spec="PAT-DET-070">
               <Section title="요약" icon="doc">
-                <TextBlock>{data.abstract || '—'}</TextBlock>
+                <TextBlock col="abstract.abstract (JP/CN 영문요약 e_abstract)">{data.abstract || '—'}</TextBlock>
               </Section>
             </div>
 
@@ -224,22 +245,22 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
             <div ref={secDesc} data-spec="PAT-DET-080">
               <Section title="상세설명" icon="book">
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3.5">
-                  <DescSub title="기술분야">{`본 발명은 ${data.title}에 관한 것으로, 해당 기술분야의 장치 및 방법에 관한 것이다.`}</DescSub>
-                  <DescSub title="배경기술">{`종래 기술은 정확도와 견고성 측면에서 한계가 있었으며, 다양한 환경 조건에서 안정적인 성능을 확보하기 어려웠다.`}</DescSub>
-                  {data.aiPurpose && <DescSub title="해결하려는 과제">{data.aiPurpose}</DescSub>}
-                  {data.aiSolution && <DescSub title="과제의 해결 수단">{data.aiSolution}</DescSub>}
-                  {data.aiEffect && <DescSub title="발명의 효과">{data.aiEffect}</DescSub>}
+                  <DescSub title="기술분야" col="⚠하드코딩 문장 + title · 연동 시 specification 파싱">{`본 발명은 ${data.title}에 관한 것으로, 해당 기술분야의 장치 및 방법에 관한 것이다.`}</DescSub>
+                  <DescSub title="배경기술" col="⚠하드코딩 문장 · 연동 시 specification 파싱">{`종래 기술은 정확도와 견고성 측면에서 한계가 있었으며, 다양한 환경 조건에서 안정적인 성능을 확보하기 어려웠다.`}</DescSub>
+                  {data.aiPurpose && <DescSub title="해결하려는 과제" col="⚠파생 · specification 파싱(aiPurpose)">{data.aiPurpose}</DescSub>}
+                  {data.aiSolution && <DescSub title="과제의 해결 수단" col="⚠파생 · specification 파싱(aiSolution)">{data.aiSolution}</DescSub>}
+                  {data.aiEffect && <DescSub title="발명의 효과" col="⚠파생 · specification 파싱(aiEffect)">{data.aiEffect}</DescSub>}
                   {(data.figures || []).length > 0 && (
                     <div>
                       <div className="text-sm2 font-semibold text-gray-600 mb-1">도면의 설명</div>
-                      <ul className="text-base2 text-gray-700 leading-relaxed space-y-0.5">
+                      <ul data-col="⚠파생 · specification 파싱(도면의 간단한 설명)" className="text-base2 text-gray-700 leading-relaxed space-y-0.5">
                         {(data.figures || []).map((f, i) => (
                           <li key={i}><span className="font-mono text-gray-500 mr-1.5">{f.label}</span>{f.desc}</li>
                         ))}
                       </ul>
                     </div>
                   )}
-                  <DescSub title="발명의 구체적인 내용">{data.description || '(데모) 발명의 배경, 기술적 과제, 해결수단, 효과 등 본문 전체가 노출됩니다.'}</DescSub>
+                  <DescSub title="발명의 구체적인 내용" col="specification.specification (KIPRIS는 전문 PDF URL)">{data.description || '(데모) 발명의 배경, 기술적 과제, 해결수단, 효과 등 본문 전체가 노출됩니다.'}</DescSub>
                 </div>
               </Section>
             </div>
@@ -257,7 +278,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                     className={clsx('px-2.5 py-0.5 rounded text-sm2 font-medium border', claimMode === 'all' ? 'bg-blue-400 text-white border-blue-400' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400')}
                   >전체청구항</button>
                 </div>
-                <div className="border border-blue-200 rounded-lg p-3.5 bg-white">
+                <div data-col="claim.claim · 독립/종속 구조는 ⚠파생(대표항 KPA_BIBLIOGRAPHIC.representation_claim_number)" className="border border-blue-200 rounded-lg p-3.5 bg-white">
                   {(() => {
                     const claims = data.claims && data.claims.length
                       ? data.claims
@@ -306,7 +327,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                           >{label}</button>
                         ))}
                       </div>
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div data-col="custom.family_document_count / family_country_count · ⚠국가 배분은 파생" className="flex items-center gap-2 flex-wrap">
                         {filtered.map(([cc, n]) => (
                           <span key={cc} className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-100 rounded-full text-md2 text-blue-700">
                             <strong className="font-mono">{cc}</strong> <span>{n}건</span>
@@ -316,7 +337,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                       {(data.familyList?.length ?? 0) > 0 && (
                         <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden">
                           <div className="bg-gray-50 px-3 py-1.5 text-xs2 font-semibold text-gray-600 border-b border-gray-200">패밀리 문헌</div>
-                          <ul className="divide-y divide-gray-50">
+                          <ul data-col="family.(family_country_code · family_literature_number · application_date · invention_title)" className="divide-y divide-gray-50">
                             {data.familyList!.filter(f => familyTab === 'all' || f.country === familyTab).map((f, i) => (
                               <li key={i} className="flex items-baseline gap-2 px-3 py-1.5 text-sm2">
                                 <span className="shrink-0 font-mono text-gray-500">{f.country}</span>
@@ -339,12 +360,12 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               <Section title="인용·피인용" icon="link">
                 <CiteBlock title={`인용 (${(data.citingList ?? []).length || data.citing}건)`} list={data.citingList} />
                 <div className="mt-3">
-                  <CiteBlock title={`피인용 (${(data.citedList ?? []).length || data.cited}건)`} list={data.citedList} />
+                  <CiteBlock title={`피인용 (${(data.citedList ?? []).length || data.cited}건)`} list={data.citedList} cited />
                 </div>
                 {(data.priorArtDocs?.length ?? 0) > 0 && (
                   <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-3.5">
                     <div className="text-base2 font-bold text-gray-700 mb-2">선행기술문헌 ({data.priorArtDocs!.length}건)</div>
-                    <ul className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
+                    <ul data-col="PRIOR_TECHNOLOGY_DOCUMENT.(prior_technology_document_number · country)" className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
                       {data.priorArtDocs!.map((d, i) => (
                         <li key={i}><span className="font-mono text-brand-400">{d.country} {d.number}</span></li>
                       ))}
@@ -359,10 +380,10 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               <Section title="분류코드" icon="tag">
                 <table className="w-full text-md2">
                   <tbody>
-                    <InfoRow k="IPC" v={(data.ipcList?.length ? data.ipcList : [data.ipc]).filter(Boolean).join('  ·  ') || '—'} mono />
-                    <InfoRow k="CPC" v={(data.cpcList?.length ? data.cpcList : [data.cpc]).filter(v => v && v !== '-').join('  ·  ') || '—'} mono />
+                    <InfoRow k="IPC" v={(data.ipcList?.length ? data.ipcList : [data.ipc]).filter(Boolean).join('  ·  ') || '—'} mono col="ipc.ipc_number / KR KPA_IPC.ipc_code" />
+                    <InfoRow k="CPC" v={(data.cpcList?.length ? data.cpcList : [data.cpc]).filter(v => v && v !== '-').join('  ·  ') || '—'} mono col="CPC.cpc_code / JP·EP custom.cpc_code" />
                     {data.countryClassifications?.map((c, i) => (
-                      <InfoRow key={i} k={c.label} v={c.codes.join('  ·  ') || '—'} mono />
+                      <InfoRow key={i} k={c.label} v={c.codes.join('  ·  ') || '—'} mono col={COUNTRY_CLASS_COL[c.label] ?? '국가고유 분류 테이블'} />
                     ))}
                   </tbody>
                 </table>
@@ -374,13 +395,13 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               <Section title="기타정보" icon="briefcase">
                 <table className="w-full text-md2 mb-3">
                   <tbody>
-                    <InfoRow k="대리인 주소" v={data.agentAddress || '—'} muted={!data.agentAddress} />
+                    <InfoRow k="대리인 주소" v={data.agentAddress || '—'} muted={!data.agentAddress} col="related_person[AGENT].address" />
                   </tbody>
                 </table>
                 {(data.rightChangeList?.length ?? 0) > 0 && (
                   <div className="border-t border-gray-100 pt-3">
                     <div className="text-sm2 font-semibold text-gray-500 mb-2">권리변동 이력</div>
-                    <ul className="text-md2 text-gray-700 space-y-0.5">
+                    <ul data-col="RIGHT_CHANGE.(change_type · name · change_date)" className="text-md2 text-gray-700 space-y-0.5">
                       {data.rightChangeList!.map((r, i) => (
                         <li key={i} className="flex items-center gap-2">
                           <span className="text-gray-400 font-mono w-24 shrink-0">{r.date}</span>
@@ -394,7 +415,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                 {(data.rightTransferList?.length ?? 0) > 0 && (
                   <div className="border-t border-gray-100 pt-3 mt-3">
                     <div className="text-sm2 font-semibold text-gray-500 mb-2">권리이전 이력</div>
-                    <ul className="text-md2 text-gray-700 space-y-0.5">
+                    <ul data-col="RIGHT_TRANSFER.(document_name · change_before/after_content · registration_number/date)" className="text-md2 text-gray-700 space-y-0.5">
                       {data.rightTransferList!.map((r, i) => (
                         <li key={i} className="flex items-center gap-2">
                           <span className="text-gray-400 font-mono w-24 shrink-0">{r.date}</span>
@@ -408,7 +429,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                 {(data.adminProcess?.length ?? 0) > 0 && (
                   <div className="border-t border-gray-100 pt-3 mt-3">
                     <div className="text-sm2 font-semibold text-gray-500 mb-2">행정처리(수발신) 이력</div>
-                    <ul className="text-md2 text-gray-700 space-y-0.5">
+                    <ul data-col="ADMINISTRATIVE_PROCESS.(receipt_send_document_name · date · proc_status)" className="text-md2 text-gray-700 space-y-0.5">
                       {data.adminProcess!.map((a, i) => (
                         <li key={i} className="flex items-center gap-2"><span className="text-gray-400 font-mono w-24 shrink-0">{a.date}</span><span className="flex-1">{a.docName}</span><span className="text-gray-500 shrink-0">{a.status}</span></li>
                       ))}
@@ -419,7 +440,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                   <div className="border-t border-gray-100 pt-3 mt-3">
                     <div className="text-sm2 font-semibold text-gray-500 mb-2">국가 R&D 정보</div>
                     {data.rnd!.map((r, i) => (
-                      <div key={i} className="text-md2 text-gray-700 mb-1.5">
+                      <div key={i} data-col="RND.(rnd_task_name · number · department · managing_institute · duration)" className="text-md2 text-gray-700 mb-1.5">
                         <div className="font-medium">{r.task} <span className="text-gray-400 font-mono text-sm2">({r.taskNo})</span></div>
                         <div className="text-sm2 text-gray-500">{r.dept} · {r.project} · {r.institute} · {r.period}</div>
                       </div>
@@ -429,25 +450,25 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                 {data.standard && (
                   <div className="border-t border-gray-100 pt-3 mt-3">
                     <div className="text-sm2 font-semibold text-gray-500 mb-2">표준특허</div>
-                    <Row k="표준화기구" v={data.standard.org} />
-                    <Row k="표준번호" v={data.standard.numbers} />
-                    <Row k="표준기술명" v={data.standard.techName} />
-                    <Row k="선언(등재)자" v={data.standard.declarants} />
-                    <Row k="선언일" v={data.standard.date} />
+                    <Row k="표준화기구" v={data.standard.org} col="STANDARD.standardization_organization" />
+                    <Row k="표준번호" v={data.standard.numbers} col="STANDARD.standard_numbers" />
+                    <Row k="표준기술명" v={data.standard.techName} col="STANDARD.technology_name" />
+                    <Row k="선언(등재)자" v={data.standard.declarants} col="STANDARD.declarants" />
+                    <Row k="선언일" v={data.standard.date} col="STANDARD.date" />
                   </div>
                 )}
                 {(data.jpEdition || data.agentCategory || data.epFileRef || data.epFilingLanguage || (data.usProvisional?.length ?? 0) > 0 || (data.usRelatedApps?.length ?? 0) > 0) && (
                   <div className="border-t border-gray-100 pt-3 mt-3">
                     <div className="text-sm2 font-semibold text-gray-500 mb-2">국가별 추가정보</div>
-                    {data.jpEdition && <Row k="공보판(JP)" v={data.jpEdition} />}
-                    {data.agentCategory && <Row k="대리인 구분(JP)" v={data.agentCategory} />}
-                    {data.epFileRef && <Row k="출원인 정리번호(EP)" v={data.epFileRef} />}
-                    {data.epFilingLanguage && <Row k="출원/공개 언어(EP)" v={data.epFilingLanguage} />}
-                    {(data.usProvisional?.length ?? 0) > 0 && <Row k="가출원 번호(US)" v={data.usProvisional!.join(', ')} />}
+                    {data.jpEdition && <Row k="공보판(JP)" v={data.jpEdition} col="CUSTOM(JP).edition" />}
+                    {data.agentCategory && <Row k="대리인 구분(JP)" v={data.agentCategory} col="CUSTOM(JP).agent_category" />}
+                    {data.epFileRef && <Row k="출원인 정리번호(EP)" v={data.epFileRef} col="CUSTOM(EP).applicant_file_reference" />}
+                    {data.epFilingLanguage && <Row k="출원/공개 언어(EP)" v={data.epFilingLanguage} col="CUSTOM(EP).filing_language" />}
+                    {(data.usProvisional?.length ?? 0) > 0 && <Row k="가출원 번호(US)" v={data.usProvisional!.join(', ')} col="CUSTOM(US).provisional_application_numbers" />}
                     {(data.usRelatedApps?.length ?? 0) > 0 && (
                       <div className="mt-1.5">
                         <div className="text-sm2 font-semibold text-gray-500 mb-2">관련출원(US)</div>
-                        <ul className="text-md2 text-gray-700 space-y-0.5">
+                        <ul data-col="REL_APPL.(registration_number · date · classification · status)" className="text-md2 text-gray-700 space-y-0.5">
                           {data.usRelatedApps!.map((u, i) => (
                             <li key={i} className="flex items-center gap-2">
                               <span className="font-mono text-gray-500 w-28 shrink-0">{u.regNo}</span>
@@ -464,7 +485,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                 {data.trial && data.trial !== '심판 없음' && (
                   <div className="border-t border-gray-100 pt-3 mt-3">
                     <div className="text-sm2 font-semibold text-gray-500 mb-2">심판 정보</div>
-                    <Row k="심판" v={data.trial} />
+                    <Row k="심판" v={data.trial} col="custom.has_trial" />
                   </div>
                 )}
               </Section>
@@ -549,44 +570,47 @@ function Section({ title, icon, children }: { title: string; icon: any; children
   );
 }
 
-function BibRow({ k, v, mono, k2, v2 }: { k: string; v: string; mono?: boolean; k2: string; v2: string }) {
+// ── 수집필드 모드(data-col) ──
+// col/col2 = 해당 표시값의 수집 DB 컬럼(테이블.컬럼). '⚠'로 시작하면 파생·목업·미정.
+// 정본은 docs/UI-수집필드-매핑표.md — 값 변경 시 문서와 함께 갱신한다.
+function BibRow({ k, v, mono, k2, v2, col, col2 }: { k: string; v: string; mono?: boolean; k2: string; v2: string; col?: string; col2?: string }) {
   return (
     <tr className="border-b border-gray-100">
       <td className="text-gray-500 py-1.5 w-28 whitespace-nowrap pr-2">{k}</td>
-      <td className={`text-gray-800 py-1.5 pr-3 ${mono ? 'font-mono' : ''}`}>{v}</td>
+      <td data-col={col} className={`text-gray-800 py-1.5 pr-3 ${mono ? 'font-mono' : ''}`}>{v}</td>
       <td className="text-gray-500 py-1.5 w-28 whitespace-nowrap pr-2">{k2}</td>
-      <td className="text-gray-800 py-1.5">{v2}</td>
+      <td data-col={col2} className="text-gray-800 py-1.5">{v2}</td>
     </tr>
   );
 }
 
-function InfoRow({ k, v, mono, muted }: { k: string; v: string; mono?: boolean; muted?: boolean }) {
+function InfoRow({ k, v, mono, muted, col }: { k: string; v: string; mono?: boolean; muted?: boolean; col?: string }) {
   return (
     <tr className="border-b border-gray-100">
       <td className="text-gray-500 py-1.5 w-28 whitespace-nowrap pr-2">{k}</td>
-      <td className={`py-1.5 ${mono ? 'font-mono' : ''} ${muted ? 'text-gray-400' : 'text-gray-800'}`}>{v}</td>
+      <td data-col={col} className={`py-1.5 ${mono ? 'font-mono' : ''} ${muted ? 'text-gray-400' : 'text-gray-800'}`}>{v}</td>
     </tr>
   );
 }
 
-function Row({ k, v }: { k: string; v: string }) {
-  return <div className="flex items-center gap-2 py-1.5 text-md2"><span className="text-gray-500 w-28 shrink-0">{k}</span><span className="text-gray-800">{v}</span></div>;
+function Row({ k, v, col }: { k: string; v: string; col?: string }) {
+  return <div className="flex items-center gap-2 py-1.5 text-md2"><span className="text-gray-500 w-28 shrink-0">{k}</span><span data-col={col} className="text-gray-800">{v}</span></div>;
 }
 
 // 상세설명 하위 섹션 (기술분야/배경기술/과제/해결수단/효과/구체적 내용)
-function DescSub({ title, children }: { title: string; children: React.ReactNode }) {
+function DescSub({ title, children, col }: { title: string; children: React.ReactNode; col?: string }) {
   return (
     <div>
       <div className="text-sm2 font-semibold text-gray-600 mb-1">{title}</div>
-      <div className="text-base2 text-gray-700 leading-relaxed whitespace-pre-line">{children}</div>
+      <div data-col={col} className="text-base2 text-gray-700 leading-relaxed whitespace-pre-line">{children}</div>
     </div>
   );
 }
 
-function TextBlock({ children }: { children: React.ReactNode }) {
+function TextBlock({ children, col }: { children: React.ReactNode; col?: string }) {
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-      <div className="text-base2 text-gray-700 leading-relaxed whitespace-pre-line">{children}</div>
+      <div data-col={col} className="text-base2 text-gray-700 leading-relaxed whitespace-pre-line">{children}</div>
     </div>
   );
 }
@@ -605,7 +629,7 @@ function stripClaimNo(text: string): string {
   return text.replace(/^제\s*\d+\s*항\.?\s*/, '');
 }
 
-function CiteBlock({ title, list }: { title: string; list?: PatentCitation[] }) {
+function CiteBlock({ title, list, cited }: { title: string; list?: PatentCitation[]; cited?: boolean }) {
   const items = list ?? [];
   const patents = items.filter(c => c.kind === 'patent');
   const npls = items.filter(c => c.kind === 'npl');
@@ -614,7 +638,7 @@ function CiteBlock({ title, list }: { title: string; list?: PatentCitation[] }) 
       <div className="text-base2 font-bold text-gray-700 mb-2">{title}</div>
       <div className="text-xs2 font-semibold text-gray-500 mt-2 mb-1">특허 정보</div>
       {patents.length > 0 ? (
-        <ul className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
+        <ul data-col={`KR KPA_CITATION.(citation_literature_number · country_code) / JP·US CTLTR${cited ? ' (피인용 방향)' : ''}`} className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
           {patents.map((c, i) => (
             <li key={i}><span className="font-mono text-brand-400">{c.ref}</span> · {c.title}</li>
           ))}
@@ -622,7 +646,7 @@ function CiteBlock({ title, list }: { title: string; list?: PatentCitation[] }) 
       ) : <div className="text-md2 text-gray-400 pl-1">없음</div>}
       <div className="text-xs2 font-semibold text-gray-500 mt-3 mb-1">비특허(논문) 정보</div>
       {npls.length > 0 ? (
-        <ul className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
+        <ul data-col="US CTLTR_ETC.other_citations / PRIOR_TECHNOLOGY_DOCUMENT.non_patent_reference_text" className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
           {npls.map((c, i) => (
             <li key={i}><span className="font-mono">{c.ref}</span> {c.title}</li>
           ))}
@@ -701,7 +725,7 @@ function DrawingsPanel({ figures, refSigns }: { figures?: { label: string; desc:
   return (
     <div className="flex flex-col flex-1 overflow-y-auto scroll-thin p-3">
       {/* 메인 도면 — 클릭 시 확대 */}
-      <div className="bg-white rounded-xl border border-neutral-150 shadow-card mb-2 shrink-0 overflow-hidden">
+      <div data-col="⚠목업(현재 절차 SVG · 컬럼은 수집됨) · patent_image.(scrape_site · key_name→S3) / custom.drawing_url / JP custom.figures" className="bg-white rounded-xl border border-neutral-150 shadow-card mb-2 shrink-0 overflow-hidden">
         <div className="px-3 pt-2 flex items-center gap-2">
           {selected === 0 && <span className="text-xs2 font-semibold text-white bg-brand-400 rounded px-1.5 py-0.5 shrink-0">대표</span>}
           <span className="text-xs2 font-semibold text-gray-600 font-mono">{figs[selected]?.label}</span>
@@ -714,7 +738,7 @@ function DrawingsPanel({ figures, refSigns }: { figures?: { label: string; desc:
       </div>
 
       {/* 대표도면 */}
-      <div className="text-xs2 font-semibold text-gray-500 mt-2 mb-1.5">대표도면</div>
+      <div data-col="⚠목업(컬럼은 수집됨) · custom.primary_drawing_url (KR·CN)" className="text-xs2 font-semibold text-gray-500 mt-2 mb-1.5">대표도면</div>
       <button
         onClick={() => setSelected(0)}
         onDoubleClick={() => { setSelected(0); setZoom(true); }}
@@ -776,7 +800,7 @@ function DrawingsPanel({ figures, refSigns }: { figures?: { label: string; desc:
 function RefSigns({ signs, className }: { signs: { sign: string; label: string }[]; className?: string }) {
   return (
     <div className={clsx('border border-gray-200 rounded-lg overflow-hidden', className)}>
-      <div className="bg-gray-50 px-3 py-1.5 text-xs2 font-semibold text-gray-600 border-b border-gray-200">
+      <div data-col="⚠파생 · specification 파싱(부호의 설명)" className="bg-gray-50 px-3 py-1.5 text-xs2 font-semibold text-gray-600 border-b border-gray-200">
         도면 주요 부분에 대한 부호의 설명
       </div>
       <ul className="divide-y divide-gray-50">
