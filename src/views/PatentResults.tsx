@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react';
 import clsx from 'clsx';
 import { PATENT_SEED } from '../data/patentSeed';
 import { PATENT_FACET_GROUPS_BASE, IPC_FACET_ITEMS, type FacetGroup, type FacetItem } from '../data/facetGroups';
-import { PatentDetail, parseKeywords, KW_COLORS } from '../components/PatentDetail';
+import { PatentDetail, KW_COLORS } from '../components/PatentDetail';
+import { parseKeywords, matchesKeywords, extractDateRanges, matchesDateRanges } from '../features/search/mockMatch';
 import { Icon } from '../components/Icon';
 import { toast, Button } from '@muhayu/axp-ui';
 import { getPatentStatusDesc } from '../utils/badgeUtils';
@@ -128,14 +129,12 @@ export function PatentResults({ onOpenDetail, onSave, onSaveMany, searchQuery, m
     setIpcMode('all');
   }, [searchQuery]);
 
-  // 결과 데이터 — 검색어 키워드 매칭 ∩ 메타필터 ∩ 패싯 → 정렬
-  const queryKeywords = parseKeywords(searchQuery || '');
-  const kwMatched = queryKeywords.length === 0
+  // 결과 데이터 — (일자 범위 절 + 키워드) 매칭 ∩ 메타필터 ∩ 패싯 → 정렬
+  const { ranges: dateRanges, rest: keywordPart } = extractDateRanges(searchQuery || '');
+  const queryKeywords = parseKeywords(keywordPart);
+  const kwMatched = queryKeywords.length === 0 && dateRanges.length === 0
     ? PATENT_SEED
-    : PATENT_SEED.filter(p => {
-        const hay = `${p.title} ${p.abstract ?? ''} ${p.applicant} ${p.ipc} ${p.repClaim ?? ''} ${p.inventors ?? ''}`.toLowerCase();
-        return queryKeywords.every(k => hay.includes(k.toLowerCase()));
-      });
+    : PATENT_SEED.filter(p => matchesKeywords(p, queryKeywords) && matchesDateRanges(p, dateRanges));
   const queryScoped = kwMatched.length > 0 ? kwMatched : PATENT_SEED;
   const metaScoped = applyMetaFilter(queryScoped, meta);
   const faceted = applyFacetFilters(metaScoped, appliedFilters);
@@ -530,7 +529,7 @@ function TableResults({ data, selectedCard, onSelectCard, onOpenDetail, onSave, 
       </div>
 
       {/* 테이블 (데스크톱) — 모바일에선 카드 리스트로 대체 */}
-      <div data-spec="PAT-LST-020" className="hidden md:block bg-white">
+      <div data-spec="PAT-LST-020" className="max-md:hidden md:block bg-white">
         <table className="w-full text-sm2 border-collapse">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>

@@ -1235,7 +1235,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             </button>
           </div>
           {/* 헤더 (48px) */}
-          <div className="hidden md:flex shrink-0 items-center gap-2 px-4 border-b border-zinc-200 bg-gray-50" style={{ height: 48 }}>
+          <div className="max-md:hidden md:flex shrink-0 items-center gap-2 px-4 border-b border-zinc-200 bg-gray-50" style={{ height: 48 }}>
             <div className="w-5 h-5 rounded flex items-center justify-center text-white text-xs font-bold shrink-0"
               style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
             <span className="text-base2 font-bold text-gray-800">AI 어시스턴트</span>

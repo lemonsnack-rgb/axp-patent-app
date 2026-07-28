@@ -39,25 +39,25 @@ const ORG_OPTS = ['ETSI', 'ISO', 'IEC', 'ITU', 'IEEE', '3GPP', 'JEDEC'].map(o =>
 // ── 전체 검색필드 카탈로그 (데모 http://10.77.0.244:8010/patents 기준 ~70개) ──
 const FIELD_CATALOG: SField[] = [
   // 명칭·청구항·설명
-  { code: 'TI',   label: '발명의 명칭',       value: '', type: 'text', hint: '예: 하이브리드 and 자동차 | *수소 자동차*' },
-  { code: 'AB',   label: '요약',              value: '', type: 'text', hint: '예: 하이브리드 and 자동차 | "전기 자동차"' },
-  { code: 'CL',   label: '대표청구항',        value: '', type: 'text', hint: '하이브리드 and 자동차' },
+  { code: 'TI',   label: '발명의 명칭',       value: '', type: 'text', hint: '예: 리튬 and 이차전지' },
+  { code: 'AB',   label: '요약',              value: '', type: 'text', hint: '예: 그래핀 and 복합' },
+  { code: 'CL',   label: '대표청구항',        value: '', type: 'text', hint: '안테나 and 어레이' },
   { code: 'CLI',  label: '독립청구항',        value: '', type: 'text' },
   { code: 'CLA',  label: '전체청구항',        value: '', type: 'text' },
   { code: 'KC',   label: '문헌종류',          value: '', type: 'multi', options: KIND_OPTS },
   { code: 'KWD',  label: '키워드(KR)',        value: '', type: 'text' },
-  { code: 'DSC',  label: '상세설명',          value: '', type: 'text', hint: '딥러닝 and 검색 and 알고리즘' },
+  { code: 'DSC',  label: '상세설명',          value: '', type: 'text', hint: '딥러닝 and 포인트 클라우드' },
   { code: 'TF',   label: '기술분야',          value: '', type: 'text' },
   { code: 'IE',   label: '발명효과',          value: '', type: 'text' },
   { code: 'SP',   label: '해결과제',          value: '', type: 'text' },
   { code: 'DE',   label: '구체실시방식',      value: '', type: 'text' },
   { code: 'DD',   label: '도면의 간단한 설명', value: '', type: 'text' },
   // 번호·일자
-  { code: 'AN',   label: '출원번호',          value: '', type: 'text', hint: '1020080012345' },
-  { code: 'PN',   label: '공개번호/특허번호', value: '', type: 'text', hint: '1020100012345' },
-  { code: 'RN',   label: '등록번호',          value: '', type: 'text', hint: '1012345670000' },
+  { code: 'AN',   label: '출원번호',          value: '', type: 'text', hint: '10-2025-1000000' },
+  { code: 'PN',   label: '공개번호/특허번호', value: '', type: 'text', hint: '10-2026-1000000' },
+  { code: 'RN',   label: '등록번호',          value: '', type: 'text', hint: '10-2501555' },
   { code: 'FN',   label: '공고번호',          value: '', type: 'text' },
-  { code: 'AD',   label: '출원일',            value: '', type: 'date-range', dateFrom: '', dateTo: '', hint: '20080101 ~ 20081231' },
+  { code: 'AD',   label: '출원일',            value: '', type: 'date-range', dateFrom: '', dateTo: '', hint: '2025-01-01 ~ 2025-12-31' },
   { code: 'PD',   label: '공개일/특허일',     value: '', type: 'date-range', dateFrom: '', dateTo: '' },
   { code: 'RD',   label: '등록일',            value: '', type: 'date-range', dateFrom: '', dateTo: '' },
   { code: 'FD',   label: '공고일',            value: '', type: 'date-range', dateFrom: '', dateTo: '' },
@@ -71,20 +71,20 @@ const FIELD_CATALOG: SField[] = [
   { code: 'DC',   label: '지정국',            value: '', type: 'multi', options: COUNTRY_OPTS },
   // 인명
   { code: 'WAP',  label: '출원인 대표명화 코드', value: '', type: 'text' },
-  { code: 'AP',   label: '출원인',            value: '', type: 'text', hint: '엘지* | 119990527105' },
+  { code: 'AP',   label: '출원인',            value: '', type: 'text', hint: '현대자동차' },
   { code: 'APC',  label: '출원인 국적',       value: '', type: 'multi', options: COUNTRY_OPTS },
-  { code: 'APD',  label: '출원인 주소',       value: '', type: 'text', hint: '서울 | 용산' },
-  { code: 'INV',  label: '발명자',            value: '', type: 'text', hint: '김한국 | 김만*' },
+  { code: 'APD',  label: '출원인 주소',       value: '', type: 'text', hint: '서울특별시 강남구' },
+  { code: 'INV',  label: '발명자',            value: '', type: 'text', hint: '김OO' },
   { code: 'INVC', label: '발명자 국적',       value: '', type: 'multi', options: COUNTRY_OPTS },
-  { code: 'AG',   label: '대리인',            value: '', type: 'text', hint: '특허법인* | 김남구' },
+  { code: 'AG',   label: '대리인',            value: '', type: 'text', hint: '특허법인 다래' },
   { code: 'AGD',  label: '대리인 주소',       value: '', type: 'text' },
   { code: 'EXN',  label: '심사관',            value: '', type: 'text' },
   { code: 'AC',   label: '출원인 식별기호(JP)', value: '', type: 'text' },
   { code: 'PCN',  label: '특허고객번호(KR)',  value: '', type: 'text' },
   // 분류코드
-  { code: 'IPCM', label: 'IPC (Main)',        value: '', type: 'ipc', ipcScope: 'all', finderType: 'ipc', finderLabel: 'IPC 코드찾기', hint: 'H04L-009/18% | G06F*' },
+  { code: 'IPCM', label: 'IPC (Main)',        value: '', type: 'ipc', ipcScope: 'all', finderType: 'ipc', finderLabel: 'IPC 코드찾기', hint: 'G01S 17/93' },
   { code: 'IPC',  label: 'IPC (All)',         value: '', type: 'ipc', ipcScope: 'all', finderType: 'ipc', finderLabel: 'IPC 코드찾기' },
-  { code: 'CPCM', label: 'CPC (Main)',        value: '', type: 'ipc', ipcScope: 'all', finderType: 'ipc', finderLabel: 'CPC 코드찾기', hint: 'C12P-0007/02% | C01C*' },
+  { code: 'CPCM', label: 'CPC (Main)',        value: '', type: 'ipc', ipcScope: 'all', finderType: 'ipc', finderLabel: 'CPC 코드찾기', hint: 'G06V 20/56' },
   { code: 'CPC',  label: 'CPC (All)',         value: '', type: 'ipc', ipcScope: 'all', finderType: 'ipc', finderLabel: 'CPC 코드찾기' },
   { code: 'UCM',  label: 'US Class (Main)',   value: '', type: 'text' },
   { code: 'UC',   label: 'US Class (All)',    value: '', type: 'text' },
@@ -616,7 +616,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
                 value={formulaText}
                 onChange={setFormulaText}
                 rows={3}
-                placeholder="예: 하이브리드 and 자동차 | *수소 자동차*"
+                placeholder="예: 자율주행 and 라이다"
               />
             ) : (
               <textarea
@@ -624,7 +624,7 @@ export const PatentInput = forwardRef<PatentInputHandle, Props>(function PatentI
                 onChange={e => setFormulaText(e.target.value)}
                 rows={3}
                 spellCheck={false}
-                placeholder="예: 하이브리드 and 자동차 | *수소 자동차*"
+                placeholder="예: 자율주행 and 라이다"
                 aria-label="특허 검색식 입력"
                 className="block w-full resize-y rounded border border-gray-300 p-2 font-mono text-sm leading-6 outline-none focus:border-blue-500 placeholder:text-gray-400"
               />

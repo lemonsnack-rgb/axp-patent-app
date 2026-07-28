@@ -8,21 +8,12 @@ import { Icon } from './Icon';
 import { SiteFooter } from './SiteFooter';
 import { CK_WORDMARK } from '../assets/ckLogo';
 import { getPatentStatusDesc } from '../utils/badgeUtils';
+import { parseKeywords } from '../features/search/mockMatch';
 import { Button } from '@muhayu/axp-ui';
 
-export function parseKeywords(query: string): string[] {
-  if (!query) return [];
-  const cleaned = query
-    .replace(/[A-Z_]+\s*[:=]\s*\(/g, ' ')   // CODE:( 또는 CODE=( 제거
-    .replace(/[A-Z_]+\s*[:=]/g, ' ')        // CODE: 또는 CODE= 제거
-    .replace(/\b(AND|OR|NOT|ADJ|NEAR|KEY|TAC|DSC)\b/gi, ' ')
-    .replace(/[()[\]~:*?"]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return [...new Set(
-    cleaned.split(' ').map(w => w.trim()).filter(w => w.length > 1)
-  )].slice(0, 10);
-}
+// 키워드 추출은 features/search/mockMatch 로 이동(JSX 없는 순수 모듈 → 테스트 가능).
+// 기존 import 경로 호환을 위해 re-export 한다.
+export { parseKeywords } from '../features/search/mockMatch';
 
 // 국가 고유 분류(라벨 → 수집 컬럼) — 수집필드 모드 뱃지용
 const COUNTRY_CLASS_COL: Record<string, string> = {

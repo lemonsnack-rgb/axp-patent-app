@@ -45,8 +45,8 @@ export function StandaloneEditor() {
         <span className="font-semibold">도면 편집</span>
         <span className="opacity-50">·</span>
         <span className="opacity-90 truncate max-w-xs">{session.drawingName}</span>
-        <span className="opacity-50 hidden sm:inline">·</span>
-        <span className="opacity-70 hidden sm:inline">이 창을 메인 창 옆에 나란히 열어 명세서를 참고하세요</span>
+        <span className="opacity-50 max-sm:hidden sm:inline">·</span>
+        <span className="opacity-70 max-sm:hidden sm:inline">이 창을 메인 창 옆에 나란히 열어 명세서를 참고하세요</span>
         <div className="ml-auto">
           <button
             className="text-white/70 hover:text-white text-xs2 border border-white/30 rounded px-2 py-0.5"

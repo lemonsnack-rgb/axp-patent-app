@@ -1247,7 +1247,7 @@ function DescriptionItemCards({
     )}
     <div className="mt-3">
       {/* lg+: 2컬럼 */}
-      <div className="hidden lg:grid lg:grid-cols-2 lg:gap-4">
+      <div className="max-lg:hidden lg:grid lg:grid-cols-2 lg:gap-4">
         {renderColumn('proposed', proposed)}
         {renderColumn('previous', previous)}
       </div>
@@ -1450,7 +1450,7 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
       />
 
       {/* 헤더 — 스텝바(48px)와 수직 정렬, 데스크탑 단일 행 */}
-      <div className="hidden md:flex shrink-0 items-center gap-2 px-4 border-b border-ck-border bg-gray-50 ml-1.5" style={{ height: 48 }}>
+      <div className="max-md:hidden md:flex shrink-0 items-center gap-2 px-4 border-b border-ck-border bg-gray-50 ml-1.5" style={{ height: 48 }}>
         <div className="w-5 h-5 rounded flex items-center justify-center text-white text-xs font-bold shrink-0"
           style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
         <span className="text-sm font-bold text-gray-800">AI 어시스턴트</span>

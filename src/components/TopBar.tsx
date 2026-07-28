@@ -107,9 +107,9 @@ export function TopBar() {
           target="_blank"
           rel="noopener noreferrer"
           title="도움말 (새 탭에서 열기)"
-          className="hidden md:inline-flex items-center gap-1.5 px-2 py-1 rounded text-zinc-600 hover:bg-zinc-100 text-sm2 transition-colors"
+          className="max-md:hidden md:inline-flex items-center gap-1.5 px-2 py-1 rounded text-zinc-600 hover:bg-zinc-100 text-sm2 transition-colors"
         ><Icon name="help" /><span className="text-sm2">도움말</span></a>
-        <Button variant="text" className="text-sm2 px-2 hidden md:inline-flex" title="언어 선택" aria-label="언어 선택 (현재: 한국어)">KR</Button>
+        <Button variant="text" className="text-sm2 px-2 max-md:hidden md:inline-flex" title="언어 선택" aria-label="언어 선택 (현재: 한국어)">KR</Button>
       </div>
     </header>
   );
