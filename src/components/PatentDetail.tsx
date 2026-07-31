@@ -154,7 +154,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
         <span className="text-sm2 font-bold text-gray-600">도면</span>
         <span className="ml-1.5 text-xs2 text-gray-400">({(data.figures || []).length})</span>
       </div>
-      <DrawingsPanel figures={data.figures} />
+      <DrawingsPanel figures={data.figures} refSigns={data.refSigns} />
     </div>
   );
 
@@ -235,14 +235,31 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               </Section>
             </div>
 
-            {/* 상세설명 — specification 원문 1블록.
-                기술분야·배경기술·과제·해결수단·효과·도면의 설명으로 쪼개 보여주던 하위섹션은
-                수집 컬럼이 없어(specification 은 단일 mediumtext) 제거했다. [2026-07-31 확정] */}
+            {/* 상세설명 — specification 원문을 섹션 표제로 파싱해 하위섹션으로 표시한다.
+                (기술분야·배경기술·해결하려는 과제·과제의 해결 수단·발명의 효과·도면의 설명·구체적 내용)
+                파싱 반입이 확정되어 하위섹션 구성을 유지한다. [2026-07-31 확정] */}
             <div ref={secDesc} data-spec="PAT-DET-080">
               <Section title="상세설명" icon="book">
-                <TextBlock col="specification.specification (값이 KIPRIS PDF URL이면 specification_extract_ticket이 전문 치환)">
-                  {data.description || '(데모) 명세서 상세설명 원문이 그대로 노출됩니다.'}
-                </TextBlock>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3.5">
+                  {data.techField && <DescSub title="기술분야" col="PARSE(specification, '기술분야' 섹션)">{data.techField}</DescSub>}
+                  {data.background && <DescSub title="배경기술" col="PARSE(specification, '배경기술' 섹션)">{data.background}</DescSub>}
+                  {data.aiPurpose && <DescSub title="해결하려는 과제" col="PARSE(specification, '해결하려는 과제' 섹션)">{data.aiPurpose}</DescSub>}
+                  {data.aiSolution && <DescSub title="과제의 해결 수단" col="PARSE(specification, '과제의 해결 수단' 섹션)">{data.aiSolution}</DescSub>}
+                  {data.aiEffect && <DescSub title="발명의 효과" col="PARSE(specification, '발명의 효과' 섹션)">{data.aiEffect}</DescSub>}
+                  {(data.figures || []).length > 0 && (
+                    <div>
+                      <div className="text-sm2 font-semibold text-gray-600 mb-1">도면의 설명</div>
+                      <ul data-col="PARSE(specification, '도면의 간단한 설명' 섹션) → [N행] 'FIG ' + (순번+1) + ' ' + 설명" className="text-base2 text-gray-700 leading-relaxed space-y-0.5">
+                        {(data.figures || []).map((f, i) => (
+                          <li key={i}><span className="font-mono text-gray-500 mr-1.5">{figLabel(i)}</span>{f.desc}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <DescSub title="발명의 구체적인 내용" col="specification.specification (값이 KIPRIS PDF URL이면 specification_extract_ticket이 전문 치환)">
+                    {data.description || '(데모) 발명의 배경, 기술적 과제, 해결수단, 효과 등 본문 전체가 노출됩니다.'}
+                  </DescSub>
+                </div>
               </Section>
             </div>
 
@@ -531,7 +548,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
             <div data-spec="PAT-DET-140" className="mb-4">
               <div className="text-sm2 font-semibold text-gray-500 mb-2">도면 ({(data.figures || []).length})</div>
               <div className="border border-gray-200 rounded-lg bg-gray-50 overflow-hidden" style={{ height: 360 }}>
-                <DrawingsPanel figures={data.figures} />
+                <DrawingsPanel figures={data.figures} refSigns={data.refSigns} />
               </div>
             </div>
           )}
@@ -579,6 +596,16 @@ function InfoRow({ k, v, mono, muted, col }: { k: string; v: string; mono?: bool
 
 function Row({ k, v, col }: { k: string; v: string; col?: string }) {
   return <div className="flex items-center gap-2 py-1.5 text-md2"><span className="text-gray-500 w-28 shrink-0">{k}</span><span data-col={col} className="text-gray-800">{v}</span></div>;
+}
+
+// 상세설명 하위 섹션 (기술분야/배경기술/과제/해결수단/효과/구체적 내용) — specification 파싱 결과
+function DescSub({ title, children, col }: { title: string; children: React.ReactNode; col?: string }) {
+  return (
+    <div>
+      <div className="text-sm2 font-semibold text-gray-600 mb-1">{title}</div>
+      <div data-col={col} className="text-base2 text-gray-700 leading-relaxed whitespace-pre-line">{children}</div>
+    </div>
+  );
 }
 
 function TextBlock({ children, col }: { children: React.ReactNode; col?: string }) {
@@ -690,8 +717,9 @@ function renderFamilyPills(total: number): [string, number][] {
 }
 
 // ── 우측 도면 패널 (keywert 참고) ──
-function DrawingsPanel({ figures }: { figures?: { imageKey?: string }[] }) {
+function DrawingsPanel({ figures, refSigns }: { figures?: { desc: string; imageKey?: string }[]; refSigns?: { sign: string; label: string }[] }) {
   const figs = figures || [];
+  const signs = refSigns || [];
   const [selected, setSelected] = useState(0);
   const [zoom, setZoom] = useState(false);
 
@@ -711,6 +739,7 @@ function DrawingsPanel({ figures }: { figures?: { imageKey?: string }[] }) {
         <div className="px-3 pt-2 flex items-center gap-2">
           {selected === 0 && <span className="text-xs2 font-semibold text-white bg-brand-400 rounded px-1.5 py-0.5 shrink-0">대표</span>}
           <span className="text-xs2 font-semibold text-gray-600 font-mono">{figLabel(selected)}</span>
+          <span data-col="PARSE(specification, '도면의 간단한 설명')" className="text-xs2 text-gray-400 truncate flex-1">{figs[selected]?.desc}</span>
           <button onClick={() => setZoom(true)} className="text-xs2 text-brand-400 hover:underline shrink-0" title="도면 확대">⤢ 확대</button>
         </div>
         <button onClick={() => setZoom(true)} className="block w-full cursor-zoom-in" title="도면 확대">
@@ -761,9 +790,13 @@ function DrawingsPanel({ figures }: { figures?: { imageKey?: string }[] }) {
         </>
       )}
 
+      {/* 부호의 설명 */}
+      {signs.length > 0 && <RefSigns signs={signs} className="mt-3" />}
+
       {zoom && (
         <DrawingZoomModal
           figures={figs}
+          refSigns={signs}
           index={selected}
           onIndex={setSelected}
           onClose={() => setZoom(false)}
@@ -773,9 +806,29 @@ function DrawingsPanel({ figures }: { figures?: { imageKey?: string }[] }) {
   );
 }
 
-// ── 도면 확대 모달 (도면 출력창) ── 확대/축소·팬
-function DrawingZoomModal({ figures, index, onIndex, onClose }: {
-  figures: { imageKey?: string }[];
+// ── 부호의 설명 (도면 주요 부분에 대한 부호 설명) — specification 말미 파싱 ──
+function RefSigns({ signs, className }: { signs: { sign: string; label: string }[]; className?: string }) {
+  return (
+    <div className={clsx('border border-gray-200 rounded-lg overflow-hidden', className)}>
+      <div data-col="PARSE(specification, '부호의 설명' 섹션) → [N행] 부호 + 명칭" className="bg-gray-50 px-3 py-1.5 text-xs2 font-semibold text-gray-600 border-b border-gray-200">
+        도면 주요 부분에 대한 부호의 설명
+      </div>
+      <ul className="divide-y divide-gray-50">
+        {signs.map(sg => (
+          <li key={sg.sign} className="flex items-baseline gap-2 px-3 py-1.5 text-sm2">
+            <span className="font-mono font-semibold text-brand-400 shrink-0 w-10">{sg.sign}</span>
+            <span className="text-gray-700">{sg.label}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ── 도면 확대 모달 (도면 출력창) ── 확대/축소·팬 + 부호의 설명
+function DrawingZoomModal({ figures, refSigns, index, onIndex, onClose }: {
+  figures: { desc: string; imageKey?: string }[];
+  refSigns?: { sign: string; label: string }[];
   index: number;
   onIndex: (i: number) => void;
   onClose: () => void;
@@ -809,6 +862,7 @@ function DrawingZoomModal({ figures, index, onIndex, onClose }: {
         {/* 헤더 + 줌 컨트롤 */}
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 bg-gray-50 shrink-0">
           <span className="font-mono font-semibold text-gray-700">{figLabel(index)}</span>
+          <span className="text-sm2 text-gray-500 truncate flex-1">{figures[index]?.desc}</span>
           <div className="flex items-center gap-0.5 shrink-0 mr-1">
             <button onClick={() => setScale(s => clampScale(s - 0.25))} className="w-7 h-7 rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-brand-400 font-bold" title="축소 (-)">−</button>
             <span className="text-xs2 text-gray-500 font-mono w-12 text-center tabular-nums">{Math.round(scale * 100)}%</span>
@@ -837,6 +891,11 @@ function DrawingZoomModal({ figures, index, onIndex, onClose }: {
             </div>
             <div className="absolute bottom-1.5 right-2 text-xs2 text-gray-400 bg-white/70 rounded px-1.5 py-0.5 pointer-events-none">휠: 확대/축소 · 더블클릭 · 드래그 이동</div>
           </div>
+          {refSigns && refSigns.length > 0 && (
+            <div className="p-4">
+              <RefSigns signs={refSigns} />
+            </div>
+          )}
         </div>
         {/* 하단 내비 + 썸네일 */}
         <div className="flex items-center gap-2 px-4 py-2 border-t border-gray-200 bg-white shrink-0">

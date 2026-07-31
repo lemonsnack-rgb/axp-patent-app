@@ -114,9 +114,17 @@ export interface PatentResult {
   family: number;
   citing: number;
   cited: number;
-  // 도면 — 이미지 키 목록(patent_image.key_name). 라벨(FIG n)은 순번으로 화면에서 생성하고,
-  // 도면 설명·부호의 설명은 수집 컬럼이 없어 표시하지 않는다. [2026-07-31 확정]
-  figures?: { imageKey?: string }[];
+  // 상세설명 하위섹션 — specification 원문을 섹션 표제로 파싱해 채운다. [2026-07-31 파싱 확정]
+  techField?: string;      // 기술분야
+  background?: string;     // 배경기술
+  aiPurpose?: string;      // 해결하려는 과제
+  aiSolution?: string;     // 과제의 해결 수단
+  aiEffect?: string;       // 발명의 효과
+  // 도면 — 이미지 키(patent_image.key_name) + 도면의 설명(specification 파싱).
+  // 라벨(FIG n)은 순번으로 화면에서 생성한다.
+  figures?: { desc: string; imageKey?: string }[];
+  // 도면 주요 부분에 대한 부호의 설명 (specification 말미 파싱)
+  refSigns?: { sign: string; label: string }[];
   // 구조화된 청구항 (없으면 repClaim 단독 표시)
   claims?: { no: number; dependsOn?: number; text: string }[];
   // 구조화된 인용/피인용 (없으면 citing/cited 카운트만 표시)
