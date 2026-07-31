@@ -15,6 +15,9 @@ import { Button } from '@muhayu/axp-ui';
 // 기존 import 경로 호환을 위해 re-export 한다.
 export { parseKeywords } from '../features/search/mockMatch';
 
+// 도면 라벨 — 수집 컬럼이 아니라 이미지 순번으로 화면에서 생성한다(파생).
+const figLabel = (i: number) => `FIG ${i + 1}`;
+
 // 국가 고유 분류(라벨 → 수집 컬럼) — 수집필드 모드 뱃지용
 const COUNTRY_CLASS_COL: Record<string, string> = {
   'FI': 'JP FI.fi_code',
@@ -151,7 +154,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
         <span className="text-sm2 font-bold text-gray-600">도면</span>
         <span className="ml-1.5 text-xs2 text-gray-400">({(data.figures || []).length})</span>
       </div>
-      <DrawingsPanel figures={data.figures} refSigns={data.refSigns} />
+      <DrawingsPanel figures={data.figures} />
     </div>
   );
 
@@ -232,27 +235,14 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               </Section>
             </div>
 
-            {/* 상세설명 — 표준 구조(기술분야·배경기술·과제·해결수단·효과·도면의 설명·구체적 내용) */}
+            {/* 상세설명 — specification 원문 1블록.
+                기술분야·배경기술·과제·해결수단·효과·도면의 설명으로 쪼개 보여주던 하위섹션은
+                수집 컬럼이 없어(specification 은 단일 mediumtext) 제거했다. [2026-07-31 확정] */}
             <div ref={secDesc} data-spec="PAT-DET-080">
               <Section title="상세설명" icon="book">
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3.5">
-                  <DescSub title="기술분야" col="⚠하드코딩 문장 + title · 연동 시 specification 파싱">{`본 발명은 ${data.title}에 관한 것으로, 해당 기술분야의 장치 및 방법에 관한 것이다.`}</DescSub>
-                  <DescSub title="배경기술" col="⚠하드코딩 문장 · 연동 시 specification 파싱">{`종래 기술은 정확도와 견고성 측면에서 한계가 있었으며, 다양한 환경 조건에서 안정적인 성능을 확보하기 어려웠다.`}</DescSub>
-                  {data.aiPurpose && <DescSub title="해결하려는 과제" col="⚠파생 · specification 파싱(aiPurpose)">{data.aiPurpose}</DescSub>}
-                  {data.aiSolution && <DescSub title="과제의 해결 수단" col="⚠파생 · specification 파싱(aiSolution)">{data.aiSolution}</DescSub>}
-                  {data.aiEffect && <DescSub title="발명의 효과" col="⚠파생 · specification 파싱(aiEffect)">{data.aiEffect}</DescSub>}
-                  {(data.figures || []).length > 0 && (
-                    <div>
-                      <div className="text-sm2 font-semibold text-gray-600 mb-1">도면의 설명</div>
-                      <ul data-col="⚠파생 · specification 파싱(도면의 간단한 설명)" className="text-base2 text-gray-700 leading-relaxed space-y-0.5">
-                        {(data.figures || []).map((f, i) => (
-                          <li key={i}><span className="font-mono text-gray-500 mr-1.5">{f.label}</span>{f.desc}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  <DescSub title="발명의 구체적인 내용" col="specification.specification (KIPRIS는 전문 PDF URL)">{data.description || '(데모) 발명의 배경, 기술적 과제, 해결수단, 효과 등 본문 전체가 노출됩니다.'}</DescSub>
-                </div>
+                <TextBlock col="specification.specification (KIPRIS는 전문 PDF URL)">
+                  {data.description || '(데모) 명세서 상세설명 원문이 그대로 노출됩니다.'}
+                </TextBlock>
               </Section>
             </div>
 
@@ -538,7 +528,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
             <div data-spec="PAT-DET-140" className="mb-4">
               <div className="text-sm2 font-semibold text-gray-500 mb-2">도면 ({(data.figures || []).length})</div>
               <div className="border border-gray-200 rounded-lg bg-gray-50 overflow-hidden" style={{ height: 360 }}>
-                <DrawingsPanel figures={data.figures} refSigns={data.refSigns} />
+                <DrawingsPanel figures={data.figures} />
               </div>
             </div>
           )}
@@ -588,16 +578,6 @@ function Row({ k, v, col }: { k: string; v: string; col?: string }) {
   return <div className="flex items-center gap-2 py-1.5 text-md2"><span className="text-gray-500 w-28 shrink-0">{k}</span><span data-col={col} className="text-gray-800">{v}</span></div>;
 }
 
-// 상세설명 하위 섹션 (기술분야/배경기술/과제/해결수단/효과/구체적 내용)
-function DescSub({ title, children, col }: { title: string; children: React.ReactNode; col?: string }) {
-  return (
-    <div>
-      <div className="text-sm2 font-semibold text-gray-600 mb-1">{title}</div>
-      <div data-col={col} className="text-base2 text-gray-700 leading-relaxed whitespace-pre-line">{children}</div>
-    </div>
-  );
-}
-
 function TextBlock({ children, col }: { children: React.ReactNode; col?: string }) {
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
@@ -629,17 +609,24 @@ function CiteBlock({ title, list, cited }: { title: string; list?: PatentCitatio
       <div className="text-base2 font-bold text-gray-700 mb-2">{title}</div>
       <div className="text-xs2 font-semibold text-gray-500 mt-2 mb-1">특허 정보</div>
       {patents.length > 0 ? (
-        <ul data-col={`KR KPA_CITATION.(citation_literature_number · country_code) / JP·US CTLTR${cited ? ' (피인용 방향)' : ''}`} className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
+        // 인용문헌 '명칭'은 수집 컬럼이 없어 표시하지 않는다 → 번호·국가·발명자명·일자로 식별.
+        <ul data-col={`KR KPA_CITATION.(citation_literature_country_code · citation_literature_number · citation_literature_inventor_name · citation_literature_publication_date) / US·JP CTLTR.(citation_literature_country_code · registration_number · inventor_name · registration_date)${cited ? ' [피인용 방향]' : ''}`} className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
           {patents.map((c, i) => (
-            <li key={i}><span className="font-mono text-brand-400">{c.ref}</span> · {c.title}</li>
+            <li key={i}>
+              <span className="font-mono text-gray-500 mr-1">{c.country}</span>
+              <span className="font-mono text-brand-400">{c.ref}</span>
+              {c.inventor && <span className="text-gray-600"> · {c.inventor}</span>}
+              {c.date && <span className="font-mono text-gray-400"> · {c.date}</span>}
+            </li>
           ))}
         </ul>
       ) : <div className="text-md2 text-gray-400 pl-1">없음</div>}
       <div className="text-xs2 font-semibold text-gray-500 mt-3 mb-1">비특허(논문) 정보</div>
       {npls.length > 0 ? (
-        <ul data-col="US CTLTR_ETC.other_citations / PRIOR_TECHNOLOGY_DOCUMENT.non_patent_reference_text" className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
+        // 비특허 인용은 제목·저널·연도가 한 컬럼에 통째로 들어온다 → 파싱 없이 원문 그대로 표시.
+        <ul data-col="US CTLTR_ETC.other_citations / PRIOR_TECHNOLOGY_DOCUMENT.non_patent_reference_text (원문 텍스트 그대로)" className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
           {npls.map((c, i) => (
-            <li key={i}><span className="font-mono">{c.ref}</span> {c.title}</li>
+            <li key={i}><span className="font-mono text-gray-400 mr-1">[NPL]</span>{c.text}</li>
           ))}
         </ul>
       ) : <div className="text-md2 text-gray-400 pl-1">없음</div>}
@@ -698,9 +685,8 @@ function renderFamilyPills(total: number): [string, number][] {
 }
 
 // ── 우측 도면 패널 (keywert 참고) ──
-function DrawingsPanel({ figures, refSigns }: { figures?: { label: string; desc: string }[]; refSigns?: { sign: string; label: string }[] }) {
+function DrawingsPanel({ figures }: { figures?: { imageKey?: string }[] }) {
   const figs = figures || [];
-  const signs = refSigns || [];
   const [selected, setSelected] = useState(0);
   const [zoom, setZoom] = useState(false);
 
@@ -719,8 +705,7 @@ function DrawingsPanel({ figures, refSigns }: { figures?: { label: string; desc:
       <div data-col="⚠목업(현재 절차 SVG · 컬럼은 수집됨) · patent_image.(scrape_site · key_name→S3) / custom.drawing_url / JP custom.figures" className="bg-white rounded-xl border border-neutral-150 shadow-card mb-2 shrink-0 overflow-hidden">
         <div className="px-3 pt-2 flex items-center gap-2">
           {selected === 0 && <span className="text-xs2 font-semibold text-white bg-brand-400 rounded px-1.5 py-0.5 shrink-0">대표</span>}
-          <span className="text-xs2 font-semibold text-gray-600 font-mono">{figs[selected]?.label}</span>
-          <span className="text-xs2 text-gray-400 truncate flex-1">{figs[selected]?.desc}</span>
+          <span className="text-xs2 font-semibold text-gray-600 font-mono">{figLabel(selected)}</span>
           <button onClick={() => setZoom(true)} className="text-xs2 text-brand-400 hover:underline shrink-0" title="도면 확대">⤢ 확대</button>
         </div>
         <button onClick={() => setZoom(true)} className="block w-full cursor-zoom-in" title="도면 확대">
@@ -740,7 +725,7 @@ function DrawingsPanel({ figures, refSigns }: { figures?: { label: string; desc:
       >
         <span className="absolute top-1 left-1 z-10 text-xs2 font-semibold text-white bg-brand-400 rounded px-1 leading-tight">대표</span>
         <FigureSVG index={0} className="w-full h-24" />
-        <div className="text-xs2 text-gray-500 font-mono truncate w-full text-center leading-tight py-0.5 border-t border-gray-100">{figs[0]?.label}</div>
+        <div className="text-xs2 text-gray-500 font-mono truncate w-full text-center leading-tight py-0.5 border-t border-gray-100">{figLabel(0)}</div>
       </button>
 
       {/* 그 외 도면 */}
@@ -748,7 +733,7 @@ function DrawingsPanel({ figures, refSigns }: { figures?: { label: string; desc:
         <>
           <div className="text-xs2 font-semibold text-gray-500 mt-3 mb-1.5">그 외 도면 ({figs.length - 1})</div>
           <div className="grid grid-cols-3 gap-1">
-            {figs.slice(1).map((f, idx) => {
+            {figs.slice(1).map((_f, idx) => {
               const i = idx + 1;
               return (
                 <button
@@ -762,7 +747,7 @@ function DrawingsPanel({ figures, refSigns }: { figures?: { label: string; desc:
                 >
                   <FigureSVG index={i} className="w-full h-14" />
                   <div className="text-xs2 text-gray-500 font-mono truncate w-full text-center leading-tight py-0.5 border-t border-gray-100">
-                    {f.label}
+                    {figLabel(i)}
                   </div>
                 </button>
               );
@@ -771,13 +756,9 @@ function DrawingsPanel({ figures, refSigns }: { figures?: { label: string; desc:
         </>
       )}
 
-      {/* 부호의 설명 */}
-      {signs.length > 0 && <RefSigns signs={signs} className="mt-3" />}
-
       {zoom && (
         <DrawingZoomModal
           figures={figs}
-          refSigns={signs}
           index={selected}
           onIndex={setSelected}
           onClose={() => setZoom(false)}
@@ -787,29 +768,9 @@ function DrawingsPanel({ figures, refSigns }: { figures?: { label: string; desc:
   );
 }
 
-// ── 부호의 설명 (도면 주요 부분에 대한 부호 설명) ──
-function RefSigns({ signs, className }: { signs: { sign: string; label: string }[]; className?: string }) {
-  return (
-    <div className={clsx('border border-gray-200 rounded-lg overflow-hidden', className)}>
-      <div data-col="⚠파생 · specification 파싱(부호의 설명)" className="bg-gray-50 px-3 py-1.5 text-xs2 font-semibold text-gray-600 border-b border-gray-200">
-        도면 주요 부분에 대한 부호의 설명
-      </div>
-      <ul className="divide-y divide-gray-50">
-        {signs.map(s => (
-          <li key={s.sign} className="flex items-baseline gap-2 px-3 py-1.5 text-sm2">
-            <span className="font-mono font-semibold text-brand-400 shrink-0 w-10">{s.sign}</span>
-            <span className="text-gray-700">{s.label}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-// ── 도면 확대 모달 (도면 출력창) ── 확대/축소·팬 + 부호의 설명
-function DrawingZoomModal({ figures, refSigns, index, onIndex, onClose }: {
-  figures: { label: string; desc: string }[];
-  refSigns?: { sign: string; label: string }[];
+// ── 도면 확대 모달 (도면 출력창) ── 확대/축소·팬
+function DrawingZoomModal({ figures, index, onIndex, onClose }: {
+  figures: { imageKey?: string }[];
   index: number;
   onIndex: (i: number) => void;
   onClose: () => void;
@@ -837,14 +798,12 @@ function DrawingZoomModal({ figures, refSigns, index, onIndex, onClose }: {
     return () => window.removeEventListener('keydown', onKey);
   }, [index, figures.length, onIndex, onClose]);
 
-  const fig = figures[index];
   return createPortal(
     <div className="fixed inset-0 z-[80] bg-black/60 flex items-center justify-center p-6" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* 헤더 + 줌 컨트롤 */}
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 bg-gray-50 shrink-0">
-          <span className="font-mono font-semibold text-gray-700">{fig?.label}</span>
-          <span className="text-sm2 text-gray-500 truncate flex-1">{fig?.desc}</span>
+          <span className="font-mono font-semibold text-gray-700">{figLabel(index)}</span>
           <div className="flex items-center gap-0.5 shrink-0 mr-1">
             <button onClick={() => setScale(s => clampScale(s - 0.25))} className="w-7 h-7 rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-brand-400 font-bold" title="축소 (-)">−</button>
             <span className="text-xs2 text-gray-500 font-mono w-12 text-center tabular-nums">{Math.round(scale * 100)}%</span>
@@ -873,23 +832,18 @@ function DrawingZoomModal({ figures, refSigns, index, onIndex, onClose }: {
             </div>
             <div className="absolute bottom-1.5 right-2 text-xs2 text-gray-400 bg-white/70 rounded px-1.5 py-0.5 pointer-events-none">휠: 확대/축소 · 더블클릭 · 드래그 이동</div>
           </div>
-          {refSigns && refSigns.length > 0 && (
-            <div className="p-4">
-              <RefSigns signs={refSigns} />
-            </div>
-          )}
         </div>
         {/* 하단 내비 + 썸네일 */}
         <div className="flex items-center gap-2 px-4 py-2 border-t border-gray-200 bg-white shrink-0">
           <Button variant="outlined" color="primary" size="sm" disabled={index <= 0} onClick={() => onIndex(index - 1)} title="이전 (←)">◀ 이전</Button>
           <Button variant="outlined" color="primary" size="sm" disabled={index >= figures.length - 1} onClick={() => onIndex(index + 1)} title="다음 (→)">다음 ▶</Button>
           <div className="flex-1 flex gap-1 overflow-x-auto scroll-thin justify-end">
-            {figures.map((f, i) => (
+            {figures.map((_f, i) => (
               <button
                 key={i}
                 onClick={() => onIndex(i)}
                 className={clsx('rounded border shrink-0 overflow-hidden w-16', index === i ? 'ring-2 ring-blue-400 border-blue-400' : 'border-gray-200 hover:border-gray-300')}
-                title={f.label}
+                title={figLabel(i)}
               >
                 <FigureSVG index={i} className="w-full h-10" />
               </button>

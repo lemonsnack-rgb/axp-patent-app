@@ -132,20 +132,6 @@ const DOMAINS: Domain[] = [
   },
 ];
 
-// 도면 부호의 설명용 — 도메인별 주요 구성요소(부호 110/120/130에 대응)
-const DOMAIN_COMPS: Record<string, [string, string, string]> = {
-  lidar: ['데이터 수집부', '전처리부', '인식부'],
-  battery: ['양극', '고체 전해질층', '음극'],
-  semi: ['적층체', '채널 구조', '비트라인'],
-  graphene: ['그래핀 산화물 분산액', '고분자 매트릭스', '계면층'],
-  comm: ['안테나 어레이', '빔 제어부', '송신부'],
-  medical: ['영상 입력부', '신경망부', '출력부'],
-  display: ['마이크로 LED 화소', '구동 트랜지스터', '정렬 마크'],
-  hydrogen: ['고분자 전해질막', '촉매층', '유로'],
-  robot: ['로봇 암', '토크 센서부', '제어부'],
-  vision: ['패치 임베딩부', '어텐션부', '분류부'],
-};
-
 const COUNTRY_SEQ: Array<'KR' | 'US' | 'JP' | 'CN' | 'EP'> = ['KR', 'US', 'JP', 'CN', 'EP'];
 // 발생 가능한 권리상태 전종 — 패싯의 모든 값이 결과로 출력되도록 커버.
 // (공개/심사중/등록예정/등록 = active계, 거절/소멸/포기/취하/취소/각하 = inactive계)
@@ -187,31 +173,29 @@ function buildClaims(dm: Domain): { no: number; dependsOn?: number; text: string
   return claims;
 }
 
+// 인용·피인용 — 수집 컬럼(번호·국가코드·발명자명·공개(등록)일)만 채운다.
+// 인용문헌 '명칭'은 수집 컬럼이 없어(KPA_CITATION·CTLTR) 데이터로 두지 않는다.
 function buildCitations(dm: Domain, year: number, seq: number): { citing: PatentCitation[]; cited: PatentCitation[] } {
-  const c = (off: number): string => `KR 10-${year - 3}-${pad(1000000 + (seq * 7 + off) * 4513, 7).slice(-7)}`;
+  const krNo = (off: number): string => `10-${year - 3}-${pad(1000000 + (seq * 7 + off) * 4513, 7).slice(-7)}`;
+  const cDate = (off: number): string => mkDate(year - 3, seq + off, seq + off * 2);
   const citing: PatentCitation[] = [
-    { kind: 'patent', ref: c(1), title: `${dm.titleKo} 관련 선행기술` },
-    { kind: 'patent', ref: c(2), title: `${dm.kw[0]} ${dm.kw[2] ?? ''} 종래 구조` },
-    { kind: 'patent', ref: `US ${pad(9000000 + seq * 131, 7)} B2`, title: `Prior art on ${dm.titleEn.toLowerCase()}` },
-    { kind: 'npl', ref: '[NPL]', title: `${dm.titleEn}: A Review, IEEE/Elsevier, ${year - 1}`, stage: '심사' },
+    { kind: 'patent', country: 'KR', ref: krNo(1), inventor: '김OO', date: cDate(1) },
+    { kind: 'patent', country: 'KR', ref: krNo(2), inventor: '이OO', date: cDate(2) },
+    { kind: 'patent', country: 'US', ref: `${pad(9000000 + seq * 131, 7)} B2`, inventor: 'J. Smith', date: cDate(3) },
+    { kind: 'npl', text: `${dm.titleEn}: A Review, IEEE/Elsevier, ${year - 1}` },
   ];
   const cited: PatentCitation[] = [
-    { kind: 'patent', ref: c(9), title: `${dm.titleKo} 후속 개량 발명` },
-    ...(seq % 3 === 0 ? [{ kind: 'npl' as const, ref: '[NPL]', title: `Follow-up study citing this work, ${year + 1}`, stage: '심사' }] : []),
+    { kind: 'patent', country: 'KR', ref: krNo(9), inventor: '박OO', date: cDate(4) },
+    ...(seq % 3 === 0 ? [{ kind: 'npl' as const, text: `Follow-up study citing this work, ${year + 1}` }] : []),
   ];
   return { citing, cited };
 }
 
-function figuresFor(dm: Domain): { label: string; desc: string }[] {
-  const base = [
-    `${dm.device}의 전체 구성도`,
-    `주요 동작 흐름도`,
-    `핵심 구성요소의 상세 구조`,
-    `실시예 적용 예시`,
-    `성능 비교 그래프`,
-  ];
+// 도면 — 수집되는 것은 이미지 키(patent_image.key_name) 목록이다.
+// 라벨(FIG n)은 순번으로 화면에서 생성하고, 도면 설명·부호의 설명은 수집 컬럼이 없어 두지 않는다.
+function figuresFor(dm: Domain): { imageKey?: string }[] {
   const n = 4 + (dm.key.length % 3); // 4~6
-  return base.slice(0, n).map((desc, i) => ({ label: `FIG ${i + 1}`, desc }));
+  return Array.from({ length: n }, () => ({}));
 }
 
 // 실제 특허 수준의 분량으로 요약·상세설명 본문을 생성
@@ -337,19 +321,9 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
     abstract: detail.abstract,
     repClaim: `제1항. ${dm.parts[0]}; ${dm.parts[1]}; 및 ${dm.parts[2]}를 포함하는, ${dm.device}.`,
     claims: buildClaims(dm),
-    aiPurpose: dm.pKo, aiSolution: dm.sKo, aiEffect: dm.eKo,
     family: 1 + (seq % 5), citing: citing.length, cited: cited.length,
     citingList: citing, citedList: cited,
     figures: figuresFor(dm),
-    refSigns: (() => {
-      const c = DOMAIN_COMPS[dm.key] ?? ['제1 구성부', '제2 구성부', '제3 구성부'];
-      return [
-        { sign: '100', label: dm.device },
-        { sign: '110', label: c[0] },
-        { sign: '120', label: c[1] },
-        { sign: '130', label: c[2] },
-      ];
-    })(),
     applicantAddress: cc === 'KR' ? '서울특별시 강남구 테헤란로 152' : cc === 'US' ? '1 Innovation Way, San Jose, CA' : cc === 'JP' ? '東京都港区赤坂1-1-1' : cc === 'CN' ? '深圳市南山区科技园' : 'Hauptstraße 1, München',
     applicantCode: pad(120000000000 + seq * 7919, 12),
     inventorAddress: cc === 'KR' ? '서울특별시 서초구 서초대로 396' : cc === 'US' ? '250 Tech Park Dr, Austin, TX' : cc === 'JP' ? '東京都千代田区丸の内2-4-1' : cc === 'CN' ? '北京市海淀区中关村大街1号' : 'Königstraße 10, Stuttgart',

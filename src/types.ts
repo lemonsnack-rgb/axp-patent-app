@@ -109,15 +109,12 @@ export interface PatentResult {
   standardOrg?: string;
   abstract: string;
   repClaim: string;
-  aiPurpose?: string;
-  aiSolution?: string;
-  aiEffect?: string;
   family: number;
   citing: number;
   cited: number;
-  figures?: { label: string; desc: string; art?: string }[];
-  // 도면 부호의 설명 (도면 주요 부분에 대한 부호 설명)
-  refSigns?: { sign: string; label: string }[];
+  // 도면 — 이미지 키 목록(patent_image.key_name). 라벨(FIG n)은 순번으로 화면에서 생성하고,
+  // 도면 설명·부호의 설명은 수집 컬럼이 없어 표시하지 않는다. [2026-07-31 확정]
+  figures?: { imageKey?: string }[];
   // 구조화된 청구항 (없으면 repClaim 단독 표시)
   claims?: { no: number; dependsOn?: number; text: string }[];
   // 구조화된 인용/피인용 (없으면 citing/cited 카운트만 표시)
@@ -168,11 +165,18 @@ export interface PatentResult {
   epFilingLanguage?: string;              // EP 출원/공개 언어
 }
 
+// 인용·피인용 문헌 — 수집 컬럼과 1:1.
+// 인용문헌의 '명칭'은 수집 대상이 아니다(KPA_CITATION·CTLTR 에 명칭 컬럼 없음) → 표시하지 않는다.
 export interface PatentCitation {
   kind: 'patent' | 'npl';   // 특허 / 비특허(논문)
-  ref: string;              // 문헌번호 또는 [NPL]
-  title: string;
-  stage?: string;           // 심사/이의 등 (비특허 표용)
+  // 특허 인용 — KR KPA_CITATION / US·JP CTLTR
+  country?: string;         // citation_literature_country_code
+  ref?: string;             // KR citation_literature_number · US·JP registration_number
+  inventor?: string;        // citation_literature_inventor_name · inventor_name
+  date?: string;             // KR citation_literature_publication_date · US·JP registration_date
+  // 비특허 인용 — CTLTR_ETC.other_citations / PRIOR_TECHNOLOGY_DOCUMENT.non_patent_reference_text
+  // 제목·저널·연도가 한 컬럼에 통째로 들어오므로 파싱하지 않고 원문 그대로 표시한다.
+  text?: string;
 }
 
 export interface PaperResult {
