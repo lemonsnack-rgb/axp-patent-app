@@ -183,14 +183,14 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                     <BibRow k="존속기간(예상)만료일" v={data.expirationDate && data.expirationDate !== '-' ? data.expirationDate : '—'} k2="권리변동" v2={data.rightChange || '—'}
                       col="⚠파생 · 등록일 + 20년(수집 컬럼 없음)" col2="custom.has_ownership_change" />
                     <BibRow k="최종처분상태" v={data.finalDisposal || '—'} k2="청구항 수" v2={data.claimCount != null ? `${data.claimCount}개` : '—'}
-                      col="bibliographic.final_disposal" col2="bibliographic.claim_count / KPA_BIBLIOGRAPHIC.claim_count" />
+                      col="bibliographic.final_disposal" col2="bibliographic.claim_count / kpa_bibliographic.claim_count" />
                     <BibRow k="출원구분" v={data.applicationFlag || '—'} k2="번역문 제출일" v2={data.translationSubmitDate || '—'}
                       col="bibliographic.application_flag" col2="bibliographic.translation_submit_date" />
                     <BibRow k="도면 수" v={data.drawingCount != null ? `${data.drawingCount}건` : '—'} k2="실시권 등록일" v2={data.licenseRegDate || '—'}
-                      col="KPA_BIBLIOGRAPHIC.drawing_count" col2="custom.license_registration_date" />
+                      col="kpa_bibliographic.drawing_count" col2="custom.license_registration_date" />
                     {((data.designatedCountries?.length ?? 0) > 0 || data.sequenceListing) &&
                       <BibRow k="지정국" v={(data.designatedCountries?.length ?? 0) > 0 ? data.designatedCountries!.join(', ') : '—'} k2="서열목록" v2={data.sequenceListing ? '있음' : '—'}
-                        col="DESIGNATED_COUNTRY.designated_country / EP DSGN.national_name" col2="custom.sequence_listing_yn" />}
+                        col="designated_country.designated_country / EP dsgn.national_name" col2="custom.sequence_listing_yn" />}
                   </tbody>
                 </table>
                 {(data.priorityList?.length ?? 0) > 0 && (
@@ -231,7 +231,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
             {/* 요약 */}
             <div ref={secAbstract} data-spec="PAT-DET-070">
               <Section title="요약" icon="doc">
-                <TextBlock col="abstract.abstract (JP/CN 영문요약 e_abstract)">{data.abstract || '—'}</TextBlock>
+                <TextBlock col="abstract.abstract (mediumtext 단일 · JP/CN 영문요약 e_abstract)">{data.abstract || '—'}</TextBlock>
               </Section>
             </div>
 
@@ -240,7 +240,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                 수집 컬럼이 없어(specification 은 단일 mediumtext) 제거했다. [2026-07-31 확정] */}
             <div ref={secDesc} data-spec="PAT-DET-080">
               <Section title="상세설명" icon="book">
-                <TextBlock col="specification.specification (KIPRIS는 전문 PDF URL)">
+                <TextBlock col="specification.specification (값이 KIPRIS PDF URL이면 specification_extract_ticket이 전문 치환)">
                   {data.description || '(데모) 명세서 상세설명 원문이 그대로 노출됩니다.'}
                 </TextBlock>
               </Section>
@@ -259,7 +259,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                     className={clsx('px-2.5 py-0.5 rounded text-sm2 font-medium border', claimMode === 'all' ? 'bg-blue-400 text-white border-blue-400' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400')}
                   >전체청구항</button>
                 </div>
-                <div data-col="claim.claim · 독립/종속 구조는 ⚠파생(대표항 KPA_BIBLIOGRAPHIC.representation_claim_number)" className="border border-blue-200 rounded-lg p-3.5 bg-white">
+                <div data-col="claim.claim (mediumtext 단일) · 독립/종속 구조는 ⚠파생(대표항 kpa_bibliographic.representation_claim_number)" className="border border-blue-200 rounded-lg p-3.5 bg-white">
                   {(() => {
                     const claims = data.claims && data.claims.length
                       ? data.claims
@@ -346,7 +346,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                 {(data.priorArtDocs?.length ?? 0) > 0 && (
                   <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-3.5">
                     <div className="text-base2 font-bold text-gray-700 mb-2">선행기술문헌 ({data.priorArtDocs!.length}건)</div>
-                    <ul data-col="prior_technology_document.prior_technology_document_country · prior_technology_document_number" className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
+                    <ul data-col="⚠갱신본: 피인용(forward)과 동일 테이블 · prior_technology_document.prior_technology_document_country · prior_technology_document_number → 피인용 블록과 통합 필요" className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
                       {data.priorArtDocs!.map((d, i) => (
                         <li key={i}><span className="font-mono text-brand-400">{d.country} {d.number}</span></li>
                       ))}
@@ -361,7 +361,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               <Section title="분류코드" icon="tag">
                 <table className="w-full text-md2">
                   <tbody>
-                    <InfoRow k="IPC" v={(data.ipcList?.length ? data.ipcList : [data.ipc]).filter(Boolean).join('  ·  ') || '—'} mono col="ipc.ipc_number / KR KPA_IPC.ipc_code" />
+                    <InfoRow k="IPC" v={(data.ipcList?.length ? data.ipcList : [data.ipc]).filter(Boolean).join('  ·  ') || '—'} mono col="ipc.ipc_number / KR kpa_ipc.ipc_code (+ipc_version)" />
                     <InfoRow k="CPC" v={(data.cpcList?.length ? data.cpcList : [data.cpc]).filter(v => v && v !== '-').join('  ·  ') || '—'} mono col="CPC.cpc_code / JP·EP custom.cpc_code" />
                     {data.countryClassifications?.map((c, i) => (
                       <InfoRow key={i} k={c.label} v={c.codes.join('  ·  ') || '—'} mono col={COUNTRY_CLASS_COL[c.label] ?? '국가고유 분류 테이블'} />
@@ -463,10 +463,13 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                     )}
                   </div>
                 )}
-                {data.trial && data.trial !== '심판 없음' && (
+                {data.trial && (
+                  // 심판 — 수집 측 3개 파라미터(타입·상태·번호)를 각각 표시. [2026-07-31 확정]
                   <div className="border-t border-gray-100 pt-3 mt-3">
                     <div className="text-sm2 font-semibold text-gray-500 mb-2">심판 정보</div>
-                    <Row k="심판" v={data.trial} col="custom.has_trial" />
+                    <Row k="심판 종류" v={data.trial.type} col="trial.trial_type (심판종류) · 유무는 custom.has_trial" />
+                    <Row k="심판 상태" v={data.trial.status} col="trial.trial_status (심판상태)" />
+                    <Row k="심판 번호" v={data.trial.number} col="trial.trial_number_text (심판번호문자) · 자연키 trial.trial_number" />
                   </div>
                 )}
               </Section>
@@ -610,7 +613,9 @@ function CiteBlock({ title, list, cited }: { title: string; list?: PatentCitatio
       <div className="text-xs2 font-semibold text-gray-500 mt-2 mb-1">특허 정보</div>
       {patents.length > 0 ? (
         // 인용문헌 '명칭'은 수집 컬럼이 없어 표시하지 않는다 → 번호·국가·발명자명·일자로 식별.
-        <ul data-col={`KR KPA_CITATION.(citation_literature_country_code · citation_literature_number · citation_literature_inventor_name · citation_literature_publication_date) / US·JP CTLTR.(citation_literature_country_code · registration_number · inventor_name · registration_date)${cited ? ' [피인용 방향]' : ''}`} className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
+        <ul data-col={cited
+          ? '피인용(forward) · prior_technology_document.prior_technology_document_country · prior_technology_document_number · std_status_name · citation_type_name'
+          : '인용(backward) · citation.std_citation_country_code · std_citation_number · std_citation_publication_date · citation_type_name (발명자명은 US·JP ctltr.inventor_name)'} className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
           {patents.map((c, i) => (
             <li key={i}>
               <span className="font-mono text-gray-500 mr-1">{c.country}</span>
@@ -624,7 +629,7 @@ function CiteBlock({ title, list, cited }: { title: string; list?: PatentCitatio
       <div className="text-xs2 font-semibold text-gray-500 mt-3 mb-1">비특허(논문) 정보</div>
       {npls.length > 0 ? (
         // 비특허 인용은 제목·저널·연도가 한 컬럼에 통째로 들어온다 → 파싱 없이 원문 그대로 표시.
-        <ul data-col="ctltr_etc.other_citations / prior_technology_document.non_patent_reference_text (원문 텍스트 그대로)" className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
+        <ul data-col="paper_citation.paper_title · paper_author · paper_journal · paper_year (US·JP는 ctltr_etc.other_citations 원문 텍스트)" className="text-md2 text-gray-700 list-disc pl-4 space-y-0.5">
           {npls.map((c, i) => (
             <li key={i}><span className="font-mono text-gray-400 mr-1">[NPL]</span>{c.text}</li>
           ))}
@@ -702,7 +707,7 @@ function DrawingsPanel({ figures }: { figures?: { imageKey?: string }[] }) {
   return (
     <div className="flex flex-col flex-1 overflow-y-auto scroll-thin p-3">
       {/* 메인 도면 — 클릭 시 확대 */}
-      <div data-col="⚠목업(현재 절차 SVG · 컬럼은 수집됨) · patent_image.(scrape_site · key_name→S3) / custom.drawing_url / JP custom.figures" className="bg-white rounded-xl border border-neutral-150 shadow-card mb-2 shrink-0 overflow-hidden">
+      <div data-col="⚠목업(현재 절차 SVG) · custom.drawing_url (실데이터 있음) / patent_image.scrape_site+key_name (⚠데이터0) / JP custom.figures" className="bg-white rounded-xl border border-neutral-150 shadow-card mb-2 shrink-0 overflow-hidden">
         <div className="px-3 pt-2 flex items-center gap-2">
           {selected === 0 && <span className="text-xs2 font-semibold text-white bg-brand-400 rounded px-1.5 py-0.5 shrink-0">대표</span>}
           <span className="text-xs2 font-semibold text-gray-600 font-mono">{figLabel(selected)}</span>
@@ -714,7 +719,7 @@ function DrawingsPanel({ figures }: { figures?: { imageKey?: string }[] }) {
       </div>
 
       {/* 대표도면 */}
-      <div data-col="⚠목업(컬럼은 수집됨) · custom.primary_drawing_url (KR·CN)" className="text-xs2 font-semibold text-gray-500 mt-2 mb-1.5">대표도면</div>
+      <div data-col="⚠목업 · custom.primary_drawing_url (KR·CN · 실데이터 있음)" className="text-xs2 font-semibold text-gray-500 mt-2 mb-1.5">대표도면</div>
       <button
         onClick={() => setSelected(0)}
         onDoubleClick={() => { setSelected(0); setZoom(true); }}

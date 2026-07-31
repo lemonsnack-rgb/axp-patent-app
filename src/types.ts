@@ -103,7 +103,9 @@ export interface PatentResult {
   cpc: string;
   rightStatus?: string;
   rightChange?: string;
-  trial?: string;
+  // 심판 — 수집 측에서 타입·상태·번호 3개 파라미터로 분리 수집된다(2026-07-31 확인).
+  // 명세서 PDF에는 custom.has_trial(Y/N)만 있어 컬럼명은 확인 필요.
+  trial?: { type: string; status: string; number: string };
   rejectionCount?: number;
   applicantStandard?: string;
   standardOrg?: string;

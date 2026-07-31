@@ -302,7 +302,10 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
     status === '취소' ? '취소' :
     status === '각하' ? '각하' :
     '공개';
-  const trial = seq % 9 === 0 ? `무효심판 계속 중 (${year}당${pad(seq, 4)})` : '심판 없음';
+  // 심판 — 타입·상태·번호 3개 파라미터. 없으면 undefined(블록 미표시).
+  const trial = seq % 9 === 0
+    ? { type: '무효심판', status: '계속 중', number: `${year}당${pad(seq, 4)}` }
+    : undefined;
 
   return {
     number: nums.number, country: cc, status,

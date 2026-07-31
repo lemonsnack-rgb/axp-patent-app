@@ -84,8 +84,8 @@ function applyFacetFilters(items: PatentResult[], filters: AppliedFilter[]): Pat
         }
         case 'trial':
           return f.label === '있음'
-            ? !(p.trial?.includes('없음') ?? true)
-            : (p.trial?.includes('없음') ?? true);
+            ? !!p.trial
+            : !p.trial;
         default: return true;
       }
     })
