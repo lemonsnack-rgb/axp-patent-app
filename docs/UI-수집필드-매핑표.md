@@ -10,6 +10,17 @@
   - *1차(2026-07-28 · 정방향)*: 화면 부착 컬럼 토큰 112개를 구버전 PDF와 기계 대조 → 없는 토큰 0건.
   - *2차(2026-07-31 · 역방향·조각 단위)*: 복합 값을 조각으로 분해해 조각마다 대응 컬럼 확인(§12). 축약 표기를 실제 컬럼명으로 교체.
   - *3차(2026-07-31 · 갱신본 대조)*: 문서의 `테이블.컬럼` 표기 **80건을 갱신본과 기계 대조 → 전건 존재 확인**. 단 **인용·피인용 계열은 테이블 자체가 교체**되어 아래와 같이 정정했다.
+- **수집 컬럼 열은 「조합식」으로 적는다** — 화면 값이 컬럼 하나가 아니면 **어떻게 조합·가공하는지**를 식으로 표기한다. 표기 규약:
+  | 기호 | 뜻 | 예 |
+  |---|---|---|
+  | `+` | 문자열 결합(리터럴은 따옴표) | `country_code + ' ' + literature_number` |
+  | `JOIN(list, '구분자')` | 다건(N행) 결합 | `JOIN(ipc.ipc_number, '  ·  ')` |
+  | `COALESCE(a, b, '—')` | 앞이 비면 뒤 값, 최종 폴백 `—` | `COALESCE(register_number, '—')` |
+  | `CASE … THEN … ELSE …` | 조건 분기 | `CASE country='JP' THEN … ELSE …` |
+  | `COUNT(*) GROUP BY x` | 집계 | `COUNT(*) GROUP BY family_country_code` |
+  | `+20년`, `→` | 날짜 계산 · 순서 배치 | `register_date + 20년` |
+  | `PARSE(x, 규칙)` | 텍스트 파싱(현재 미지원 = ⚠미수집) | `PARSE(specification, 섹션)` |
+  | `[N행]` | 목록을 N행으로 반복 렌더 | `[N행] change_date + name + change_type` |
 - **예시 열**: 「§0 예시 표본」의 목업 값을 그대로 인용한다. 기본은 **표본 A(KR/공개)** 이고, 국가·상태 조건 항목은 표본 기호(**B~E**)를 함께 표기한다.
 
 ### 갱신본에서 달라진 것 (구버전 기준 매핑 정정)
@@ -60,10 +71,10 @@
 
 | UI 항목 | 렌더 필드 | 예시 | 수집 컬럼 · 테이블 |
 |---|---|---|---|
-| 권리상태(평문) | `status` | `공개` (툴팁: `공개 — 출원이 공개된 상태(심사 전/중, 권리 미발생)`) | `bibliographic.register_status` (+ `custom.legal_status` 예 `발송처리완료 (Completion of Transmission)`) |
+| 권리상태(평문) | `status` | `공개` (툴팁: `공개 — 출원이 공개된 상태(심사 전/중, 권리 미발생)`) | `COALESCE(bibliographic.register_status, custom.legal_status)` → 평문 라벨 매핑(툴팁 문구는 화면 상수) |
 | 국가 | `country` | `KR` | `bibliographic.country_code` |
-| 문헌번호 | `number` | `KR 10-2026-1000000 A` | `bibliographic.literature_number` (갱신본 예시 `1020190002417_PUB`) |
-| 발명의 명칭 | `title` | `자율주행 차량용 라이다 기반 객체 감지` · **D**: `LiDAR-Based Object Detection for Autonomous Driving (Method)` | `bibliographic.invention_title` (영문 `kpa_bibliographic.english_invention_name`) |
+| 문헌번호 | `number` | `KR 10-2026-1000000 A` | `bibliographic.country_code + ' ' + bibliographic.literature_number` — 갱신본 `literature_number`엔 국가 접두가 없다(예 `1020190002417_PUB`) |
+| 발명의 명칭 | `title` | `자율주행 차량용 라이다 기반 객체 감지` · **D**: `LiDAR-Based Object Detection for Autonomous Driving (Method)` | `CASE 원문언어=영문 THEN kpa_bibliographic.english_invention_name ELSE bibliographic.invention_title` |
 | 원문 PDF 다운로드 | (버튼) | `원문 PDF 다운로드` → `KR 10-2026-1000000 A.pdf` 저장(현재 데모 표지 1p) | `specification.specification` 이 **KIPRIS PDF URL** 인 경우 그 URL(= `specification_extract_ticket.pdf_url`) · `⚠확인 필요`(공보 원문 PDF와 동일본인지) |
 
 **목업 렌더 (표본 A)**
@@ -83,25 +94,25 @@
 | 문헌번호 / 문헌일 | `number` / `publicationDate` | `KR 10-2026-1000000 A` / `2026-04-06` | `bibliographic.literature_number` / `open_date` |
 | 출원번호 / 출원일 | `applicationNo` / `applicationDate` | `10-2025-1000000` / `2025-01-01` | `bibliographic.application_number` / `application_date` |
 | 공개·공고번호 / 공개·공고일 | `publicationNo` / `publicationDate` | `10-2026-1000000 A` / `2026-04-06` | `bibliographic.open_number` · `publication_number` / `publication_date` |
-| 등록번호 / 등록일 | `registerNo` / `registerDate` | A: `—` / `—` · **B**: `CN 1010299973 B` / `2017-10-05` | `bibliographic.register_number` / `register_date` · 조건(등록계) |
-| 문헌종류 | `(status 파생)` | `공개특허공보` · **B**: `등록특허공보` | `bibliographic.document_kind` (현재 화면은 권리상태에서 파생) |
+| 등록번호 / 등록일 | `registerNo` / `registerDate` | A: `—` / `—` · **B**: `CN 1010299973 B` / `2017-10-05` | `COALESCE(bibliographic.register_number, '—')` / `COALESCE(bibliographic.register_date, '—')` · 조건(등록계) |
+| 문헌종류 | `(status 파생)` | `공개특허공보` · **B**: `등록특허공보` | `COALESCE(bibliographic.document_kind, CASE register_status IN ('등록','소멸') THEN '등록특허공보' ELSE '공개특허공보')` — 현재 화면은 후자(파생)만 사용 |
 | 권리상태 | `rightStatus` | `공개` · **B**: `존속 중` · **D**: `심사 중` · **E**: `등록결정(등록료 납부 전)` | `bibliographic.register_status` (+ `custom.legal_status` · 이력 `legal_status_history`·`register_status_history`) |
 | 원출원번호 | `originalAppNo` | A: `—` · **B**: `20161010000099` | `bibliographic.original_application_number` · 조건(분할·변경) |
 | 국제출원번호 | `intlAppNo` | A: `—` · **C**: `PCT/EP2013/050052` | `bibliographic.international_application_number` · 조건(PCT/국제) |
 | 우선권주장일 | `priorityDate` | `2024-01-01` | `priority.priority_application_date` · 조건 |
 | 심사청구일 | `examRequestDate` | `2025-02-03` | `bibliographic.original_examination_request_date` |
-| 존속기간(예상)만료일 | `expirationDate` | A: `—` · **B**: `2036-04-07` | `⚠파생` — 등록일 + 20년. **연장 시 `term_extension`(신규) 반영 필요** |
+| 존속기간(예상)만료일 | `expirationDate` | A: `—` · **B**: `2036-04-07` | `⚠파생` = `bibliographic.register_date + 20년` (연장 있으면 `+ term_extension` 반영) |
 | 권리변동(유무) | `rightChange` | `있음 (권리 양도)` · **D**: `없음` | `custom.has_ownership_change` |
 | 최종처분상태 | `finalDisposal` | `출원공개` · **B**: `설정등록` · **C**: `거절결정` · **D**: `심사청구` · **E**: `등록결정` | `bibliographic.final_disposal` (상세는 신규 `examination_notice`·`rejection_decision`) |
-| 청구항 수 | `claimCount` | `10개` | `bibliographic.claim_count` (KR 보강 `kpa_bibliographic.claim_count`) |
+| 청구항 수 | `claimCount` | `10개` | `COALESCE(bibliographic.claim_count, kpa_bibliographic.claim_count) + '개'` |
 | 출원구분 | `applicationFlag` | `정상출원` · **B**: `분할출원` · **C**: `PCT 국내단계진입` | `bibliographic.application_flag` |
 | 번역문 제출일 | `translationSubmitDate` | A(KR): `—` · **D**: `2023-04-02` | `bibliographic.translation_submit_date` · 조건(외국어) |
-| 도면 수 | `drawingCount` | `6건` | `kpa_bibliographic.drawing_count` |
+| 도면 수 | `drawingCount` | `6건` | `kpa_bibliographic.drawing_count + '건'` |
 | 실시권 등록일 | `licenseRegDate` | A: `—` · 등록계 일부: `2018-06-06` | `custom.license_registration_date` · 조건 |
-| 지정국 | `designatedCountries` | A: `—` · **C**: `DE, FR, GB, IT, NL` | `designated_country.designated_country`(KR) · EP `dsgn.national_name` · 조건 |
-| 서열목록 | `sequenceListing` | A: `있음` · B~E: 행 미표시 | `custom.sequence_listing_yn` (내용 `sequence_listing_content` · 신규 `sequence_listing` 테이블) · 조건 |
-| 우선권 주장(목록) | `priorityList` | A: 블록 미표시 · **C**: `EP 20000068 · 2012-05-05` | `priority.priority_application_country_code` · `priority_application_number` · `priority_application_date` (JP `prir`) · 조건 · 조각별 §12 |
-| 타임라인 | `(timeline 파생)` | 아래 블록 참조 | `⚠파생` — 위 일자 컬럼 조합 |
+| 지정국 | `designatedCountries` | A: `—` · **C**: `DE, FR, GB, IT, NL` | `JOIN(designated_country.designated_country, ', ')` · EP는 `JOIN(dsgn.national_name, ', ')` · 조건 |
+| 서열목록 | `sequenceListing` | A: `있음` · B~E: 행 미표시 | `CASE custom.sequence_listing_yn='Y' THEN '있음' ELSE '—'` (내용 `sequence_listing_content` · 신규 `sequence_listing`) · 조건 |
+| 우선권 주장(목록) | `priorityList` | A: 블록 미표시 · **C**: `EP 20000068 · 2012-05-05` | `[N행] priority.priority_application_country_code + ' ' + priority_application_number + ' · ' + priority_application_date` (JP `prir`) · 조건 |
+| 타임라인 | `(timeline 파생)` | 아래 블록 참조 | `⚠파생` = `priority_application_date → application_date → original_examination_request_date → COALESCE(open_date, publication_date) → register_date → (register_date + 20년)` · 소멸이면 마지막이 소멸일 |
 
 **목업 렌더 (표본 A — KR/공개)** · 2열(라벨-값) × 2쌍 테이블
 
@@ -159,12 +170,12 @@
 
 | UI 항목 | 렌더 필드 | 예시 (A / 조건 표본) | 수집 컬럼 · 테이블 |
 |---|---|---|---|
-| 출원인 / 출원인 주소 | `applicant` / `applicantAddress` | `현대자동차주식회사` / `서울특별시 강남구 테헤란로 152` · **D**: `Waymo LLC` | `related_person[APPLICANT].name` / `.address` |
-| 특허고객번호(KR) · 출원인식별기호(JP) | `applicantCode` | A: `특허고객번호 (KR)` → `120000000000` · **E**: `출원인식별기호 (JP)` → `120000015838` | `representative_applicant.patent_customer_number` / `custom.applicant_identifier`(예 `119980045708`) · 조건(국가) |
+| 출원인 / 출원인 주소 | `applicant` / `applicantAddress` | `현대자동차주식회사` / `서울특별시 강남구 테헤란로 152` · **D**: `Waymo LLC` | `JOIN(related_person[classification=APPLICANT].name, ', ')` / 대표 1행의 `.address` |
+| 특허고객번호(KR) · 출원인식별기호(JP) | `applicantCode` | A: `특허고객번호 (KR)` → `120000000000` · **E**: `출원인식별기호 (JP)` → `120000015838` | `CASE country='JP' THEN custom.applicant_identifier ELSE representative_applicant.patent_customer_number` (라벨도 같은 분기) |
 | 대표출원인 | `repApplicant` | `현대자동차주식회사` | `representative_applicant.representative_applicant_name` (명칭 변동 이력 `applicant_name_change`) |
-| 발명자 / 발명자 주소 | `inventors` / `inventorAddress` | `김OO, 이OO` / `서울특별시 서초구 서초대로 396`(회색) · **D**: `A. Researcher, B. Engineer` | `related_person[INVENTOR].name` / `.address` |
+| 발명자 / 발명자 주소 | `inventors` / `inventorAddress` | `김OO, 이OO` / `서울특별시 서초구 서초대로 396`(회색) · **D**: `A. Researcher, B. Engineer` | `JOIN(related_person[classification=INVENTOR].name, ', ')` / 대표 1행의 `.address` |
 | 대리인 | `agent` | `특허법인 다래` · **D**: `Wilson Sonsini Goodrich & Rosati` (주소는 「기타정보」) | `related_person[AGENT].name` |
-| 심사관 | `examiner` | `박심사` · **D**: `J. Smith` | `related_person[EXAMINER].name` 또는 `custom.examiners`(예 `남기영`) |
+| 심사관 | `examiner` | `박심사` · **D**: `J. Smith` | `COALESCE(JOIN(related_person[classification=EXAMINER].name, ', '), custom.examiners)` |
 | (UI 미노출) 현재권리자 | — | — | 신규 `final_right_holder`(등록원부 최종권리자) · `custom.current_assignees_country` |
 
 **목업 렌더 (표본 A)** · 1열(라벨-값) 테이블
@@ -192,7 +203,7 @@
 | 상세설명 | `description` | `[기술분야] 【0001】 본 발명은 … 【0023】` 원문 전문 | `specification.specification` (longtext 단일). **값이 KIPRIS PDF URL 인 경우가 있고**, `specification_extract_ticket`(service·pdf_url·ticket_key·status)이 전문 텍스트로 치환 |
 | ~~상세설명 하위섹션~~(기술분야·배경기술·해결하려는 과제·과제의 해결 수단·발명의 효과·도면의 설명) | (제거) | (표시하지 않음) | **⚠미수집** — `specification` 은 단일 컬럼이고 섹션별 컬럼이 없다. 2026-07-31 **UI에서 제거 확정** |
 | 청구범위(전체) | `claims` | 10개 항 — 독립항 2개(제1·8항)·종속항 8개 | `claim.claim` (mediumtext 단일) · 변동 이력 `claim_revision`·`claim_revision_detail`(신규) |
-| 독립항/종속항 구조 · 인용 관계 | `claims[].dependsOn` | `독립항 — 제1항` / `종속항 (제2항 → 제1항 인용)` | `⚠파생` — `claim` 원문의 `제N항`·`제N항에 있어서` 패턴 분해(대표항 번호 `kpa_bibliographic.representation_claim_number`). 2026-07-31 **유지 확정** |
+| 독립항/종속항 구조 · 인용 관계 | `claims[].dependsOn` | `독립항 — 제1항` / `종속항 (제2항 → 제1항 인용)` | `⚠파생` = `PARSE(claim.claim, '제N항' 분할 + '제M항에 있어서' → 인용관계)` · 대표항 = `kpa_bibliographic.representation_claim_number`. 2026-07-31 **유지 확정** |
 
 **목업 렌더 — 상세설명 (표본 A)** · 회색 박스에 원문 1블록
 
@@ -230,8 +241,8 @@
 
 | UI 항목 | 렌더 필드 | 예시 | 수집 컬럼 · 테이블 |
 |---|---|---|---|
-| 국가별 건수(탭 + 알약) | `family` | A(1건): 탭 `전체(1) KR(1)` · **B**(4건): `전체(4) KR(1) US(1) JP(1) CN(1)` | `custom.family_document_count` · `family_country_count` (⚠국가별 건수는 `family` 국가 집계로 대체 필요) |
-| 패밀리 문헌(국가·번호·일자·명칭) | `familyList` | A: `KR  KR 10-2026-1000000 A  2026-01-03  자율주행 차량용 라이다 기반 객체 감지` · **B**: 4건 | `family.family_country_code` · `family_literature_number` · `application_date` · `invention_title` · 조각별 §12 |
+| 국가별 건수(탭 + 알약) | `family` | A(1건): 탭 `전체(1) KR(1)` · **B**(4건): `전체(4) KR(1) US(1) JP(1) CN(1)` | 전체 = `custom.family_document_count` · 국가별 = `COUNT(*) GROUP BY family.family_country_code` → `family_country_code + '(' + N + ')'` (현재 화면은 총건수 기계 배분 = ⚠파생) |
+| 패밀리 문헌(국가·번호·일자·명칭) | `familyList` | A: `KR  KR 10-2026-1000000 A  2026-01-03  자율주행 차량용 라이다 기반 객체 감지` · **B**: 4건 | `[N행] family.family_country_code + ' ' + family_literature_number + ' ' + application_date + ' ' + invention_title` |
 | (UI 미노출) 패밀리 상세 | — | — | `family.family_category` · `family_identification` · `family_country` · `open_number`/`open_date` · `register_number`/`register_date` · `publication_number`/`publication_date` |
 
 **목업 렌더 (표본 B — CN/등록, 패밀리 4건)**
@@ -255,7 +266,7 @@
 |---|---|---|---|
 | 인용(backward) — 특허 | `citingList` | `KR  10-2023-1004513 · 김OO · 2023-02-03` | **`citation`** — `std_citation_country_code`(국가명 `std_citation_country_name`) · `std_citation_number` · `original_citation_number`(원문 표기, 예 `유럽특허공개공보0082977`) · `std_citation_publication_date` · `std_citation_identification_code` · `citation_type_code`/`citation_type_name` |
 | 피인용(forward) — 특허 | `citedList` | `KR  10-2023-1040617 · 박OO · 2023-05-09` | **`prior_technology_document`** — `prior_technology_document_number`(**피인용 문헌의 출원번호**) · `prior_technology_document_country` · `std_status_code`/`std_status_name` · `citation_type_code`/`citation_type_name`. ⚠테이블명은 "선행기술문헌"이지만 **데이터는 피인용** |
-| 비특허(논문) 인용 | `citingList`(kind=npl) | `[NPL] LiDAR-Based Object Detection for Autonomous Driving: A Review, IEEE/Elsevier, 2025` | **`paper_citation`** — `paper_title`(인용논문명) · `paper_author` · `paper_journal` · `paper_year` · `citation_type_code` · `citation_serial` |
+| 비특허(논문) 인용 | `citingList`(kind=npl) | `[NPL] LiDAR-Based Object Detection for Autonomous Driving: A Review, IEEE/Elsevier, 2025` | `[N행] '[NPL] ' + paper_citation.paper_title + ', ' + COALESCE(paper_journal, '') + ', ' + paper_year` (저자 `paper_author` 병기 여부는 화면 결정 · `[NPL]`은 화면 라벨) |
 | ~~인용문헌 명칭(특허)~~ | (제거) | (표시하지 않음) | **⚠미수집** — `citation`·`kpa_citation`·`ctltr` 모두 명칭 컬럼 없음. 2026-07-31 UI에서 제거 확정 |
 | 인용문헌 발명자명 | `citingList[].inventor` | `김OO` | US·JP `ctltr.inventor_name` · KR `kpa_citation.citation_literature_inventor_name`(⚠데이터0) — **KR `citation` 에는 발명자 컬럼 없음** |
 | (참고) 구버전 인용 테이블 | — | — | `kpa_citation`(KR) **⚠데이터0** · US·JP `ctltr`(`registration_number`·`inventor_name`·`registration_date`·`kind`·`upc`) · `ctltr_etc.other_citations` |
@@ -289,8 +300,8 @@
 
 | UI 항목 | 렌더 필드 | 예시 (A / 조건 표본) | 수집 컬럼 · 테이블 |
 |---|---|---|---|
-| IPC | `ipc` / `ipcList` | `G01S 17/93  ·  G01S10/10  ·  H04L 9/10` | `ipc.ipc_number` · KR 보강 `kpa_ipc.ipc_code`(+`ipc_version`·`patent_classification_code`) |
-| CPC | `cpc` / `cpcList` | A: `G06V 20/56  ·  G06V2200/10` · **E**(JP): `—` | `cpc.cpc_code` · JP·EP `custom.cpc_code` |
+| IPC | `ipc` / `ipcList` | `G01S 17/93  ·  G01S10/10  ·  H04L 9/10` | `JOIN(COALESCE(ipc.ipc_number, kpa_ipc.ipc_code), '  ·  ')` (버전 `kpa_ipc.ipc_version`) |
+| CPC | `cpc` / `cpcList` | A: `G06V 20/56  ·  G06V2200/10` · **E**(JP): `—` | `COALESCE(JOIN(cpc.cpc_code, '  ·  '), custom.cpc_code, '—')` |
 | FI / F-term / 테마 | `countryClassifications` | **E**: `FI G01S,302` / `F-term 5B002AA2` / `테마 5B002` | JP `fi.fi_code` / `fterm.fterm_code` / `tema.tema_code` · 조건(JP) |
 | UPC | `countryClassifications` | **D**: `UPC 301/101` | US `upc.upc_code` · 조건(US) |
 | EPC | `countryClassifications` | **C**: `EPC G01S14/04` | EP `epc.epc_code` · 조건(EP) |
@@ -311,14 +322,14 @@ F-term    5B002AA2
 | UI 항목 | 렌더 필드 | 예시 (표본) | 수집 컬럼 · 테이블 |
 |---|---|---|---|
 | 대리인 주소 | `agentAddress` | A: `서울특별시 강남구 테헤란로 152` · **D**: `650 Page Mill Rd, Palo Alto, CA` | `related_person[AGENT].address` |
-| 권리변동 이력 | `rightChangeList` | **B**: `2018-04-04 │ 百度… → OO기술지주(주) │ 권리 양도` | `right_change.change_date` · `name` · `change_type`(현재권리자/양도인/양수인/전용실시권자) · `code` · 조건 |
+| 권리변동 이력 | `rightChangeList` | **B**: `2018-04-04 │ 百度… → OO기술지주(주) │ 권리 양도` | `[N행] right_change.change_date + ' │ ' + name + ' │ ' + change_type`(현재권리자/양도인/양수인/전용실시권자) · 조건 |
 | 권리이전 이력 | `rightTransferList` | **B**: `2018-04-04 │ 권리이전등록신청서 (百度… → OO기술지주(주)) │ CN 1010299973 B` | `right_transfer.registration_date` · `document_name` · `change_before_content` · `change_after_content` · `registration_number`(+`information_change_cause`·`receipt_number`) · 조건 |
-| 행정처리(수발신) 이력 | `adminProcess` | A: `2025-01-01 출원서 수리` · **B**: 3건 | `administrative_process.receipt_send_date` · `receipt_send_document_name`(+`_eng`) · `proc_status`(+`proc_status_en`) · **`step`**(단계, 예 `출원`) · **`trial_number`**(심판번호 브릿지) · 조건 |
-| 국가 R&D 정보 | `rnd` | A: `자율주행 … 원천기술 개발 (2025-000000)` / `산업통상자원부 · 차세대 핵심기술개발사업 · 현대자동차주식회사 · 2024.03 ~ 2026.02` | `rnd.rnd_task_name` · `rnd_task_number` · `rnd_department_name` · `rnd_project_name` · `rnd_managing_institute_name` · `rnd_duration` · 조건(KR) · 조각별 §12 |
+| 행정처리(수발신) 이력 | `adminProcess` | A: `2025-01-01 출원서 수리` · **B**: 3건 | `[N행] administrative_process.receipt_send_date + ' ' + receipt_send_document_name + ' ' + proc_status` (영문 `_eng`/`proc_status_en` · 부가 `step`·`trial_number` 브릿지) · 조건 |
+| 국가 R&D 정보 | `rnd` | A: `자율주행 … 원천기술 개발 (2025-000000)` / `산업통상자원부 · 차세대 핵심기술개발사업 · 현대자동차주식회사 · 2024.03 ~ 2026.02` | `[N행]` 1행 = `rnd.rnd_task_name + ' (' + rnd_task_number + ')'` · 2행 = `rnd_department_name + ' · ' + rnd_project_name + ' · ' + rnd_managing_institute_name + ' · ' + rnd_duration` · 조건(KR) |
 | 표준특허 | `standard` | A: `3GPP` / `TS 38.300` / `자율주행 … 표준` / `현대자동차주식회사` / `2026-01-01` | `standard.standardization_organization` · `standard_numbers` · `standard_technology_name` · `standard_declarants` · `standard_declaration_date`(+`standards_information`·`standard_declarant_nationalities`) · **⚠데이터0**(명세서: "적재 골격만", US는 소스에 선언 정보 없음) |
 | 심판 정보 | `trial.type` / `.status` / `.number` | A: `무효심판` / `계속 중` / `2026당0000` (3행) · B~E: 블록 미표시 | **`trial.trial_type`**(심판종류, 예 `거절결정불복`) · **`trial.trial_status`**(심판상태, 예 `심결`) · **`trial.trial_number_text`**(심판번호문자, 예 `2008원2960`) · 자연키 `trial.trial_number`(예 `2008101002960`) · 유무 `custom.has_trial` |
-| 관련출원(US) | `usRelatedApps` | **D**: `US 9000013 │ 2021-02-02 │ Continuation │ Granted` | US `rel_appl.registration_number` · `registration_date` · `classification` · `status` · 조건(US) |
-| 가출원 번호(US) | `usProvisional` | **D**: `US 2021/600007` | US `custom.provisional_application_numbers` · 조건(US) |
+| 관련출원(US) | `usRelatedApps` | **D**: `US 9000013 │ 2021-02-02 │ Continuation │ Granted` | `[N행] rel_appl.registration_number + ' │ ' + registration_date + ' │ ' + classification + ' │ ' + status` · 조건(US) |
+| 가출원 번호(US) | `usProvisional` | **D**: `US 2021/600007` | `JOIN(custom.provisional_application_numbers, ', ')` · 조건(US) |
 | 공보판(JP) / 대리인 구분(JP) | `jpEdition` / `agentCategory` | **E**: `공개특허공보(A)` / `弁理士` | JP `custom.edition` / `agent_category` · 조건(JP) |
 | 출원인 정리번호(EP) / 출원·공개 언어(EP) | `epFileRef` / `epFilingLanguage` | **C**: `P000068EP` / `en` | EP `custom.applicant_file_reference` / `filing_language` · 조건(EP) |
 | (UI 미노출) 심판 상세 | — | — | `trial.instance_category`(심급) · `right_type` · `request_date` · `case_display` · `request_purport` · `decision_order`(심결주문) · `decision_date` · `confirm_status`/`confirm_result`/`confirm_date`/`confirm_order_content` · `sub_code` · `merged_trial_number` · `original_trial_number` · `appeal_yn`/`supreme_appeal_yn` |
@@ -377,7 +388,7 @@ F-term    5B002AA2
 |---|---|---|---|
 | 도면 이미지 | `figures` | `도면 (6)` — 현재 이미지는 임시 생성 도식(4종 순환) | `custom.drawing_url`(도면 링크 · **실데이터 있음**) · `patent_image.scrape_site`+`key_name`(→S3, **⚠데이터0**) · JP `custom.figures` · `⚠목업` |
 | 대표도면 | `figures[0]` | `대표` 배지 + 첫 도면 | `custom.primary_drawing_url`(**실데이터 있음**) · `⚠목업` |
-| 도면 라벨 | `(index 파생)` | `FIG 1` … `FIG 6` | `⚠파생` — 이미지 **순번으로 화면 생성**(2026-07-31 확정) |
+| 도면 라벨 | `(index 파생)` | `FIG 1` … `FIG 6` | `⚠파생` = `'FIG ' + (이미지 순번 + 1)` — 화면 생성(2026-07-31 확정) |
 | ~~도면 캡션~~ · ~~부호의 설명~~ | (제거) | (표시하지 않음) | **⚠미수집** — `specification` 파싱 필요. 2026-07-31 UI에서 제거 확정 |
 | (UI 미노출) 도면 부가 | — | — | `kpa_bibliographic.drawing_area_count`(도면 영역 수) · `representation_image_source_status_code`(대표도면 출처 상태) |
 
