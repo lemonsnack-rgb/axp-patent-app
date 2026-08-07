@@ -156,7 +156,7 @@ function pad(n: number, len: number): string { return String(n).padStart(len, '0
 function docNumber(cc: string, year: number, seq: number): { number: string; pubNo: string; appNo: string; regNo: string } {
   const s7 = pad(1000000 + seq * 13457, 7).slice(-7);
   switch (cc) {
-    case 'KR': return { number: `KR 10-${year}-${s7} A`, pubNo: `10-${year}-${s7} A`, appNo: `10-${year - 1}-${s7}`, regNo: `10-${pad(2500000 + seq * 311, 7)}` };
+    case 'KR': return { number: `KR 10-${year}-${s7} A`, pubNo: `10-${year}-${s7}`, appNo: `10-${year - 1}-${s7}`, regNo: `10-${pad(2500000 + seq * 311, 7)}` };
     case 'US': return { number: `US 1${pad(1000000 + seq * 7919, 7).slice(-7)} B2`, pubNo: `US ${year}/${pad(98000 + seq, 7).slice(-7)} A1`, appNo: `1${pad(7000000 + seq * 521, 7).slice(-7)}`, regNo: `US 1${pad(1000000 + seq * 7919, 7).slice(-7)} B2` };
     case 'JP': return { number: `JP ${year}-${pad(10000 + seq * 37, 6)} A`, pubNo: `특개${year}-${pad(10000 + seq * 37, 6)}`, appNo: `특원${year - 1}-${pad(90000 + seq * 53, 6)}`, regNo: `특허${pad(6000000 + seq * 211, 7)}` };
     case 'CN': return { number: `CN 1${pad(10000000 + seq * 99991, 9).slice(-9)} A`, pubNo: `CN 1${pad(10000000 + seq * 99991, 9).slice(-9)} A`, appNo: `${year - 1}1${pad(10000000 + seq * 33, 9).slice(-9)}`, regNo: `CN 1${pad(10000000 + seq * 99991, 9).slice(-9)} B` };
@@ -312,9 +312,11 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
   const nums = docNumber(cc, year, seq);
   const isReg = status === '등록' || status === '소멸';
   const appDate = mkDate(year - 1, seq, seq * 2);
-  const pubDate = mkDate(year, seq + 3, seq + 5);
   // 등록 필드는 상태상 존재하는 경우에만(공개·심사중·거절은 미등록 → '-')
   const regDate = isReg ? mkDate(year, seq + 6, seq + 1) : '-';
+  // publicationDate 는 '공고일'이다 — 공고는 등록 이후에 난다(실데이터 985+314건 전건 그렇다).
+  // 미등록 문헌에는 공고일이 없다.
+  const pubDate = isReg ? mkDate(year + 1, seq + 1, seq + 2) : '';
   const exp = isReg ? `${year - 1 + 20}-${appDate.slice(5)}` : '-';
   // device명과 중복되지 않는 자연스러운 접미 (slot 0은 접미 없음)
   const titleSuffix = ['', ' 및 그 동작 방법', ' 및 제어 방법', ' 및 그 제조 방법', '를 포함하는 시스템'][slot % 5];
