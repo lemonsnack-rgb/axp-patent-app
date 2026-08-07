@@ -7,6 +7,10 @@
 export const DOC_KIND_LABEL: Record<string, string> = {
   B1: '등록특허공보',
   Y1: '등록실용신안공보',
+  // 공개계 — 현재 적재분(등록계 1,804건)에서는 관측되지 않았다.
+  // 코드 자체는 표준이라 목업에는 반영하되, 구현 시에는 공개 문헌 적재 후 실제 코드값을 확인하고 넣는다.
+  A: '공개특허공보',
+  U: '공개실용신안공보',
 };
 
 export function docKindLabel(code?: string): string | undefined {
@@ -55,12 +59,22 @@ export function pubRows(pubNo?: string, pubDate?: string, openDate?: string, reg
   // publication_date 가 공고일도 국제공개일도 아니면 공개일이다(원본 open_date 결손 보완)
   const openDateVal = od || (!bulletin && !isWo && pd ? pd : '');
 
-  const rows: BibRowTuple[] = [
-    ['공개번호', isOpenNo ? no : '', '공개일', openDateVal],
-    ['국제공개번호', isWo ? no : '', '국제공개일', isWo ? pd : ''],
-    ['공고번호', isRegNo ? no : '', '공고일', bulletin ? pd : ''],
+  // 계열별로 '있는 값'만 모아 왼쪽부터 채운다 — 빈 칸이 앞에 오면 오류처럼 보인다.
+  const series: [string, string][][] = [
+    [['공개번호', isOpenNo ? no : ''], ['공개일', openDateVal]],
+    [['국제공개번호', isWo ? no : ''], ['국제공개일', isWo ? pd : '']],
+    [['공고번호', isRegNo ? no : ''], ['공고일', bulletin ? pd : '']],
   ];
-  return rows.filter(([, v, , v2]) => v || v2);   // 좌우 모두 비면 행 자체를 만들지 않는다
+
+  const rows: BibRowTuple[] = [];
+  for (const pairs of series) {
+    const filled = pairs.filter(([, v]) => v);
+    if (!filled.length) continue;                                  // 계열 자체가 없으면 행도 없다
+    const [l1, v1] = filled[0];
+    const [l2, v2] = filled[1] ?? ['', ''];
+    rows.push([l1, v1, l2, v2]);
+  }
+  return rows;
 }
 
 // 문헌번호에서 국가 접두 제거 — 국가는 배지로 따로 표시하므로 번호에 중복 노출하지 않는다.
