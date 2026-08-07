@@ -584,8 +584,8 @@ export function PaperInlineDetail({
                 </div>
               ) : '-'}
             </MetaRow>
-            <MetaRow label="초록" block>{paper.abstract || '-'}</MetaRow>
-            <MetaRow label="영문초록" block>{paper.abstractEn || '-'}</MetaRow>
+            <MetaRow label="초록" block clamp2>{paper.abstract || '-'}</MetaRow>
+            <MetaRow label="영문초록" block clamp2>{paper.abstractEn || '-'}</MetaRow>
           </dl>
         </div>
       </div>
@@ -698,8 +698,8 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
                     </div>
                   ) : '-'}
                 </MetaRow>
-                <MetaRow label="초록" block>{paper.abstract || '-'}</MetaRow>
-                <MetaRow label="영문초록" block>{paper.abstractEn || '-'}</MetaRow>
+                <MetaRow label="초록" block clamp2>{paper.abstract || '-'}</MetaRow>
+                <MetaRow label="영문초록" block clamp2>{paper.abstractEn || '-'}</MetaRow>
               </dl>
             </div>
           </div>
@@ -749,13 +749,17 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
 }
 
 // ── 레이블:값 행 (OpenAlex 방식 — 레이블과 값을 명시적으로 구분) ──
-function MetaRow({ label, children, block }: { label: string; children: React.ReactNode; block?: boolean }) {
+function MetaRow({ label, children, block, clamp2 }: { label: string; children: React.ReactNode; block?: boolean; clamp2?: boolean }) {
   // block=true: 장문(초록 등) — 레이블 위, 값은 전체 폭
+  // clamp2=true: 저작권 보호 — 2줄까지만 노출
   if (block) {
     return (
       <div className="py-3.5">
-        <dt className="text-sm2 font-medium text-gray-400 mb-1.5">{label}</dt>
-        <dd className="text-base2 text-gray-900 leading-relaxed whitespace-pre-line">{children}</dd>
+        <dt className="text-sm2 font-medium text-gray-400 mb-1.5">
+          {label}
+          {clamp2 && <span className="ml-2 text-xs2 font-normal text-gray-400">저작권 보호를 위해 2줄까지만 표시</span>}
+        </dt>
+        <dd className={`text-base2 text-gray-900 leading-relaxed whitespace-pre-line${clamp2 ? ' line-clamp-2' : ''}`}>{children}</dd>
       </div>
     );
   }
