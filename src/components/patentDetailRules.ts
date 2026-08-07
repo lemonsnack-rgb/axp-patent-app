@@ -27,10 +27,13 @@ export function pubSeriesLabel(no?: string): string {
   return '공개번호';
 }
 
+const isYmd = (s?: string): boolean => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
+
 // 공고는 등록 이후에 나온다 → 이 조건을 통과해야만 publication_date 를 '공고일'로 쓸 수 있다.
 //   실데이터에서 조건을 깨는 값이 115건 있다: WO 국제공개 113건(값은 국제공개일) + 실용신안 2건(값은 공개일).
+//   등록일이 없거나 '-'·'—' 같은 자리표시자면 비교하지 않는다(문자열 비교가 잘못 통과한다).
 export const isBulletinDate = (pubDate?: string, regDate?: string): boolean =>
-  !!(pubDate && regDate && pubDate >= regDate);
+  isYmd(pubDate) && isYmd(regDate) && (pubDate as string) >= (regDate as string);
 
 // 공개/공고 4칸 배치 — 번호 형식 + 일자 논리를 함께 보고 라벨·값을 정한다.
 //   반환: { 공고일칸: [라벨, 값], 번호행: [라벨, 번호, 일자라벨, 일자] | null }

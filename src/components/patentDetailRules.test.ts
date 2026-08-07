@@ -114,3 +114,17 @@ test('isBulletinDate: 공고일은 등록일 이후여야 한다', () => {
   assert.equal(isBulletinDate('2011-11-24', '2024-02-05'), false);
   assert.equal(isBulletinDate(undefined, '2024-02-05'), false);
 });
+
+test('isBulletinDate: 등록일이 없거나 자리표시자면 공고일로 보지 않는다', () => {
+  // 미등록(공개 단계) 문헌 — '-'·'—' 와 문자열 비교하면 잘못 통과한다
+  assert.equal(isBulletinDate('2025-10-12', '-'), false);
+  assert.equal(isBulletinDate('2025-10-12', '—'), false);
+  assert.equal(isBulletinDate('2025-10-12', ''), false);
+  assert.equal(isBulletinDate('2025-10-12', undefined), false);
+});
+
+test('미등록 문헌: 공고일 대신 공개일을 보여준다', () => {
+  const r = pubSeries('US 2025/0098006 A1', '2025-10-12', '2024-03-09', '-');
+  assert.equal(r.headRight[0], '공개일');
+  assert.equal(r.headRight[1], '2024-03-09');
+});
