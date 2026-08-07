@@ -757,7 +757,7 @@ function MetaRow({ label, children, block, clamp2 }: { label: string; children: 
       <div className="py-3.5">
         <dt className="text-sm2 font-medium text-gray-400 mb-1.5">
           {label}
-          {clamp2 && <span className="ml-2 text-xs2 font-normal text-gray-400">저작권 보호를 위해 2줄까지만 표시</span>}
+          {clamp2 && <span className="ml-2 text-xs2 font-normal text-gray-400">초록은 미리보기만 가능합니다.</span>}
         </dt>
         <dd className={`text-base2 text-gray-900 leading-relaxed whitespace-pre-line${clamp2 ? ' line-clamp-2' : ''}`}>{children}</dd>
       </div>

@@ -81,7 +81,7 @@ export function LibraryDetailModal({ id, onClose, onReview }: { id: string | nul
             <div className="text-sm2 font-semibold text-gray-500 mb-1">
               요약
               {/* 논문 초록은 저작권 보호를 위해 2줄까지만 노출 (특허 요약은 공개공보라 전문 표시) */}
-              {it.type === 'paper' && <span className="ml-2 text-xs2 font-normal text-gray-400">저작권 보호를 위해 2줄까지만 표시</span>}
+              {it.type === 'paper' && <span className="ml-2 text-xs2 font-normal text-gray-400">초록은 미리보기만 가능합니다.</span>}
             </div>
             <div className={'bg-gray-50 p-3 rounded text-md2 text-gray-700 leading-relaxed' + (it.type === 'paper' ? ' line-clamp-2' : '')}>{it.abstract}</div>
           </div>
