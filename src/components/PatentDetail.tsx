@@ -8,7 +8,7 @@ import { Icon } from './Icon';
 import { SiteFooter } from './SiteFooter';
 import { CK_WORDMARK } from '../assets/ckLogo';
 import { getPatentStatusDesc } from '../utils/badgeUtils';
-import { docKindLabel, pubSeriesLabel, stripCountry, isDeletedClaim, familyCounts, rightChangeCell } from './patentDetailRules';
+import { docKindLabel, pubSeries, stripCountry, isDeletedClaim, familyCounts, dedupeFamily, rightChangeCell } from './patentDetailRules';
 import { parseKeywords } from '../features/search/mockMatch';
 import { Button } from '@muhayu/axp-ui';
 
@@ -52,8 +52,10 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
   // 관측 코드는 등록계 B1·Y1뿐. 공개계(A·U)는 미적재라 도메인 미확정 → 미관측 코드는 원값 노출.
   const docKind = docKindLabel(data.documentKind)
     ?? ((data.status === '등록' || data.status === '소멸') ? '등록특허공보' : '공개특허공보');
-  // 공개/공고 계열 — 번호 형식으로 라벨을 정한다(번호와 일자의 계열을 맞추기 위함)
-  const pubNoLabel = pubSeriesLabel(data.publicationNo);
+  // 공개/공고 계열 — 번호 형식 + 일자 논리(공고일은 등록일 이후)로 라벨·값을 정한다.
+  //   실데이터에 publication_date 가 공고일이 아닌 문헌이 115건 있다(WO 국제공개 113 + 실용신안 2).
+  //   docs/상세페이지-수정지시서-2차.md §1·§2
+  const pub = pubSeries(data.publicationNo, data.publicationDate, data.openDate, data.registerDate);
   // 권리변동(서지) — has_ownership_change 는 채움률 0% → 이력 배열 유무로 판정한다
   const rightChangeValue = rightChangeCell(data.rightChangeList);
 
@@ -123,11 +125,13 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
         <span data-col="COALESCE(bibliographic.register_status, custom.legal_status) → 평문 라벨" title={getPatentStatusDesc(data.status)} className="cursor-help font-semibold text-gray-700">{data.status}</span>
         <span className="text-gray-300">·</span>
         <span data-col="bibliographic.country_code" className="font-semibold text-gray-600">{data.country}</span>
-        <span data-col="bibliographic.country_code + ' ' + bibliographic.literature_number (갱신본 번호엔 국가 접두 없음)" className="font-mono text-md2 font-semibold text-gray-600">{data.number}</span>
+        <span data-col="REGEXP_REPLACE(bibliographic.literature_number, '^[A-Z]{2} ', '') — 국가는 왼쪽 배지로만 표시(중복 금지)" className="font-mono text-md2 font-semibold text-gray-600">{stripCountry(data.number)}</span>
       </div>
       <h2 data-col="CASE 원문언어=영문 THEN kpa_bibliographic.english_invention_name ELSE bibliographic.invention_title" className="text-2xl font-bold text-gray-800 leading-snug">{data.title}</h2>
       {/* 제목 하단 액션 링크 — 논문(원문 보기/본문 보기)과 동일 패턴 */}
-      <div data-col="⚠미정 · 원문 PDF URL 컬럼 확인 필요" className="flex flex-wrap items-center gap-2 mt-3">
+      {/* 원문 PDF — source_link 채움률 0%(미반입). 버튼 자리는 유지하고 값이 없으면 비활성·안내로 상태를 알린다.
+          (0% 필드를 숨기는 규칙은 서지 표의 '값 행'에만 적용한다. 액션 버튼은 기능 자리라 유지) */}
+      <div data-col="CASE WHEN source_link IS NULL THEN 비활성('원문 준비 중') ELSE source_link 링크 END" className="flex flex-wrap items-center gap-2 mt-3">
         <Button data-spec="PAT-DET-021" variant="filled" color="primary" size="sm" className="text-xs2 h-8" onClick={() => downloadPatentPdf(data)} title="특허 원문 PDF 다운로드">
           <Icon name="doc" size={12} /> 원문 PDF 다운로드
         </Button>
@@ -174,14 +178,18 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               <Section title="서지사항" icon="cal">
                 <table className="w-full text-md2">
                   <tbody>
-                    <BibRow k="문헌번호" v={stripCountry(data.number)} mono k2="공고일" v2={data.publicationDate || '—'}
+                    <BibRow k="문헌번호" v={stripCountry(data.number)} mono k2={pub.headRight[0]} v2={pub.headRight[1]} hideEmpty
                       col="REGEXP_REPLACE(bibliographic.literature_number, '^[A-Z]{2} ', '') — 국가는 배지로만"
-                      col2="bibliographic.publication_date" />
+                      col2="CASE WHEN publication_date >= register_date THEN '공고일'=publication_date ELSE '공개일'=open_date END" />
                     <BibRow k="출원번호" v={data.applicationNo} mono k2="출원일" v2={data.applicationDate || '—'}
                       col="bibliographic.application_number" col2="bibliographic.application_date" />
-                    {/* 공개 계열 — 번호가 없으면(공개 없이 등록, 21%) 행 자체를 숨긴다. 공개일도 27%는 없다. */}
-                    <BibRow k={pubNoLabel} v={data.publicationNo} mono k2="공개일" v2={data.openDate || ''} hideEmpty
-                      col="bibliographic.publication_number (라벨은 번호 형식으로 판정)" col2="bibliographic.open_date" />
+                    {/* 공개 계열 — 번호가 없으면(공개 없이 등록, 21%) 행 자체를 숨긴다.
+                        WO 국제공개는 짝 일자가 open_date 가 아니라 publication_date(국제공개일)다. */}
+                    {pub.numberRow && (
+                      <BibRow k={pub.numberRow[0]} v={pub.numberRow[1]} mono k2={pub.numberRow[2]} v2={pub.numberRow[3]} hideEmpty
+                        col="bibliographic.publication_number (라벨은 번호 형식으로 판정)"
+                        col2="공개계→open_date · 국제공개→publication_date(국제공개일)" />
+                    )}
                     <BibRow k="등록번호" v={data.registerNo && data.registerNo !== '-' ? data.registerNo : '—'} mono k2="등록일" v2={data.registerDate && data.registerDate !== '-' ? data.registerDate : '—'}
                       col="COALESCE(bibliographic.register_number, '—')" col2="COALESCE(bibliographic.register_date, '—')" />
                     <BibRow k="문헌종류" v={docKind} k2="권리상태" v2={data.rightStatus || '—'}
@@ -228,12 +236,13 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                   <tbody>
                     <InfoRow k="출원인" v={data.applicant || '—'} col="JOIN(related_person[classification=APPLICANT].name, ', ')" />
                     <InfoRow k="출원인 주소" v={data.applicantAddress || '—'} muted={!data.applicantAddress} col="related_person[APPLICANT].address" />
-                    <InfoRow k={data.country === 'JP' ? '출원인식별기호 (JP)' : '특허고객번호 (KR)'} v={data.applicantCode || '—'} mono col="CASE country='JP' THEN custom.applicant_identifier ELSE representative_applicant.patent_customer_number (라벨도 같은 분기)" />
+                    <InfoRow k={data.country === 'JP' ? '출원인식별기호 (JP)' : '특허고객번호 (KR)'} v={data.applicantCode || ''} mono hideEmpty col="CASE country='JP' THEN custom.applicant_identifier ELSE representative_applicant.patent_customer_number (라벨도 같은 분기)" />
                     <InfoRow k="대표출원인" v={data.repApplicant || '—'} muted={!data.repApplicant} col="representative_applicant.representative_applicant_name" />
                     <InfoRow k="발명자" v={data.inventors || '—'} col="JOIN(related_person[classification=INVENTOR].name, ', ')" />
-                    <InfoRow k="발명자 주소" v={data.inventorAddress || '(예시) 동일 — 출원인 주소'} muted col="related_person[INVENTOR].address" />
+                    {/* 발명자 주소 — 전원 주소가 같으면 주소 1줄만, 다르면 '이름 — 주소'를 사람마다 한 줄(실데이터 렌더 규칙) */}
+                    <InfoRow k="발명자 주소" v={data.inventorAddress || '(예시) 동일 — 출원인 주소'} muted col="CASE WHEN 전원 동일 THEN address ELSE [N행] name + ' — ' + address END (related_person[INVENTOR].address)" />
                     <InfoRow k="대리인" v={data.agent || '—'} muted={!data.agent} col="related_person[AGENT].name" />
-                    <InfoRow k="심사관" v={data.examiner || '—'} muted={!data.examiner} col="COALESCE(JOIN(related_person[classification=EXAMINER].name, ', '), custom.examiners)" />
+                    <InfoRow k="심사관" v={data.examiner || ''} hideEmpty col="COALESCE(JOIN(related_person[classification=EXAMINER].name, ', '), custom.examiners)" />
                   </tbody>
                 </table>
               </Section>
@@ -292,8 +301,11 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                     const all = data.claims && data.claims.length
                       ? data.claims
                       : [{ no: 1, text: data.repClaim }];
-                    // 삭제항 제외 — 본문이 '삭제'인 항은 권리가 없고 인용관계도 없어 독립항으로 오분류된다.
-                    // 서지 「청구항 수」(=삭제 제외 실질 수)와 목록 개수를 일치시키는 기준이기도 하다.
+                    // ⚠ 잠정(A안) — 삭제항 처리 방식은 **변리사 확인 후 확정**한다. 확정 전까지 개발 구현 보류.
+                    //    A안: 삭제항을 목록에서 빼고 「삭제된 청구항 N개」 접기로 알린다.
+                    //    B안: 「삭제」 라벨로 목록에 남기되 독립항 분류에서만 제외.  C안: 현행 유지.
+                    //    배경: 삭제항은 본문이 '삭제' 한 단어이고 인용관계가 없어 지금은 독립항으로 분류된다.
+                    //    docs/상세페이지-수정지시서.md §7
                     const claims = all.filter(c => !isDeletedClaim(c.text));
                     const deleted = all.filter(c => isDeletedClaim(c.text));
                     const independents = claims.filter(c => !c.dependsOn);
@@ -366,12 +378,11 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
                         <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden">
                           <div className="bg-gray-50 px-3 py-1.5 text-xs2 font-semibold text-gray-600 border-b border-gray-200">패밀리 문헌</div>
                           <ul data-col="[N행] family.family_country_code + ' ' + family_literature_number + ' ' + application_date + ' ' + invention_title" className="divide-y divide-gray-50">
-                            {data.familyList!.filter(f => familyTab === 'all' || f.country === familyTab).map((f, i) => (
+                            {/* 명칭·출원일은 채움률 0%라 열을 만들지 않는다. 0 패딩만 다른 중복 문헌은 합친다. */}
+                            {dedupeFamily(data.familyList!).filter(f => familyTab === 'all' || f.country === familyTab).map((f, i) => (
                               <li key={i} className="flex items-baseline gap-2 px-3 py-1.5 text-sm2">
                                 <span className="shrink-0 font-mono text-gray-500">{f.country}</span>
                                 <span className="font-mono text-brand-400 shrink-0">{f.docNumber}</span>
-                                <span className="text-gray-400 shrink-0">{f.date}</span>
-                                <span className="text-gray-600 truncate">{f.title}</span>
                               </li>
                             ))}
                           </ul>
@@ -621,7 +632,9 @@ function BibRow({ k, v, mono, k2, v2, col, col2, hideEmpty }: { k: string; v: st
   );
 }
 
-function InfoRow({ k, v, mono, muted, col }: { k: string; v: string; mono?: boolean; muted?: boolean; col?: string }) {
+// hideEmpty: 채움률 0% 필드(심사관·특허고객번호 등)는 '—'로 자리를 차지하지 않고 행을 숨긴다.
+function InfoRow({ k, v, mono, muted, col, hideEmpty }: { k: string; v: string; mono?: boolean; muted?: boolean; col?: string; hideEmpty?: boolean }) {
+  if (hideEmpty && (!v || v === '—' || v === '-')) return null;
   return (
     <tr className="border-b border-gray-100">
       <td className="text-gray-500 py-1.5 w-28 whitespace-nowrap pr-2">{k}</td>

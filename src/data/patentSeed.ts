@@ -442,10 +442,11 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
     rightChangeList: isReg ? [{ type: '권리 양도', name: `${applicant} → OO기술지주(주)`, date: mkDate(year + 1, seq, seq) }] : [],
     rightTransferList: isReg ? [{ date: mkDate(year + 1, seq, seq), regNo: nums.regNo, docName: '권리이전등록신청서', before: applicant, after: 'OO기술지주(주)' }] : [],
     licenseRegDate: isReg && seq % 2 === 0 ? mkDate(year + 2, seq, seq) : undefined,
+    // 행정처리(수발신) — 수집은 이력 목록이 아니라 최신 1건(단일 객체)이다. [실데이터 1,200건 전건 단일]
     adminProcess: [
-      { docName: '출원서', date: appDate, status: '수리' },
-      ...(status !== '공개' ? [{ docName: '의견제출통지서', date: mkDate(year, seq + 4, seq), status: '발송' }] : []),
-      ...(isReg ? [{ docName: '등록결정서', date: regDate, status: '발송' }] : []),
+      isReg
+        ? { docName: '등록결정서', date: regDate, status: '발송처리완료' }
+        : { docName: '의견제출통지서', date: mkDate(year, seq + 4, seq), status: '발송처리완료' },
     ],
     // 국가 R&D: KR 문헌 중 짝수 seq(국내 과제 지원분)
     rnd: cc === 'KR' && seq % 2 === 0 ? [{

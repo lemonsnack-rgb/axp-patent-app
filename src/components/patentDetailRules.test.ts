@@ -2,7 +2,7 @@
 // 근거: docs/QC-상세페이지-적재데이터-대조.md (1,804건 전수 관측)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { docKindLabel, pubSeriesLabel, stripCountry, isDeletedClaim, familyCounts, rightChangeCell } from './patentDetailRules.ts';
+import { docKindLabel, pubSeriesLabel, pubSeries, isBulletinDate, stripCountry, isDeletedClaim, familyCounts, rightChangeCell } from './patentDetailRules.ts';
 
 test('문헌종류: 코드를 그대로 노출하지 않고 라벨로 치환한다', () => {
   assert.equal(docKindLabel('B1'), '등록특허공보');   // KR 10-2620137 B1
@@ -71,4 +71,46 @@ test('권리변동: 0% 필드가 아니라 이력 유무로 판정한다', () =>
   assert.equal(rightChangeCell([{ date: '2023-12-29', name: '네스트필드(주)' }]), '있음');
   assert.equal(rightChangeCell([]), '');
   assert.equal(rightChangeCell(undefined), '');
+});
+
+// ── 공개/공고 계열 + 일자 논리 (2차 지시서 §1·§2) ──────────────────────────
+test('공개계: 공고일은 등록일 이후, 공개일은 open_date 와 짝', () => {
+  // KR 10-2620084 B1
+  const r = pubSeries('10-2018-0013604', '2024-01-02', '2018-02-07', '2023-12-27');
+  assert.deepEqual(r.headRight, ['공고일', '2024-01-02']);
+  assert.deepEqual(r.numberRow, ['공개번호', '10-2018-0013604', '공개일', '2018-02-07']);
+});
+
+test('국제공개(WO): publication_date 는 공고일이 아니라 국제공개일이다', () => {
+  // KR 10-2635013 B1 — 등록 2024-02-05 인데 publication_date 는 2011-11-24
+  const r = pubSeries('WO 2011/146808', '2011-11-24', '2022-07-26', '2024-02-05');
+  assert.deepEqual(r.headRight, ['공개일', '2022-07-26']);          // 국내 공개일
+  assert.deepEqual(r.numberRow, ['국제공개번호', 'WO 2011/146808', '국제공개일', '2011-11-24']);
+});
+
+test('공고일이 아닌 publication_date 는 공고일로 쓰지 않는다', () => {
+  // KR 20-0497874 Y1 — open_date 결손, publication_date 가 공개일
+  const r = pubSeries('20-2023-0000689', '2023-04-05', undefined, '2024-03-18');
+  assert.deepEqual(r.headRight, ['', '']);                          // 공고일 칸 비움
+  assert.deepEqual(r.numberRow, ['공개번호', '20-2023-0000689', '공개일', '2023-04-05']);
+});
+
+test('공고계: 공고번호와 공고일이 함께 온다', () => {
+  // KR 10-2649868 B1
+  const r = pubSeries('10-2649868', '2024-03-20', '2023-03-07', '2024-03-18');
+  assert.deepEqual(r.headRight, ['공고일', '2024-03-20']);
+  assert.deepEqual(r.numberRow, ['공고번호', '10-2649868', '공개일', '2023-03-07']);
+});
+
+test('공개번호 없음: 번호 행을 만들지 않는다', () => {
+  // KR 10-2618432 B1
+  const r = pubSeries('', '2024-01-02', undefined, '2023-12-21');
+  assert.deepEqual(r.headRight, ['공고일', '2024-01-02']);
+  assert.equal(r.numberRow, null);
+});
+
+test('isBulletinDate: 공고일은 등록일 이후여야 한다', () => {
+  assert.equal(isBulletinDate('2024-01-02', '2023-12-27'), true);
+  assert.equal(isBulletinDate('2011-11-24', '2024-02-05'), false);
+  assert.equal(isBulletinDate(undefined, '2024-02-05'), false);
 });
