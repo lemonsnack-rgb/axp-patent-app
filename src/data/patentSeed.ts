@@ -170,7 +170,10 @@ function mkDate(year: number, monthSeed: number, daySeed: number): string {
   return `${year}-${pad(m, 2)}-${pad(d, 2)}`;
 }
 
-function buildClaims(dm: Domain): { no: number; dependsOn?: number; text: string }[] {
+// 청구항 — 실데이터는 68%의 문헌이 '삭제'된 항을 갖는다(심사 중 취하).
+// 삭제항은 본문이 '삭제' 한 단어이고 인용관계(dependsOn)가 없어, 필터하지 않으면 독립항으로 분류된다.
+// 시드도 같은 분기를 갖도록 일부 문헌에 삭제항을 넣는다.
+function buildClaims(dm: Domain, seq = 0): { no: number; dependsOn?: number; text: string }[] {
   const dev = dm.device;
   const claims: { no: number; dependsOn?: number; text: string }[] = [
     { no: 1, text: `제1항. ${dm.parts[0]}; ${dm.parts[1]}; 및 ${dm.parts[2]}를 포함하는, ${dev}.` },
@@ -184,6 +187,13 @@ function buildClaims(dm: Domain): { no: number; dependsOn?: number; text: string
     { no: 9, dependsOn: 8, text: `제9항. 제8항에 있어서, ${dm.deps[0]}을 특징으로 하는, ${dev}의 동작 방법.` },
     { no: 10, text: `제10항. 제8항의 방법을 컴퓨터에서 실행시키기 위한 프로그램이 기록된 컴퓨터로 읽을 수 있는 기록매체.` },
   ];
+  // 삭제항 분기 — seq % 3 === 0: 제2·7항 삭제 / seq % 11 === 0: 제1항만 남기고 전부 삭제(극단 사례)
+  if (seq % 11 === 0) {
+    return claims.map(c => (c.no === 1 ? c : { no: c.no, text: '삭제' }));
+  }
+  if (seq % 3 === 0) {
+    return claims.map(c => ([2, 7].includes(c.no) ? { no: c.no, text: '삭제' } : c));
+  }
   return claims;
 }
 
@@ -337,6 +347,10 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
     applicant, inventors: isEn ? 'A. Researcher, B. Engineer' : '김OO, 이OO',
     applicationNo: nums.appNo, applicationDate: appDate,
     publicationNo: nums.pubNo, publicationDate: pubDate,
+    // 공개일 — 실데이터는 27%가 없다(공개 없이 등록). 시드도 같은 분기를 갖는다.
+    openDate: seq % 4 === 3 ? undefined : mkDate(year - 1, seq + 8, seq + 2),
+    // 문헌종류 코드 — 화면은 코드를 그대로 쓰지 않고 라벨로 치환한다(PatentDetail: DOC_KIND_LABEL)
+    documentKind: isReg ? (cc === 'KR' && seq % 97 === 0 ? 'Y1' : 'B1') : 'A',
     registerNo: nums.regNo && isReg ? nums.regNo : '-', registerDate: regDate,
     expirationDate: exp,
     ipc: dm.ipc, cpc: cc === 'JP' ? '-' : dm.cpc,
@@ -345,7 +359,7 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
     applicantStandard: applicant, standardOrg: seq % 6 === 0 ? '3GPP' : '-',
     abstract: detail.abstract,
     repClaim: `제1항. ${dm.parts[0]}; ${dm.parts[1]}; 및 ${dm.parts[2]}를 포함하는, ${dm.device}.`,
-    claims: buildClaims(dm),
+    claims: buildClaims(dm, seq),
     family: 1 + (seq % 5), citing: citing.length, cited: cited.length,
     citingList: citing, citedList: cited,
     // 상세설명 하위섹션 — specification 파싱 결과(목업)

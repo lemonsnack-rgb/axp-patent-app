@@ -95,7 +95,9 @@ export interface PatentResult {
   applicationNo: string;
   applicationDate: string;
   publicationNo: string;
-  publicationDate: string;
+  publicationDate: string;        // 공고일 (bibliographic.publication_date)
+  openDate?: string;              // 공개일 (bibliographic.open_date) — 27%는 없음(공개 없이 등록)
+  documentKind?: string;          // 문헌종류 코드 (bibliographic.document_kind) — B1/Y1 …
   registerNo: string;
   registerDate: string;
   expirationDate: string;
