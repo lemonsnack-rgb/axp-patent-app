@@ -8,7 +8,7 @@ import { Icon } from './Icon';
 import { SiteFooter } from './SiteFooter';
 import { CK_WORDMARK } from '../assets/ckLogo';
 import { getPatentStatusDesc } from '../utils/badgeUtils';
-import { docKindLabel, pubRows, stripCountry, isDeletedClaim, familyCounts, dedupeFamily, rightChangeCell } from './patentDetailRules';
+import { docKindLabel, pubValues, stripCountry, isDeletedClaim, familyCounts, dedupeFamily, rightChangeCell } from './patentDetailRules';
 import { parseKeywords } from '../features/search/mockMatch';
 import { Button } from '@muhayu/axp-ui';
 
@@ -54,7 +54,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
     ?? ((data.status === '등록' || data.status === '소멸') ? '등록특허공보' : '공개특허공보');
   // 공개/국제공개/공고 — 계열마다 행을 따로 만들고, 값이 없는 행은 렌더하지 않는다.
   //   한 칸이 상황에 따라 다른 의미를 갖지 않게 라벨을 고정한다. docs/상세페이지-수정지시서.md §A-1
-  const pubDateRows = pubRows(data.publicationNo, data.publicationDate, data.openDate, data.registerDate);
+  const pub = pubValues(data.publicationNo, data.publicationDate, data.openDate, data.registerDate);
   // 권리변동(서지) — has_ownership_change 는 채움률 0% → 이력 배열 유무로 판정한다
   const rightChangeValue = rightChangeCell(data.rightChangeList);
 
@@ -177,37 +177,43 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
               <Section title="서지사항" icon="cal">
                 <table className="w-full text-md2">
                   <tbody>
-                    <BibRow k="문헌번호" v={stripCountry(data.number)} mono k2="문헌종류" v2={docKind}
-                      col="REGEXP_REPLACE(bibliographic.literature_number, '^[A-Z]{2} ', '') — 국가는 배지로만"
-                      col2="CASE bibliographic.document_kind WHEN 'B1' THEN '등록특허공보' WHEN 'Y1' THEN '등록실용신안공보' ELSE document_kind END" />
-                    <BibRow k="출원번호" v={data.applicationNo} mono k2="출원일" v2={data.applicationDate || '—'}
-                      col="bibliographic.application_number" col2="bibliographic.application_date" />
-                    {/* 공개 · 국제공개 · 공고 — 계열마다 행이 따로다. 값이 없는 계열은 행이 나오지 않는다. */}
-                    {pubDateRows.map(([k, v, k2, v2]) => (
-                      <BibRow key={k} k={k} v={v} mono k2={k2} v2={v2} hideEmpty
-                        col="bibliographic.publication_number (형식으로 계열 판정)"
-                        col2="공개일=open_date · 국제공개일·공고일=publication_date (일자 논리로 배치)" />
+                    {/* 값이 있는 항목만 정해진 순서대로 모아 왼쪽부터 2개씩 채운다.
+                        칸을 고정해 두면 값이 없을 때 표 중간에 구멍이 생겨 오류처럼 보인다. */}
+                    {chunkBibCells([
+                      { k: '문헌번호', v: stripCountry(data.number), mono: true,
+                        col: "REGEXP_REPLACE(bibliographic.literature_number, '^[A-Z]{2} ', '') — 국가는 배지로만" },
+                      { k: '문헌종류', v: docKind,
+                        col: "CASE bibliographic.document_kind WHEN 'B1' THEN '등록특허공보' WHEN 'Y1' THEN '등록실용신안공보' WHEN 'A' THEN '공개특허공보' ELSE document_kind END" },
+                      { k: '출원번호', v: data.applicationNo, mono: true, col: 'bibliographic.application_number' },
+                      { k: '출원일', v: dash(data.applicationDate), col: 'bibliographic.application_date' },
+                      // 공개 · 국제공개 · 공고 — 항목은 고정, 값만 계열에 맞게 배치(§A-1)
+                      { k: '공개번호', v: dash(pub.공개번호), mono: true, col: 'bibliographic.publication_number (공개계 형식일 때)' },
+                      { k: '공개일', v: dash(pub.공개일), col: 'bibliographic.open_date (없고 publication_date 가 공고일이 아니면 그 값)' },
+                      { k: '국제공개번호', v: dash(pub.국제공개번호), mono: true, col: 'bibliographic.publication_number (WO 형식일 때)' },
+                      { k: '국제공개일', v: dash(pub.국제공개일), col: 'bibliographic.publication_date (WO 형식일 때 = 국제공개일)' },
+                      { k: '공고번호', v: dash(pub.공고번호), mono: true, col: 'bibliographic.publication_number (공고계 형식 = register_number 와 동일)' },
+                      { k: '공고일', v: dash(pub.공고일), col: 'bibliographic.publication_date (publication_date >= register_date 일 때만)' },
+                      { k: '등록번호', v: dash(data.registerNo), mono: true, col: 'bibliographic.register_number' },
+                      { k: '등록일', v: dash(data.registerDate), col: 'bibliographic.register_date' },
+                      { k: '권리상태', v: dash(data.rightStatus), col: 'COALESCE(bibliographic.register_status, custom.legal_status) (이력 legal_status_history)' },
+                      { k: '원출원번호', v: dash(data.originalAppNo), mono: true, col: 'bibliographic.original_application_number' },
+                      { k: '국제출원번호', v: dash(data.intlAppNo), mono: true, col: 'bibliographic.international_application_number' },
+                      { k: '번역문 제출일', v: dash(data.translationSubmitDate), col: 'bibliographic.translation_submit_date' },
+                      { k: '우선권주장일', v: dash(data.priorityDate), col: 'priority.priority_application_date' },
+                      { k: '심사청구일', v: dash(data.examRequestDate), col: 'bibliographic.original_examination_request_date' },
+                      { k: '존속기간(예상)만료일', v: dash(data.expirationDate), col: '⚠파생 = bibliographic.register_date + 20년 (연장 시 + term_extension)' },
+                      { k: '권리변동', v: dash(rightChangeValue), col: "CASE WHEN COUNT(right_history.change_histories) > 0 THEN '있음' END (has_ownership_change 는 0%)" },
+                      { k: '청구항 수', v: data.claimCount != null ? `${data.claimCount}개` : '—', col: "bibliographic.claim_count + '개' (삭제항 제외 실질 항 수)" },
+                      { k: '도면 수', v: data.drawingCount ? `${data.drawingCount}건` : '—', col: "bibliographic.drawing_count + '건' — 도면 미반입 구간에는 숨김" },
+                      { k: '출원구분', v: dash(data.applicationFlag), col: 'bibliographic.application_flag' },
+                      { k: '최종처분상태', v: dash(data.finalDisposal), col: 'bibliographic.final_disposal' },
+                      { k: '실시권 등록일', v: dash(data.licenseRegDate), col: 'custom.license_registration_date' },
+                      { k: '지정국', v: (data.designatedCountries?.length ?? 0) > 0 ? data.designatedCountries!.join(', ') : '—', col: "JOIN(designated_country.designated_country, ', ') · EP는 JOIN(dsgn.national_name, ', ')" },
+                      { k: '서열목록', v: data.sequenceListing ? '있음' : '—', col: "CASE custom.sequence_listing_yn='Y' THEN '있음' END" },
+                    ]).map((pair, i) => (
+                      <BibRow key={i} k={pair[0].k} v={pair[0].v ?? '—'} mono={pair[0].mono} col={pair[0].col}
+                        k2={pair[1]?.k ?? ''} v2={pair[1]?.v ?? ''} col2={pair[1]?.col} />
                     ))}
-                    <BibRow k="등록번호" v={data.registerNo && data.registerNo !== '-' ? data.registerNo : '—'} mono k2="등록일" v2={data.registerDate && data.registerDate !== '-' ? data.registerDate : '—'}
-                      col="COALESCE(bibliographic.register_number, '—')" col2="COALESCE(bibliographic.register_date, '—')" />
-                    <BibRow k="권리상태" v={data.rightStatus || '—'} k2="원출원번호" v2={data.originalAppNo && data.originalAppNo !== '-' ? data.originalAppNo : ''} hideEmpty
-                      col="COALESCE(bibliographic.register_status, custom.legal_status) (이력 legal_status_history)" col2="bibliographic.original_application_number" />
-                    <BibRow k="국제출원번호" v={data.intlAppNo && data.intlAppNo !== '-' ? data.intlAppNo : ''} mono k2="번역문 제출일" v2={data.translationSubmitDate || ''} hideEmpty
-                      col="bibliographic.international_application_number" col2="bibliographic.translation_submit_date" />
-                    <BibRow k="우선권주장일" v={data.priorityDate || '—'} k2="심사청구일" v2={data.examRequestDate || '—'}
-                      col="priority.priority_application_date" col2="bibliographic.original_examination_request_date" />
-                    {/* 아래 행들은 값이 없으면 칸(라벨 포함)을 비우고, 양쪽 다 없으면 행을 숨긴다.
-                        권리변동·최종처분상태·출원구분·실시권 등록일·지정국은 실데이터 채움률 0%다. */}
-                    <BibRow k="존속기간(예상)만료일" v={data.expirationDate && data.expirationDate !== '-' ? data.expirationDate : ''} k2="권리변동" v2={rightChangeValue} hideEmpty
-                      col="⚠파생 = bibliographic.register_date + 20년 (연장 시 + term_extension)" col2="CASE WHEN COUNT(right_history.change_histories) > 0 THEN '있음' END (has_ownership_change 는 0%)" />
-                    <BibRow k="청구항 수" v={data.claimCount != null ? `${data.claimCount}개` : ''} k2="도면 수" v2={data.drawingCount ? `${data.drawingCount}건` : ''} hideEmpty
-                      col="bibliographic.claim_count + '개' (삭제항 제외 실질 항 수)" col2="bibliographic.drawing_count + '건' — 도면 미반입 구간에는 숨김" />
-                    <BibRow k="출원구분" v={data.applicationFlag || ''} k2="최종처분상태" v2={data.finalDisposal || ''} hideEmpty
-                      col="bibliographic.application_flag" col2="bibliographic.final_disposal" />
-                    <BibRow k="실시권 등록일" v={data.licenseRegDate || ''} k2="지정국" v2={(data.designatedCountries?.length ?? 0) > 0 ? data.designatedCountries!.join(', ') : ''} hideEmpty
-                      col="custom.license_registration_date" col2="JOIN(designated_country.designated_country, ', ') · EP는 JOIN(dsgn.national_name, ', ')" />
-                    <BibRow k="서열목록" v={data.sequenceListing ? '있음' : ''} k2="" v2="" hideEmpty
-                      col="CASE custom.sequence_listing_yn='Y' THEN '있음' END" />
                   </tbody>
                 </table>
                 {(data.priorityList?.length ?? 0) > 0 && (
@@ -602,6 +608,18 @@ function Section({ title, icon, children }: { title: string; icon: any; children
 // ── 수집필드 모드(data-col) ──
 // col/col2 = 해당 표시값의 수집 DB 컬럼(테이블.컬럼). '⚠'로 시작하면 파생·목업·미정.
 // 정본은 docs/UI-수집필드-매핑표.md — 값 변경 시 문서와 함께 갱신한다.
+// 서지 표 셀 — 라벨은 항상 남기고 값이 없으면 '—' 로 채운다.
+//   0% 필드도 '수집 예정'이지 '불필요'가 아니므로 항목이 있다는 사실을 화면에서 지운다.
+//   단, 그 문헌에 개념 자체가 없는 계열(예: PCT 아닌 문헌의 국제공개)은 행을 만들지 않는다.
+type BibCell = { k: string; v?: string; mono?: boolean; col?: string };
+const dash = (v?: string): string => (!v || v === '-' || v === '—' ? '—' : v);
+
+function chunkBibCells(cells: BibCell[]): [BibCell, BibCell | undefined][] {
+  const out: [BibCell, BibCell | undefined][] = [];
+  for (let i = 0; i < cells.length; i += 2) out.push([cells[i], cells[i + 1]]);
+  return out;
+}
+
 // hideEmpty: 값이 없는 칸은 라벨까지 비우고, 양쪽 다 없으면 행 자체를 렌더하지 않는다.
 //   빈 칸은 <td>로 자리를 유지해 표 정렬(4칸)이 깨지지 않게 한다.
 function BibRow({ k, v, mono, k2, v2, col, col2, hideEmpty }: { k: string; v: string; mono?: boolean; k2: string; v2: string; col?: string; col2?: string; hideEmpty?: boolean }) {

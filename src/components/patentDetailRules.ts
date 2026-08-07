@@ -47,6 +47,35 @@ export const isBulletinDate = (pubDate?: string, regDate?: string): boolean =>
 //     그 외              → 공개일     = publication_date   (open_date 가 없을 때만 · 실용신안 2건)
 export type BibRowTuple = [string, string, string, string];
 
+// 서지 표의 공개/국제공개/공고 6칸에 들어갈 값을 정한다.
+//   **항목은 고정**이다 — 값이 없어도 라벨은 늘 같은 자리에 있고 값만 비운다(화면에서 '—').
+//   판정은 'publication_date 를 어느 칸에 넣을까' 하나뿐이다.
+export interface PubValues {
+  공개번호: string; 공개일: string;
+  국제공개번호: string; 국제공개일: string;
+  공고번호: string; 공고일: string;
+}
+
+export function pubValues(pubNo?: string, pubDate?: string, openDate?: string, regDate?: string): PubValues {
+  const no = (pubNo || '').trim();
+  const pd = (pubDate || '').trim();
+  const od = (openDate || '').trim();
+  const bulletin = isBulletinDate(pd, regDate);
+  const isWo = /^WO \d{4}\/\d{6}$/.test(no);
+  const isOpenNo = /^\d{2}-\d{4}-\d{7}$/.test(no);
+  const isRegNo = /^\d{2}-\d{7}$/.test(no);
+
+  return {
+    공개번호: isOpenNo ? no : '',
+    // publication_date 가 공고일도 국제공개일도 아니면 공개일이다(open_date 결손 보완 · 2건)
+    공개일: od || (!bulletin && !isWo && pd ? pd : ''),
+    국제공개번호: isWo ? no : '',
+    국제공개일: isWo ? pd : '',
+    공고번호: isRegNo ? no : '',
+    공고일: bulletin ? pd : '',
+  };
+}
+
 export function pubRows(pubNo?: string, pubDate?: string, openDate?: string, regDate?: string): BibRowTuple[] {
   const no = (pubNo || '').trim();
   const pd = (pubDate || '').trim();
