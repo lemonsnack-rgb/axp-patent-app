@@ -448,11 +448,6 @@ function buildPatent(dm: Domain, domIdx: number, slot: number): PatentResult {
         ? { docName: '등록결정서', date: regDate, status: '발송처리완료' }
         : { docName: '의견제출통지서', date: mkDate(year, seq + 4, seq), status: '발송처리완료' },
     ],
-    // 국가 R&D: KR 문헌 중 짝수 seq(국내 과제 지원분)
-    rnd: cc === 'KR' && seq % 2 === 0 ? [{
-      taskNo: `${year - 1}-${pad(seq * 3, 6)}`, dept: '산업통상자원부', project: '차세대 핵심기술개발사업',
-      task: `${dm.titleKo} 원천기술 개발`, institute: applicant, period: `${year - 2}.03 ~ ${year}.02`,
-    }] : [],
     // 표준특허: 표준화기구(3GPP) 관련 문헌(seq%6)
     standard: seq % 6 === 0 ? {
       org: '3GPP', numbers: `TS 38.${300 + seq % 99}`, techName: `${dm.titleKo} 표준`,

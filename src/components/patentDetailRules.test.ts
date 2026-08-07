@@ -2,7 +2,7 @@
 // 근거: docs/QC-상세페이지-적재데이터-대조.md (1,804건 전수 관측)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { docKindLabel, pubSeriesLabel, pubSeries, isBulletinDate, stripCountry, isDeletedClaim, familyCounts, rightChangeCell } from './patentDetailRules.ts';
+import { docKindLabel, pubSeriesLabel, pubRows, isBulletinDate, stripCountry, isDeletedClaim, familyCounts, rightChangeCell } from './patentDetailRules.ts';
 
 test('문헌종류: 코드를 그대로 노출하지 않고 라벨로 치환한다', () => {
   assert.equal(docKindLabel('B1'), '등록특허공보');   // KR 10-2620137 B1
@@ -73,40 +73,64 @@ test('권리변동: 0% 필드가 아니라 이력 유무로 판정한다', () =>
   assert.equal(rightChangeCell(undefined), '');
 });
 
-// ── 공개/공고 계열 + 일자 논리 (2차 지시서 §1·§2) ──────────────────────────
-test('공개계: 공고일은 등록일 이후, 공개일은 open_date 와 짝', () => {
+// ── 공개/국제공개/공고 행 분리 (지시서 §A-1) ───────────────────────────────
+// 계열마다 행이 따로다. 라벨은 고정이고, 값이 없는 행은 만들지 않는다.
+
+test('공개계: 공개번호+공개일 / 공고일 행이 따로 나온다', () => {
   // KR 10-2620084 B1
-  const r = pubSeries('10-2018-0013604', '2024-01-02', '2018-02-07', '2023-12-27');
-  assert.deepEqual(r.headRight, ['공고일', '2024-01-02']);
-  assert.deepEqual(r.numberRow, ['공개번호', '10-2018-0013604', '공개일', '2018-02-07']);
+  assert.deepEqual(pubRows('10-2018-0013604', '2024-01-02', '2018-02-07', '2023-12-27'), [
+    ['공개번호', '10-2018-0013604', '공개일', '2018-02-07'],
+    ['공고번호', '', '공고일', '2024-01-02'],
+  ]);
 });
 
-test('국제공개(WO): publication_date 는 공고일이 아니라 국제공개일이다', () => {
-  // KR 10-2635013 B1 — 등록 2024-02-05 인데 publication_date 는 2011-11-24
-  const r = pubSeries('WO 2011/146808', '2011-11-24', '2022-07-26', '2024-02-05');
-  assert.deepEqual(r.headRight, ['공개일', '2022-07-26']);          // 국내 공개일
-  assert.deepEqual(r.numberRow, ['국제공개번호', 'WO 2011/146808', '국제공개일', '2011-11-24']);
+test('국제공개(WO): 공개일(국내)과 국제공개일이 각자 행을 갖는다', () => {
+  // KR 10-2635013 B1 — publication_date 는 국제공개일, open_date 는 국내 공개일
+  assert.deepEqual(pubRows('WO 2011/146808', '2011-11-24', '2022-07-26', '2024-02-05'), [
+    ['공개번호', '', '공개일', '2022-07-26'],
+    ['국제공개번호', 'WO 2011/146808', '국제공개일', '2011-11-24'],
+  ]);
 });
 
-test('공고일이 아닌 publication_date 는 공고일로 쓰지 않는다', () => {
+test('국제공개: 국내 공개일이 없으면 그 행은 만들지 않는다', () => {
+  assert.deepEqual(pubRows('WO 2020/018181', '2020-01-23', undefined, '2024-02-05'), [
+    ['국제공개번호', 'WO 2020/018181', '국제공개일', '2020-01-23'],
+  ]);
+});
+
+test('공고일이 아닌 publication_date 는 공개일 행으로 간다', () => {
   // KR 20-0497874 Y1 — open_date 결손, publication_date 가 공개일
-  const r = pubSeries('20-2023-0000689', '2023-04-05', undefined, '2024-03-18');
-  assert.deepEqual(r.headRight, ['', '']);                          // 공고일 칸 비움
-  assert.deepEqual(r.numberRow, ['공개번호', '20-2023-0000689', '공개일', '2023-04-05']);
+  assert.deepEqual(pubRows('20-2023-0000689', '2023-04-05', undefined, '2024-03-18'), [
+    ['공개번호', '20-2023-0000689', '공개일', '2023-04-05'],
+  ]);
 });
 
-test('공고계: 공고번호와 공고일이 함께 온다', () => {
+test('공고계: 공고번호+공고일 / 공개일 행이 따로 나온다', () => {
   // KR 10-2649868 B1
-  const r = pubSeries('10-2649868', '2024-03-20', '2023-03-07', '2024-03-18');
-  assert.deepEqual(r.headRight, ['공고일', '2024-03-20']);
-  assert.deepEqual(r.numberRow, ['공고번호', '10-2649868', '공개일', '2023-03-07']);
+  assert.deepEqual(pubRows('10-2649868', '2024-03-20', '2023-03-07', '2024-03-18'), [
+    ['공개번호', '', '공개일', '2023-03-07'],
+    ['공고번호', '10-2649868', '공고일', '2024-03-20'],
+  ]);
 });
 
-test('공개번호 없음: 번호 행을 만들지 않는다', () => {
+test('공고계: 공개일이 없으면 공고 행만 나온다', () => {
+  assert.deepEqual(pubRows('10-2650577', '2024-03-22', undefined, '2024-03-19'), [
+    ['공고번호', '10-2650577', '공고일', '2024-03-22'],
+  ]);
+});
+
+test('번호 없음: 공고일만 있으면 공고 행 하나만 나온다', () => {
   // KR 10-2618432 B1
-  const r = pubSeries('', '2024-01-02', undefined, '2023-12-21');
-  assert.deepEqual(r.headRight, ['공고일', '2024-01-02']);
-  assert.equal(r.numberRow, null);
+  assert.deepEqual(pubRows('', '2024-01-02', undefined, '2023-12-21'), [
+    ['공고번호', '', '공고일', '2024-01-02'],
+  ]);
+});
+
+test('미등록 문헌: 등록일 자리표시자에서 공고일로 새지 않는다', () => {
+  // 등록일 '-' 과 문자열 비교하면 공고일로 잘못 통과한다
+  assert.deepEqual(pubRows('US 2025/0098006 A1', '2025-10-12', '2024-03-09', '-'), [
+    ['공개번호', '', '공개일', '2024-03-09'],
+  ]);
 });
 
 test('isBulletinDate: 공고일은 등록일 이후여야 한다', () => {
@@ -116,15 +140,8 @@ test('isBulletinDate: 공고일은 등록일 이후여야 한다', () => {
 });
 
 test('isBulletinDate: 등록일이 없거나 자리표시자면 공고일로 보지 않는다', () => {
-  // 미등록(공개 단계) 문헌 — '-'·'—' 와 문자열 비교하면 잘못 통과한다
   assert.equal(isBulletinDate('2025-10-12', '-'), false);
   assert.equal(isBulletinDate('2025-10-12', '—'), false);
   assert.equal(isBulletinDate('2025-10-12', ''), false);
   assert.equal(isBulletinDate('2025-10-12', undefined), false);
-});
-
-test('미등록 문헌: 공고일 대신 공개일을 보여준다', () => {
-  const r = pubSeries('US 2025/0098006 A1', '2025-10-12', '2024-03-09', '-');
-  assert.equal(r.headRight[0], '공개일');
-  assert.equal(r.headRight[1], '2024-03-09');
 });

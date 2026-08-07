@@ -158,7 +158,6 @@ export interface PatentResult {
   priorArtDocs?: { number: string; country: string }[];                  // 선행기술문헌
   rightChangeList?: { type: string; name: string; date: string }[];      // 권리변동 이력
   adminProcess?: { docName: string; date: string; status: string }[];    // 행정처리(수발신)
-  rnd?: { taskNo: string; dept: string; project: string; task: string; institute: string; period: string }[];  // 국가 R&D
   standard?: { org: string; numbers: string; techName: string; declarants: string; date: string };             // 표준특허
   // ── 추가 보강 (P3 + 국가고유, 목업) ──
   applicationFlag?: string;               // 출원 구분(정상/분할/변경/PCT국내단계)

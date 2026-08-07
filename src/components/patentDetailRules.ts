@@ -35,30 +35,32 @@ const isYmd = (s?: string): boolean => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
 export const isBulletinDate = (pubDate?: string, regDate?: string): boolean =>
   isYmd(pubDate) && isYmd(regDate) && (pubDate as string) >= (regDate as string);
 
-// 공개/공고 4칸 배치 — 번호 형식 + 일자 논리를 함께 보고 라벨·값을 정한다.
-//   반환: { 공고일칸: [라벨, 값], 번호행: [라벨, 번호, 일자라벨, 일자] | null }
-export function pubSeries(pubNo?: string, pubDate?: string, openDate?: string, regDate?: string): {
-  headRight: [string, string];
-  numberRow: [string, string, string, string] | null;
-} {
+// 공개/국제공개/공고 — 계열마다 행을 따로 둔다. 라벨이 고정되므로 한 칸이 여러 의미를 갖지 않는다.
+//   값이 없는 행은 렌더하지 않는다(BibRow hideEmpty 와 같은 규칙).
+//   판정은 '어느 행에 넣을지' 뿐이다:
+//     WO 번호            → 국제공개일 = publication_date
+//     공고일 조건 충족    → 공고일     = publication_date   (publication_date >= register_date)
+//     그 외              → 공개일     = publication_date   (open_date 가 없을 때만 · 실용신안 2건)
+export type BibRowTuple = [string, string, string, string];
+
+export function pubRows(pubNo?: string, pubDate?: string, openDate?: string, regDate?: string): BibRowTuple[] {
   const no = (pubNo || '').trim();
-  const label = pubSeriesLabel(no);
-  const bulletin = isBulletinDate(pubDate, regDate);
+  const pd = (pubDate || '').trim();
+  const od = (openDate || '').trim();
+  const bulletin = isBulletinDate(pd, regDate);
   const isWo = /^WO \d{4}\/\d{6}$/.test(no);
+  const isOpenNo = /^\d{2}-\d{4}-\d{7}$/.test(no);
+  const isRegNo = /^\d{2}-\d{7}$/.test(no);
 
-  // 문헌번호 행 우측: 공고일이 확실할 때만 '공고일', 아니면 국내 공개일을 보여준다
-  const headRight: [string, string] = bulletin
-    ? ['공고일', pubDate || '']
-    : ['공개일', openDate || ''];
+  // publication_date 가 공고일도 국제공개일도 아니면 공개일이다(원본 open_date 결손 보완)
+  const openDateVal = od || (!bulletin && !isWo && pd ? pd : '');
 
-  if (!no) return { headRight, numberRow: null };            // 번호 없음 → 행 숨김
-
-  // 국제공개는 publication_date 가 국제공개일이다(등록일보다 앞선다)
-  if (isWo && !bulletin) return { headRight, numberRow: [label, no, '국제공개일', pubDate || ''] };
-  // 공고일이 아닌 publication_date 를 가진 문헌(실용신안 2건) → 그 값이 공개일이다
-  if (!bulletin && !openDate && pubDate) return { headRight: ['', ''], numberRow: [label, no, '공개일', pubDate] };
-
-  return { headRight, numberRow: [label, no, '공개일', openDate || ''] };
+  const rows: BibRowTuple[] = [
+    ['공개번호', isOpenNo ? no : '', '공개일', openDateVal],
+    ['국제공개번호', isWo ? no : '', '국제공개일', isWo ? pd : ''],
+    ['공고번호', isRegNo ? no : '', '공고일', bulletin ? pd : ''],
+  ];
+  return rows.filter(([, v, , v2]) => v || v2);   // 좌우 모두 비면 행 자체를 만들지 않는다
 }
 
 // 문헌번호에서 국가 접두 제거 — 국가는 배지로 따로 표시하므로 번호에 중복 노출하지 않는다.
