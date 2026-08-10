@@ -459,12 +459,13 @@ function ListResults({
                 <div className="text-sm2 text-gray-500 mb-1 mt-1">
                   {paperMetaLine(p)}
                 </div>
-                {p.abstract && (
-                  <div className="text-sm2 text-gray-600 line-clamp-2">
-                    <span className="font-semibold text-gray-400 mr-1">초록</span>
-                    {highlightText(p.abstract, searchQuery)}
-                  </div>
-                )}
+                {/* 초록 — 없으면 행을 숨기지 않고 부재 사유를 명시 */}
+                <div className="text-sm2 text-gray-600 line-clamp-2">
+                  <span className="font-semibold text-gray-400 mr-1">초록</span>
+                  {p.abstract
+                    ? highlightText(p.abstract, searchQuery)
+                    : <span className="text-gray-400">초록이 없습니다</span>}
+                </div>
               </div>
             </div>
           </Card>
@@ -584,8 +585,8 @@ export function PaperInlineDetail({
                 </div>
               ) : '-'}
             </MetaRow>
-            <MetaRow label="초록" block clamp2>{paper.abstract || '-'}</MetaRow>
-            <MetaRow label="영문초록" block clamp2>{paper.abstractEn || '-'}</MetaRow>
+            <MetaRow label="초록" block clamp2={!!paper.abstract}>{paper.abstract || <span className="text-gray-400">초록이 없습니다</span>}</MetaRow>
+            <MetaRow label="영문초록" block clamp2={!!paper.abstractEn}>{paper.abstractEn || <span className="text-gray-400">초록이 없습니다</span>}</MetaRow>
           </dl>
         </div>
       </div>
@@ -698,8 +699,8 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
                     </div>
                   ) : '-'}
                 </MetaRow>
-                <MetaRow label="초록" block clamp2>{paper.abstract || '-'}</MetaRow>
-                <MetaRow label="영문초록" block clamp2>{paper.abstractEn || '-'}</MetaRow>
+                <MetaRow label="초록" block clamp2={!!paper.abstract}>{paper.abstract || <span className="text-gray-400">초록이 없습니다</span>}</MetaRow>
+                <MetaRow label="영문초록" block clamp2={!!paper.abstractEn}>{paper.abstractEn || <span className="text-gray-400">초록이 없습니다</span>}</MetaRow>
               </dl>
             </div>
           </div>
