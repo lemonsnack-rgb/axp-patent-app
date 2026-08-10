@@ -8,6 +8,7 @@ import { parseKeywords, KW_COLORS } from '../components/PatentDetail';
 import { SiteFooter } from '../components/SiteFooter';
 import { CK_WORDMARK } from '../assets/ckLogo';
 import { Badge, Card } from '../components/ui';
+import { abstractPreview } from '../features/abstractPreview';
 import type { PaperResult } from '../types';
 import { Button, toast } from '@muhayu/axp-ui';
 
@@ -459,11 +460,11 @@ function ListResults({
                 <div className="text-sm2 text-gray-500 mb-1 mt-1">
                   {paperMetaLine(p)}
                 </div>
-                {/* 초록 — 없으면 행을 숨기지 않고 부재 사유를 명시 */}
-                <div className="text-sm2 text-gray-600 line-clamp-2">
+                {/* 초록 — 저작권 보호: 전문이 아닌 미리보기 규격(문자수)만 노출. 없으면 부재 사유를 명시 */}
+                <div className="text-sm2 text-gray-600">
                   <span className="font-semibold text-gray-400 mr-1">초록</span>
                   {p.abstract
-                    ? highlightText(p.abstract, searchQuery)
+                    ? highlightText(abstractPreview(p.abstract).text, searchQuery)
                     : <span className="text-gray-400">초록이 없습니다</span>}
                 </div>
               </div>
@@ -550,7 +551,7 @@ export function PaperInlineDetail({
               {paper.externalUrl && (
                 <Button variant="filled" color="primary" size="sm" className="text-xs2 h-8"
                   onClick={() => window.open(paper.externalUrl, '_blank', 'noopener,noreferrer')}>
-                  <Icon name="link" size={12} /> 원문 보기
+                  <Icon name="link" size={12} /> 출처 이동
                 </Button>
               )}
               <button
@@ -585,8 +586,8 @@ export function PaperInlineDetail({
                 </div>
               ) : '-'}
             </MetaRow>
-            <MetaRow label="초록" block clamp2={!!paper.abstract}>{paper.abstract || <span className="text-gray-400">초록이 없습니다</span>}</MetaRow>
-            <MetaRow label="영문초록" block clamp2={!!paper.abstractEn}>{paper.abstractEn || <span className="text-gray-400">초록이 없습니다</span>}</MetaRow>
+            <MetaRow label="초록" block previewNote={!!paper.abstract}>{paper.abstract ? abstractPreview(paper.abstract).text : <span className="text-gray-400">초록이 없습니다</span>}</MetaRow>
+            <MetaRow label="영문초록" block previewNote={!!paper.abstractEn}>{paper.abstractEn ? abstractPreview(paper.abstractEn).text : <span className="text-gray-400">초록이 없습니다</span>}</MetaRow>
           </dl>
         </div>
       </div>
@@ -655,12 +656,12 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
             {altTitle && altTitle !== paper.title && (
               <div className="text-base2 text-gray-500 mt-2 leading-snug">{altTitle}</div>
             )}
-            {/* 링크 — 제목 하단 (원문/본문) */}
+            {/* 링크 — 제목 하단 (출처 이동/본문). 본 사이트가 원문을 직접 제공하는 것으로 오인되지 않도록 '출처 이동'으로 표기 */}
             <div className="flex flex-wrap items-center gap-2 mt-4">
               {paper.externalUrl && (
                 <Button variant="filled" color="primary" size="sm" className="text-xs2 h-8"
                   onClick={() => window.open(paper.externalUrl, '_blank', 'noopener,noreferrer')}>
-                  <Icon name="link" size={12} /> 원문 보기
+                  <Icon name="link" size={12} /> 출처 이동
                 </Button>
               )}
               <button
@@ -699,8 +700,8 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
                     </div>
                   ) : '-'}
                 </MetaRow>
-                <MetaRow label="초록" block clamp2={!!paper.abstract}>{paper.abstract || <span className="text-gray-400">초록이 없습니다</span>}</MetaRow>
-                <MetaRow label="영문초록" block clamp2={!!paper.abstractEn}>{paper.abstractEn || <span className="text-gray-400">초록이 없습니다</span>}</MetaRow>
+                <MetaRow label="초록" block previewNote={!!paper.abstract}>{paper.abstract ? abstractPreview(paper.abstract).text : <span className="text-gray-400">초록이 없습니다</span>}</MetaRow>
+                <MetaRow label="영문초록" block previewNote={!!paper.abstractEn}>{paper.abstractEn ? abstractPreview(paper.abstractEn).text : <span className="text-gray-400">초록이 없습니다</span>}</MetaRow>
               </dl>
             </div>
           </div>
@@ -750,17 +751,17 @@ export function PaperDetailFull({ paper, onClose, onSave, onOpenRelated }: {
 }
 
 // ── 레이블:값 행 (OpenAlex 방식 — 레이블과 값을 명시적으로 구분) ──
-function MetaRow({ label, children, block, clamp2 }: { label: string; children: React.ReactNode; block?: boolean; clamp2?: boolean }) {
+function MetaRow({ label, children, block, previewNote }: { label: string; children: React.ReactNode; block?: boolean; previewNote?: boolean }) {
   // block=true: 장문(초록 등) — 레이블 위, 값은 전체 폭
-  // clamp2=true: 저작권 보호 — 2줄까지만 노출
+  // previewNote=true: 값이 미리보기 규격(abstractPreview)으로 잘린 상태임을 알린다
   if (block) {
     return (
       <div className="py-3.5">
         <dt className="text-sm2 font-medium text-gray-400 mb-1.5">
           {label}
-          {clamp2 && <span className="ml-2 text-xs2 font-normal text-gray-400">초록은 미리보기만 가능합니다.</span>}
+          {previewNote && <span className="ml-2 text-xs2 font-normal text-gray-400">초록은 미리보기만 가능합니다.</span>}
         </dt>
-        <dd className={`text-base2 text-gray-900 leading-relaxed whitespace-pre-line${clamp2 ? ' line-clamp-2' : ''}`}>{children}</dd>
+        <dd className="text-base2 text-gray-900 leading-relaxed whitespace-pre-line">{children}</dd>
       </div>
     );
   }

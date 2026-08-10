@@ -127,7 +127,7 @@ export function PatentDetail({ data, onBack, posLabel, onSave, onPrev, onNext, s
         <span data-col="REGEXP_REPLACE(bibliographic.literature_number, '^[A-Z]{2} ', '') — 국가는 왼쪽 배지로만 표시(중복 금지)" className="font-mono text-md2 font-semibold text-gray-600">{stripCountry(data.number)}</span>
       </div>
       <h2 data-col="CASE 원문언어=영문 THEN kpa_bibliographic.english_invention_name ELSE bibliographic.invention_title" className="text-2xl font-bold text-gray-800 leading-snug">{data.title}</h2>
-      {/* 제목 하단 액션 링크 — 논문(원문 보기/본문 보기)과 동일 패턴 */}
+      {/* 제목 하단 액션 링크 — 논문(출처 이동/본문 보기)과 동일 패턴 */}
       {/* 원문 PDF — source_link 채움률 0%(미반입). 버튼 자리는 유지하고 값이 없으면 비활성·안내로 상태를 알린다.
           (0% 필드를 숨기는 규칙은 서지 표의 '값 행'에만 적용한다. 액션 버튼은 기능 자리라 유지) */}
       <div data-col="CASE WHEN source_link IS NULL THEN 비활성('원문 준비 중') ELSE source_link 링크 END" className="flex flex-wrap items-center gap-2 mt-3">
