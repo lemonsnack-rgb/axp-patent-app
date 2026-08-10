@@ -10,8 +10,13 @@
 // 비율 조건이 필요한 이유: 상한만 두면 원문이 상한보다 짧을 때 전문이 그대로
 // 노출된다(= 저작권 목적 미달). 두 조건의 min을 취하므로 결과는 항상 원문보다 짧다.
 
+// 상한 200자 근거 — 실적재 초록 1,812건(docs/데이터/patent.json, 국문) 실측
+//   길이 분포: 중앙값 330자 · 평균 356자 · P25 235자 · P75 437자 · P90 561자
+//   상한 200자일 때 평균 노출비율 46%, 상한이 실제로 작동하는 문서는 34%
+//   (나머지 66%는 200자에 닿기 전에 50% 비율 조건이 먼저 걸린다)
+//   국문 200자 ≒ 4문장 — 주제·기존 한계·접근까지 파악 가능한 분량
 /** 최대 표시 문자수 — 공백 포함, 유니코드 코드포인트 기준(한글·영문 동일 계산) */
-export const PREVIEW_MAX_CHARS = 100;
+export const PREVIEW_MAX_CHARS = 200;
 
 /** 원문 대비 최대 표시 비율 — 짧은 초록의 전문 노출 방지 */
 export const PREVIEW_MAX_RATIO = 0.5;
@@ -35,9 +40,9 @@ export type AbstractPreview = {
  *
  * 계산: shown = min(PREVIEW_MAX_CHARS, floor(총 문자수 × PREVIEW_MAX_RATIO))
  *
- * 예) 총 600자 → min(100, 300) = 100자 표시
- *     총 120자 → min(100,  60) =  60자 표시
- *     총  10자 → min(100,   5) =   5자 표시
+ * 예) 총 600자 → min(200, 300) = 200자 표시
+ *     총 330자 → min(200, 165) = 165자 표시
+ *     총 120자 → min(200,  60) =  60자 표시
  */
 export function abstractPreview(raw?: string | null): AbstractPreview {
   const source = (raw ?? '').trim();
