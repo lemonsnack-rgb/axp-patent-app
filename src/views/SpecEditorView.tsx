@@ -129,11 +129,11 @@ function MarkdownTable({ text }: { text: string }) {
   return (
     <table className="border-collapse text-base2 w-full">
       <thead>
-        <tr>{head.map((c, i) => <th key={i} className="border border-zinc-300 px-2 py-1 bg-zinc-50 font-semibold text-left text-zinc-700">{c}</th>)}</tr>
+        <tr>{head.map((c, i) => <th key={i} className="border border-neutral-300 px-2 py-1 bg-neutral-50 font-semibold text-left text-neutral-700">{c}</th>)}</tr>
       </thead>
       <tbody>
         {body.map((r, ri) => (
-          <tr key={ri}>{head.map((_, ci) => <td key={ci} className="border border-zinc-300 px-2 py-1 text-zinc-700">{r[ci] ?? ''}</td>)}</tr>
+          <tr key={ri}>{head.map((_, ci) => <td key={ci} className="border border-neutral-300 px-2 py-1 text-neutral-700">{r[ci] ?? ''}</td>)}</tr>
         ))}
       </tbody>
     </table>
@@ -247,7 +247,7 @@ function ClaimsEditor({ blocks, onChange, elements = [], onClickElement }: {
   if (items.length === 0) {
     return (
       <div data-spec="SPC-EDT-090" className="space-y-2">
-        <p className="text-xs2 text-zinc-400 py-3 text-center">청구항이 없습니다. 아래에서 추가하세요.</p>
+        <p className="text-xs2 text-neutral-400 py-3 text-center">청구항이 없습니다. 아래에서 추가하세요.</p>
         <div className="flex gap-2">
           <button data-spec="SPC-EDT-094" onClick={addIndep} className="flex-1 py-1.5 text-xs2 font-semibold text-brand-600 border border-dashed border-brand-300 rounded-lg hover:bg-brand-50 transition-colors">+ 독립항 추가</button>
           <button onClick={addDep} className="flex-1 py-1.5 text-xs2 font-semibold text-neutral-600 border border-dashed border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors">+ 종속항 추가</button>
@@ -258,7 +258,7 @@ function ClaimsEditor({ blocks, onChange, elements = [], onClickElement }: {
 
   return (
     <div className="space-y-2">
-      <p className="text-xs2 text-zinc-400 mb-1">
+      <p className="text-xs2 text-neutral-400 mb-1">
         번호는 위치에 따라 자동 부여되며, 순서 변경·삭제 시 본문의 "제N항" 인용도 함께 갱신됩니다. 항을 클릭하면 편집할 수 있습니다.
       </p>
       {items.map((it, idx) => {
@@ -269,7 +269,7 @@ function ClaimsEditor({ blocks, onChange, elements = [], onClickElement }: {
         return (
           <div key={idx} className={clsx('rounded-lg border border-neutral-200 bg-white p-2 border-l-[3px]', isIndep ? 'border-l-brand-400' : 'border-l-neutral-300 ml-4')}>
             <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-xs2 font-bold text-zinc-700">청구항 {no}</span>
+              <span className="text-xs2 font-bold text-neutral-700">청구항 {no}</span>
               {isIndep ? (
                 <span className="text-xs2 px-1.5 py-px rounded-full bg-brand-50 text-brand-600 font-medium">독립항</span>
               ) : (
@@ -278,13 +278,13 @@ function ClaimsEditor({ blocks, onChange, elements = [], onClickElement }: {
                 </span>
               )}
               <div className="ml-auto flex gap-0.5">
-                <button data-spec="SPC-EDT-092" onClick={() => move(idx, -1)} disabled={idx === 0} className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-all" title="위로">
+                <button data-spec="SPC-EDT-092" onClick={() => move(idx, -1)} disabled={idx === 0} className="w-6 h-6 rounded-md flex items-center justify-center text-neutral-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-all" title="위로">
                   <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="11" height="11"><path d="M2 7l3-4 3 4"/></svg>
                 </button>
-                <button onClick={() => move(idx, 1)} disabled={idx === items.length - 1} className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-all" title="아래로">
+                <button onClick={() => move(idx, 1)} disabled={idx === items.length - 1} className="w-6 h-6 rounded-md flex items-center justify-center text-neutral-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-all" title="아래로">
                   <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="11" height="11"><path d="M2 3l3 4 3-4"/></svg>
                 </button>
-                <button data-spec="SPC-EDT-093" onClick={() => remove(idx)} className="w-5 h-5 rounded-md flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 transition-all" title="삭제">
+                <button data-spec="SPC-EDT-093" onClick={() => remove(idx)} className="w-5 h-5 rounded-md flex items-center justify-center text-neutral-300 hover:text-red-500 hover:bg-red-50 transition-all" title="삭제">
                   <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" width="11" height="11"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>
                 </button>
               </div>
@@ -296,14 +296,14 @@ function ClaimsEditor({ blocks, onChange, elements = [], onClickElement }: {
                 onChange={e => editVal(idx, e.target.value)}
                 onBlur={() => setEditing(null)}
                 rows={Math.max(2, Math.ceil(it.value.length / 50))}
-                className="w-full text-base2 text-zinc-800 leading-relaxed bg-white outline-none resize-none border border-brand-300 rounded-md px-1.5 py-1 transition-colors"
+                className="w-full text-base2 text-neutral-800 leading-relaxed bg-white outline-none resize-none border border-brand-300 rounded-md px-1.5 py-1 transition-colors"
                 ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
               />
             ) : (
               <p
                 onClick={() => setEditing(idx)}
                 data-spec="SPC-EDT-091" title="클릭하여 편집"
-                className="text-base2 text-zinc-800 leading-relaxed whitespace-pre-wrap px-1.5 py-1 rounded-md cursor-text hover:bg-white hover:ring-1 hover:ring-zinc-200 transition-colors"
+                className="text-base2 text-neutral-800 leading-relaxed whitespace-pre-wrap px-1.5 py-1 rounded-md cursor-text hover:bg-white hover:ring-1 hover:ring-neutral-200 transition-colors"
               ><ElementText text={it.value} elements={elements} onClickElement={onClickElement} /></p>
             )}
           </div>
@@ -358,31 +358,31 @@ function ProposalCard({ p, onAccept, onDecline, onRefine, onZoom }: {
     onRefine(v);
   };
   return (
-    <div data-spec="SPC-EDT-031" className="rounded-lg bg-white border border-zinc-200 p-2.5">
+    <div data-spec="SPC-EDT-031" className="rounded-lg bg-white border border-neutral-200 p-2.5">
       <div className="flex items-center gap-1.5 mb-1">
         <span className={clsx('px-1.5 py-0.5 rounded-md text-xs2 font-bold',
           p.action === 'DELETE' ? 'bg-red-100 text-red-600'
           : p.action === 'INSERT' ? 'bg-emerald-100 text-emerald-700'
-          : p.action === 'REWRITE' ? 'bg-amber-100 text-amber-700'
-          : 'bg-blue-100 text-blue-700')}>
+          : p.action === 'REWRITE' ? 'bg-neutral-100 text-neutral-700'
+          : 'bg-brand-100 text-brand-700')}>
           {EDIT_ACTION_LABEL[p.action]}
         </span>
-        <span className="text-xs2 text-zinc-500 truncate">{p.targetDesc}</span>
-        <button onClick={onZoom} className="ml-auto shrink-0 text-xs2 text-zinc-400 hover:text-blue-600 transition-colors" title="크게 보기">↗ 확대</button>
+        <span className="text-xs2 text-neutral-500 truncate">{p.targetDesc}</span>
+        <button onClick={onZoom} className="ml-auto shrink-0 text-xs2 text-neutral-400 hover:text-brand-600 transition-colors" title="크게 보기">↗ 확대</button>
       </div>
-      {p.summary && <p className="text-xs2 text-zinc-400 mb-1.5">{p.summary}</p>}
+      {p.summary && <p className="text-xs2 text-neutral-400 mb-1.5">{p.summary}</p>}
       {p.action !== 'INSERT' && p.source && (
         <div className="mb-1">
-          <p className="text-xs2 text-zinc-400 mb-0.5">Before</p>
-          <p className="text-xs2 leading-relaxed rounded-md px-2 py-1 bg-red-50/60 text-zinc-700 whitespace-pre-wrap max-h-32 overflow-y-auto scroll-thin">
+          <p className="text-xs2 text-neutral-400 mb-0.5">Before</p>
+          <p className="text-xs2 leading-relaxed rounded-md px-2 py-1 bg-red-50/60 text-neutral-700 whitespace-pre-wrap max-h-32 overflow-y-auto scroll-thin">
             {diff ? <DiffText segs={diff.before} mode="before" /> : <span className="bg-red-100 text-red-700 line-through">{p.source}</span>}
           </p>
         </div>
       )}
       {p.action !== 'DELETE' && (
         <div>
-          <p className="text-xs2 text-zinc-400 mb-0.5">After</p>
-          <p className="text-xs2 leading-relaxed rounded-md px-2 py-1 bg-emerald-50/60 text-zinc-700 whitespace-pre-wrap max-h-32 overflow-y-auto scroll-thin">
+          <p className="text-xs2 text-neutral-400 mb-0.5">After</p>
+          <p className="text-xs2 leading-relaxed rounded-md px-2 py-1 bg-emerald-50/60 text-neutral-700 whitespace-pre-wrap max-h-32 overflow-y-auto scroll-thin">
             {diff ? <DiffText segs={diff.after} mode="after" /> : <span className="bg-emerald-100 text-emerald-800">{p.target}</span>}
           </p>
         </div>
@@ -391,10 +391,10 @@ function ProposalCard({ p, onAccept, onDecline, onRefine, onZoom }: {
         {p.status === 'pending' ? (
           <>
             <button onClick={onAccept} className="flex-1 py-1 text-xs2 font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">✓ 적용</button>
-            <button onClick={onDecline} className="flex-1 py-1 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50">✕ 취소</button>
+            <button onClick={onDecline} className="flex-1 py-1 text-xs2 font-semibold text-neutral-500 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50">✕ 취소</button>
           </>
         ) : (
-          <span className={clsx('text-xs2 font-semibold', p.status === 'accepted' ? 'text-emerald-600' : 'text-zinc-400')}>
+          <span className={clsx('text-xs2 font-semibold', p.status === 'accepted' ? 'text-emerald-600' : 'text-neutral-400')}>
             {p.status === 'accepted' ? '✓ 적용됨' : '✕ 취소됨'}
           </span>
         )}
@@ -403,7 +403,7 @@ function ProposalCard({ p, onAccept, onDecline, onRefine, onZoom }: {
       {p.status === 'pending' && (
         <div className="flex gap-1 mt-1.5">
           <input
-            className="flex-1 min-w-0 text-xs2 px-2 py-1 border border-zinc-200 rounded-lg bg-zinc-50 outline-none focus:border-blue-400 focus:bg-white transition-colors"
+            className="flex-1 min-w-0 text-xs2 px-2 py-1 border border-neutral-200 rounded-lg bg-neutral-50 outline-none focus:border-brand-400 focus:bg-white transition-colors"
             placeholder="대신 이렇게 해줘 (보강 지시)..."
             value={refine}
             onChange={e => setRefine(e.target.value)}
@@ -412,7 +412,7 @@ function ProposalCard({ p, onAccept, onDecline, onRefine, onZoom }: {
           <button
             onClick={sendRefine}
             disabled={!refine.trim()}
-            className="shrink-0 text-xs2 font-semibold px-2 py-1 rounded-lg bg-zinc-800 text-white hover:bg-zinc-700 disabled:opacity-40 transition-colors"
+            className="shrink-0 text-xs2 font-semibold px-2 py-1 rounded-lg bg-neutral-800 text-white hover:bg-neutral-700 disabled:opacity-40 transition-colors"
           >보내기</button>
         </div>
       )}
@@ -423,8 +423,8 @@ function ProposalCard({ p, onAccept, onDecline, onRefine, onZoom }: {
 // ── 요청 분석 진행 트리 (데모 SSE 진행 이벤트 정합) ─────────────────────────
 function ThinkingProgress({ steps, done }: { steps: ProgressStep[]; done: number }) {
   return (
-    <div className="rounded-xl px-3 py-2 bg-zinc-100 border border-zinc-200">
-      <p className="text-xs2 font-semibold text-zinc-500 mb-1">요청 분석 중...</p>
+    <div className="rounded-xl px-3 py-2 bg-neutral-100 border border-neutral-200">
+      <p className="text-xs2 font-semibold text-neutral-500 mb-1">요청 분석 중...</p>
       <div className="space-y-0.5">
         {steps.slice(0, done + 1).map((s, i) => {
           const finished = i < done;
@@ -433,9 +433,9 @@ function ThinkingProgress({ steps, done }: { steps: ProgressStep[]; done: number
               {finished ? (
                 <span className="text-emerald-600 text-xs2 shrink-0">✓</span>
               ) : (
-                <span className="w-2.5 h-2.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin shrink-0 inline-block" />
+                <span className="w-2.5 h-2.5 border-2 border-brand-400 border-t-transparent rounded-full animate-spin shrink-0 inline-block" />
               )}
-              <span className={clsx('text-xs2', finished ? 'text-zinc-400' : 'text-blue-700 font-semibold')}>{s.label}</span>
+              <span className={clsx('text-xs2', finished ? 'text-neutral-400' : 'text-brand-700 font-semibold')}>{s.label}</span>
             </div>
           );
         })}
@@ -591,11 +591,11 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     etc:                     '기타',
   };
   const DRAWING_LABEL_STYLES: Record<string, string> = {
-    '제안기술': 'bg-blue-100 text-brand-400',
-    '종래기술': 'bg-gray-100 text-gray-600',
-    '배경':     'bg-zinc-100 text-zinc-600',
+    '제안기술': 'bg-brand-100 text-brand-400',
+    '종래기술': 'bg-neutral-100 text-neutral-600',
+    '배경':     'bg-neutral-100 text-neutral-600',
     '효과':     'bg-brand-50 text-brand-600',
-    '기타':     'bg-zinc-100 text-zinc-500',
+    '기타':     'bg-neutral-100 text-neutral-500',
   };
 
   // 구성요소 이름 변경 모달
@@ -1088,30 +1088,30 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     {zoomProposal && (
       <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-6" onClick={() => setZoomProposal(null)}>
         <div className="bg-white rounded-2xl shadow-card-deep max-w-3xl w-full max-h-[82vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-200 shrink-0">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-neutral-200 shrink-0">
             <span className={clsx('px-1.5 py-0.5 rounded-md text-xs2 font-bold',
               zoomProposal.action === 'DELETE' ? 'bg-red-100 text-red-600'
               : zoomProposal.action === 'INSERT' ? 'bg-emerald-100 text-emerald-700'
-              : zoomProposal.action === 'REWRITE' ? 'bg-amber-100 text-amber-700'
-              : 'bg-blue-100 text-blue-700')}>
+              : zoomProposal.action === 'REWRITE' ? 'bg-neutral-100 text-neutral-700'
+              : 'bg-brand-100 text-brand-700')}>
               {EDIT_ACTION_LABEL[zoomProposal.action]}
             </span>
-            <span className="text-sm2 font-semibold text-zinc-700">{zoomProposal.targetDesc}</span>
-            <button onClick={() => setZoomProposal(null)} className="ml-auto text-zinc-400 hover:text-zinc-600 text-sm px-1">✕</button>
+            <span className="text-sm2 font-semibold text-neutral-700">{zoomProposal.targetDesc}</span>
+            <button onClick={() => setZoomProposal(null)} className="ml-auto text-neutral-400 hover:text-neutral-600 text-sm px-1">✕</button>
           </div>
           <div className="flex-1 overflow-y-auto scroll-thin p-4 space-y-3">
             {zoomProposal.action !== 'INSERT' && zoomProposal.source && (
               <div>
-                <p className="text-xs2 font-semibold text-zinc-400 mb-1">Before</p>
-                <p className="text-sm2 leading-relaxed rounded-lg px-3 py-2 bg-red-50/60 text-zinc-700 whitespace-pre-wrap">
+                <p className="text-xs2 font-semibold text-neutral-400 mb-1">Before</p>
+                <p className="text-sm2 leading-relaxed rounded-lg px-3 py-2 bg-red-50/60 text-neutral-700 whitespace-pre-wrap">
                   <DiffText segs={diffWords(zoomProposal.source, zoomProposal.target).before} mode="before" />
                 </p>
               </div>
             )}
             {zoomProposal.action !== 'DELETE' && (
               <div>
-                <p className="text-xs2 font-semibold text-zinc-400 mb-1">After</p>
-                <p className="text-sm2 leading-relaxed rounded-lg px-3 py-2 bg-emerald-50/60 text-zinc-700 whitespace-pre-wrap">
+                <p className="text-xs2 font-semibold text-neutral-400 mb-1">After</p>
+                <p className="text-sm2 leading-relaxed rounded-lg px-3 py-2 bg-emerald-50/60 text-neutral-700 whitespace-pre-wrap">
                   <DiffText segs={diffWords(zoomProposal.source, zoomProposal.target).after} mode="after" />
                 </p>
               </div>
@@ -1131,9 +1131,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           className="bg-white rounded-2xl shadow-card-deep w-80 p-5"
           onClick={e => e.stopPropagation()}
         >
-          <p className="text-base2 font-bold text-zinc-800 mb-1">구성요소 이름 전체 변경</p>
-          <p className="text-xs2 text-zinc-500 mb-3 leading-relaxed">
-            <span className="font-semibold text-zinc-700">"{renamingComp.name}"</span>{' '}
+          <p className="text-base2 font-bold text-neutral-800 mb-1">구성요소 이름 전체 변경</p>
+          <p className="text-xs2 text-neutral-500 mb-3 leading-relaxed">
+            <span className="font-semibold text-neutral-700">"{renamingComp.name}"</span>{' '}
             → 본문·청구범위·부호의 설명과 작성 단계(구성요소·청구항·중간명세서)의 모든 언급이 한 번에 바뀝니다. 부호는 유지됩니다.
           </p>
           <Input
@@ -1169,25 +1169,25 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
 
       {/* 서브헤더 Row 1: 편집 툴바 */}
-      <div data-spec="SPC-EDT-060" className="flex items-center border-b border-zinc-200 bg-white shrink-0 h-10 pl-2">
+      <div data-spec="SPC-EDT-060" className="flex items-center border-b border-neutral-200 bg-white shrink-0 h-10 pl-2">
         <div className="flex items-center gap-0.5 shrink-0">
           <button onClick={undo} disabled={!undoStack.length} data-spec="SPC-EDT-061" title="실행 취소 (Ctrl+Z)"
-            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
+            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-neutral-100 disabled:opacity-30 transition-colors text-neutral-500 text-xs2">
             <UndoIcon /><span className="max-xl:hidden">실행 취소</span>
           </button>
           <button onClick={redo} disabled={!redoStack.length} title="다시 실행 (Ctrl+Y)"
-            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
+            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-neutral-100 disabled:opacity-30 transition-colors text-neutral-500 text-xs2">
             <RedoIcon /><span className="max-xl:hidden">다시 실행</span>
           </button>
-          <div className="w-px h-5 bg-zinc-200 mx-1" />
+          <div className="w-px h-5 bg-neutral-200 mx-1" />
           {ENABLE_TABLE_INSERT && (
             <button onClick={() => setTableModal(true)} disabled={!sel} title="표 삽입"
-              className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
+              className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-neutral-100 disabled:opacity-30 transition-colors text-neutral-500 text-xs2">
               <TableIcon /><span>표</span>
             </button>
           )}
-          <button onClick={() => setFormulaModal(true)} disabled={!sel} data-spec="SPC-EDT-062" title="수식 입력"
-            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
+          <button onClick={() => setFormulaModal(true)} disabled={!sel} data-spec="SPC-EDT-062" title="수식 입력 — 단락을 클릭(편집)한 뒤 삽입"
+            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-neutral-100 disabled:opacity-30 transition-colors text-neutral-500 text-xs2">
             <span className="font-serif text-base2 leading-none">∑</span><span>수식</span>
           </button>
           {/* 도면 참조 삽입 — 선택한 본문 블록의 커서 위치에 '(도 N 참조)' 삽입 (이번 버전 제외, ENABLE_DRAWING_REF) */}
@@ -1195,21 +1195,21 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           <div className="relative">
             <button onClick={() => setDrawingRefMenuOpen(o => !o)} disabled={!sel || drawings.length === 0}
               title={drawings.length === 0 ? '채택된 도면이 없습니다' : "선택한 단락의 커서 위치에 '(도 N 참조)' 문구를 넣습니다 — 실시예 본문이 어느 도면을 설명하는지 표시"}
-              className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
+              className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-neutral-100 disabled:opacity-30 transition-colors text-neutral-500 text-xs2">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2.5 11l3.5-3 2.5 2 3-3.5 2 2"/></svg>
               <span>도면 참조</span><span className="text-xs2 leading-none">▾</span>
             </button>
             {drawingRefMenuOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setDrawingRefMenuOpen(false)} />
-                <div className="absolute left-0 top-full mt-1 z-20 w-60 max-h-64 overflow-y-auto scroll-thin rounded-lg border border-zinc-200 bg-white shadow-lg py-1">
+                <div className="absolute left-0 top-full mt-1 z-20 w-60 max-h-64 overflow-y-auto scroll-thin rounded-lg border border-neutral-200 bg-white shadow-lg py-1">
                   {drawings.map((d, i) => {
                     const figNo = String(d.detail.symbol).replace(/\D/g, '') || String(i + 1);
                     return (
                       <button key={i} onClick={() => insertDrawingRef(figNo)}
-                        className="w-full text-left px-3 py-1.5 text-xs2 hover:bg-blue-50 flex items-center gap-2 transition-colors">
-                        <span className="font-bold text-zinc-700 shrink-0">도 {figNo}</span>
-                        <span className="text-zinc-500 truncate">{d.detail.name || '제목 없음'}</span>
+                        className="w-full text-left px-3 py-1.5 text-xs2 hover:bg-brand-50 flex items-center gap-2 transition-colors">
+                        <span className="font-bold text-neutral-700 shrink-0">도 {figNo}</span>
+                        <span className="text-neutral-500 truncate">{d.detail.name || '제목 없음'}</span>
                       </button>
                     );
                   })}
@@ -1218,30 +1218,27 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             )}
           </div>
           )}
-          <div className="w-px h-5 bg-zinc-200 mx-1" />
+          <div className="w-px h-5 bg-neutral-200 mx-1" />
           <button onClick={() => setFindOpen(o => !o)} data-spec="SPC-EDT-063" title="찾기/바꾸기 (Ctrl+F)"
-            className={clsx('flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md transition-colors text-xs2', findOpen ? 'bg-blue-50 text-blue-700' : 'hover:bg-zinc-100 text-zinc-500')}>
+            className={clsx('flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md transition-colors text-xs2', findOpen ? 'bg-brand-50 text-brand-700' : 'hover:bg-neutral-100 text-neutral-500')}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
             <span className="max-xl:hidden">찾기</span>
           </button>
         </div>
-        {!sel && (
-          <span className="hidden xl:block flex-1 min-w-0 text-xs2 text-zinc-400 ml-3 truncate">단락을 클릭하면 수식을 삽입할 수 있습니다</span>
-        )}
         {/* 출력 그룹 — 편집 도구와 분리해 우측 정렬 (미리보기 · DOCX · PDF) */}
         <div className="ml-auto flex items-center gap-0.5 pr-2 shrink-0">
           <button onClick={() => setEditorPreviewOpen(true)} data-spec="SPC-EDT-064" title="미리보기"
-            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 transition-colors text-zinc-500 text-xs2">
+            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-neutral-100 transition-colors text-neutral-500 text-xs2">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
             <span className="max-xl:hidden">미리보기</span>
           </button>
           <button onClick={() => exportDocx(task?.name ?? '명세서', editorPreviewSections, exportDrawings)} data-spec="SPC-EDT-065" title="DOCX 내보내기 (도면 포함)"
-            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 transition-colors text-zinc-600 text-xs2 font-medium">
+            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-neutral-100 transition-colors text-neutral-600 text-xs2 font-medium">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><path d="M9 2v4h4"/><path d="M5 9h6M5 11h4"/></svg>
             <span className="max-xl:hidden">DOCX</span>
           </button>
           <button onClick={() => exportPdf(task?.name ?? '명세서', editorPreviewSections, exportDrawings)} data-spec="SPC-EDT-065" title="PDF 내보내기 (도면 포함, 인쇄)"
-            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 transition-colors text-zinc-600 text-xs2 font-medium">
+            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-neutral-100 transition-colors text-neutral-600 text-xs2 font-medium">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><path d="M9 2v4h4"/><path d="M5.5 9.5h5M5.5 11.5h3"/></svg>
             <span className="max-xl:hidden">PDF</span>
           </button>
@@ -1250,33 +1247,33 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
 
       {/* 찾기/바꾸기 바 (문서 통계 포함) */}
       {findOpen && (
-        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-zinc-200 bg-zinc-50 shrink-0">
+        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-neutral-200 bg-neutral-50 shrink-0">
           <input
             value={findText}
             onChange={e => setFindText(e.target.value)}
             placeholder="찾기"
-            className="w-40 text-xs2 px-2 py-1 border border-zinc-200 rounded-md bg-white outline-none focus:border-blue-400"
+            className="w-40 text-xs2 px-2 py-1 border border-neutral-200 rounded-md bg-white outline-none focus:border-brand-400"
           />
-          <span className="text-xs2 text-zinc-400 w-10 shrink-0">{findText ? `${matchCount}건` : ''}</span>
+          <span className="text-xs2 text-neutral-400 w-10 shrink-0">{findText ? `${matchCount}건` : ''}</span>
           <input
             value={replaceText}
             onChange={e => setReplaceText(e.target.value)}
             placeholder="바꿀 내용"
-            className="w-40 text-xs2 px-2 py-1 border border-zinc-200 rounded-md bg-white outline-none focus:border-blue-400"
+            className="w-40 text-xs2 px-2 py-1 border border-neutral-200 rounded-md bg-white outline-none focus:border-brand-400"
           />
           <button
             onClick={replaceAll}
             disabled={!findText || matchCount === 0}
             className="text-xs2 font-semibold px-2.5 py-1 rounded-lg bg-brand-400 text-white hover:bg-brand-500 disabled:opacity-40 transition-colors"
           >전체 바꾸기</button>
-          <span className="ml-auto text-xs2 text-zinc-400">{totalBlocks}단락 · {totalChars.toLocaleString()}자</span>
-          <button onClick={() => setFindOpen(false)} className="text-zinc-400 hover:text-zinc-600 text-xs2 px-1" title="닫기">✕</button>
+          <span className="ml-auto text-xs2 text-neutral-400">{totalBlocks}단락 · {totalChars.toLocaleString()}자</span>
+          <button onClick={() => setFindOpen(false)} className="text-neutral-400 hover:text-neutral-600 text-xs2 px-1" title="닫기">✕</button>
         </div>
       )}
 
       {/* 서브헤더 Row 2: 내비게이션 — [← 작성 단계로] + 섹션 탭 (툴바는 편집 도구만, 이동은 이 줄에) */}
-      <div data-spec="SPC-EDT-070" className="flex items-stretch border-b border-zinc-200 bg-white shrink-0">
-        <div className="flex items-center pl-3 pr-2 shrink-0 border-r border-zinc-200 my-1.5">
+      <div data-spec="SPC-EDT-070" className="flex items-stretch border-b border-neutral-200 bg-white shrink-0">
+        <div className="flex items-center pl-3 pr-2 shrink-0 border-r border-neutral-200 my-1.5">
           <button onClick={onBack} data-spec="SPC-EDT-071" title="위저드(작성 단계)로 돌아갑니다 — 편집 내용은 저장됩니다"
             className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border border-brand-300 text-brand-600 text-xs2 font-semibold whitespace-nowrap hover:bg-brand-50 transition-colors">
             ← 작성 단계로
@@ -1289,7 +1286,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
               'px-3 py-2 text-xs2 whitespace-nowrap border-b-2 transition-colors shrink-0',
               activeSec === s.id
                 ? 'border-brand-400 text-brand-600 font-semibold'
-                : 'border-transparent text-zinc-500 hover:text-zinc-700'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700'
             )}>
             {s.short}
           </button>
@@ -1300,7 +1297,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       {/* 본문 — 전체 명세서 스크롤 */}
       <div
           ref={centerRef}
-          className="flex-1 overflow-y-auto scroll-thin bg-zinc-50"
+          className="flex-1 overflow-y-auto scroll-thin bg-neutral-50"
           onClick={e => { if (e.target === e.currentTarget) setSel(null); }}
           onScroll={() => {
             if (!centerRef.current) return;
@@ -1315,7 +1312,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             {/* 섹션별 단락 */}
             {EDITOR_SECTIONS.map(sec => (
               <div key={sec.id} data-section={sec.id} data-spec="SPC-EDT-080" className="mb-10">
-                <h2 className="text-base2 font-bold text-zinc-800 mb-3 pb-1.5 border-b border-zinc-200">
+                <h2 className="text-lg2 font-semibold text-neutral-800 mb-3 mt-1">
                   {sec.label}
                 </h2>
 
@@ -1326,14 +1323,14 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                       {drawings.map((d, idx) => {
                         const labelKo = DRAWING_LABEL_MAP[d.detail.label] ?? 'AI생성';
                         return (
-                          <div key={idx} className="rounded-xl border overflow-hidden bg-white shadow-sm border-zinc-200">
+                          <div key={idx} className="rounded-xl border overflow-hidden bg-white shadow-sm border-neutral-200">
                             {/* 이미지 영역 */}
-                            <div className="relative aspect-[4/3] bg-zinc-100 border-b border-zinc-200 flex flex-col items-center justify-center gap-1 overflow-hidden">
+                            <div className="relative aspect-[4/3] bg-neutral-100 border-b border-neutral-200 flex flex-col items-center justify-center gap-1 overflow-hidden">
                               {d.image.file.data ? (
                                 <img src={`data:${d.image.file.media_type};base64,${d.image.file.data}`} className="w-full h-full object-contain" alt={d.detail.name} />
                               ) : (
                                 <>
-                                  <svg viewBox="0 0 120 90" width="80" height="60" className="text-zinc-300" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                  <svg viewBox="0 0 120 90" width="80" height="60" className="text-neutral-300" fill="none" stroke="currentColor" strokeWidth="1.5">
                                     <rect x="4" y="4" width="112" height="82" rx="4" strokeDasharray="6 3"/>
                                     <rect x="16" y="14" width="36" height="28" rx="3" fill="currentColor" fillOpacity=".08"/>
                                     <rect x="68" y="14" width="36" height="28" rx="3" fill="currentColor" fillOpacity=".08"/>
@@ -1342,24 +1339,24 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                                     <line x1="60" y1="42" x2="60" y2="52" strokeDasharray="3 2"/>
                                     <polyline points="100,28 110,28 110,64 78,64" strokeDasharray="3 2"/>
                                   </svg>
-                                  <span className="text-xs2 font-semibold text-zinc-400">{d.detail.symbol}</span>
+                                  <span className="text-xs2 font-semibold text-neutral-400">{d.detail.symbol}</span>
                                 </>
                               )}
                             </div>
                             {/* 캡션 */}
                             <div className="px-3 pt-2 pb-1.5">
                               <div className="flex items-center gap-1.5 mb-0.5">
-                                <span className="text-xs2 font-bold text-zinc-700" title={`원본 기호: ${d.detail.symbol}`}>도 {idx + 1}</span>
-                                <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', DRAWING_LABEL_STYLES[labelKo] ?? 'bg-zinc-100 text-zinc-500')}>{labelKo}</span>
+                                <span className="text-xs2 font-bold text-neutral-700" title={`원본 기호: ${d.detail.symbol}`}>도 {idx + 1}</span>
+                                <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', DRAWING_LABEL_STYLES[labelKo] ?? 'bg-neutral-100 text-neutral-500')}>{labelKo}</span>
                               </div>
-                              <p className="text-xs2 text-zinc-600 leading-snug">{d.detail.name}</p>
+                              <p className="text-xs2 text-neutral-600 leading-snug">{d.detail.name}</p>
                             </div>
                             {/* 도면 수정모드(새 탭) — 참조 삽입은 본문 툴바의 '도면 참조'로 이동 */}
-                            <div className="border-t border-zinc-100 px-3 py-1.5 flex items-center justify-end">
+                            <div className="border-t border-neutral-100 px-3 py-1.5 flex items-center justify-end">
                               <button
                                 onClick={() => openEditorTab({ drawingId: String(idx), drawings: drawings.map(toWorkflowDrawingItem), components: [], references: [], drawingName: d.detail.name, timestamp: Date.now() })}
                                 data-spec="SPC-EDT-100" title="도면 편집기를 새 탭에서 엽니다 (범위 조정·CAD 변환)"
-                                className="inline-flex items-center gap-0.5 h-7 px-2 rounded-md text-xs2 font-semibold text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 transition-colors shrink-0"
+                                className="inline-flex items-center gap-0.5 h-7 px-2 rounded-md text-xs2 font-semibold text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 transition-colors shrink-0"
                               >도면 편집기 <span className="text-xs2">↗</span></button>
                             </div>
                           </div>
@@ -1402,12 +1399,12 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                         className={clsx(
                           'group relative pl-8 pr-4 py-2.5 transition-all rounded-lg border',
                           isEditing
-                            ? 'border-blue-400 bg-white shadow-sm cursor-text'
+                            ? 'border-brand-400 bg-white shadow-sm cursor-text'
                             : isChecked
-                              ? 'border-blue-500 bg-blue-50 shadow-sm cursor-pointer'
+                              ? 'border-brand-500 bg-brand-50 shadow-sm cursor-pointer'
                               : blockText.trim()
-                                ? 'border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-sm cursor-pointer'
-                                : 'border-dashed border-zinc-200 bg-white hover:border-zinc-300 cursor-pointer'
+                                ? 'border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-sm cursor-pointer'
+                                : 'border-dashed border-neutral-200 bg-white hover:border-neutral-300 cursor-pointer'
                         )}
                       >
                         {/* 체크박스 — 상시 표시 (다중 선택용), 선택 시 강조 */}
@@ -1418,7 +1415,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             'absolute left-2 top-2.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer shrink-0',
                             isChecked
                               ? 'bg-brand-400 border-brand-400 text-white'
-                              : 'border-gray-400 bg-white opacity-90 group-hover:opacity-100 group-hover:border-brand-400'
+                              : 'border-neutral-400 bg-white opacity-90 group-hover:opacity-100 group-hover:border-brand-400'
                           )}
                         >
                           {isChecked && <Icon name="check" size={10} />}
@@ -1429,13 +1426,13 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             <button
                               onClick={e => { e.stopPropagation(); moveBlock(sec.id, blockIdx, -1); }}
                               disabled={blockIdx === 0}
-                              className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-all"
+                              className="w-6 h-6 rounded-md flex items-center justify-center text-neutral-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-all"
                               data-spec="SPC-EDT-083" title="위로 이동"
                             ><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="11" height="11"><path d="M2 7l3-4 3 4"/></svg></button>
                             <button
                               onClick={e => { e.stopPropagation(); moveBlock(sec.id, blockIdx, 1); }}
                               disabled={blockIdx === blocks[sec.id].length - 1}
-                              className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-all"
+                              className="w-6 h-6 rounded-md flex items-center justify-center text-neutral-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-all"
                               title="아래로 이동"
                             ><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="11" height="11"><path d="M2 3l3 4 3-4"/></svg></button>
                           </div>
@@ -1451,7 +1448,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                                 { theme: 'danger', onConfirm: (ctrl) => { ctrl.close(); deleteBlock(sec.id, blockIdx); } },
                               );
                             }}
-                            className="absolute top-1.5 right-1.5 w-6 h-6 rounded-md flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                            className="absolute top-1.5 right-1.5 w-6 h-6 rounded-md flex items-center justify-center text-neutral-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
                             data-spec="SPC-EDT-084" title="단락 삭제"
                           >
                             <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" width="10" height="10">
@@ -1462,7 +1459,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                         {isEditing ? (
                           <>
                           <textarea
-                            className="w-full text-base2 text-zinc-800 bg-transparent outline-none border-0 resize-none leading-relaxed overflow-hidden py-1.5 px-3"
+                            className="w-full text-base2 text-neutral-800 bg-transparent outline-none border-0 resize-none leading-relaxed overflow-hidden py-1.5 px-3"
                             value={blockText}
                             autoFocus
                             rows={Math.max(2, Math.ceil(blockText.length / 55))}
@@ -1480,7 +1477,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                           />
                           {/* 편집 모드 안내 — 구성요소 이름이 들어 있는 단락에서만: 여기서 고치면 이 자리만 바뀜을 알린다 */}
                           {(context?.elements ?? []).some(el => el.value_ko && blockText.includes(el.value_ko)) && (
-                            <p className="mx-3 mb-1.5 text-xs2 text-zinc-400">
+                            <p className="mx-3 mb-1.5 text-xs2 text-neutral-400">
                               구성요소 이름은 여기서 고쳐도 이 단락에만 반영됩니다. 명세서 전체에서 바꾸려면 편집을 끝낸 뒤 <span className="text-brand-600 font-medium border-b border-dashed border-brand-400">점선 밑줄 이름</span>을 클릭하세요.
                             </p>
                           )}
@@ -1488,12 +1485,12 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                         ) : isMarkdownTable(blockText) ? (
                           <div className="py-1.5 px-3 overflow-x-auto"><MarkdownTable text={blockText} /></div>
                         ) : blockText.includes('$') ? (
-                          <p className="text-base2 leading-relaxed text-zinc-800 py-1.5 px-3"
+                          <p className="text-base2 leading-relaxed text-neutral-800 py-1.5 px-3"
                             dangerouslySetInnerHTML={{ __html: renderBlockWithTeX(blockText) }} />
                         ) : (
                           <p className={clsx(
                             'text-base2 leading-relaxed whitespace-pre-wrap py-1.5 px-3',
-                            blockText.trim() ? 'text-zinc-800' : 'text-zinc-400 italic'
+                            blockText.trim() ? 'text-neutral-800' : 'text-neutral-400 italic'
                           )}>
                             {blockText.trim()
                               ? <ElementText text={blockText} elements={context?.elements ?? []} onClickElement={(name) => setRenamingComp({ name, draft: name })} />
@@ -1513,7 +1510,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                       setBlocks(p => ({ ...p, [sec.id]: [...p[sec.id], ''] }));  // 빈 단락은 입력 시점에 저장
                       setTimeout(() => selectBlock(sec.id, newIdx), 50);
                     }}
-                    className="ml-auto flex items-center h-7 px-2.5 text-xs2 text-zinc-400 hover:text-brand-500 border border-dashed border-zinc-200 rounded-lg hover:border-brand-300 hover:bg-brand-50/40 transition-colors"
+                    className="w-full justify-center flex items-center h-8 px-2.5 text-xs2 text-neutral-400 hover:text-brand-500 border border-dashed border-neutral-200 rounded-lg hover:border-brand-300 hover:bg-brand-50/40 transition-colors"
                   >
                     + 단락 추가
                   </button>
@@ -1535,40 +1532,40 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
         )}
         <aside data-spec="SPC-EDT-010" className={clsx(
           'bg-white flex-col overflow-hidden',
-          'md:flex md:relative md:shrink-0 md:border-l md:border-zinc-200',
+          'md:flex md:relative md:shrink-0 md:border-l md:border-neutral-200',
           'md:w-[clamp(280px,28vw,360px)] md:min-w-[280px]',
           'max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-50',
           'max-md:h-[72vh] max-md:rounded-t-2xl max-md:shadow-2xl',
-          'max-md:border-t max-md:border-zinc-200',
+          'max-md:border-t max-md:border-neutral-200',
           'max-md:transition-transform max-md:duration-300 max-md:ease-out',
           mobileAiOpen ? 'max-md:flex max-md:translate-y-0' : 'max-md:hidden',
           'md:flex',
         )}>
           {/* 모바일 핸들 */}
           <div className="md:hidden shrink-0 pt-2 pb-1 px-4 flex items-center justify-between relative">
-            <div className="absolute left-1/2 -translate-x-1/2 top-2 w-9 h-1 bg-zinc-300 rounded-full" />
+            <div className="absolute left-1/2 -translate-x-1/2 top-2 w-9 h-1 bg-neutral-300 rounded-full" />
             <button
               onClick={() => setMobileAiOpen(false)}
-              className="ml-auto w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-zinc-600"
+              className="ml-auto w-7 h-7 flex items-center justify-center text-neutral-400 hover:text-neutral-600"
             >
               <Icon name="close" size={14} />
             </button>
           </div>
           {/* 헤더 (48px) */}
-          <div className="max-md:hidden md:flex shrink-0 items-center gap-2 px-4 border-b border-zinc-200 bg-gray-50" style={{ height: 48 }}>
+          <div className="max-md:hidden md:flex shrink-0 items-center gap-2 px-4 border-b border-neutral-200 bg-neutral-50" style={{ height: 48 }}>
             <div className="w-5 h-5 rounded-md flex items-center justify-center text-white text-xs font-bold shrink-0 bg-brand-400"><svg viewBox="0 0 16 16" fill="currentColor" width="10" height="10" aria-hidden="true"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg></div>
-            <span className="text-base2 font-bold text-gray-800">AI 어시스턴트</span>
-            <span className="text-xs2 text-zinc-400 font-medium">본문 수정</span>
+            <span className="text-base2 font-bold text-neutral-800">AI 어시스턴트</span>
+            <span className="text-xs2 text-neutral-400 font-medium">본문 수정</span>
           </div>
 
           {/* ── 상단: 정보 영역(선택 단락) — 하단 대화 영역과 영역 제목 바로 구분 ── */}
-          <div data-spec="SPC-EDT-011" className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 bg-zinc-50 border-b border-zinc-200">
-            <Icon name="check" size={11} className="text-zinc-400" />
-            <span className="text-xs2 font-semibold text-zinc-500 tracking-wide">선택 단락</span>
-            <span className="ml-auto text-xs2 text-zinc-400">{selSet.size > 0 ? `${selSet.size}개 선택` : '미선택 · 전체 문서 대상'}</span>
+          <div data-spec="SPC-EDT-011" className="shrink-0 flex items-center gap-1.5 px-4 py-1 bg-neutral-50 border-b border-neutral-200">
+            <Icon name="check" size={11} className="text-neutral-400" />
+            <span className="text-xs2 font-semibold text-neutral-500 tracking-wide">선택 단락</span>
+            <span className="ml-auto text-xs2 text-neutral-400">{selSet.size > 0 ? `${selSet.size}개 선택` : '미선택 · 전체 문서 대상'}</span>
           </div>
           {/* 선택된 블록 컨텍스트 */}
-          <div className={clsx(selSet.size > 0 ? 'flex-1 flex flex-col min-h-0 bg-white' : 'shrink-0 bg-white')}>
+          <div className="shrink-0 flex flex-col bg-white">
             {selSet.size === 1 ? (() => {
               const key = [...selSet][0];
               const dashIdx = key.indexOf('-');
@@ -1577,34 +1574,34 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
               const secLabel = EDITOR_SECTIONS.find(s => s.id === sid)?.short ?? sid;
               return (
                 <>
-                  <div className="flex items-center justify-between px-3 pt-2 pb-1.5 shrink-0 border-b border-zinc-100">
+                  <div className="flex items-center justify-between px-3 pt-2 pb-1.5 shrink-0 border-b border-neutral-100">
                     <span className="text-xs2 font-semibold text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded-md">
                       선택 중 · {secLabel} {idx + 1}
                     </span>
-                    <button onClick={() => setSelSet(new Set())} className="text-xs2 text-zinc-400 hover:text-zinc-600 transition-colors">
+                    <button onClick={() => setSelSet(new Set())} className="text-xs2 text-neutral-400 hover:text-neutral-600 transition-colors">
                       선택 해제
                     </button>
                   </div>
                   {/* 선택 단락 미리보기(읽기 전용) — 패널에서는 본문을 편집하지 않는다. 본문 편집은 중앙 단락을 클릭해서. (A1) */}
-                  <div className="flex-1 min-h-0 overflow-y-auto scroll-thin px-4 py-2.5">
-                    <p className="text-sm2 text-zinc-700 leading-relaxed whitespace-pre-wrap">
-                      {(blocks[sid]?.[idx] || '').trim() || <span className="text-zinc-400 italic">(빈 단락)</span>}
+                  <div className="max-h-[40vh] overflow-y-auto scroll-thin px-4 py-2.5">
+                    <p className="text-sm2 text-neutral-700 leading-relaxed whitespace-pre-wrap">
+                      {(blocks[sid]?.[idx] || '').trim() || <span className="text-neutral-400 italic">(빈 단락)</span>}
                     </p>
-                    <p className="mt-2 text-xs2 text-zinc-400">아래 입력창에 이 단락에 대한 <b className="text-zinc-500">수정 명령</b>을 입력하세요. 본문을 직접 고치려면 중앙의 단락을 클릭합니다.</p>
+                    <p className="mt-2 text-xs2 text-neutral-400">아래 입력창에 이 단락에 대한 <b className="text-neutral-500">수정 명령</b>을 입력하세요. 본문을 직접 고치려면 중앙의 단락을 클릭합니다.</p>
                   </div>
                 </>
               );
             })() : selSet.size > 1 ? (
               <>
                 <div className="flex items-center justify-between px-3 pt-2 pb-1.5 shrink-0">
-                  <span className="text-xs2 font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md">
+                  <span className="text-xs2 font-semibold text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded-md">
                     편집 명령 대상 · {selSet.size}개
                   </span>
-                  <button onClick={() => setSelSet(new Set())} className="text-xs2 text-zinc-400 hover:text-zinc-600 transition-colors">
+                  <button onClick={() => setSelSet(new Set())} className="text-xs2 text-neutral-400 hover:text-neutral-600 transition-colors">
                     선택 해제
                   </button>
                 </div>
-                <div className="flex-1 overflow-y-auto scroll-thin px-3 pb-2 space-y-1.5">
+                <div className="max-h-[40vh] overflow-y-auto scroll-thin px-3 pb-2 space-y-1.5">
                   {Array.from(selSet).map(key => {
                     const dashIdx = key.indexOf('-');
                     const sid = key.slice(0, dashIdx) as SectionId;
@@ -1612,10 +1609,10 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                     const text = blocks[sid]?.[idx] || '';
                     const secLabel = EDITOR_SECTIONS.find(s => s.id === sid)?.short ?? sid;
                     return (
-                      <div key={key} className="bg-white rounded-md border border-blue-100 px-2.5 py-1.5">
-                        <span className="text-xs2 font-semibold text-blue-500 mr-1.5">{secLabel} · {idx + 1}</span>
-                        <p className="text-xs2 text-zinc-700 leading-relaxed mt-0.5 whitespace-pre-wrap">
-                          {text || <span className="text-zinc-400 italic">빈 단락</span>}
+                      <div key={key} className="bg-white rounded-md border border-brand-100 px-2.5 py-1.5">
+                        <span className="text-xs2 font-semibold text-brand-500 mr-1.5">{secLabel} · {idx + 1}</span>
+                        <p className="text-xs2 text-neutral-700 leading-relaxed mt-0.5 whitespace-pre-wrap">
+                          {text || <span className="text-neutral-400 italic">빈 단락</span>}
                         </p>
                       </div>
                     );
@@ -1623,33 +1620,33 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                 </div>
               </>
             ) : (
-              <p className="text-xs2 text-zinc-400 text-center py-2.5 px-3 leading-relaxed">
-                중앙에서 단락을 선택하면 여기에 표시됩니다.<br /><span className="text-zinc-500 font-medium">선택 없이 명령하면 전체 문서를 대상으로 합니다.</span>
+              <p className="text-xs2 text-neutral-400 text-center py-2.5 px-3 leading-relaxed">
+                중앙에서 단락을 선택하면 여기에 표시됩니다.<br /><span className="text-neutral-500 font-medium">선택 없이 명령하면 전체 문서를 대상으로 합니다.</span>
               </p>
             )}
           </div>
 
           {/* ── 하단: 대화 영역 — 영역 제목 바 ── */}
-          <div className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 bg-zinc-50 border-y border-zinc-200">
-            <span className="w-3.5 h-3.5 rounded-sm bg-zinc-300 text-white text-[7px] font-bold flex items-center justify-center leading-none" aria-hidden="true">AI</span>
-            <span className="text-xs2 font-semibold text-zinc-500 tracking-wide">대화 · 본문 수정</span>
-            <span className="ml-auto text-xs2 text-zinc-400">수정 명령 입력</span>
+          <div className="shrink-0 flex items-center gap-1.5 px-4 py-1 bg-neutral-50 border-y border-neutral-200">
+            <svg viewBox="0 0 16 16" fill="currentColor" width="11" height="11" className="text-neutral-400" aria-hidden="true"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
+            <span className="text-xs2 font-semibold text-neutral-500 tracking-wide">대화 · 본문 수정</span>
+            <span className="ml-auto text-xs2 text-neutral-400">수정 명령 입력</span>
           </div>
           {/* 대화 메시지 (스크롤 영역) */}
-          <div className={clsx('overflow-y-auto scroll-thin', selSet.size > 0 ? 'shrink-0 max-h-[30vh]' : 'flex-1')}>
+          <div className="flex-1 overflow-y-auto scroll-thin">
 
             {/* ── AI 채팅 메시지 ── */}
             <div className="px-3 py-2 space-y-3">
                 {chatMessages.length === 0 && (
                   <div className="py-1">
-                    <p className="text-xs2 text-zinc-400 mb-2">{selSet.size > 0 ? '선택한 단락에 이렇게 명령할 수 있습니다' : '단락을 선택하거나 전체 문서에 명령하세요'}</p>
+                    <p className="text-xs2 text-neutral-400 mb-2">{selSet.size > 0 ? '선택한 단락에 이렇게 명령할 수 있습니다' : '단락을 선택하거나 전체 문서에 명령하세요'}</p>
                     <div className="flex flex-col gap-1.5">
                       {(selSet.size > 0
                         ? ['더 간결하게 다듬어줘', '특허 문체로 바꿔줘', '구성요소의 결합 관계를 더 구체적으로 써줘']
                         : ['전체 문서를 검토해줘', '"본원 발명"을 "본 발명"으로 통일해줘', '청구항 1을 더 넓게 써줘']
                       ).map(q => (
                         <button key={q} type="button" onClick={() => sendChat(q)} disabled={planRunning || aiThinking}
-                          className="text-left text-sm2 text-zinc-600 px-2.5 py-1.5 rounded-lg border border-zinc-200 bg-white hover:bg-brand-50 hover:border-brand-200 hover:text-brand-700 transition-colors disabled:opacity-40">
+                          className="text-left text-sm2 text-neutral-600 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-brand-50 hover:border-brand-200 hover:text-brand-700 transition-colors disabled:opacity-40">
                           {q}
                         </button>
                       ))}
@@ -1668,16 +1665,16 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                         {m.text}
                       </div>
                     ) : (
-                      <div data-spec="SPC-EDT-030" className="rounded-xl text-xs2 leading-relaxed max-w-[88%] bg-zinc-100 text-zinc-800 overflow-hidden">
+                      <div data-spec="SPC-EDT-030" className="rounded-xl text-xs2 leading-relaxed max-w-[88%] bg-neutral-100 text-neutral-800 overflow-hidden">
                         {/* 의도 배지 */}
                         {m.intent && (
                           <div className="px-3 pt-2">
                             <span className={clsx('inline-block px-1.5 py-0.5 rounded-md text-xs2 font-semibold',
-                              m.intent.startsWith('edit') ? 'bg-blue-100 text-blue-700'
+                              m.intent.startsWith('edit') ? 'bg-brand-100 text-brand-700'
                               : m.intent === 'plan' ? 'bg-brand-50 text-brand-600'
                               : m.intent === 'clarify' ? 'bg-amber-100 text-amber-700'
                               : m.intent === 'replace_expression' ? 'bg-brand-50 text-brand-600'
-                              : m.intent === 'terminate' ? 'bg-gray-200 text-gray-500'
+                              : m.intent === 'terminate' ? 'bg-neutral-200 text-neutral-500'
                               : 'bg-emerald-100 text-emerald-700')}>
                               {INTENT_LABEL[m.intent]}
                             </span>
@@ -1691,7 +1688,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             {m.intentOptions.map((opt, i) => (
                               <button key={i}
                                 onClick={() => selectIntent(m.id, opt)}
-                                className="px-2.5 py-1 text-xs2 border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-colors">
+                                className="px-2.5 py-1 text-xs2 border border-brand-300 text-brand-600 rounded-lg hover:bg-brand-50 hover:border-brand-400 transition-colors">
                                 {opt}
                               </button>
                             ))}
@@ -1705,14 +1702,14 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                               <span className="text-xs2 font-semibold text-brand-600">
                                 플랜 · {Math.min(m.plan.current + (m.plan.status === 'done' ? 0 : 1), m.plan.steps.length)} / {m.plan.steps.length} 단계
                               </span>
-                              <span className="text-xs2 text-zinc-400">{m.plan.status === 'running' ? '진행 중' : m.plan.status === 'stopped' ? '중단됨' : '완료'}</span>
+                              <span className="text-xs2 text-neutral-400">{m.plan.status === 'running' ? '진행 중' : m.plan.status === 'stopped' ? '중단됨' : '완료'}</span>
                             </div>
                             <ol className="space-y-0.5 mb-2">
                               {m.plan.steps.map((st, si) => (
                                 <li key={si} className={clsx('flex items-start gap-1.5 text-xs2',
-                                  si < m.plan!.current ? 'text-zinc-400 line-through'
-                                  : si === m.plan!.current && m.plan!.status === 'running' ? 'text-zinc-800 font-semibold'
-                                  : 'text-zinc-500')}>
+                                  si < m.plan!.current ? 'text-neutral-400 line-through'
+                                  : si === m.plan!.current && m.plan!.status === 'running' ? 'text-neutral-800 font-semibold'
+                                  : 'text-neutral-500')}>
                                   <span className="shrink-0">{si < m.plan!.current ? '✓' : `${si + 1}.`}</span>
                                   <span>{st.title}</span>
                                 </li>
@@ -1721,7 +1718,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             {m.plan.status === 'running' && (
                               <div className="flex gap-1.5">
                                 <button onClick={() => advancePlan(m.id)} className="flex-1 py-1.5 text-xs2 font-semibold bg-brand-400 text-white rounded-lg hover:bg-brand-500">▶ {m.plan.current + 1}단계 진행</button>
-                                <button onClick={() => stopPlan(m.id)} className="px-3 py-1.5 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50">■ 중단</button>
+                                <button onClick={() => stopPlan(m.id)} className="px-3 py-1.5 text-xs2 font-semibold text-neutral-500 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50">■ 중단</button>
                               </div>
                             )}
                           </div>
@@ -1743,7 +1740,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                               ))}
                             </div>
                             <div className="px-2.5 pb-2.5">
-                              <button onClick={() => regenerate(m)} className="text-xs2 font-semibold text-zinc-500 hover:text-blue-600">↻ 다시 생성</button>
+                              <button onClick={() => regenerate(m)} className="text-xs2 font-semibold text-neutral-500 hover:text-brand-600">↻ 다시 생성</button>
                             </div>
                           </>
                         )}
@@ -1752,18 +1749,18 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                         {m.replacements && m.replacements.length > 0 && (
                           <div className="mx-2.5 mb-2.5 space-y-1.5">
                             {m.replacements.map((r, ri) => (
-                              <div key={ri} className="rounded-lg bg-white border border-zinc-200 px-2.5 py-2 flex items-center gap-2">
+                              <div key={ri} className="rounded-lg bg-white border border-neutral-200 px-2.5 py-2 flex items-center gap-2">
                                 <span className="text-xs2 bg-red-50 text-red-600 line-through rounded-md px-1.5 py-0.5 shrink-0 max-w-[38%] truncate" title={r.source}>{r.source}</span>
-                                <span className="text-zinc-400 text-xs2 shrink-0">→</span>
+                                <span className="text-neutral-400 text-xs2 shrink-0">→</span>
                                 <span className="text-xs2 bg-emerald-50 text-emerald-700 rounded-md px-1.5 py-0.5 shrink-0 max-w-[38%] truncate" title={r.target}>{r.target}</span>
                                 <div className="ml-auto flex gap-1 shrink-0">
                                   {r.status === 'pending' ? (
                                     <>
                                       <button onClick={() => applyReplacement(m.id, ri)} className="px-2 py-0.5 text-xs2 font-semibold bg-emerald-600 text-white rounded-md hover:bg-emerald-700">반영</button>
-                                      <button onClick={() => declineReplacement(m.id, ri)} className="px-2 py-0.5 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-md hover:bg-zinc-50">무시</button>
+                                      <button onClick={() => declineReplacement(m.id, ri)} className="px-2 py-0.5 text-xs2 font-semibold text-neutral-500 bg-white border border-neutral-200 rounded-md hover:bg-neutral-50">무시</button>
                                     </>
                                   ) : (
-                                    <span className={clsx('text-xs2 font-semibold', r.status === 'accepted' ? 'text-emerald-600' : 'text-zinc-400')}>
+                                    <span className={clsx('text-xs2 font-semibold', r.status === 'accepted' ? 'text-emerald-600' : 'text-neutral-400')}>
                                       {r.status === 'accepted' ? '✓ 적용됨' : '✕ 취소됨'}
                                     </span>
                                   )}
@@ -1791,7 +1788,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           </div>
 
           {/* 하단 채팅 입력창 */}
-          <div data-spec="SPC-EDT-050" className="border-t border-zinc-200 px-3 py-2.5 shrink-0 bg-white">
+          <div data-spec="SPC-EDT-050" className="border-t border-neutral-200 px-3 py-2.5 shrink-0 bg-white">
             {planRunning && (
               <div className="mb-2 text-xs2 text-brand-600 bg-brand-50 border border-brand-200 rounded-md px-2 py-1">
                 플랜 진행 중입니다 — 단계를 진행하거나 중단한 뒤 입력할 수 있습니다.
@@ -1849,14 +1846,14 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setTableModal(false)}>
           <div className="bg-white rounded-xl shadow-card-deep w-72 p-5" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base2 font-bold text-zinc-800 mb-4">표 삽입</h3>
+            <h3 className="text-base2 font-bold text-neutral-800 mb-4">표 삽입</h3>
             <div>
-              <label className="text-xs2 font-semibold text-zinc-600 mb-1 block">행 수</label>
+              <label className="text-xs2 font-semibold text-neutral-600 mb-1 block">행 수</label>
               <Input type="number" min={1} max={10} value={tableRows}
                 onChange={e => setTableRows(Number(e.target.value))}
                 className="py-1.5" />
             </div>
-            <p className="text-xs2 text-zinc-400 mt-2">열 수: 3 (고정)</p>
+            <p className="text-xs2 text-neutral-400 mt-2">열 수: 3 (고정)</p>
             <div className="flex gap-2 mt-4 justify-end">
               <Button variant="outlined" color="primary" size="sm" onClick={() => setTableModal(false)}>취소</Button>
               <Button variant="filled" color="primary" size="sm" onClick={insertTable}>삽입</Button>
@@ -1875,18 +1872,18 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             <div className="bg-white rounded-xl shadow-card-deep w-[560px]" onClick={e => e.stopPropagation()}>
 
               {/* 헤더 */}
-              <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-200">
-                <h3 className="text-base2 font-bold text-zinc-800">수식 입력 (TeX / LaTeX)</h3>
+              <div className="flex items-center justify-between px-5 py-3 border-b border-neutral-200">
+                <h3 className="text-base2 font-bold text-neutral-800">수식 입력 (TeX / LaTeX)</h3>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs2 text-zinc-400">모드:</span>
+                  <span className="text-xs2 text-neutral-400">모드:</span>
                   <button onClick={() => setFormulaMode('inline')}
                     className={clsx('px-2 py-1 rounded-md text-xs2',
-                      formulaMode === 'inline' ? 'bg-blue-100 text-blue-700 font-semibold' : 'bg-zinc-100 text-zinc-500')}>
+                      formulaMode === 'inline' ? 'bg-brand-100 text-brand-700 font-semibold' : 'bg-neutral-100 text-neutral-500')}>
                     인라인 ($...$)
                   </button>
                   <button onClick={() => setFormulaMode('block')}
                     className={clsx('px-2 py-1 rounded-md text-xs2',
-                      formulaMode === 'block' ? 'bg-blue-100 text-blue-700 font-semibold' : 'bg-zinc-100 text-zinc-500')}>
+                      formulaMode === 'block' ? 'bg-brand-100 text-brand-700 font-semibold' : 'bg-neutral-100 text-neutral-500')}>
                     블록 ($$...$$)
                   </button>
                 </div>
@@ -1895,7 +1892,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
               <div className="p-5 space-y-4">
                 {/* TeX 입력란 */}
                 <div>
-                  <label className="block text-xs2 font-semibold text-zinc-600 mb-1">TeX 수식</label>
+                  <label className="block text-xs2 font-semibold text-neutral-600 mb-1">TeX 수식</label>
                   <textarea autoFocus
                     className="w-full input py-2 font-mono text-base2 resize-none"
                     rows={3}
@@ -1908,11 +1905,11 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
 
                 {/* 실시간 렌더링 미리보기 */}
                 <div>
-                  <label className="block text-xs2 font-semibold text-zinc-600 mb-1">미리보기</label>
+                  <label className="block text-xs2 font-semibold text-neutral-600 mb-1">미리보기</label>
                   <div className={clsx(
                     'min-h-[60px] rounded-lg border px-4 py-3 flex items-center',
                     formulaMode === 'block' ? 'justify-center' : 'justify-start',
-                    preview?.error ? 'border-red-200 bg-red-50' : 'border-zinc-200 bg-zinc-50'
+                    preview?.error ? 'border-red-200 bg-red-50' : 'border-neutral-200 bg-neutral-50'
                   )}>
                     {preview ? (
                       preview.error ? (
@@ -1924,20 +1921,20 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                         />
                       )
                     ) : (
-                      <span className="text-zinc-400 text-xs2">수식을 입력하면 여기에 표시됩니다</span>
+                      <span className="text-neutral-400 text-xs2">수식을 입력하면 여기에 표시됩니다</span>
                     )}
                   </div>
                 </div>
 
                 {/* 자주 쓰는 TeX 템플릿 */}
                 <div>
-                  <label className="block text-xs2 font-semibold text-zinc-600 mb-1.5">자주 쓰는 TeX</label>
+                  <label className="block text-xs2 font-semibold text-neutral-600 mb-1.5">자주 쓰는 TeX</label>
                   <div className="flex flex-wrap gap-1">
                     {FORMULA_TEMPLATES.map(t => (
                       <button key={t.label}
                         onClick={() => setFormulaVal(v => v ? v + ' ' + t.tex : t.tex)}
                         title={t.title}
-                        className="px-2 py-1 border border-zinc-200 rounded-md text-xs2 font-mono hover:bg-zinc-100 hover:border-zinc-400 transition-colors">
+                        className="px-2 py-1 border border-neutral-200 rounded-md text-xs2 font-mono hover:bg-neutral-100 hover:border-neutral-400 transition-colors">
                         {t.label}
                       </button>
                     ))}

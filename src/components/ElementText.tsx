@@ -29,7 +29,7 @@ export function ElementText({ text, elements, onClickElement, className }: {
         title={tip}
         onClick={onClickElement ? (e) => { e.stopPropagation(); onClickElement(name); } : undefined}
         className={clsx(
-          'bg-brand-50 text-brand-700 rounded-sm px-0.5 font-medium not-italic',
+          'bg-transparent text-brand-700 font-medium not-italic',
           // 클릭 가능(전체 이름 변경)한 곳은 점선 밑줄로 '동작 있음'을 표시 — 읽기 전용 하이라이트와 구분
           onClickElement && 'cursor-pointer border-b border-dashed border-brand-400 hover:bg-brand-100 hover:border-solid transition-colors',
           className,
