@@ -1548,8 +1548,14 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             <span className="text-xs2 text-zinc-400 font-medium">본문 수정</span>
           </div>
 
+          {/* ── 상단: 정보 영역(선택 단락) — 하단 대화 영역과 영역 제목 바로 구분 ── */}
+          <div className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 bg-zinc-50 border-b border-zinc-200">
+            <Icon name="check" size={11} className="text-zinc-400" />
+            <span className="text-xs2 font-semibold text-zinc-500 tracking-wide">선택 단락</span>
+            <span className="ml-auto text-xs2 text-zinc-400">{selSet.size > 0 ? `${selSet.size}개 선택` : '미선택 · 전체 문서 대상'}</span>
+          </div>
           {/* 선택된 블록 컨텍스트 */}
-          <div className={clsx('border-b border-zinc-100', selSet.size > 0 ? 'flex-1 flex flex-col min-h-0 bg-white' : 'shrink-0 bg-zinc-50')}>
+          <div className={clsx(selSet.size > 0 ? 'flex-1 flex flex-col min-h-0 bg-white' : 'shrink-0 bg-white')}>
             {selSet.size === 1 ? (() => {
               const key = [...selSet][0];
               const dashIdx = key.indexOf('-');
@@ -1604,13 +1610,19 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                 </div>
               </>
             ) : (
-              <p className="text-xs2 text-zinc-400 text-center py-2 px-3 leading-relaxed">
-                <>중앙에서 단락을 선택하고<br /><span className="text-zinc-500 font-medium">수정 명령을 입력하세요</span><br /><span className="text-xs2 text-zinc-300">미선택 시 전체 문서 대상</span></>
+              <p className="text-xs2 text-zinc-400 text-center py-2.5 px-3 leading-relaxed">
+                중앙에서 단락을 선택하면 여기에 표시됩니다.<br /><span className="text-zinc-500 font-medium">선택 없이 명령하면 전체 문서를 대상으로 합니다.</span>
               </p>
             )}
           </div>
 
-          {/* 탭 본문 (스크롤 영역) */}
+          {/* ── 하단: 대화 영역 — 영역 제목 바 ── */}
+          <div className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 bg-zinc-50 border-y border-zinc-200">
+            <span className="w-3.5 h-3.5 rounded-sm bg-zinc-300 text-white text-[7px] font-bold flex items-center justify-center leading-none" aria-hidden="true">AI</span>
+            <span className="text-xs2 font-semibold text-zinc-500 tracking-wide">대화 · 본문 수정</span>
+            <span className="ml-auto text-xs2 text-zinc-400">수정 명령 입력</span>
+          </div>
+          {/* 대화 메시지 (스크롤 영역) */}
           <div className={clsx('overflow-y-auto scroll-thin', selSet.size > 0 ? 'shrink-0 max-h-[30vh]' : 'flex-1')}>
 
             {/* ── AI 채팅 메시지 ── */}

@@ -1088,8 +1088,8 @@ function confirmDelete(what: string, onOk: () => void, detail?: string) {
 // - AiEditButton: 항목 단위 'AI 수정' 토글 — 항목 헤더 행의 우측 끝(ml-auto)에 배치
 // - AiGlobalBar : 단계 전체 대상 지시 입력 + '전체 AI 수정' — 목록 상단에 배치
 // 색상은 brand(#3B8EF5) 계열로 통일 (index.css btn-primary 규약)
-const AiIcon = ({ size = 9 }: { size?: number }) => (
-  <svg viewBox="0 0 16 16" fill="currentColor" width={size} height={size} aria-hidden="true"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
+const AiIcon = ({ size = 9, className }: { size?: number; className?: string }) => (
+  <svg className={className} viewBox="0 0 16 16" fill="currentColor" width={size} height={size} aria-hidden="true"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
 );
 
 function AiEditButton({ active, onClick, title = 'AI 수정', className }: {
@@ -1946,12 +1946,14 @@ function GuidePanel({ step, confirmed, summary, mobileOpen, onMobileClose, chatI
         </div>
       </div>
 
+      {/* ── 상단: 정보 영역(확정 내용) — 하단 대화 영역과 영역 제목 바로 구분 ── */}
+      <div className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 ml-1.5 bg-neutral-50 border-b border-ck-border">
+        <Icon name="check" size={11} className="text-neutral-400" />
+        <span className="text-xs2 font-semibold text-neutral-500 tracking-wide">확정 내용</span>
+        {!!summary?.length && <span className="ml-auto text-xs2 text-neutral-400">{summary.length + 1}/{STEPS.length} 단계</span>}
+      </div>
       {/* 지금까지 확정된 내용 — 데모 InventionContext 패널 정합 (U12) */}
-      <div className="shrink-0 mx-3 mt-2 mb-1 rounded-lg border border-neutral-200 bg-white overflow-hidden">
-        <div className="px-3 py-1.5 bg-neutral-50 border-b border-neutral-200 flex items-center gap-1.5">
-          <span className="text-xs2 font-semibold text-neutral-600">지금까지 확정된 내용</span>
-          {!!summary?.length && <span className="text-xs2 text-neutral-400">{summary.length + 1}/{STEPS.length} 단계 확정</span>}
-        </div>
+      <div className="shrink-0 mx-3 mt-2 mb-1 ml-[18px] rounded-lg border border-neutral-200 bg-white overflow-hidden">
         {summary && summary.length > 0 ? (
           <dl className="px-3 py-2 space-y-1.5">
             {summary.map(row => (
@@ -1965,13 +1967,18 @@ function GuidePanel({ step, confirmed, summary, mobileOpen, onMobileClose, chatI
           <p className="px-3 py-2 text-xs2 text-neutral-400">단계를 확정하면 여기에 요약이 쌓입니다.</p>
         )}
       </div>
-      <p className="shrink-0 mx-3 mb-1 px-1 text-xs2 text-zinc-400">
-        항목 수정은 각 항목의 <span className="text-brand-500 font-semibold">AI 수정</span> 버튼으로 그 자리에서 요청하세요. 여기서는 단계 진행·작성 방법을 질문할 수 있습니다.
+      <p className="shrink-0 mx-3 mb-2 ml-[18px] px-1 text-xs2 text-zinc-400">
+        항목 수정은 각 항목의 <span className="text-brand-500 font-semibold">AI 수정</span> 버튼으로 그 자리에서 요청하세요.
       </p>
 
-
+      {/* ── 하단: 대화 영역 — 영역 제목 바 ── */}
+      <div className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 ml-1.5 bg-neutral-50 border-y border-ck-border">
+        <AiIcon size={11} className="text-neutral-400" />
+        <span className="text-xs2 font-semibold text-neutral-500 tracking-wide">대화 · 작성 안내</span>
+        <span className="ml-auto text-xs2 text-neutral-400">단계 진행·작성 방법 질문</span>
+      </div>
       {/* 채팅 영역 — flex-1로 남은 공간 차지 */}
-      <div data-spec="SPC-AST-010" className="flex-1 border-t border-ck-border ml-1.5 bg-white flex flex-col overflow-hidden">
+      <div data-spec="SPC-AST-010" className="flex-1 ml-1.5 bg-white flex flex-col overflow-hidden">
         {/* 메시지 이력 */}
         {guideChatMsgs.length > 0 && (
           <div className="flex-1 overflow-y-auto scroll-thin px-3 py-2 space-y-2 bg-zinc-50">
