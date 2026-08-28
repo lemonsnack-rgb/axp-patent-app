@@ -468,8 +468,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     ) as Record<SectionId, string[]>;
   });
 
-  // 편집 중인 블록 (textarea 활성화, 단일)
-  const [sel, setSel] = useState<{ sid: SectionId; idx: number } | null>({ sid: 'technical_field', idx: 0 });
+  // 편집 중인 블록 (textarea 활성화, 단일) — 진입 시에는 아무 단락도 편집 모드로 두지 않는다 (A1: 의도치 않은 덮어쓰기 방지)
+  const [sel, setSel] = useState<{ sid: SectionId; idx: number } | null>(null);
   const [drawingRefMenuOpen, setDrawingRefMenuOpen] = useState(false); // 본문 툴바: 도면 참조 삽입 메뉴
   const blockTaRef = useRef<HTMLTextAreaElement | null>(null);          // 현재 편집 중인 본문 textarea
   const caretRef = useRef<{ sid: SectionId; idx: number; start: number; end: number } | null>(null); // 마지막 캐럿 위치
@@ -1516,19 +1516,20 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
               return (
                 <>
                   <div className="flex items-center justify-between px-3 pt-2 pb-1.5 shrink-0 border-b border-zinc-100">
-                    <span className="text-xs2 font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md">
-                      {secLabel} · {idx + 1} 편집 중
+                    <span className="text-xs2 font-semibold text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded-md">
+                      선택 중 · {secLabel} {idx + 1}
                     </span>
                     <button onClick={() => setSelSet(new Set())} className="text-xs2 text-zinc-400 hover:text-zinc-600 transition-colors">
                       선택 해제
                     </button>
                   </div>
-                  <textarea
-                    className="flex-1 w-full px-4 py-2.5 text-base2 text-zinc-800 bg-white outline-none resize-none leading-relaxed overflow-y-auto border-0"
-                    value={blocks[sid]?.[idx] || ''}
-                    onChange={e => updateBlock(sid, idx, e.target.value)}
-                    placeholder="단락 내용을 입력하세요..."
-                  />
+                  {/* 선택 단락 미리보기(읽기 전용) — 패널에서는 본문을 편집하지 않는다. 본문 편집은 중앙 단락을 클릭해서. (A1) */}
+                  <div className="flex-1 min-h-0 overflow-y-auto scroll-thin px-4 py-2.5">
+                    <p className="text-sm2 text-zinc-700 leading-relaxed whitespace-pre-wrap">
+                      {(blocks[sid]?.[idx] || '').trim() || <span className="text-zinc-400 italic">(빈 단락)</span>}
+                    </p>
+                    <p className="mt-2 text-xs2 text-zinc-400">아래 입력창에 이 단락에 대한 <b className="text-zinc-500">수정 명령</b>을 입력하세요. 본문을 직접 고치려면 중앙의 단락을 클릭합니다.</p>
+                  </div>
                 </>
               );
             })() : selSet.size > 1 ? (

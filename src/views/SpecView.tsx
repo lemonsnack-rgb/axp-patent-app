@@ -3487,6 +3487,13 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange }
   // 중간명세서 다시 생성 — 생성 지시·선호 사항 반영 (mock: 전체 블록에 지시 반영)
   const regenerate = () => {
     if (genBusy || done) return;
+    // 편집 내용이 대체되므로 확인 후 실행 (A3, 데모 confirm 정합)
+    openAlertDialog(
+      { title: '중간명세서 다시 생성', description: '현재 편집한 블록 내용이 새 초안으로 대체됩니다. 계속할까요?', confirm: '다시 생성', cancel: '취소' },
+      { theme: 'primary', onConfirm: (ctrl) => { ctrl.close(); runRegenerate(); } },
+    );
+  };
+  const runRegenerate = () => {
     setGenBusy(true);
     setTimeout(() => {
       const instr = genInstr.trim() || '초안 재생성';
