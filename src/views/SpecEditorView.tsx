@@ -249,8 +249,8 @@ function ClaimsEditor({ blocks, onChange, elements = [], onClickElement }: {
       <div data-spec="SPC-EDT-090" className="space-y-2">
         <p className="text-xs2 text-zinc-400 py-3 text-center">청구항이 없습니다. 아래에서 추가하세요.</p>
         <div className="flex gap-2">
-          <button data-spec="SPC-EDT-094" onClick={addIndep} className="flex-1 py-1.5 text-xs2 font-semibold text-blue-600 border border-dashed border-blue-300 rounded-lg hover:bg-blue-50 transition-colors">+ 독립항 추가</button>
-          <button onClick={addDep} className="flex-1 py-1.5 text-xs2 font-semibold text-amber-600 border border-dashed border-amber-300 rounded-lg hover:bg-amber-50 transition-colors">+ 종속항 추가</button>
+          <button data-spec="SPC-EDT-094" onClick={addIndep} className="flex-1 py-1.5 text-xs2 font-semibold text-brand-600 border border-dashed border-brand-300 rounded-lg hover:bg-brand-50 transition-colors">+ 독립항 추가</button>
+          <button onClick={addDep} className="flex-1 py-1.5 text-xs2 font-semibold text-neutral-600 border border-dashed border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors">+ 종속항 추가</button>
         </div>
       </div>
     );
@@ -267,13 +267,13 @@ function ClaimsEditor({ blocks, onChange, elements = [], onClickElement }: {
         const isIndep = dep === null;
         const mismatch = dep !== null && (dep < 1 || dep >= no);
         return (
-          <div key={idx} className={clsx('rounded-lg border p-2', isIndep ? 'border-blue-300 bg-blue-50/30' : 'border-amber-200 bg-white ml-4')}>
+          <div key={idx} className={clsx('rounded-lg border border-neutral-200 bg-white p-2 border-l-[3px]', isIndep ? 'border-l-brand-400' : 'border-l-neutral-300 ml-4')}>
             <div className="flex items-center gap-1.5 mb-1">
               <span className="text-xs2 font-bold text-zinc-700">청구항 {no}</span>
               {isIndep ? (
-                <span className="text-xs2 px-1.5 py-px rounded-full bg-blue-100 text-blue-700 font-medium">독립항</span>
+                <span className="text-xs2 px-1.5 py-px rounded-full bg-brand-50 text-brand-600 font-medium">독립항</span>
               ) : (
-                <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', mismatch ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700')}>
+                <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', mismatch ? 'bg-red-100 text-red-600' : 'bg-neutral-100 text-neutral-600')}>
                   제{dep}항 종속{mismatch && ' ⚠ 번호 확인'}
                 </span>
               )}
@@ -310,8 +310,8 @@ function ClaimsEditor({ blocks, onChange, elements = [], onClickElement }: {
         );
       })}
       <div className="flex gap-2 pt-1">
-        <button data-spec="SPC-EDT-094" onClick={addIndep} className="flex-1 py-1.5 text-xs2 font-semibold text-blue-600 border border-dashed border-blue-300 rounded-lg hover:bg-blue-50 transition-colors">+ 독립항 추가</button>
-        <button onClick={addDep} className="flex-1 py-1.5 text-xs2 font-semibold text-amber-600 border border-dashed border-amber-300 rounded-lg hover:bg-amber-50 transition-colors">+ 종속항 추가</button>
+        <button data-spec="SPC-EDT-094" onClick={addIndep} className="flex-1 py-1.5 text-xs2 font-semibold text-brand-600 border border-dashed border-brand-300 rounded-lg hover:bg-brand-50 transition-colors">+ 독립항 추가</button>
+        <button onClick={addDep} className="flex-1 py-1.5 text-xs2 font-semibold text-neutral-600 border border-dashed border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors">+ 종속항 추가</button>
       </div>
     </div>
   );
@@ -1173,11 +1173,11 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
         <div className="flex items-center gap-0.5 shrink-0">
           <button onClick={undo} disabled={!undoStack.length} data-spec="SPC-EDT-061" title="실행 취소 (Ctrl+Z)"
             className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
-            <UndoIcon /><span>실행 취소</span>
+            <UndoIcon /><span className="max-xl:hidden">실행 취소</span>
           </button>
           <button onClick={redo} disabled={!redoStack.length} title="다시 실행 (Ctrl+Y)"
             className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
-            <RedoIcon /><span>다시 실행</span>
+            <RedoIcon /><span className="max-xl:hidden">다시 실행</span>
           </button>
           <div className="w-px h-5 bg-zinc-200 mx-1" />
           {ENABLE_TABLE_INSERT && (
@@ -1222,7 +1222,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           <button onClick={() => setFindOpen(o => !o)} data-spec="SPC-EDT-063" title="찾기/바꾸기 (Ctrl+F)"
             className={clsx('flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md transition-colors text-xs2', findOpen ? 'bg-blue-50 text-blue-700' : 'hover:bg-zinc-100 text-zinc-500')}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
-            <span>찾기</span>
+            <span className="max-xl:hidden">찾기</span>
           </button>
         </div>
         {!sel && (
@@ -1233,17 +1233,17 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           <button onClick={() => setEditorPreviewOpen(true)} data-spec="SPC-EDT-064" title="미리보기"
             className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 transition-colors text-zinc-500 text-xs2">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
-            <span>미리보기</span>
+            <span className="max-xl:hidden">미리보기</span>
           </button>
           <button onClick={() => exportDocx(task?.name ?? '명세서', editorPreviewSections, exportDrawings)} data-spec="SPC-EDT-065" title="DOCX 내보내기 (도면 포함)"
             className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 transition-colors text-zinc-600 text-xs2 font-medium">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><path d="M9 2v4h4"/><path d="M5 9h6M5 11h4"/></svg>
-            <span>DOCX</span>
+            <span className="max-xl:hidden">DOCX</span>
           </button>
           <button onClick={() => exportPdf(task?.name ?? '명세서', editorPreviewSections, exportDrawings)} data-spec="SPC-EDT-065" title="PDF 내보내기 (도면 포함, 인쇄)"
             className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 transition-colors text-zinc-600 text-xs2 font-medium">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><path d="M9 2v4h4"/><path d="M5.5 9.5h5M5.5 11.5h3"/></svg>
-            <span>PDF</span>
+            <span className="max-xl:hidden">PDF</span>
           </button>
         </div>
       </div>
@@ -1536,7 +1536,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
         <aside data-spec="SPC-EDT-010" className={clsx(
           'bg-white flex-col overflow-hidden',
           'md:flex md:relative md:shrink-0 md:border-l md:border-zinc-200',
-          'md:w-[360px] md:min-w-[320px]',
+          'md:w-[clamp(280px,28vw,360px)] md:min-w-[280px]',
           'max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-50',
           'max-md:h-[72vh] max-md:rounded-t-2xl max-md:shadow-2xl',
           'max-md:border-t max-md:border-zinc-200',
@@ -1556,8 +1556,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           </div>
           {/* 헤더 (48px) */}
           <div className="max-md:hidden md:flex shrink-0 items-center gap-2 px-4 border-b border-zinc-200 bg-gray-50" style={{ height: 48 }}>
-            <div className="w-5 h-5 rounded-md flex items-center justify-center text-white text-xs font-bold shrink-0"
-              style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
+            <div className="w-5 h-5 rounded-md flex items-center justify-center text-white text-xs font-bold shrink-0 bg-brand-400"><svg viewBox="0 0 16 16" fill="currentColor" width="10" height="10" aria-hidden="true"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg></div>
             <span className="text-base2 font-bold text-gray-800">AI 어시스턴트</span>
             <span className="text-xs2 text-zinc-400 font-medium">본문 수정</span>
           </div>
@@ -1641,6 +1640,22 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
 
             {/* ── AI 채팅 메시지 ── */}
             <div className="px-3 py-2 space-y-3">
+                {chatMessages.length === 0 && (
+                  <div className="py-1">
+                    <p className="text-xs2 text-zinc-400 mb-2">{selSet.size > 0 ? '선택한 단락에 이렇게 명령할 수 있습니다' : '단락을 선택하거나 전체 문서에 명령하세요'}</p>
+                    <div className="flex flex-col gap-1.5">
+                      {(selSet.size > 0
+                        ? ['더 간결하게 다듬어줘', '특허 문체로 바꿔줘', '구성요소의 결합 관계를 더 구체적으로 써줘']
+                        : ['전체 문서를 검토해줘', '"본원 발명"을 "본 발명"으로 통일해줘', '청구항 1을 더 넓게 써줘']
+                      ).map(q => (
+                        <button key={q} type="button" onClick={() => sendChat(q)} disabled={planRunning || aiThinking}
+                          className="text-left text-sm2 text-zinc-600 px-2.5 py-1.5 rounded-lg border border-zinc-200 bg-white hover:bg-brand-50 hover:border-brand-200 hover:text-brand-700 transition-colors disabled:opacity-40">
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {chatMessages.map((m) => (
                   <div key={m.id} className={clsx('flex gap-2', m.role === 'user' ? 'justify-end' : 'justify-start')}>
                     {m.role === 'ai' && (

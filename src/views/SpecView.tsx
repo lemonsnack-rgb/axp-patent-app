@@ -61,6 +61,18 @@ const STEP_LABEL: Partial<Record<StepId, string>> = {
 // 명세서 생성(중간명세서 → 에디터) mock 소요 시간. 실 API에서는 응답 도착 시 onDone 호출로 대체.
 const SPEC_GEN_MOCK_MS = 6600;
 
+// AI 어시스턴트 빈 대화 영역의 예시 질문 (심미성 A1) — 클릭하면 그대로 전송
+const GUIDE_EXAMPLES: Record<string, string[]> = {
+  description: ['제안기술과 종래기술은 어떻게 나누나요?', '채택하지 않은 항목은 어디에 영향이 있나요?', '표 항목은 왜 수정할 수 없나요?'],
+  images:      ['대표 이미지는 무엇에 쓰이나요?', '선택하지 않은 이미지는 어떻게 되나요?', '이미지를 나중에 추가할 수 있나요?'],
+  title:       ['발명의 명칭은 어떻게 정하나요?', '요약은 어디에 반영되나요?', '후보를 다시 생성하면 무엇이 바뀌나요?'],
+  components:  ['부호 100, 200은 어떤 규칙인가요?', '구성요소 명칭을 바꾸면 어디까지 바뀌나요?', '하위 구성요소는 어떻게 만들나요?'],
+  drawings:    ['참고만과 채택의 차이는?', '대표도면은 어디에 표시되나요?', 'CAD 변환은 무엇을 하나요?'],
+  claims:      ['추상화 수준은 어떻게 고르나요?', '장치항과 방법항의 차이는?', '종속항 분량은 어떻게 정하나요?'],
+  midspec:     ['중간명세서와 명세서의 차이는?', '명세서 생성은 얼마나 걸리나요?', '에디터에서 다시 돌아올 수 있나요?'],
+  default:     ['이 단계에서 무엇을 확인해야 하나요?', '확정 후 되돌릴 수 있나요?', '청구항은 어떻게 구성되나요?'],
+};
+
 // 단계별 실질 안내 — 8단계 동일 템플릿 대신 이 단계에서 실제로 할 일 1~2문장 (D7)
 const STEP_HINT: Partial<Record<StepId, string>> = {
   description: '채택할 항목만 체크해 두세요. 카드를 끌어 순서를 바꾸거나 제안/종래 기술 사이로 보낼 수 있고, 표 항목은 원문 그대로 반영됩니다.',
@@ -492,7 +504,7 @@ export function SpecView() {
 
 
           {/* Stepper — 3분할(다시시작 / 단계 / 진행표시)로 겹침 방지 */}
-          <div data-spec="SPC-WIZ-020" className="flex items-center border-b border-ck-border shrink-0 px-2 gap-1" style={{ height: 48 }}>
+          <div data-spec="SPC-WIZ-020" className="flex items-center border-b border-ck-border shrink-0 px-2 gap-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style={{ height: 48 }}>
             {/* 좌: 다시 시작 (아이콘, 폭 최소화) */}
             <div className="shrink-0">
               {(phase === 'flow' || phase === 'done') && (
@@ -544,6 +556,7 @@ export function SpecView() {
                       <span className={clsx(
                         'text-sm2 max-md:hidden',
                         active && 'max-md:inline text-brand-400 font-semibold',
+                        !active && 'max-xl:hidden',                                        // 좁은 폭: 현재 단계만 라벨, 나머지는 번호 원만 (L1)
                         isDone && !active && 'text-green-700 font-medium',
                         locked && 'text-gray-400',
                         !active && !isDone && !locked && 'text-gray-500',
@@ -1604,10 +1617,9 @@ function DescriptionItemCards({
                 onDragOver={e => { if (dragSrc) { e.preventDefault(); setDropHint(`${type}-${idx}`); } }}
                 onDrop={() => handleDrop(type, idx)}
                 className={clsx(
-                  'rounded-xl border-2 p-3 bg-white transition-all',
-                  isAdopted
-                    ? (accent === 'blue' ? 'border-blue-300' : 'border-amber-300')
-                    : 'border-zinc-200 opacity-50',
+                  'rounded-xl border p-3.5 bg-white transition-all',
+                  // 기본 상태는 중립 테두리 — 색 테두리는 편집/선택 상태 전용 (심미성 C2)
+                  isAdopted ? 'border-neutral-200 hover:border-neutral-300' : 'border-neutral-200 opacity-50',
                   dragSrc && dropHint === `${type}-${idx}` && !(dragSrc.type === type && dragSrc.idx === idx) && 'ring-2 ring-blue-400 ring-offset-1',
                   dragSrc && dragSrc.type === type && dragSrc.idx === idx && 'opacity-30',
                 )}
@@ -1669,9 +1681,7 @@ function DescriptionItemCards({
                       onClick={() => onMoveAcross(type, idx)}
                       className={clsx(
                         'inline-flex items-center h-6 px-2 rounded-lg text-xs2 font-medium border transition-colors',
-                        type === 'previous'
-                          ? 'text-blue-600 border-blue-200 bg-white hover:bg-blue-50'
-                          : 'text-amber-700 border-amber-200 bg-white hover:bg-amber-50',
+                        'text-neutral-500 border-transparent hover:bg-neutral-100 hover:text-neutral-700',
                       )}
                       title={type === 'previous' ? '이 항목을 제안기술 목록으로 보냅니다' : '이 항목을 종래기술 목록으로 보냅니다'}
                     >{type === 'previous' ? '← 제안기술로' : '종래기술로 →'}</button>
@@ -1693,7 +1703,7 @@ function DescriptionItemCards({
                   </div>
                 ) : (
                 <textarea
-                  className="w-full text-sm2 text-gray-700 leading-relaxed bg-transparent outline-none resize-none overflow-hidden"
+                  className="w-full text-base2 text-gray-700 leading-relaxed bg-transparent outline-none resize-none overflow-hidden"
                   value={item.content}
                   disabled={!isAdopted}
                   rows={1}
@@ -1929,8 +1939,7 @@ function GuidePanel({ step, confirmed, summary, mobileOpen, onMobileClose, chatI
 
       {/* 헤더 — 스텝바(48px)와 수직 정렬, 데스크탑 단일 행 */}
       <div className="max-md:hidden md:flex shrink-0 items-center gap-2 px-4 border-b border-ck-border bg-gray-50 ml-1.5" style={{ height: 48 }}>
-        <div className="w-5 h-5 rounded-md flex items-center justify-center text-white text-xs font-bold shrink-0"
-          style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
+        <div className="w-5 h-5 rounded-md flex items-center justify-center text-white text-xs font-bold shrink-0 bg-brand-400"><AiIcon size={10} /></div>
         <span className="text-sm font-bold text-gray-800">AI 어시스턴트</span>
         {isDone && (
           <span className="ml-auto inline-flex items-center gap-1 text-xs2 px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
@@ -1941,8 +1950,7 @@ function GuidePanel({ step, confirmed, summary, mobileOpen, onMobileClose, chatI
       {/* 모바일 헤더 — 기존 스타일 유지 */}
       <div className="md:hidden px-4 py-3 border-b border-ck-border bg-gray-50 shrink-0">
         <div className="flex items-center gap-2 mb-1.5">
-          <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs2 font-bold shrink-0"
-            style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
+          <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs2 font-bold shrink-0 bg-brand-400"><AiIcon size={10} /></div>
           <span className="text-base2 font-bold text-gray-800">AI 어시스턴트</span>
           <span className="text-xs2 text-neutral-400 font-medium">작성 안내</span>
           {isDone && (
@@ -1992,8 +2000,7 @@ function GuidePanel({ step, confirmed, summary, mobileOpen, onMobileClose, chatI
             {guideChatMsgs.map(m => (
               <div key={m.id} className={clsx('flex gap-1.5', m.role === 'user' ? 'justify-end' : 'justify-start')}>
                 {m.role === 'ai' && (
-                  <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[8px] font-bold text-white shrink-0"
-                    style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
+                  <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[8px] font-bold text-white shrink-0 bg-brand-400"><AiIcon size={10} /></div>
                 )}
                 {m.role === 'user' ? (
                   <div className="rounded-xl px-2.5 py-1.5 text-xs2 leading-relaxed max-w-[85%] bg-brand-400 text-white">
@@ -2032,7 +2039,19 @@ function GuidePanel({ step, confirmed, summary, mobileOpen, onMobileClose, chatI
             <div ref={guideChatEndRef} />
           </div>
         )}
-        {guideChatMsgs.length === 0 && <div className="flex-1" />}
+        {guideChatMsgs.length === 0 && (
+          <div className="flex-1 px-3 py-3">
+            <p className="text-xs2 text-neutral-400 mb-2">이런 것을 물어볼 수 있습니다</p>
+            <div className="flex flex-col gap-1.5">
+              {(GUIDE_EXAMPLES[step] ?? GUIDE_EXAMPLES.default).map(q => (
+                <button key={q} type="button" onClick={() => sendGuideChat(q)}
+                  className="text-left text-sm2 text-neutral-600 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-brand-50 hover:border-brand-200 hover:text-brand-700 transition-colors">
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {/* 입력창 — 항상 표시 */}
         <div className="shrink-0 flex gap-2 items-end px-3 py-2">
           <Textarea
@@ -3496,7 +3515,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                   />
                 )}
               </div>
-              <p className="text-sm2 text-gray-700 leading-relaxed whitespace-pre-wrap px-1"><ElementText text={claimText} elements={elements} /></p>
+              <p className="text-base2 text-gray-700 leading-relaxed whitespace-pre-wrap px-1"><ElementText text={claimText} elements={elements} /></p>
               {aiKey === `indepB-${ci}` && !done && (
                 <InlineAiEdit
                   placeholder="이 독립항을 어떻게 수정할지 지시해주세요"
@@ -3575,7 +3594,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                     <div className="px-2.5 pb-2">
                       {!done && dep.sel ? (
                         <textarea
-                          className="w-full text-sm2 text-gray-700 leading-relaxed bg-transparent outline-none resize-none overflow-hidden"
+                          className="w-full text-base2 text-gray-700 leading-relaxed bg-transparent outline-none resize-none overflow-hidden"
                           value={displayText}
                           rows={1}
                           onChange={e => {
@@ -3587,7 +3606,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                           ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                         />
                       ) : (
-                        <p className="text-sm2 text-gray-700 leading-relaxed"><ElementText text={displayText} elements={elements} /></p>
+                        <p className="text-base2 text-gray-700 leading-relaxed"><ElementText text={displayText} elements={elements} /></p>
                       )}
                       {/* 선행 근거 경고 — "상기 X"가 인용 독립항에 없으면 표시 (A2) */}
                       {ENABLE_ANTECEDENT_CHECK && dep.sel && (() => {
@@ -3803,7 +3822,7 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange, 
                   ) : (
                     <>
                     <div className="flex gap-2 px-3 py-2">
-                      <p className="flex-1 text-sm2 text-gray-700 leading-relaxed whitespace-pre-wrap"><ElementText text={block.content} elements={elements} /></p>
+                      <p className="flex-1 text-base2 text-gray-700 leading-relaxed whitespace-pre-wrap"><ElementText text={block.content} elements={elements} /></p>
                       {!done && (
                         <div className={clsx(
                           'flex items-center gap-1 shrink-0 self-start transition-opacity',
