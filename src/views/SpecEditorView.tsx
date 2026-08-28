@@ -1188,29 +1188,29 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           ← 작성 단계로
         </button>
         <div className="w-px h-5 bg-zinc-200 mx-1 self-center shrink-0" />
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-0.5 shrink-0">
           <button onClick={undo} disabled={!undoStack.length} title="실행 취소 (Ctrl+Z)"
-            className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
+            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
             <UndoIcon /><span>실행 취소</span>
           </button>
           <button onClick={redo} disabled={!redoStack.length} title="다시 실행 (Ctrl+Y)"
-            className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
+            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
             <RedoIcon /><span>다시 실행</span>
           </button>
           <div className="w-px h-5 bg-zinc-200 mx-1" />
           <button onClick={() => setTableModal(true)} disabled={!sel} title="표 삽입"
-            className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
+            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
             <TableIcon /><span>표</span>
           </button>
           <button onClick={() => setFormulaModal(true)} disabled={!sel} title="수식 입력"
-            className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
+            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
             <span className="font-serif text-base2 leading-none">∑</span><span>수식</span>
           </button>
           {/* 도면 참조 삽입 — 선택한 본문 블록의 커서 위치에 '(도 N 참조)' 삽입 */}
           <div className="relative">
             <button onClick={() => setDrawingRefMenuOpen(o => !o)} disabled={!sel || drawings.length === 0}
               title={drawings.length === 0 ? '도면이 없습니다' : '본문에 도면 참조 (도 N 참조) 삽입'}
-              className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
+              className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2.5 11l3.5-3 2.5 2 3-3.5 2 2"/></svg>
               <span>도면 참조</span><span className="text-xs2 leading-none">▾</span>
             </button>
@@ -1234,28 +1234,28 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           </div>
           <div className="w-px h-5 bg-zinc-200 mx-1" />
           <button onClick={() => setFindOpen(o => !o)} title="찾기/바꾸기 (Ctrl+F)"
-            className={clsx('flex items-center gap-1 px-2 py-1 rounded-md transition-colors text-xs2', findOpen ? 'bg-blue-50 text-blue-700' : 'hover:bg-zinc-100 text-zinc-500')}>
+            className={clsx('flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md transition-colors text-xs2', findOpen ? 'bg-blue-50 text-blue-700' : 'hover:bg-zinc-100 text-zinc-500')}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
             <span>찾기</span>
           </button>
         </div>
         {!sel && (
-          <span className="hidden lg:inline text-xs2 text-zinc-400 ml-2 truncate">단락을 클릭하면 표·수식·도면 참조를 넣을 수 있습니다</span>
+          <span className="hidden xl:block flex-1 min-w-0 text-xs2 text-zinc-400 ml-3 truncate">단락을 클릭하면 표·수식·도면 참조 삽입 가능</span>
         )}
         {/* 출력 그룹 — 편집 도구와 분리해 우측 정렬 (미리보기 · DOCX · PDF) */}
-        <div className="ml-auto flex items-center gap-0.5 pr-2">
+        <div className="ml-auto flex items-center gap-0.5 pr-2 shrink-0">
           <button onClick={() => setEditorPreviewOpen(true)} title="미리보기"
-            className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-zinc-100 transition-colors text-zinc-500 text-xs2">
+            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 transition-colors text-zinc-500 text-xs2">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
             <span>미리보기</span>
           </button>
           <button onClick={() => exportDocx(task?.name ?? '명세서', editorPreviewSections, exportDrawings)} title="DOCX 내보내기 (도면 포함)"
-            className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-zinc-100 transition-colors text-zinc-600 text-xs2 font-medium">
+            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 transition-colors text-zinc-600 text-xs2 font-medium">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><path d="M9 2v4h4"/><path d="M5 9h6M5 11h4"/></svg>
             <span>DOCX</span>
           </button>
           <button onClick={() => exportPdf(task?.name ?? '명세서', editorPreviewSections, exportDrawings)} title="PDF 내보내기 (도면 포함, 인쇄)"
-            className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-zinc-100 transition-colors text-zinc-600 text-xs2 font-medium">
+            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 transition-colors text-zinc-600 text-xs2 font-medium">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><path d="M9 2v4h4"/><path d="M5.5 9.5h5M5.5 11.5h3"/></svg>
             <span>PDF</span>
           </button>
