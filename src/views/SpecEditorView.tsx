@@ -853,6 +853,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       else next.add(key);
       return next;
     });
+    // 체크 상태와 편집(포커스) 상태가 어긋나지 않게: 편집 중인 단락을 체크 해제하면 편집도 끝내고,
+    // 다른 단락을 체크하면 이전 편집 상태를 닫는다 (해제 후에도 '선택된 것처럼' 남는 문제 방지)
+    setSel(null);
   };
 
   // ── 전체 문서 대상 mock Q&A ────────────────────────────────────────────
@@ -1282,6 +1285,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       <div
           ref={centerRef}
           className="flex-1 overflow-y-auto scroll-thin bg-zinc-50"
+          onClick={e => { if (e.target === e.currentTarget) setSel(null); }}
           onScroll={() => {
             if (!centerRef.current) return;
             const st = centerRef.current.scrollTop;
