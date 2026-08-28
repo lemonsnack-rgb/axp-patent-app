@@ -892,6 +892,18 @@ export function SpecView() {
                       >{specCount === 0 ? '도면 없이 다음 →' : '다음 →'}</button>
                     );
                   }
+                  if (curStep === 'components') {
+                    // 채택 구성요소에 빈 필드(영문명·상위어·정의)가 있으면 확인 후 진행 (A4)
+                    const incomplete = aiComponents.filter(c => c.sel && (!c.value_en.trim() || !c.hypernym_ko.trim() || !c.description.trim()));
+                    return (
+                      <button
+                        onClick={() => incomplete.length
+                          ? showConfirm(`보완이 필요한 구성요소 ${incomplete.length}개(${incomplete.map(c => c.value_ko || '(이름 없음)').slice(0, 3).join(', ')}${incomplete.length > 3 ? ' 외' : ''})가 있습니다. 영문명·상위어·정의가 비어 있으면 청구항·명세서에 그대로 반영됩니다. 그대로 진행할까요?`, () => confirm('components'))
+                          : confirm('components')}
+                        className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-brand-500 transition-colors"
+                      >다음 →</button>
+                    );
+                  }
                   if (curStep === 'images') {
                     // 선택 이미지 0개면 확인 후 진행 — 이후 도면·도면 설명이 비게 됨을 알린다 (A5)
                     const inc = context.drawings.filter(d => d.included !== false).length;
@@ -2067,7 +2079,8 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
     upd([...items, {
       id, ...EMPTY_COMP,
       value_ko: instr.length > 24 ? instr.slice(0, 24) : instr,
-      description: `${instr} (AI 제안 — 영문명·상위어를 보완하세요)`,
+      // 안내문을 값으로 넣지 않는다 — 빈 필드는 '보완 필요' 배지 + 진행 시 확인으로 안내 (A4)
+      description: '',
     }]);
     setAiInput('');
     setAiOpen(false);
@@ -2234,6 +2247,9 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                   )}>
                     {item.num || '—'}
                   </span>
+                  {item.sel && (!item.value_en.trim() || !item.hypernym_ko.trim() || !item.description.trim()) && (
+                    <span className="text-xs2 px-1.5 py-px rounded-md bg-amber-50 text-amber-700 font-medium shrink-0" title="영문명·상위어·정의 중 빈 항목이 있습니다. 채워 넣거나 채택을 해제하세요.">보완 필요</span>
+                  )}
                   {!done && (
                     <div className="flex items-center gap-px shrink-0 ml-auto">
                       {item.sel && (
@@ -2821,6 +2837,22 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
 }
 
 // ── 독립항 세트 권리범위 레이블 매핑 ──────────────────────────────────────────
+// ── 종속항 선행 근거(antecedent basis) 검증 (A2, 사용자 확정) ────────────
+// "상기 X"의 X가 인용 독립항 본문에 없으면 선행 근거 없음으로 본다. 텍스트 로직이라 mock·실데이터 무관.
+const ANTECEDENT_RE = /상기\s+([가-힣A-Za-z0-9·]+?)(?=(?:은|는|이|가|을|를|의|에|로|와|과|도|만|들)?(?:[\s,.;()]|$))/g;
+function findMissingAntecedents(depText: string, indepText: string): string[] {
+  const missing = new Set<string>();
+  const indep = indepText.replace(/\s+/g, '');
+  for (const m of depText.matchAll(ANTECEDENT_RE)) {
+    const term = m[1];
+    if (term.length < 2) continue;
+    // 명사 자체 또는 접미(부/단계/장치/모듈/수단) 제거형이 독립항에 있으면 통과
+    const variants = [term, term.replace(/(부|단계|장치|모듈|수단)$/, '')].filter(v => v.length >= 2);
+    if (!variants.some(v => indep.includes(v))) missing.add(term);
+  }
+  return [...missing];
+}
+
 const SCOPE_LABELS: Record<string, { label: string; sub: string }> = {
   BROAD:        { label: '넓은 권리범위', sub: '청구 범위 최대화 — 심사 대응 필요' },
   INTERMEDIATE: { label: '균형 권리범위', sub: '등록 가능성과 보호 범위 균형' },
@@ -3433,6 +3465,18 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
                       ) : (
                         <p className="text-sm2 text-gray-700 leading-relaxed">{displayText}</p>
                       )}
+                      {/* 선행 근거 경고 — "상기 X"가 인용 독립항에 없으면 표시 (A2) */}
+                      {dep.sel && (() => {
+                        const missing = findMissingAntecedents(displayText, claimText);
+                        if (!missing.length) return null;
+                        const list = missing.map(t => `'${t}'`).join(', ');
+                        return (
+                          <p className="mt-1.5 inline-flex items-start gap-1.5 text-xs2 text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1" title="종속항이 인용하는 구성요소가 독립항에 정의되어 있지 않습니다 (선행 근거 결함)">
+                            <span aria-hidden="true">⚠</span>
+                            <span>선행 근거 확인: {list}{missing.length > 1 ? '이(가)' : particle(missing[0], '이', '가')} 제{indepNum}항에 없습니다.</span>
+                          </p>
+                        );
+                      })()}
                       {aiKey === `dep-${ci}-${dep.id}` && !done && dep.sel && (
                         <InlineAiEdit
                           placeholder="이 종속항을 어떻게 수정할지 지시해주세요 (예: 한정 요소를 더 구체화해줘)"
