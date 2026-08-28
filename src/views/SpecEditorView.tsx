@@ -1157,12 +1157,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
 
       {/* 서브헤더 Row 1: 편집 툴바 */}
-      <div className="flex items-center border-b border-zinc-200 bg-white shrink-0 h-10">
-        <button onClick={onBack}
-          className="flex items-center gap-1 text-xs2 font-medium text-brand-600 hover:text-brand-700 px-3 h-7 mx-1 rounded-md hover:bg-zinc-100 transition-colors shrink-0">
-          ← 작성 단계로
-        </button>
-        <div className="w-px h-5 bg-zinc-200 mx-1 self-center shrink-0" />
+      <div className="flex items-center border-b border-zinc-200 bg-white shrink-0 h-10 pl-2">
         <div className="flex items-center gap-0.5 shrink-0">
           <button onClick={undo} disabled={!undoStack.length} title="실행 취소 (Ctrl+Z)"
             className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
@@ -1267,8 +1262,15 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
         </div>
       )}
 
-      {/* 서브헤더 Row 2: 섹션 탭 */}
-      <div className="flex border-b border-zinc-200 bg-white shrink-0 overflow-x-auto scroll-thin [mask-image:linear-gradient(to_right,transparent_0,black_8px,black_calc(100%-32px),transparent_100%)]">
+      {/* 서브헤더 Row 2: 내비게이션 — [← 작성 단계로] + 섹션 탭 (툴바는 편집 도구만, 이동은 이 줄에) */}
+      <div className="flex items-stretch border-b border-zinc-200 bg-white shrink-0">
+        <div className="flex items-center pl-3 pr-2 shrink-0 border-r border-zinc-200 my-1.5">
+          <button onClick={onBack} title="위저드(작성 단계)로 돌아갑니다 — 편집 내용은 저장됩니다"
+            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border border-brand-300 text-brand-600 text-xs2 font-semibold whitespace-nowrap hover:bg-brand-50 transition-colors">
+            ← 작성 단계로
+          </button>
+        </div>
+      <div className="flex flex-1 min-w-0 overflow-x-auto scroll-thin [mask-image:linear-gradient(to_right,transparent_0,black_8px,black_calc(100%-32px),transparent_100%)]">
         {EDITOR_SECTIONS.map(s => (
           <button key={s.id} onClick={() => goToSection(s.id)}
             className={clsx(
@@ -1281,8 +1283,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           </button>
         ))}
       </div>
-
-
+      </div>
 
       {/* 본문 — 전체 명세서 스크롤 */}
       <div
