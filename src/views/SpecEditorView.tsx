@@ -257,14 +257,14 @@ function ClaimsEditor({ blocks, onChange }: {
                 </span>
               )}
               <div className="ml-auto flex gap-0.5">
-                <button onClick={() => move(idx, -1)} disabled={idx === 0} className="w-5 h-5 rounded flex items-center justify-center text-zinc-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-20 transition-all" title="위로">
-                  <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 7l3-4 3 4"/></svg>
+                <button onClick={() => move(idx, -1)} disabled={idx === 0} className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-all" title="위로">
+                  <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="11" height="11"><path d="M2 7l3-4 3 4"/></svg>
                 </button>
-                <button onClick={() => move(idx, 1)} disabled={idx === items.length - 1} className="w-5 h-5 rounded flex items-center justify-center text-zinc-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-20 transition-all" title="아래로">
-                  <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 3l3 4 3-4"/></svg>
+                <button onClick={() => move(idx, 1)} disabled={idx === items.length - 1} className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-all" title="아래로">
+                  <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="11" height="11"><path d="M2 3l3 4 3-4"/></svg>
                 </button>
                 <button onClick={() => remove(idx)} className="w-5 h-5 rounded flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 transition-all" title="삭제">
-                  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" width="9" height="9"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>
+                  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" width="11" height="11"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>
                 </button>
               </div>
             </div>
@@ -375,20 +375,20 @@ function ProposalCard({ p, onAccept, onDecline, onRefine, onZoom }: {
   return (
     <div data-spec="SPC-EDT-031" className="rounded-lg bg-white border border-zinc-200 p-2.5">
       <div className="flex items-center gap-1.5 mb-1">
-        <span className={clsx('px-1.5 py-0.5 rounded text-[10px] font-bold',
+        <span className={clsx('px-1.5 py-0.5 rounded text-xs2 font-bold',
           p.action === 'DELETE' ? 'bg-red-100 text-red-600'
           : p.action === 'INSERT' ? 'bg-emerald-100 text-emerald-700'
           : p.action === 'REWRITE' ? 'bg-amber-100 text-amber-700'
           : 'bg-blue-100 text-blue-700')}>
           {EDIT_ACTION_LABEL[p.action]}
         </span>
-        <span className="text-[11px] text-zinc-500 truncate">{p.targetDesc}</span>
-        <button onClick={onZoom} className="ml-auto shrink-0 text-[11px] text-zinc-400 hover:text-blue-600 transition-colors" title="크게 보기">↗ 확대</button>
+        <span className="text-xs2 text-zinc-500 truncate">{p.targetDesc}</span>
+        <button onClick={onZoom} className="ml-auto shrink-0 text-xs2 text-zinc-400 hover:text-blue-600 transition-colors" title="크게 보기">↗ 확대</button>
       </div>
-      {p.summary && <p className="text-[11px] text-zinc-400 mb-1.5">{p.summary}</p>}
+      {p.summary && <p className="text-xs2 text-zinc-400 mb-1.5">{p.summary}</p>}
       {p.action !== 'INSERT' && p.source && (
         <div className="mb-1">
-          <p className="text-[10px] text-zinc-400 mb-0.5">Before</p>
+          <p className="text-xs2 text-zinc-400 mb-0.5">Before</p>
           <p className="text-xs2 leading-relaxed rounded px-2 py-1 bg-red-50/60 text-zinc-700 whitespace-pre-wrap max-h-32 overflow-y-auto scroll-thin">
             {diff ? <DiffText segs={diff.before} mode="before" /> : <span className="bg-red-100 text-red-700 line-through">{p.source}</span>}
           </p>
@@ -396,7 +396,7 @@ function ProposalCard({ p, onAccept, onDecline, onRefine, onZoom }: {
       )}
       {p.action !== 'DELETE' && (
         <div>
-          <p className="text-[10px] text-zinc-400 mb-0.5">After</p>
+          <p className="text-xs2 text-zinc-400 mb-0.5">After</p>
           <p className="text-xs2 leading-relaxed rounded px-2 py-1 bg-emerald-50/60 text-zinc-700 whitespace-pre-wrap max-h-32 overflow-y-auto scroll-thin">
             {diff ? <DiffText segs={diff.after} mode="after" /> : <span className="bg-emerald-100 text-emerald-800">{p.target}</span>}
           </p>
@@ -418,7 +418,7 @@ function ProposalCard({ p, onAccept, onDecline, onRefine, onZoom }: {
       {p.status === 'pending' && (
         <div className="flex gap-1 mt-1.5">
           <input
-            className="flex-1 min-w-0 text-[11px] px-2 py-1 border border-zinc-200 rounded-lg bg-zinc-50 outline-none focus:border-blue-400 focus:bg-white transition-colors"
+            className="flex-1 min-w-0 text-xs2 px-2 py-1 border border-zinc-200 rounded-lg bg-zinc-50 outline-none focus:border-blue-400 focus:bg-white transition-colors"
             placeholder="대신 이렇게 해줘 (보강 지시)..."
             value={refine}
             onChange={e => setRefine(e.target.value)}
@@ -427,7 +427,7 @@ function ProposalCard({ p, onAccept, onDecline, onRefine, onZoom }: {
           <button
             onClick={sendRefine}
             disabled={!refine.trim()}
-            className="shrink-0 text-[11px] font-semibold px-2 py-1 rounded-lg bg-zinc-800 text-white hover:bg-zinc-700 disabled:opacity-40 transition-colors"
+            className="shrink-0 text-xs2 font-semibold px-2 py-1 rounded-lg bg-zinc-800 text-white hover:bg-zinc-700 disabled:opacity-40 transition-colors"
           >보내기</button>
         </div>
       )}
@@ -439,18 +439,18 @@ function ProposalCard({ p, onAccept, onDecline, onRefine, onZoom }: {
 function ThinkingProgress({ steps, done }: { steps: ProgressStep[]; done: number }) {
   return (
     <div className="rounded-xl px-3 py-2 bg-zinc-100 border border-zinc-200">
-      <p className="text-[11px] font-semibold text-zinc-500 mb-1">요청 분석 중...</p>
+      <p className="text-xs2 font-semibold text-zinc-500 mb-1">요청 분석 중...</p>
       <div className="space-y-0.5">
         {steps.slice(0, done + 1).map((s, i) => {
           const finished = i < done;
           return (
             <div key={i} className="flex items-center gap-1.5" style={{ paddingLeft: s.depth * 14 }}>
               {finished ? (
-                <span className="text-emerald-600 text-[10px] shrink-0">✓</span>
+                <span className="text-emerald-600 text-xs2 shrink-0">✓</span>
               ) : (
                 <span className="w-2.5 h-2.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin shrink-0 inline-block" />
               )}
-              <span className={clsx('text-[11px]', finished ? 'text-zinc-400' : 'text-blue-700 font-semibold')}>{s.label}</span>
+              <span className={clsx('text-xs2', finished ? 'text-zinc-400' : 'text-blue-700 font-semibold')}>{s.label}</span>
             </div>
           );
         })}
@@ -596,7 +596,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     '제안기술': 'bg-blue-100 text-brand-400',
     '종래기술': 'bg-gray-100 text-gray-600',
     '배경':     'bg-zinc-100 text-zinc-600',
-    '효과':     'bg-violet-100 text-violet-700',
+    '효과':     'bg-brand-50 text-brand-600',
   };
 
   const compNames = (context?.elements ?? [])
@@ -1072,7 +1072,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-6" onClick={() => setZoomProposal(null)}>
         <div className="bg-white rounded-2xl shadow-card-deep max-w-3xl w-full max-h-[82vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-200 shrink-0">
-            <span className={clsx('px-1.5 py-0.5 rounded text-[10px] font-bold',
+            <span className={clsx('px-1.5 py-0.5 rounded text-xs2 font-bold',
               zoomProposal.action === 'DELETE' ? 'bg-red-100 text-red-600'
               : zoomProposal.action === 'INSERT' ? 'bg-emerald-100 text-emerald-700'
               : zoomProposal.action === 'REWRITE' ? 'bg-amber-100 text-amber-700'
@@ -1156,17 +1156,17 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       <div className="flex items-center border-b border-zinc-200 bg-white shrink-0 h-10">
         <button onClick={onBack}
           className="flex items-center gap-1 text-xs2 text-blue-600 hover:text-blue-800 px-3 h-full hover:bg-zinc-50 transition-colors shrink-0">
-          ← 분석 후보 보기
+          ← 작성 단계로
         </button>
         <div className="w-px h-5 bg-zinc-200 mx-1 self-center shrink-0" />
         <div className="flex items-center gap-0.5">
           <button onClick={undo} disabled={!undoStack.length} title="실행 취소 (Ctrl+Z)"
             className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
-            <UndoIcon /><span>취소</span>
+            <UndoIcon /><span>실행 취소</span>
           </button>
           <button onClick={redo} disabled={!redoStack.length} title="다시 실행 (Ctrl+Y)"
             className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
-            <RedoIcon /><span>재실행</span>
+            <RedoIcon /><span>다시 실행</span>
           </button>
           <div className="w-px h-5 bg-zinc-200 mx-1" />
           <button onClick={() => setTableModal(true)} disabled={!sel} title="표 삽입"
@@ -1183,7 +1183,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
               title={drawings.length === 0 ? '도면이 없습니다' : '본문에 도면 참조 (도 N 참조) 삽입'}
               className="flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2.5 11l3.5-3 2.5 2 3-3.5 2 2"/></svg>
-              <span>도면 참조</span><span className="text-[9px] leading-none">▾</span>
+              <span>도면 참조</span><span className="text-xs2 leading-none">▾</span>
             </button>
             {drawingRefMenuOpen && (
               <>
@@ -1231,18 +1231,18 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
               className={clsx('flex items-center gap-1 px-2 py-1 rounded transition-colors text-xs2', versionsOpen ? 'bg-blue-50 text-blue-700' : 'hover:bg-zinc-100 text-zinc-500')}>
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5V8l2.5 1.5"/></svg>
               <span>버전</span>
-              <span className="text-[10px] px-1 rounded bg-zinc-100 text-zinc-500 font-semibold">{versions.length}</span>
+              <span className="text-xs2 px-1 rounded bg-zinc-100 text-zinc-500 font-semibold">{versions.length}</span>
             </button>
             {versionsOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setVersionsOpen(false)} />
                 <div className="absolute left-0 top-full mt-1 z-20 w-64 max-h-72 overflow-y-auto scroll-thin rounded-lg border border-zinc-200 bg-white shadow-lg py-1">
-                  <p className="px-3 py-1.5 text-[10px] font-bold text-zinc-400 border-b border-zinc-100">버전 기록</p>
+                  <p className="px-3 py-1.5 text-xs2 font-bold text-zinc-400 border-b border-zinc-100">버전 기록</p>
                   {[...versions].reverse().map((v, i) => (
                     <div key={versions.length - 1 - i} className="px-3 py-1.5 flex items-center gap-2 text-xs2">
                       <span className="font-semibold text-zinc-600 shrink-0">{v.time}</span>
                       <span className="text-zinc-500 truncate">{v.label}</span>
-                      {i === 0 && <span className="ml-auto shrink-0 text-[10px] px-1 rounded bg-emerald-50 text-emerald-600 font-semibold">현재</span>}
+                      {i === 0 && <span className="ml-auto shrink-0 text-xs2 px-1 rounded bg-emerald-50 text-emerald-600 font-semibold">현재</span>}
                     </div>
                   ))}
                 </div>
@@ -1271,7 +1271,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           <button
             onClick={replaceAll}
             disabled={!findText || matchCount === 0}
-            className="text-xs2 font-semibold px-2.5 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 transition-colors"
+            className="text-xs2 font-semibold px-2.5 py-1 rounded-lg bg-brand-400 text-white hover:bg-brand-500 disabled:opacity-40 transition-colors"
           >전체 바꾸기</button>
           <span className="ml-auto text-xs2 text-zinc-400">{totalBlocks}단락 · {totalChars.toLocaleString()}자</span>
           <button onClick={() => setFindOpen(false)} className="text-zinc-400 hover:text-zinc-600 text-xs2 px-1" title="닫기">✕</button>
@@ -1339,7 +1339,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                                     <line x1="60" y1="42" x2="60" y2="52" strokeDasharray="3 2"/>
                                     <polyline points="100,28 110,28 110,64 78,64" strokeDasharray="3 2"/>
                                   </svg>
-                                  <span className="text-[11px] font-semibold text-zinc-400">{d.detail.symbol}</span>
+                                  <span className="text-xs2 font-semibold text-zinc-400">{d.detail.symbol}</span>
                                 </>
                               )}
                             </div>
@@ -1347,7 +1347,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             <div className="px-3 pt-2 pb-1.5">
                               <div className="flex items-center gap-1.5 mb-0.5">
                                 <span className="text-xs2 font-bold text-zinc-700">{d.detail.symbol}</span>
-                                <span className={clsx('text-[10px] px-1.5 py-px rounded-full font-medium', DRAWING_LABEL_STYLES[labelKo] ?? 'bg-zinc-100 text-zinc-500')}>{labelKo}</span>
+                                <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', DRAWING_LABEL_STYLES[labelKo] ?? 'bg-zinc-100 text-zinc-500')}>{labelKo}</span>
                               </div>
                               <p className="text-xs2 text-zinc-600 leading-snug">{d.detail.name}</p>
                             </div>
@@ -1356,8 +1356,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                               <button
                                 onClick={() => openEditorTab({ drawingId: String(idx), drawings: drawings.map(toWorkflowDrawingItem), components: [], references: [], drawingName: d.detail.name, timestamp: Date.now() })}
                                 title="도면 수정모드를 새 탭에서 엽니다 (범위 조정·CAD 변환)"
-                                className="inline-flex items-center gap-0.5 text-xs2 font-semibold text-zinc-500 hover:text-zinc-800 transition-colors shrink-0"
-                              >수정모드 <span className="text-[10px]">↗</span></button>
+                                className="inline-flex items-center gap-0.5 h-7 px-2 rounded-md text-xs2 font-semibold text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 transition-colors shrink-0"
+                              >수정모드 <span className="text-xs2">↗</span></button>
                             </div>
                           </div>
                         );
@@ -1412,8 +1412,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                           className={clsx(
                             'absolute left-2 top-3 w-4 h-4 rounded border-2 flex items-center justify-center transition-all cursor-pointer shrink-0',
                             isChecked
-                              ? 'bg-brand-400 border-blue-600 text-white'
-                              : 'border-gray-300 bg-white opacity-60 group-hover:opacity-100'
+                              ? 'bg-brand-400 border-brand-400 text-white'
+                              : 'border-gray-400 bg-white opacity-90 group-hover:opacity-100 group-hover:border-brand-400'
                           )}
                         >
                           {isChecked && <Icon name="check" size={8} />}
@@ -1424,15 +1424,15 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             <button
                               onClick={e => { e.stopPropagation(); moveBlock(sec.id, blockIdx, -1); }}
                               disabled={blockIdx === 0}
-                              className="w-5 h-5 rounded flex items-center justify-center text-zinc-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-20 transition-all"
+                              className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-all"
                               title="위로 이동"
-                            ><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 7l3-4 3 4"/></svg></button>
+                            ><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="11" height="11"><path d="M2 7l3-4 3 4"/></svg></button>
                             <button
                               onClick={e => { e.stopPropagation(); moveBlock(sec.id, blockIdx, 1); }}
                               disabled={blockIdx === blocks[sec.id].length - 1}
-                              className="w-5 h-5 rounded flex items-center justify-center text-zinc-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-20 transition-all"
+                              className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-all"
                               title="아래로 이동"
-                            ><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 3l3 4 3-4"/></svg></button>
+                            ><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="11" height="11"><path d="M2 3l3 4 3-4"/></svg></button>
                           </div>
                         )}
                         {/* 단락 삭제 버튼 */}
@@ -1448,7 +1448,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                                                         if (sel?.sid === sec.id && sel?.idx === blockIdx) { setSel(null); }
                             setSelSet(prev => { const n = new Set(prev); n.delete(`${sec.id}-${blockIdx}`); return n; });
                             }}
-                            className="absolute top-1.5 right-1.5 w-5 h-5 rounded flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                            className="absolute top-1.5 right-1.5 w-6 h-6 rounded-md flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
                             title="단락 삭제"
                           >
                             <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" width="10" height="10">
@@ -1618,12 +1618,12 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                 {chatMessages.map((m) => (
                   <div key={m.id} className={clsx('flex gap-2', m.role === 'user' ? 'justify-end' : 'justify-start')}>
                     {m.role === 'ai' && (
-                      <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center shrink-0 mt-0.5">
-                        <span className="text-[9px] font-bold text-white">AI</span>
+                      <div className="w-6 h-6 rounded-full bg-brand-400 flex items-center justify-center shrink-0 mt-0.5">
+                        <span className="text-xs2 font-bold text-white">AI</span>
                       </div>
                     )}
                     {m.role === 'user' ? (
-                      <div className="rounded-xl px-3 py-2 text-xs2 leading-relaxed max-w-[85%] bg-blue-600 text-white">
+                      <div className="rounded-xl px-3 py-2 text-xs2 leading-relaxed max-w-[85%] bg-brand-400 text-white">
                         {m.text}
                       </div>
                     ) : (
@@ -1631,11 +1631,11 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                         {/* 의도 배지 */}
                         {m.intent && (
                           <div className="px-3 pt-2">
-                            <span className={clsx('inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold',
+                            <span className={clsx('inline-block px-1.5 py-0.5 rounded text-xs2 font-semibold',
                               m.intent.startsWith('edit') ? 'bg-blue-100 text-blue-700'
-                              : m.intent === 'plan' ? 'bg-violet-100 text-violet-700'
+                              : m.intent === 'plan' ? 'bg-brand-50 text-brand-600'
                               : m.intent === 'clarify' ? 'bg-amber-100 text-amber-700'
-                              : m.intent === 'replace_expression' ? 'bg-cyan-100 text-cyan-700'
+                              : m.intent === 'replace_expression' ? 'bg-brand-50 text-brand-600'
                               : m.intent === 'terminate' ? 'bg-gray-200 text-gray-500'
                               : 'bg-emerald-100 text-emerald-700')}>
                               {INTENT_LABEL[m.intent]}
@@ -1659,12 +1659,12 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
 
                         {/* 플랜 진행 (PlanProgress: Step X of Y · Continue/Stop) */}
                         {m.plan && (
-                          <div data-spec="SPC-EDT-040" className="mx-2.5 mb-2.5 rounded-lg bg-white border border-violet-200 p-2.5">
+                          <div data-spec="SPC-EDT-040" className="mx-2.5 mb-2.5 rounded-lg bg-white border border-brand-200 p-2.5">
                             <div className="flex items-center justify-between mb-1.5">
-                              <span className="text-xs2 font-semibold text-violet-700">
+                              <span className="text-xs2 font-semibold text-brand-600">
                                 플랜 · {Math.min(m.plan.current + (m.plan.status === 'done' ? 0 : 1), m.plan.steps.length)} / {m.plan.steps.length} 단계
                               </span>
-                              <span className="text-[10px] text-zinc-400">{m.plan.status === 'running' ? '진행 중' : m.plan.status === 'stopped' ? '중단됨' : '완료'}</span>
+                              <span className="text-xs2 text-zinc-400">{m.plan.status === 'running' ? '진행 중' : m.plan.status === 'stopped' ? '중단됨' : '완료'}</span>
                             </div>
                             <ol className="space-y-0.5 mb-2">
                               {m.plan.steps.map((st, si) => (
@@ -1679,7 +1679,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             </ol>
                             {m.plan.status === 'running' && (
                               <div className="flex gap-1.5">
-                                <button onClick={() => advancePlan(m.id)} className="flex-1 py-1.5 text-xs2 font-semibold bg-violet-600 text-white rounded-lg hover:bg-violet-700">▶ {m.plan.current + 1}단계 진행</button>
+                                <button onClick={() => advancePlan(m.id)} className="flex-1 py-1.5 text-xs2 font-semibold bg-brand-400 text-white rounded-lg hover:bg-brand-500">▶ {m.plan.current + 1}단계 진행</button>
                                 <button onClick={() => stopPlan(m.id)} className="px-3 py-1.5 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50">■ 중단</button>
                               </div>
                             )}
@@ -1718,11 +1718,11 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                                 <div className="ml-auto flex gap-1 shrink-0">
                                   {r.status === 'pending' ? (
                                     <>
-                                      <button onClick={() => applyReplacement(m.id, ri)} className="px-2 py-0.5 text-[11px] font-semibold bg-emerald-600 text-white rounded hover:bg-emerald-700">반영</button>
-                                      <button onClick={() => declineReplacement(m.id, ri)} className="px-2 py-0.5 text-[11px] font-semibold text-zinc-500 bg-white border border-zinc-200 rounded hover:bg-zinc-50">무시</button>
+                                      <button onClick={() => applyReplacement(m.id, ri)} className="px-2 py-0.5 text-xs2 font-semibold bg-emerald-600 text-white rounded hover:bg-emerald-700">반영</button>
+                                      <button onClick={() => declineReplacement(m.id, ri)} className="px-2 py-0.5 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded hover:bg-zinc-50">무시</button>
                                     </>
                                   ) : (
-                                    <span className={clsx('text-[11px] font-semibold', r.status === 'accepted' ? 'text-emerald-600' : 'text-zinc-400')}>
+                                    <span className={clsx('text-xs2 font-semibold', r.status === 'accepted' ? 'text-emerald-600' : 'text-zinc-400')}>
                                       {r.status === 'accepted' ? '✓ 반영됨' : '✕ 무시됨'}
                                     </span>
                                   )}
@@ -1737,8 +1737,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                 ))}
                 {thinking && (
                   <div className="flex gap-2 justify-start">
-                    <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center shrink-0 mt-0.5">
-                      <span className="text-[9px] font-bold text-white">AI</span>
+                    <div className="w-6 h-6 rounded-full bg-brand-400 flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="text-xs2 font-bold text-white">AI</span>
                     </div>
                     <div className="max-w-[88%] flex-1">
                       <ThinkingProgress steps={thinking.steps} done={thinking.done} />
@@ -1752,7 +1752,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           {/* 하단 채팅 입력창 */}
           <div data-spec="SPC-EDT-050" className="border-t border-zinc-200 px-3 py-2.5 shrink-0 bg-white">
             {planRunning && (
-              <div className="mb-2 text-[11px] text-violet-600 bg-violet-50 border border-violet-200 rounded px-2 py-1">
+              <div className="mb-2 text-xs2 text-brand-600 bg-brand-50 border border-brand-200 rounded px-2 py-1">
                 플랜 진행 중입니다 — 단계를 진행하거나 중단한 뒤 입력할 수 있습니다.
               </div>
             )}
@@ -1776,7 +1776,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
               <button
                 onClick={() => sendChat()}
                 disabled={!chatInput.trim() || planRunning || aiThinking}
-                className="shrink-0 w-8 h-8 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center transition-colors">
+                className="shrink-0 w-8 h-8 rounded-xl bg-brand-400 hover:bg-brand-500 disabled:opacity-40 flex items-center justify-center transition-colors">
                 <svg viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" width="13" height="13">
                   <path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z" fill="white" stroke="none"/>
                 </svg>
@@ -1791,7 +1791,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
         onClick={() => setMobileAiOpen(true)}
         className={clsx(
           'md:hidden fixed bottom-5 right-4 z-30',
-          'w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-700 active:scale-95',
+          'w-12 h-12 rounded-full bg-brand-400 hover:bg-brand-500 active:scale-95',
           'shadow-lg flex items-center justify-center transition-all',
           mobileAiOpen && 'hidden',
         )}

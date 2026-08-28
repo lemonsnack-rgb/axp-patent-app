@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore, taskTypeMeta } from '../store';
 import { TaskItemSkeleton } from './ui/Skeleton';
 import { toast, openAlertDialog } from '@muhayu/axp-ui';
@@ -7,6 +7,24 @@ import { Icon } from './Icon';
 import { QuickNameModal } from './QuickNameModal';
 import { EmptyState } from './EmptyState';
 import type { Task } from '../types';
+import { loadSpecState } from '../features/spec/specStore';
+
+// 명세서 작업의 진행 단계 표시 (U11) — 위저드 8단계 + 에디터/완료
+const SPEC_STAGE: Record<string, [number, string]> = {
+  upload: [1, '업로드'], description: [2, '발명 설명'], images: [3, '이미지 선별'], title: [4, '제목·요약'],
+  components: [5, '구성요소'], drawings: [6, '명세서 도면'], claims: [7, '청구항'], midspec: [8, '중간명세서'],
+};
+function specStageOf(t: Task): { text: string; tone: 'progress' | 'done' } | null {
+  if (t.type !== 'spec') return null;
+  try {
+    const st = loadSpecState(t.id);
+    if (!st) return null;
+    if (st.mainView === 'editor') return { text: '에디터 편집 중', tone: 'done' };
+    if (st.phase === 'done') return { text: '분석 완료', tone: 'done' };
+    if (st.phase === 'flow') { const [n, label] = SPEC_STAGE[st.curStep] ?? [0, st.curStep]; return { text: `${n}/8 ${label}`, tone: 'progress' }; }
+    return null;
+  } catch { return null; }
+}
 
 export function Sidebar() {
   const {
@@ -181,6 +199,8 @@ function TaskRow({ t, active, onSelect, onToggleFav, menuOpen, onMenuToggle, onR
   const meta = taskTypeMeta(t.type);
   const ago = relTime(t.updatedAt);
   const menuRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stage = useMemo(() => specStageOf(t), [t.id, t.type, t.updatedAt]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -217,13 +237,19 @@ function TaskRow({ t, active, onSelect, onToggleFav, menuOpen, onMenuToggle, onR
             {t.name}
           </span>
           {(t.name === '직무발명서' || t.name === '미지정') && (
-            <span className="shrink-0 text-[10px] px-1 py-px bg-zinc-100 text-zinc-400 rounded font-medium">샘플</span>
+            <span className="shrink-0 text-xs2 px-1 py-px bg-zinc-100 text-zinc-400 rounded font-medium">샘플</span>
           )}
         </div>
-        <div className="text-xs2 text-zinc-400 mt-0.5 truncate">
-          {t.techField
-            ? <><span className="text-zinc-500 font-medium">{t.techField}</span> · {ago}</>
-            : ago}
+        <div className="text-xs2 text-zinc-400 mt-0.5 truncate flex items-center gap-1 min-w-0">
+          {stage && (
+            <span className={clsx('shrink-0 px-1.5 py-px rounded font-medium',
+              stage.tone === 'done' ? 'bg-green-50 text-green-700' : 'bg-brand-50 text-brand-600')}>{stage.text}</span>
+          )}
+          <span className="truncate">
+            {t.techField
+              ? <><span className="text-zinc-500 font-medium">{t.techField}</span> · {ago}</>
+              : ago}
+          </span>
         </div>
       </span>
       <button

@@ -251,10 +251,16 @@ export function SpecView() {
     }
   };
   const reselect = (id: StepId) => {
-    const p = { ...confirmed }; delete p[id];
-    setConfirmed(p); setCurStep(id); setGuideStep(id);
-    setStepAction(null);
-    setTimeout(() => scrollToStep(id), 60);
+    const doIt = () => {
+      const p = { ...confirmed }; delete p[id];
+      setConfirmed(p); setCurStep(id); setGuideStep(id);
+      setStepAction(null);
+      setTimeout(() => scrollToStep(id), 60);
+    };
+    // 이후 단계가 이미 확정되어 있으면 재확정이 필요함을 먼저 알린다 (U4)
+    const later = STEPS.filter(st => si(st.id) > si(id) && confirmed[st.id] && STEP_LABEL[st.id]).map(st => STEP_LABEL[st.id]);
+    if (later.length) showConfirm(`"${STEP_LABEL[id]}"을(를) 다시 선택하면 이후 단계(${later.join(' · ')})를 다시 확정해야 합니다. 계속할까요?`, doIt);
+    else doIt();
   };
   const scrollToStep = (id: StepId) => {
     flowRef.current?.querySelector<HTMLElement>(`[data-flowstep="${id}"]`)
@@ -625,10 +631,10 @@ export function SpecView() {
                       ) : (<>
                       <AiMsg text={
                         isSpecialStep(s.id) ? (
-                          <><strong>{STEP_LABEL[s.id]}</strong><br />
+                          <><strong className="text-base2 font-semibold text-gray-800">{STEP_LABEL[s.id]}</strong><br />
                           업로드 내용을 기반으로 {STEP_LABEL[s.id]} 항목을 준비했습니다. 아래에서 확인하고 항목을 채우세요.</>
                         ) : (
-                          <><strong>{STEP_LABEL[s.id]}</strong><br />
+                          <><strong className="text-base2 font-semibold text-gray-800">{STEP_LABEL[s.id]}</strong><br />
                           업로드 내용을 기반으로 {STEP_LABEL[s.id]} 후보를 생성했습니다. 아래에서 선택하거나 직접 입력하세요.</>
                         )
                       } />
@@ -822,14 +828,16 @@ export function SpecView() {
           <div className="shrink-0 border-t border-ck-border bg-white w-full">
             <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between">
               <div>
-                {STEPS.findIndex(s => s.id === guideStep) > 1 && (
+                {si(curStep) > 1 && (
                   <button
                     onClick={() => {
-                      const idx = STEPS.findIndex(s => s.id === guideStep);
-                      setGuideStep(STEPS[idx - 1].id);
-                      if (phase === 'done') setPhase('flow');
+                      // 보기 이동만 — 확정 상태는 바꾸지 않는다 (재확정은 '다시 선택'으로) (U4)
+                      const prev = STEPS[si(curStep) - 1].id;
+                      setExpandedDone(p => ({ ...p, [prev]: true }));
+                      gotoFlowStep(prev);
                     }}
                     className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+                    title="이전 단계 내용 보기"
                   >← 이전</button>
                 )}
               </div>
@@ -849,8 +857,8 @@ export function SpecView() {
                       >{stepAction.label}</button>
                     </>);
                   }
-                  if (guideStep === 'midspec') return null; // 중간명세서는 패널이 '명세서 생성' 동작을 등록
-                  if (guideStep === 'drawings') {
+                  if (curStep === 'midspec') return null; // 중간명세서는 패널이 '명세서 생성' 동작을 등록
+                  if (curStep === 'drawings') {
                     // 도면 0개면 확인 후 진행 — 별도 '건너뛰기' 버튼 없이 한 경로로 (U2)
                     const specCount = context.drawings.filter(d => d.included !== false && d.useForSpec).length;
                     return (
@@ -862,10 +870,10 @@ export function SpecView() {
                       >{specCount === 0 ? '도면 없이 다음 →' : '다음 →'}</button>
                     );
                   }
-                  const canGo = isSpecialStep(guideStep) || !!gSel[guideStep]?.trim();
+                  const canGo = isSpecialStep(curStep) || !!gSel[curStep]?.trim();
                   return (
                     <button
-                      onClick={() => { if (canGo) confirm(guideStep); }}
+                      onClick={() => { if (canGo) confirm(curStep); }}
                       disabled={!canGo}
                       className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-brand-500 disabled:opacity-40 transition-colors"
                     >다음 →</button>
@@ -890,6 +898,7 @@ export function SpecView() {
             key={`guide-panel-${guideStep}`}
             step={guideStep}
             confirmed={confirmed}
+            summary={STEPS.filter(st => confirmed[st.id] && STEP_LABEL[st.id]).map(st => ({ label: STEP_LABEL[st.id]!, value: doneSummary(st.id) }))}
             mobileOpen={mobileGuideOpen}
             onMobileClose={() => setMobileGuideOpen(false)}
             chatInputRef={guidePanelInputRef}
@@ -1013,7 +1022,7 @@ function AiPendingCard({ title, instruction, changes, onApply, onCancel, classNa
           <div key={i} className="px-3 py-2 space-y-1">
             <div className="flex items-center gap-1.5">
               <span className={clsx(
-                'text-[10px] font-bold px-1.5 py-0.5 rounded',
+                'text-xs2 font-bold px-1.5 py-0.5 rounded',
                 c.tag === '추가' ? 'bg-green-50 text-green-700' : c.tag === '삭제' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-700',
               )}>{c.tag}</span>
               {c.label && <span className="text-xs2 font-semibold text-neutral-700">{c.label}</span>}
@@ -1471,20 +1480,20 @@ function DescriptionItemCards({
                     onDragStart={() => setDragSrc({ type, idx })}
                     onDragEnd={() => { setDragSrc(null); setDropHint(null); }}
                     className="flex items-center gap-0.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing shrink-0 select-none text-xs2 leading-none px-1 py-0.5 rounded border border-gray-200 hover:border-blue-300 transition-colors"
-                    title="드래그하여 순서 변경 / 반대편 기술로 이동"
+                    title="끌어서 순서 변경 (반대편 기술로도 끌어 놓을 수 있음)"
+                    aria-label="끌어서 순서 변경"
                   >
-                    <svg viewBox="0 0 10 10" width="9" height="9" fill="currentColor"><circle cx="3" cy="2" r="1"/><circle cx="7" cy="2" r="1"/><circle cx="3" cy="5" r="1"/><circle cx="7" cy="5" r="1"/><circle cx="3" cy="8" r="1"/><circle cx="7" cy="8" r="1"/></svg>
-                    이동
+                    <svg viewBox="0 0 10 10" width="11" height="11" fill="currentColor"><circle cx="3" cy="2" r="1"/><circle cx="7" cy="2" r="1"/><circle cx="3" cy="5" r="1"/><circle cx="7" cy="5" r="1"/><circle cx="3" cy="8" r="1"/><circle cx="7" cy="8" r="1"/></svg>
                   </span>
                   <span className="text-xs2 text-gray-400 font-medium">{sublabel}</span>
                   <div className="ml-auto flex items-center gap-0.5 shrink-0">
                     <button onClick={() => onReorder(type, idx, idx - 1)} disabled={idx === 0}
-                      className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20 transition-colors" title="위로">
-                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 7l3-4 3 4"/></svg>
+                      className="w-6 h-6 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-colors" title="위로">
+                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="11" height="11"><path d="M2 7l3-4 3 4"/></svg>
                     </button>
                     <button onClick={() => onReorder(type, idx, idx + 1)} disabled={idx === items.length - 1}
-                      className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20 transition-colors" title="아래로">
-                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 3l3 4 3-4"/></svg>
+                      className="w-6 h-6 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-colors" title="아래로">
+                      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="11" height="11"><path d="M2 3l3 4 3-4"/></svg>
                     </button>
                     {isAdopted && item.type !== 'table' && (
                       <AiEditButton
@@ -1537,9 +1546,9 @@ function DescriptionItemCards({
                         ? 'text-blue-600 border-blue-200 hover:bg-blue-50'
                         : 'text-amber-600 border-amber-200 hover:bg-amber-50',
                     )}
-                    title={type === 'previous' ? '이 항목을 제안기술로 이동' : '이 항목을 종래기술로 이동'}
+                    title={type === 'previous' ? '이 항목을 제안기술 목록으로 보냅니다' : '이 항목을 종래기술 목록으로 보냅니다'}
                   >
-                    {type === 'previous' ? '← 제안기술로 이동' : '종래기술로 이동 →'}
+                    {type === 'previous' ? '← 제안기술로 보내기' : '종래기술로 보내기 →'}
                   </button>
                 </div>
               </div>
@@ -1631,9 +1640,10 @@ function DescriptionItemCards({
   );
 }
 
-function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, chatInputRef }: {
+function GuidePanel({ step, confirmed, summary, mobileOpen, onMobileClose, chatInputRef }: {
   step: StepId;
   confirmed: Partial<Record<StepId, string>>;
+  summary?: { label: string; value: string }[];   // 지금까지 확정된 내용 (데모 InventionContext 패널 정합) (U12)
   mobileOpen?: boolean;
   onMobileClose?: () => void;
   chatInputRef?: React.RefObject<HTMLTextAreaElement | null>;
@@ -1781,12 +1791,28 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, chatInputRef }
         </div>
       </div>
 
-      {/* 안내 — 항목 수정은 본문 인라인 AI 수정으로 통일 (사이드패널 미사용) */}
-      <div className="shrink-0 mx-3 mt-2 mb-1 px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg">
-        <p className="text-xs2 text-zinc-400">
-          항목 수정은 각 카드의 <span className="text-blue-500 font-semibold">AI 수정</span> 버튼으로 그 자리에서 요청하세요. 여기서는 단계 진행·작성 방법을 질문할 수 있습니다.
-        </p>
+      {/* 지금까지 확정된 내용 — 데모 InventionContext 패널 정합 (U12) */}
+      <div className="shrink-0 mx-3 mt-2 mb-1 rounded-lg border border-neutral-200 bg-white overflow-hidden">
+        <div className="px-3 py-1.5 bg-neutral-50 border-b border-neutral-200 flex items-center gap-1.5">
+          <span className="text-xs2 font-semibold text-neutral-600">지금까지 확정된 내용</span>
+          <span className="text-xs2 text-neutral-400">{summary?.length ?? 0}단계</span>
+        </div>
+        {summary && summary.length > 0 ? (
+          <dl className="px-3 py-2 space-y-1.5">
+            {summary.map(row => (
+              <div key={row.label} className="grid grid-cols-[64px_1fr] gap-2 items-start">
+                <dt className="text-xs2 text-neutral-400 leading-relaxed">{row.label}</dt>
+                <dd className="text-xs2 text-neutral-700 leading-relaxed m-0 break-words">{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="px-3 py-2 text-xs2 text-neutral-400">단계를 확정하면 여기에 요약이 쌓입니다.</p>
+        )}
       </div>
+      <p className="shrink-0 mx-3 mb-1 px-1 text-xs2 text-zinc-400">
+        항목 수정은 각 카드의 <span className="text-brand-500 font-semibold">AI 수정</span> 버튼으로 그 자리에서 요청하세요. 여기서는 단계 진행·작성 방법을 질문할 수 있습니다.
+      </p>
 
 
       {/* 채팅 영역 — flex-1로 남은 공간 차지 */}
@@ -1808,11 +1834,11 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, chatInputRef }
                   <div data-spec="SPC-AST-030" className="rounded-xl text-xs2 leading-relaxed max-w-[85%] bg-zinc-200 text-zinc-800 overflow-hidden">
                     {m.intent && (
                       <div className="px-2.5 pt-1.5">
-                        <span className={clsx('inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold',
+                        <span className={clsx('inline-block px-1.5 py-0.5 rounded text-xs2 font-semibold',
                           m.intent.startsWith('edit') ? 'bg-blue-100 text-blue-700'
                           : m.intent === 'clarify' ? 'bg-amber-100 text-amber-700'
                           : m.intent === 'terminate' ? 'bg-gray-200 text-gray-500'
-                          : 'bg-emerald-100 text-emerald-700')}>
+                          : 'bg-green-100 text-green-700')}>
                           {INTENT_LABEL[m.intent]}
                         </span>
                       </div>
@@ -2098,7 +2124,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
               <button
                 onClick={submitAiComponent}
                 disabled={!aiInput.trim()}
-                className="shrink-0 text-xs2 font-semibold px-2.5 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                className="shrink-0 text-xs2 font-semibold px-2.5 py-1 rounded-lg bg-brand-400 text-white hover:bg-brand-500 disabled:opacity-40 transition-colors"
               >추가</button>
             </div>
           </div>
@@ -2162,21 +2188,21 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                         />
                       )}
                       <button onClick={() => moveUp(idx)} disabled={idx===0}
-                        className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20" title="위로">
-                        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 7l3-4 3 4"/></svg>
+                        className="w-6 h-6 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-colors" title="위로">
+                        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="11" height="11"><path d="M2 7l3-4 3 4"/></svg>
                       </button>
                       <button onClick={() => moveDown(idx)} disabled={idx===items.length-1}
-                        className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20" title="아래로">
-                        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 3l3 4 3-4"/></svg>
+                        className="w-6 h-6 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-colors" title="아래로">
+                        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="11" height="11"><path d="M2 3l3 4 3-4"/></svg>
                       </button>
                       <span className="w-px h-3 bg-gray-200 mx-0.5" />
                       <button onClick={() => indent(item.id)} disabled={!canIndent(idx, item)}
-                        className="p-0.5 text-gray-400 hover:text-violet-500 disabled:opacity-20" title="하위로 (→)">
-                        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 5h6M6 3l2 2-2 2"/></svg>
+                        className="w-6 h-6 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-colors" title="하위로 (→)">
+                        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="11" height="11"><path d="M2 5h6M6 3l2 2-2 2"/></svg>
                       </button>
                       <button onClick={() => outdent(item.id)} disabled={item.depth<=0}
-                        className="p-0.5 text-gray-400 hover:text-violet-500 disabled:opacity-20" title="상위로 (←)">
-                        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M8 5H2M4 3L2 5l2 2"/></svg>
+                        className="w-6 h-6 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-colors" title="상위로 (←)">
+                        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="11" height="11"><path d="M8 5H2M4 3L2 5l2 2"/></svg>
                       </button>
                     </div>
                   )}
@@ -2312,7 +2338,7 @@ const DRAWING_LABEL_MAP: Record<string, { text: string; cls: string }> = {
   proposed_implementation: { text: '제안기술', cls: 'bg-blue-100 text-brand-400' },
   previous_implementation: { text: '종래기술', cls: 'bg-gray-100 text-gray-600' },
   background:              { text: '배경',     cls: 'bg-zinc-100 text-zinc-600' },
-  effect:                  { text: '효과',     cls: 'bg-violet-100 text-violet-700' },
+  effect:                  { text: '효과',     cls: 'bg-amber-100 text-amber-700' },
 };
 
 function toWorkflowDrawingItem(drawing: Drawing, idx: number): WorkflowDrawingItem {
@@ -2562,13 +2588,13 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                           className="absolute top-1.5 right-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-lg shadow-sm bg-white/95 border border-gray-200 transition-all"
                           title="대표 이미지 (1개만)"
                         >
-                          <span className={clsx('w-4 h-4 rounded-full border-2 flex items-center justify-center', isRep ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white')}>
+                          <span className={clsx('w-4 h-4 rounded-full border-2 flex items-center justify-center', isRep ? 'border-brand-400 bg-brand-400' : 'border-gray-300 bg-white')}>
                             {isRep && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                           </span>
                           <span className={clsx('text-xs2 font-semibold', isRep ? 'text-blue-700' : 'text-gray-500')}>대표</span>
                         </button>
                       )}
-                      {done && isRep && <span className="absolute top-1.5 right-1.5 text-xs2 px-2 py-0.5 rounded-full font-semibold bg-blue-600 text-white">대표</span>}
+                      {done && isRep && <span className="absolute top-1.5 right-1.5 text-xs2 px-2 py-0.5 rounded-full font-semibold bg-brand-400 text-white">대표</span>}
                     </>
                   ))}
                   <div className="px-2.5 pt-1.5 pb-1">
@@ -2596,7 +2622,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                     <div className="flex border-t border-gray-100">
                       <button
                         onClick={() => removeDrawing(idx)}
-                        className="flex-1 py-1.5 text-xs2 font-semibold text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                        className="ml-auto inline-flex items-center gap-1 h-7 px-2 mr-1 my-0.5 rounded-md text-xs2 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
                         title="목록에서 삭제"
                       >삭제</button>
                     </div>
@@ -2653,13 +2679,13 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                           className="absolute top-1.5 right-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-lg shadow-sm bg-white/95 border border-gray-200 transition-all"
                           title="대표도면 (1개만)"
                         >
-                          <span className={clsx('w-4 h-4 rounded-full border-2 flex items-center justify-center', isRep ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white')}>
+                          <span className={clsx('w-4 h-4 rounded-full border-2 flex items-center justify-center', isRep ? 'border-brand-400 bg-brand-400' : 'border-gray-300 bg-white')}>
                             {isRep && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                           </span>
                           <span className={clsx('text-xs2 font-semibold', isRep ? 'text-blue-700' : 'text-gray-500')}>대표</span>
                         </button>
                       )}
-                      {done && isForSpec && isRep && <span className="absolute top-1.5 right-1.5 text-xs2 px-2 py-0.5 rounded-full font-semibold bg-blue-600 text-white">대표</span>}
+                      {done && isForSpec && isRep && <span className="absolute top-1.5 right-1.5 text-xs2 px-2 py-0.5 rounded-full font-semibold bg-brand-400 text-white">대표</span>}
                     </>
                   ))}
                   <div className="px-2.5 pt-1.5 pb-1">
@@ -3001,7 +3027,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
               <button
                 onClick={addSlot}
                 disabled={done || preference.slots.length >= 3}
-                className="text-xs2 font-semibold text-purple-600 hover:text-purple-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="text-xs2 font-semibold text-brand-500 hover:text-brand-600 disabled:opacity-30 disabled:cursor-not-allowed"
               >+ 청구항 추가</button>
             </div>
             <div className="space-y-1.5">
@@ -3009,7 +3035,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
                 <div key={i} className="flex items-center gap-1.5">
                   <span className="text-xs2 text-gray-300 w-4 shrink-0 text-right">{i + 1}</span>
                   <select
-                    className="text-xs2 font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded px-1.5 py-1 outline-none focus:border-purple-400 transition-colors shrink-0 disabled:opacity-60"
+                    className="text-xs2 font-semibold text-neutral-700 bg-neutral-100 border border-neutral-200 rounded-lg px-1.5 py-1 outline-none focus:border-brand-400 transition-colors shrink-0 disabled:opacity-60"
                     value={slot.category}
                     disabled={done}
                     onChange={e => updateSlotCategory(i, e.target.value)}
@@ -3019,7 +3045,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
                     ))}
                   </select>
                   <input
-                    className="flex-1 min-w-0 text-xs2 bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-purple-300 transition-colors disabled:bg-gray-50"
+                    className="flex-1 min-w-0 text-xs2 bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-brand-400 transition-colors disabled:bg-gray-50"
                     placeholder="이 청구항의 방향·강조점 (선택)"
                     value={slot.description}
                     disabled={done}
@@ -3046,7 +3072,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
               value={genInstruction}
               onChange={e => setGenInstruction(e.target.value)}
             />
-            <p className="text-xs2 text-gray-400">설정을 마쳤으면 하단의 <b className="text-gray-600">독립항 세트 생성 →</b> 버튼을 누르세요.</p>
+            <p className="text-xs2 text-gray-400">기본 설정(균형 · 장치항+방법항) 그대로 생성해도 됩니다. 준비되면 하단의 <b className="text-gray-600">독립항 세트 생성 →</b>을 누르세요.</p>
           </>
         )}
 
@@ -3076,16 +3102,19 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
                   onClick={e => { e.stopPropagation(); if (!done) { setSelectedSetIndex(setIdx); syncUpdate(setIdx, depGroupsMap); } }}
                   className={clsx(
                     'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all',
-                    isSelected ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white hover:border-blue-400'
+                    isSelected ? 'border-brand-400 bg-brand-400' : 'border-gray-300 bg-white hover:border-brand-300'
                   )}
                 >
                   {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white block" />}
                 </button>
                 <div className="flex-1 min-w-0">
-                  <span className={clsx('text-sm2 font-semibold', isSelected ? 'text-blue-700' : 'text-gray-700')}>
-                    {scopeInfo.label}
+                  <span className={clsx('text-sm2 font-semibold', isSelected ? 'text-brand-600' : 'text-gray-700')}>
+                    세트 {filteredSetIndices.indexOf(setIdx) + 1} · {scopeInfo.label}
                   </span>
-                  <span className="text-xs2 text-gray-400 ml-2">{scopeInfo.sub}</span>
+                  {/* 세트 식별 정보 — 청구 카테고리 조합 · 참조 구성요소 수 (U5) */}
+                  <span className="text-xs2 text-gray-400 ml-2">
+                    {set.claims.map(c => CATEGORY_LABEL[c.category] ?? c.category).join(' + ')} · 구성요소 {new Set(set.claims.flatMap(c => c.element_ids ?? [])).size}개 · {scopeInfo.sub}
+                  </span>
                 </div>
                 {isSelected && !done && (
                   <span className="text-xs2 text-blue-600 font-semibold shrink-0">선택됨</span>
@@ -3102,7 +3131,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
                       isSelected ? 'border-blue-200 bg-white' : 'border-zinc-100 bg-zinc-50'
                     )}>
                       <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-xs2 px-1.5 py-0.5 rounded font-medium bg-purple-100 text-purple-700">{catLabel}</span>
+                        <span className="text-xs2 px-1.5 py-0.5 rounded font-medium bg-neutral-100 text-neutral-700">{catLabel}</span>
                         {!done && isSelected && (
                           <AiEditButton
                             className="ml-auto"
@@ -3113,7 +3142,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
                       </div>
                       {isSelected && !done ? (
                         <textarea
-                          className="w-full text-xs2 text-gray-800 bg-transparent outline-none resize-none leading-relaxed overflow-hidden"
+                          className="w-full text-sm2 text-gray-800 bg-transparent outline-none resize-none leading-relaxed overflow-hidden"
                           value={text}
                           rows={Math.max(3, Math.ceil(text.length / 44))}
                           onClick={e => e.stopPropagation()}
@@ -3121,7 +3150,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
                           ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                         />
                       ) : (
-                        <p className="text-xs2 text-gray-600 leading-relaxed line-clamp-3">{text}</p>
+                        <p className="text-sm2 text-gray-600 leading-relaxed line-clamp-3">{text}</p>
                       )}
                       {aiKey === `indep-${setIdx}-${ci}` && isSelected && !done && (
                         <InlineAiEdit
@@ -3227,7 +3256,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
               <div className="flex items-center gap-2 mb-1.5">
                 <Icon name="check" size={11} className="text-blue-600" />
                 <span className="text-xs2 font-bold text-brand-400">청구항 {indepNum}</span>
-                <span className="text-xs2 px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium">{catLabel}</span>
+                <span className="text-xs2 px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-700 font-medium">{catLabel}</span>
                 {!done && (
                   <AiEditButton
                     className="ml-auto"
@@ -3236,7 +3265,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
                   />
                 )}
               </div>
-              <p className="text-xs2 text-gray-700 leading-relaxed whitespace-pre-wrap px-1">{claimText}</p>
+              <p className="text-sm2 text-gray-700 leading-relaxed whitespace-pre-wrap px-1">{claimText}</p>
               {aiKey === `indepB-${ci}` && !done && (
                 <InlineAiEdit
                   placeholder="이 독립항을 어떻게 수정할지 지시해주세요"
@@ -3307,7 +3336,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
                     <div className="px-2.5 pb-2">
                       {!done && dep.sel ? (
                         <textarea
-                          className="w-full text-xs2 text-gray-700 leading-relaxed bg-transparent outline-none resize-none overflow-hidden"
+                          className="w-full text-sm2 text-gray-700 leading-relaxed bg-transparent outline-none resize-none overflow-hidden"
                           value={displayText}
                           rows={Math.max(2, Math.ceil(displayText.length / 46))}
                           onChange={e => {
@@ -3319,7 +3348,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
                           ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                         />
                       ) : (
-                        <p className="text-xs2 text-gray-700 leading-relaxed">{displayText}</p>
+                        <p className="text-sm2 text-gray-700 leading-relaxed">{displayText}</p>
                       )}
                       {aiKey === `dep-${ci}-${dep.id}` && !done && dep.sel && (
                         <InlineAiEdit
@@ -3495,7 +3524,7 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange }
                     <div className="p-2">
                       <textarea
                         autoFocus
-                        className="w-full text-xs2 text-gray-800 leading-relaxed bg-transparent outline-none resize-none"
+                        className="w-full text-sm2 text-gray-800 leading-relaxed bg-transparent outline-none resize-none"
                         value={editVal}
                         rows={Math.max(3, Math.ceil(editVal.length / 46))}
                         onChange={e => setEditVal(e.target.value)}
@@ -3508,14 +3537,14 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange }
                         >취소</button>
                         <button
                           onClick={() => { updateBlock(section.key, bIdx, editVal); setEditing(null); }}
-                          className="text-xs2 px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
+                          className="text-xs2 px-2 py-1 rounded-lg bg-brand-400 text-white hover:bg-brand-500"
                         >저장</button>
                       </div>
                     </div>
                   ) : (
                     <>
                     <div className="flex gap-2 px-3 py-2">
-                      <p className="flex-1 text-xs2 text-gray-700 leading-relaxed whitespace-pre-wrap">{block.content}</p>
+                      <p className="flex-1 text-sm2 text-gray-700 leading-relaxed whitespace-pre-wrap">{block.content}</p>
                       {!done && (
                         <div className={clsx(
                           'flex items-center gap-1 shrink-0 self-start transition-opacity',
