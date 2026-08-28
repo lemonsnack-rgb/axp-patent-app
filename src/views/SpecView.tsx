@@ -2936,7 +2936,10 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
 }
 
 // ── 독립항 세트 권리범위 레이블 매핑 ──────────────────────────────────────────
-// ── 종속항 선행 근거(antecedent basis) 검증 (A2, 사용자 확정) ────────────
+// 이번 버전 범위 제외(사용자 결정 2026-08-28): 선행 근거 검증은 API 응답에 없는 클라이언트 판단이라 숨김. 연동 시 element_ids 기반으로 재검토.
+const ENABLE_ANTECEDENT_CHECK = false;
+
+// ── 종속항 선행 근거(antecedent basis) 검증 (A2) ────────────
 // "상기 X"의 X가 인용 독립항 본문에 없으면 선행 근거 없음으로 본다. 텍스트 로직이라 mock·실데이터 무관.
 const ANTECEDENT_RE = /상기\s+([가-힣A-Za-z0-9·]+?)(?=(?:은|는|이|가|을|를|의|에|로|와|과|도|만|들)?(?:[\s,.;()]|$))/g;
 function findMissingAntecedents(depText: string, indepText: string): string[] {
@@ -3566,7 +3569,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                         <p className="text-sm2 text-gray-700 leading-relaxed"><ElementText text={displayText} elements={elements} /></p>
                       )}
                       {/* 선행 근거 경고 — "상기 X"가 인용 독립항에 없으면 표시 (A2) */}
-                      {dep.sel && (() => {
+                      {ENABLE_ANTECEDENT_CHECK && dep.sel && (() => {
                         const missing = findMissingAntecedents(displayText, claimText);
                         if (!missing.length) return null;
                         const list = missing.map(t => `'${t}'`).join(', ');
