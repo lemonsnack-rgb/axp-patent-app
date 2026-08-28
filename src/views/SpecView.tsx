@@ -1511,7 +1511,7 @@ function TitleCandidateCards({
 
 // ── 발명의 설명 항목 카드 (제안기술 / 종래기술 그룹) ──────────────────
 const DESC_LABEL_MAP: Record<string, string> = {
-  background: '배경기술', implementation: '구성', objective: '목적', effect: '효과',
+  background: '배경기술', implementation: '구성', objective: '목적', effect: '효과', etc: '기타',
 };
 
 function DescriptionItemCards({
@@ -1719,8 +1719,10 @@ function DescriptionItemCards({
               >
                 <option value="background">배경기술</option>
                 <option value="implementation">구성(해결수단)</option>
+                <option value="etc">기타</option>
                 <option value="objective">목적</option>
                 <option value="effect">효과</option>
+                          <option value="etc">기타</option>
               </select>
             </div>
             <div className="flex gap-1.5 items-end">
@@ -2511,6 +2513,7 @@ const DRAWING_LABEL_MAP: Record<string, { text: string; cls: string }> = {
   previous_implementation: { text: '종래기술', cls: 'bg-gray-100 text-gray-600' },
   background:              { text: '배경',     cls: 'bg-zinc-100 text-zinc-600' },
   effect:                  { text: '효과',     cls: 'bg-amber-100 text-amber-700' },
+  etc:                     { text: '기타',     cls: 'bg-zinc-100 text-zinc-500' },
 };
 
 function toWorkflowDrawingItem(drawing: Drawing, idx: number): WorkflowDrawingItem {
@@ -2792,6 +2795,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                           <option value="previous_implementation">종래기술</option>
                           <option value="background">배경</option>
                           <option value="effect">효과</option>
+                          <option value="etc">기타</option>
                         </select>
                       )}
                     </div>
@@ -2909,6 +2913,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                           <option value="previous_implementation">종래기술</option>
                           <option value="background">배경</option>
                           <option value="effect">효과</option>
+                          <option value="etc">기타</option>
                         </select>
                       )}
                     </div>

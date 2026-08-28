@@ -190,10 +190,11 @@ function serializeClaimItems(items: { value: string }[]): string[] {
   return [header, ...items.map((it, i) => `청구항 ${i + 1}.\n${it.value}`)];
 }
 
-function ClaimsEditor({ blocks, onChange, elements = [] }: {
+function ClaimsEditor({ blocks, onChange, elements = [], onClickElement }: {
   blocks: string[];
   onChange: (next: string[]) => void;
   elements?: ElementLike[];
+  onClickElement?: (name: string) => void;   // 하이라이트 클릭 → 구성요소 이름 전체 변경 (본문과 동일)
 }) {
   const items = parseClaimItems(blocks);
   const commit = (next: { value: string }[]) => onChange(serializeClaimItems(next));
@@ -302,7 +303,7 @@ function ClaimsEditor({ blocks, onChange, elements = [] }: {
                 onClick={() => setEditing(idx)}
                 title="클릭하여 편집"
                 className="text-base2 text-zinc-800 leading-relaxed whitespace-pre-wrap px-1.5 py-1 rounded-md cursor-text hover:bg-white hover:ring-1 hover:ring-zinc-200 transition-colors"
-              ><ElementText text={it.value} elements={elements} /></p>
+              ><ElementText text={it.value} elements={elements} onClickElement={onClickElement} /></p>
             )}
           </div>
         );
@@ -586,12 +587,14 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     previous_implementation: '종래기술',
     background:              '배경',
     effect:                  '효과',
+    etc:                     '기타',
   };
   const DRAWING_LABEL_STYLES: Record<string, string> = {
     '제안기술': 'bg-blue-100 text-brand-400',
     '종래기술': 'bg-gray-100 text-gray-600',
     '배경':     'bg-zinc-100 text-zinc-600',
     '효과':     'bg-brand-50 text-brand-600',
+    '기타':     'bg-zinc-100 text-zinc-500',
   };
 
   // 구성요소 이름 변경 모달
@@ -1358,6 +1361,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                   <ClaimsEditor
                     blocks={blocks['claims']}
                     elements={context?.elements ?? []}
+                    onClickElement={(name) => setRenamingComp({ name, draft: name })}
                     onChange={(next) => {
                       setUndoStack(p => [...p.slice(-20), blocks]);
                       setRedoStack([]);

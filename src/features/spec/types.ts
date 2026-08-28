@@ -27,7 +27,7 @@ export interface InventionElement {
 
 export interface InventionDescriptionItem {
   id: string                    // API: 항목 UUID (item/modification 대상 지정)
-  label: 'background' | 'implementation' | 'objective' | 'effect'
+  label: 'background' | 'implementation' | 'objective' | 'effect' | 'etc'   // API: etc(기타) 포함
   type: 'text' | 'table'        // API: 표 항목 지원 (table이면 content는 HTML <table>)
   content: string               // API 필드명 (구 text)
   caption?: string | null       // 표 캡션 (type === 'table')
@@ -105,7 +105,7 @@ export interface Drawing {
     symbol: string
     name: string
     description: string
-    label: 'background' | 'previous_implementation' | 'proposed_implementation' | 'effect'
+    label: 'background' | 'previous_implementation' | 'proposed_implementation' | 'effect' | 'etc'   // API: etc(기타) 포함
   }
   included?: boolean
   useForSpec?: boolean
