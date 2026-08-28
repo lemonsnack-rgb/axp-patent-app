@@ -3,6 +3,13 @@
 import { useState, useEffect } from 'react';
 import { SPEC_CATALOG } from './specCatalog';
 
+function isDevToolsEnabled(): boolean {
+  try {
+    if (new URLSearchParams(window.location.search).has('dev')) { localStorage.setItem('axp_dev', '1'); return true; }
+    return localStorage.getItem('axp_dev') === '1';
+  } catch { return false; }
+}
+
 export function SpecOverlay() {
   const [active, setActive] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -56,6 +63,9 @@ export function SpecOverlay() {
   }, [selected, active]);
 
   const entry = selected ? SPEC_CATALOG[selected] : null;
+
+  // 개발/리뷰용 토글은 ?dev=1 또는 localStorage.axp_dev='1' 일 때만 노출 (U13)
+  if (!isDevToolsEnabled()) return null;
 
   return (
     <>
