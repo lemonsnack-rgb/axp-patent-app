@@ -19,6 +19,7 @@ import {
 import { generateMockModification } from '../features/ai/clarityAnalyzer';
 import { toast } from '../components/Toast';
 import { uid } from '../utils/uid';
+import { particle } from '../utils/korean';
 import type { DrawingItem as WorkflowDrawingItem } from '../features/drawing-workflow/types';
 import { openEditorTab, onEditorResult } from '../features/drawing-workflow/editorChannel';
 import type {
@@ -33,6 +34,10 @@ import {
 } from '../features/ai/specAgentMock';
 
 type StepId = SpecStepId;
+
+// 단계 패널이 하단 네비게이션 바에 등록하는 '현재 단계의 주 동작' (D3: 화면당 Primary 1개)
+// 등록이 없으면 하단 바는 기본 '다음 →'(단계 확정)을 표시한다.
+export type StepAction = { label: string; onClick: () => void; disabled?: boolean; hint?: string };
 const STEPS: StepConfig[] = [
   { id: 'upload',      label: '업로드',      step: 1 },
   { id: 'description', label: '발명 설명',   step: 2 },
@@ -117,6 +122,10 @@ export function SpecView() {
   const [loadingStage, setLoadingStage] = useState(0);
   // 단계 전환(다음 단계 분석) 로딩 — 분석에 시간이 걸릴 수 있어 로딩 바 표시
   const [stepLoading, setStepLoading] = useState<StepId | null>(null);
+  // 하단 바 주 동작 — 현재 단계 패널(청구항·중간명세서)이 등록 (U1/D3)
+  const [stepAction, setStepAction] = useState<StepAction | null>(null);
+  // 완료 단계 접기/펼치기 — 기본 접힘(1줄 요약) (U3)
+  const [expandedDone, setExpandedDone] = useState<Partial<Record<StepId, boolean>>>({});
 
   const flowRef = useRef<HTMLDivElement>(null);
   const flowSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -192,14 +201,36 @@ export function SpecView() {
       import('../features/spec/mockAiService').then(({ MOCK_MIDSPEC }) => {
         const specDrawings = context.drawings.filter(d => d.included !== false && d.useForSpec);
         const fallback = MOCK_MIDSPEC.find(s => s.key === 'drawing_descriptions')?.blocks ?? [];
+        // 도 번호는 명세서 도면 채택 순서(1부터), 조사는 받침에 따라 자동 선택 (U9)
         const drawingBlocks = specDrawings.length
-          ? specDrawings.map(d => ({
-              id: uid(), type: 'text' as const,
-              content: `도 ${d.detail.symbol}은(는) ${d.detail.name || '발명의 구성'}을(를) 나타낸 도면이다.${d.isRepresentative ? ' (대표도면)' : ''}`,
-            }))
+          ? specDrawings.map((d, i) => {
+              const fig = `도 ${i + 1}`;
+              const name = d.detail.name || '발명의 구성';
+              return {
+                id: uid(), type: 'text' as const,
+                content: `${fig}${particle(fig, '은', '는')} ${name}${particle(name, '을', '를')} 나타낸 도면이다.${d.isRepresentative ? ' (대표도면)' : ''}`,
+              };
+            })
           : fallback;
         const next = MOCK_MIDSPEC.map(s => s.key === 'drawing_descriptions' ? { ...s, blocks: drawingBlocks } : s);
         setMidspec(next);
+      });
+    }
+    // 명세서 도면 단계 진입 시 — 이미지 선별(3단계) 결과를 도면 채택 기본값으로 프리셋 (U2)
+    // (이미 채택된 도면이 있으면 사용자 선택을 존중)
+    if (id === 'components') {
+      setContext(p => {
+        if (p.drawings.some(d => d.useForSpec)) return p;
+        let repSet = p.drawings.some(d => d.included !== false && d.isRepresentative);
+        return {
+          ...p,
+          drawings: p.drawings.map(d => {
+            const inc = d.included !== false;
+            const rep = inc && (d.isRepresentative || !repSet);
+            if (rep) repSet = true;
+            return { ...d, useForSpec: inc, isRepresentative: rep };
+          }),
+        };
       });
     }
     const next = STEPS[si(id) + 1];
@@ -211,7 +242,8 @@ export function SpecView() {
         setCurStep(next.id);
         setGuideStep(next.id);
         setStepLoading(null);
-        setTimeout(() => flowRef.current?.scrollTo({ top: 99999, behavior: 'smooth' }), 60);
+        // 새 단계의 헤더로 스크롤 — 하단이 아니라 상단 도구부터 보이게 (U3)
+        setTimeout(() => scrollToStep(next.id), 60);
       }, 900);
     } else {
       setPhase('done');
@@ -221,6 +253,34 @@ export function SpecView() {
   const reselect = (id: StepId) => {
     const p = { ...confirmed }; delete p[id];
     setConfirmed(p); setCurStep(id); setGuideStep(id);
+    setStepAction(null);
+    setTimeout(() => scrollToStep(id), 60);
+  };
+  const scrollToStep = (id: StepId) => {
+    flowRef.current?.querySelector<HTMLElement>(`[data-flowstep="${id}"]`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  // 완료 단계 1줄 요약 (U3)
+  const doneSummary = (id: StepId): string => {
+    switch (id) {
+      case 'description': {
+        const a = (arr: { adopted?: boolean }[]) => arr.filter(x => x.adopted !== false).length;
+        return `제안기술 ${a(context.proposed)}/${context.proposed.length} · 종래기술 ${a(context.previous)}/${context.previous.length} 항목 채택`;
+      }
+      case 'images': {
+        const inc = context.drawings.filter(d => d.included !== false).length;
+        return `관련 이미지 ${inc}/${context.drawings.length}개 선택`;
+      }
+      case 'title': return confirmed['title'] || gSel['title'] || '명칭 확정';
+      case 'components': return `구성요소 ${context.elements.length}개 확정`;
+      case 'drawings': {
+        const n = context.drawings.filter(d => d.included !== false && d.useForSpec).length;
+        return n ? `명세서 도면 ${n}개 (${n === 1 ? '도 1' : `도 1~${n}`})` : '명세서 도면 없음 (참고 이미지만 사용)';
+      }
+      case 'claims': return '독립항 세트 · 종속항 확정';
+      case 'midspec': return `${(midspec ?? []).length}개 섹션`;
+      default: return '확정';
+    }
   };
   // 진행표시(Stepper) 클릭 이동 — 방문한 단계로 스크롤(확정 내용은 보존)
   const gotoFlowStep = (id: StepId) => {
@@ -259,7 +319,7 @@ export function SpecView() {
         const taskName = title.length > 40 ? title.slice(0, 40) + '…' : title;
         taskUpdate(task.id, { name: taskName });
       }
-      setTimeout(() => flowRef.current?.scrollTo({ top: 99999, behavior: 'smooth' }), 50);
+      setTimeout(() => scrollToStep('description'), 80);
     }, 1500);
   };
 
@@ -544,8 +604,25 @@ export function SpecView() {
                 {STEPS.slice(1).map(s => {
                   if (!isVisible(s.id)) return null;
                   const isDone = si(s.id) < si(curStep) && (phase === 'flow' || phase === 'done');
+                  const collapsed = isDone && !expandedDone[s.id];
                   return (
                     <div key={s.id} data-flowstep={s.id} className="space-y-3 scroll-mt-3">
+                      {collapsed ? (
+                        /* 완료 단계 — 1줄 요약 (펼치기 / 다시 선택) */
+                        <div className="flex items-center gap-2.5 rounded-xl border border-green-200 bg-green-50/60 px-3.5 py-2.5">
+                          <span className="w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center shrink-0"><Icon name="check" size={10} /></span>
+                          <span className="text-sm2 font-semibold text-gray-800 shrink-0">{STEP_LABEL[s.id]}</span>
+                          <span className="text-xs2 text-gray-500 truncate flex-1 min-w-0">{doneSummary(s.id)}</span>
+                          <button
+                            onClick={() => setExpandedDone(p => ({ ...p, [s.id]: true }))}
+                            className="shrink-0 text-xs2 text-gray-500 hover:text-gray-800 px-2 py-1 rounded-lg hover:bg-white transition-colors"
+                          >펼치기</button>
+                          <button
+                            onClick={() => reselect(s.id)}
+                            className="shrink-0 inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-xs2 font-medium text-brand-500 border border-brand-200 bg-white hover:bg-brand-50 transition-colors"
+                          ><Icon name="edit" size={10} /> 다시 선택</button>
+                        </div>
+                      ) : (<>
                       <AiMsg text={
                         isSpecialStep(s.id) ? (
                           <><strong>{STEP_LABEL[s.id]}</strong><br />
@@ -652,11 +729,13 @@ export function SpecView() {
                                 done={isDone}
                                 onConfirm={() => confirm('claims')}
                                 onUpdate={v => setGSel(p => ({ ...p, claims: v }))}
+                                onActionChange={setStepAction}
                               />
                             )}
                             {s.id === 'midspec' && (
                               <MidspecPanel
                                 done={isDone}
+                                onActionChange={setStepAction}
                                 sections={midspec ?? []}
                                 onUpdate={(next) => {
                                   setMidspec(next);
@@ -681,18 +760,20 @@ export function SpecView() {
                           </div>
                         )}
                       </div>
-                      {/* 수정 버튼 — 딤 영역 하단, 포인터 정상 */}
+                      {/* 완료 단계(펼침) — 접기 / 다시 선택 */}
                       {isDone && (
-                        <div className="flex justify-end mt-1">
+                        <div className="flex justify-end gap-1.5 mt-1">
+                          <button
+                            onClick={() => setExpandedDone(p => ({ ...p, [s.id]: false }))}
+                            className="inline-flex items-center h-7 px-2.5 rounded-lg text-xs2 text-gray-500 hover:bg-gray-100 transition-colors"
+                          >접기</button>
                           <button
                             onClick={() => reselect(s.id)}
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs2 text-blue-600 hover:bg-blue-50 border border-blue-200 transition-colors"
-                          >
-                            <Icon name="edit" size={10} /> 다시 선택
-                          </button>
+                            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-xs2 font-medium text-brand-500 border border-brand-200 bg-white hover:bg-brand-50 transition-colors"
+                          ><Icon name="edit" size={10} /> 다시 선택</button>
                         </div>
                       )}
-                      {isDone && <AiMsg text={AI_NEXT[s.id]} />}
+                      </>)}
                     </div>
                   );
                 })}
@@ -752,18 +833,44 @@ export function SpecView() {
                   >← 이전</button>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                {phase === 'flow' && guideStep === 'drawings' && !confirmed['drawings'] && (
-                  <button onClick={() => confirm('drawings')} disabled={!!stepLoading} className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 disabled:opacity-40 transition-colors">건너뛰기</button>
-                )}
-                {/* 진행(다음)은 flow 단계에서만. midspec은 패널의 '에디터로' 버튼이 마무리, done은 완료 화면 버튼이 진입 — 중복 제거 */}
-                {phase === 'flow' && guideStep !== 'midspec' && (
-                  !isSpecialStep(guideStep) ? (
-                    <button onClick={() => { const cur = gSel[guideStep]; if (cur?.trim()) confirm(guideStep); }} disabled={!gSel[guideStep]?.trim() || !!stepLoading} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 disabled:opacity-40 transition-colors">{stepLoading ? '분석 중…' : '다음 →'}</button>
-                  ) : (
-                    <button onClick={() => confirm(guideStep)} disabled={!!stepLoading} className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-blue-800 disabled:opacity-40 transition-colors">{stepLoading ? '분석 중…' : '다음 →'}</button>
-                  )
-                )}
+              <div className="flex items-center gap-3">
+                {/* 하단 바의 Primary는 화면당 1개 — 단계 패널이 등록한 주 동작(stepAction)이 있으면 그것을, 없으면 단계 확정(다음)을 표시 (U1/D3) */}
+                {phase === 'flow' && (() => {
+                  if (stepLoading) {
+                    return <button disabled className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl opacity-40">분석 중…</button>;
+                  }
+                  if (stepAction) {
+                    return (<>
+                      {stepAction.disabled && stepAction.hint && <span className="text-xs2 text-gray-400">{stepAction.hint}</span>}
+                      <button
+                        onClick={stepAction.onClick}
+                        disabled={stepAction.disabled}
+                        className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-brand-500 disabled:opacity-40 transition-colors"
+                      >{stepAction.label}</button>
+                    </>);
+                  }
+                  if (guideStep === 'midspec') return null; // 중간명세서는 패널이 '명세서 생성' 동작을 등록
+                  if (guideStep === 'drawings') {
+                    // 도면 0개면 확인 후 진행 — 별도 '건너뛰기' 버튼 없이 한 경로로 (U2)
+                    const specCount = context.drawings.filter(d => d.included !== false && d.useForSpec).length;
+                    return (
+                      <button
+                        onClick={() => specCount === 0
+                          ? showConfirm('명세서에 넣을 도면이 없습니다. 도면 없이(참고 이미지만 사용) 청구항 단계로 진행할까요?', () => confirm('drawings'))
+                          : confirm('drawings')}
+                        className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-brand-500 transition-colors"
+                      >{specCount === 0 ? '도면 없이 다음 →' : '다음 →'}</button>
+                    );
+                  }
+                  const canGo = isSpecialStep(guideStep) || !!gSel[guideStep]?.trim();
+                  return (
+                    <button
+                      onClick={() => { if (canGo) confirm(guideStep); }}
+                      disabled={!canGo}
+                      className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-brand-500 disabled:opacity-40 transition-colors"
+                    >다음 →</button>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -2519,7 +2626,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
           <p className="text-xs2 text-gray-500 mb-1">
             관련 이미지 <span className="font-semibold">{includedDrawings.length}개</span> · 명세서 도면 <span className="font-semibold">{specDrawings.length}개</span>
           </p>
-          <p className="text-xs2 text-gray-400 mb-2">명세서에 넣을 이미지를 도면으로 선택하세요. 선택한 도면은 "도 N" 번호가 붙고 CAD 변환 대상이 됩니다. 미선택은 AI 참고용(맥락만)입니다.</p>
+          <p className="text-xs2 text-gray-400 mb-2">이미지 선별에서 고른 이미지는 기본으로 채택되어 있습니다. 명세서에 넣지 않을 이미지는 <b className="text-gray-500">참고만</b>으로 바꾸세요 — 채택 도면은 "도 N" 번호가 붙고 CAD 변환 대상이 됩니다.</p>
           {includedDrawings.length === 0 && (
             <div className="text-center py-8 text-gray-400 text-sm2">이미지 선별 단계에서 관련 이미지를 먼저 선별하세요.</div>
           )}
@@ -2540,18 +2647,6 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                 )}>
                   {renderThumbnail(d, (
                     <>
-                      {!done && (
-                        <button
-                          onClick={() => toggleUseForSpec(idx)}
-                          className="absolute top-1.5 left-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-lg shadow-sm bg-white/95 border border-gray-200 transition-all"
-                          title={isForSpec ? '선택 해제 (AI 참고용)' : '명세서 도면으로 선택'}
-                        >
-                          <span className={clsx('w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all', isForSpec ? 'bg-brand-400 border-blue-600 text-white' : 'border-gray-300 bg-white')}>
-                            {isForSpec && <Icon name="check" size={8} />}
-                          </span>
-                          <span className={clsx('text-xs2 font-semibold', isForSpec ? 'text-blue-700' : 'text-gray-500')}>선택</span>
-                        </button>
-                      )}
                       {!done && isForSpec && (
                         <button
                           onClick={() => setRepresentative(idx)}
@@ -2569,10 +2664,28 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                   ))}
                   <div className="px-2.5 pt-1.5 pb-1">
                     <div className="flex items-center gap-1 flex-wrap mb-0.5">
-                      {isForSpec ? (
-                        <span className="text-xs2 px-1.5 py-px rounded-full font-bold bg-blue-600 text-white">도 {myFig}</span>
+                      {/* 채택 상태 토글 하나로 통일: [도면 채택 | 참고만] (U2) */}
+                      {done ? (
+                        isForSpec
+                          ? <span className="text-xs2 px-1.5 py-px rounded-full font-bold bg-brand-400 text-white">도 {myFig}</span>
+                          : <span className="text-xs2 px-1.5 py-px rounded-full font-medium bg-gray-200 text-gray-500">참고만</span>
                       ) : (
-                        <span className="text-xs2 px-1.5 py-px rounded-full font-medium bg-gray-200 text-gray-500">AI 참고용</span>
+                        <span className="inline-flex rounded-full border border-neutral-200 overflow-hidden text-xs2 font-semibold" role="group" aria-label="도면 채택 여부">
+                          <button
+                            type="button"
+                            onClick={() => { if (!isForSpec) toggleUseForSpec(idx); }}
+                            aria-pressed={isForSpec}
+                            title="명세서 도면으로 채택 (도 N 번호 부여 · CAD 변환 대상)"
+                            className={clsx('px-2 py-px transition-colors', isForSpec ? 'bg-brand-400 text-white' : 'bg-white text-gray-500 hover:bg-brand-50')}
+                          >{isForSpec ? `도 ${myFig}` : '도면 채택'}</button>
+                          <button
+                            type="button"
+                            onClick={() => { if (isForSpec) toggleUseForSpec(idx); }}
+                            aria-pressed={!isForSpec}
+                            title="명세서에 넣지 않고 AI 참고용(맥락)으로만 사용"
+                            className={clsx('px-2 py-px border-l border-neutral-200 transition-colors', !isForSpec ? 'bg-gray-200 text-gray-700' : 'bg-white text-gray-400 hover:bg-gray-50')}
+                          >참고만</button>
+                        </span>
                       )}
                       <span className="text-xs2 font-bold text-gray-700">{d.detail.symbol}</span>
                       {done ? (
@@ -2637,10 +2750,11 @@ interface DepGroupState { generated: boolean; items: DepItemState[]; newText: st
 // 선택된 세트의 각 claim별 종속항 그룹 (key: claimIndex 숫자)
 type DepGroupsForSet = Record<number, DepGroupState>;
 
-function ClaimsPanel({ done, onUpdate }: {
+function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
   done: boolean;
   onConfirm: () => void;
   onUpdate: (v: string) => void;
+  onActionChange?: (a: StepAction | null) => void;   // 하단 바 주 동작 등록 (U1/D3)
 }) {
   const [claimsPhase, setClaimsPhase] = useState<'indep' | 'dep'>('indep');
   const [claimSets] = useState(MOCK_INDEPENDENT_CLAIM_SETS);
@@ -2756,6 +2870,35 @@ function ClaimsPanel({ done, onUpdate }: {
     setClaimsPhase('dep');
     syncUpdate(selectedSetIndex, nextMap);
   };
+
+  // 독립항 세트 생성 (mock) — 생성 후 세트 목록 첫 항목으로 스크롤
+  const generateSets = () => {
+    setGenerated(true);
+    setSelectedSetIndex(null);
+    setTimeout(() => document.querySelector<HTMLElement>('[data-claimsets]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+  };
+
+  // 하단 바 주 동작 등록 — 단계 내부 상태에 따라 라벨·동작이 바뀐다 (U1: 종속항 건너뜀 방지, D3: Primary 1개)
+  const latest = useRef({ generateSets, confirmIndep, onConfirm });
+  useEffect(() => { latest.current = { generateSets, confirmIndep, onConfirm }; });
+  useEffect(() => {
+    if (!onActionChange) return;
+    if (done) { onActionChange(null); return; }
+    if (!generated) {
+      onActionChange({ label: '독립항 세트 생성 →', onClick: () => latest.current.generateSets() });
+    } else if (claimsPhase === 'indep') {
+      onActionChange({
+        label: '종속항 구성 →',
+        onClick: () => latest.current.confirmIndep(),
+        disabled: selectedSetIndex === null,
+        hint: '독립항 세트를 하나 선택하세요',
+      });
+    } else {
+      onActionChange({ label: '청구항 확정 →', onClick: () => latest.current.onConfirm() });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done, generated, claimsPhase, selectedSetIndex]);
+  useEffect(() => () => onActionChange?.(null), [onActionChange]);
 
   const toggleDep = (claimIdx: number, depId: number) => {
     if (done || selectedSetIndex === null) return;
@@ -2903,10 +3046,7 @@ function ClaimsPanel({ done, onUpdate }: {
               value={genInstruction}
               onChange={e => setGenInstruction(e.target.value)}
             />
-            <button
-              onClick={() => { setGenerated(true); setSelectedSetIndex(null); }}
-              className="w-full py-2.5 bg-brand-400 text-white rounded-lg text-sm2 font-semibold hover:bg-brand-500 transition-colors"
-            >독립항 세트 생성 →</button>
+            <p className="text-xs2 text-gray-400">설정을 마쳤으면 하단의 <b className="text-gray-600">독립항 세트 생성 →</b> 버튼을 누르세요.</p>
           </>
         )}
 
@@ -2915,6 +3055,7 @@ function ClaimsPanel({ done, onUpdate }: {
           <div className="text-center py-6 text-gray-400 text-xs2">선택한 조건에 맞는 세트가 없습니다.</div>
         )}
 
+        <div data-claimsets />
         {filteredSetIndices.map(setIdx => {
           const set = claimSets[setIdx];
           const isSelected = selectedSetIndex === setIdx;
@@ -3000,17 +3141,6 @@ function ClaimsPanel({ done, onUpdate }: {
           );
         })}
 
-        {!done && (
-          <button
-            onClick={confirmIndep}
-            disabled={selectedSetIndex === null}
-            className="w-full py-2.5 border border-blue-400 text-blue-600 bg-blue-50 rounded-lg text-sm2 font-medium hover:bg-blue-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {selectedSetIndex !== null
-              ? `선택한 세트로 종속항 구성 →`
-              : '세트를 선택하세요'}
-          </button>
-        )}
         </>)}
       </div>
       </>
@@ -3252,12 +3382,22 @@ function ClaimsPanel({ done, onUpdate }: {
 }
 
 // ── 중간명세서 패널 (#22) ─────────────────────────────────────────────────────
-function MidspecPanel({ done, sections, onUpdate, onGoToEditor }: {
+function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange }: {
   done: boolean;
   sections: MidspecSection[];
   onUpdate: (next: MidspecSection[]) => void;
   onGoToEditor?: () => void;
+  onActionChange?: (a: StepAction | null) => void;   // 하단 바 주 동작 등록 (D3)
 }) {
+  // 하단 바 주 동작: '명세서 생성 →' (패널 내부 풀폭 CTA 대신) — D3
+  const goRef = useRef(onGoToEditor);
+  useEffect(() => { goRef.current = onGoToEditor; });
+  useEffect(() => {
+    if (!onActionChange) return;
+    onActionChange(!done && onGoToEditor ? { label: '명세서 생성 →', onClick: () => goRef.current?.() } : null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done, !!onGoToEditor]);
+  useEffect(() => () => onActionChange?.(null), [onActionChange]);
   const [editing, setEditing] = useState<{ sectionKey: string; blockIdx: number } | null>(null);
   const [editVal, setEditVal] = useState('');
   const [newTexts, setNewTexts] = useState<Record<string, string>>({});
@@ -3332,9 +3472,9 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor }: {
           <button
             onClick={regenerate}
             disabled={genBusy}
-            className="w-full py-2 text-sm2 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="inline-flex items-center gap-1 h-8 px-3 rounded-lg text-xs2 font-medium text-brand-500 border border-brand-200 bg-white hover:bg-brand-50 disabled:opacity-50 transition-colors"
           >
-            {genBusy ? '중간명세서를 생성하고 있습니다...' : '중간명세서 다시 생성'}
+            {genBusy ? <><span className="w-3 h-3 border-2 border-brand-400 border-t-transparent rounded-full animate-spin inline-block" /> 생성 중...</> : '↻ 중간명세서 다시 생성'}
           </button>
         </div>
       )}
@@ -3436,16 +3576,11 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor }: {
         </div>
       ))}
 
-      {/* 실시예 생성 버튼 */}
+      {/* 다음 동작 안내 — 실행 버튼은 하단 바 '명세서 생성 →' 하나로 (D3) */}
       {!done && onGoToEditor && (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-          <p className="text-xs2 text-blue-700 font-semibold mb-1">명세서 생성</p>
-          <p className="text-xs2 text-gray-500 mb-2.5">AI가 구성요소·도면·청구항을 기반으로 실시예를 포함한 명세서 초안을 생성하고 에디터로 이동합니다.</p>
-          <button
-            onClick={onGoToEditor}
-            className="w-full py-2 text-sm2 font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
-          >명세서 생성 →</button>
-        </div>
+        <p className="text-xs2 text-gray-500 px-1">
+          편집을 마쳤으면 하단의 <b className="text-gray-700">명세서 생성 →</b>을 누르세요. AI가 구성요소·도면·청구항을 기반으로 실시예를 포함한 명세서 초안을 만들고 에디터로 이동합니다.
+        </p>
       )}
     </div>
   );
