@@ -1474,10 +1474,7 @@ function DescriptionItemCards({
           <span>{type === 'proposed' ? '제안기술' : '종래기술'}</span>
           <span className="opacity-60 font-normal">채택 {items.filter(i => i.adopted !== false).length}/{items.length}</span>
         </div>
-        <p className="text-xs2 text-gray-400 mb-2 flex items-center gap-1">
-          <svg viewBox="0 0 10 10" width="9" height="9" fill="currentColor" className="text-gray-300"><circle cx="3" cy="2" r="1"/><circle cx="7" cy="2" r="1"/><circle cx="3" cy="5" r="1"/><circle cx="7" cy="5" r="1"/><circle cx="3" cy="8" r="1"/><circle cx="7" cy="8" r="1"/></svg>
-          카드를 끌어 순서 변경 · 아래 버튼으로 반대편 기술로 이동
-        </p>
+
         <div className="space-y-2">
           {items.map((item, idx) => {
             const isAdopted = item.adopted !== false;
@@ -1840,7 +1837,7 @@ function GuidePanel({ step, confirmed, summary, mobileOpen, onMobileClose, chatI
       <div className="shrink-0 mx-3 mt-2 mb-1 rounded-lg border border-neutral-200 bg-white overflow-hidden">
         <div className="px-3 py-1.5 bg-neutral-50 border-b border-neutral-200 flex items-center gap-1.5">
           <span className="text-xs2 font-semibold text-neutral-600">지금까지 확정된 내용</span>
-          <span className="text-xs2 text-neutral-400">{summary?.length ?? 0}단계</span>
+          {!!summary?.length && <span className="text-xs2 text-neutral-400">확정 {summary.length} / {STEPS.length - 1}</span>}
         </div>
         {summary && summary.length > 0 ? (
           <dl className="px-3 py-2 space-y-1.5">
@@ -2496,6 +2493,13 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
             ...(dt.label !== undefined ? { label: LABEL_TO_API[dt.label] ?? next.detail.label } : {}),
           } };
         }
+        // 편집기에서 CAD 변환(내보내기) 결과가 오면 썸네일을 변환본으로 교체하고 상태 배지를 표시 (B13)
+        if (result.stage === 'done' && result.exportedImageUrl?.startsWith('data:')) {
+          const mm = result.exportedImageUrl.match(/^data:([^;]+);base64,(.+)$/);
+          if (mm) {
+            next = { ...next, cadConverted: true, image: { file: { ...next.image.file, media_type: mm[1], data: mm[2] } } };
+          }
+        }
         return next;
       }));
     });
@@ -2572,7 +2576,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
     const hasData = !!d.image.file.data;
     const bbox = d.image.bbox;
     return (
-      <div className="w-full aspect-[4/3] bg-gray-100 flex items-center justify-center overflow-hidden relative group">
+      <div className="w-full aspect-[4/3] max-h-[240px] bg-gray-100 flex items-center justify-center overflow-hidden relative group">
         {hasData
           ? (bbox
             ? <CroppedCanvas data={d.image.file.data} mediaType={d.image.file.media_type} bbox={bbox} />
@@ -2749,6 +2753,9 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                             title="명세서 도면으로 채택 (도 N 번호 부여 · CAD 변환 대상)"
                             className={clsx('px-2 py-px transition-colors', isForSpec ? 'bg-brand-400 text-white' : 'bg-white text-gray-500 hover:bg-brand-50')}
                           >{isForSpec ? `도 ${myFig}` : '도면 채택'}</button>
+                          {isForSpec && d.cadConverted && (
+                            <span className="ml-1 text-xs2 px-1.5 py-px rounded-full bg-green-50 text-green-700 font-medium" title="도면 편집기에서 CAD 변환 결과를 반영했습니다">CAD 변환 완료</span>
+                          )}
                           <button
                             type="button"
                             onClick={() => { if (isForSpec) toggleUseForSpec(idx); }}
@@ -3334,7 +3341,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
             <div className="p-2.5 space-y-1.5">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs2 font-semibold text-gray-500">
-                  종속항 ({grp.items.filter(d => d.sel).length}개 선택)
+                  종속항 ({grp.items.filter(d => d.sel).length}개 채택)
                 </span>
                 {!done && grp.generated && (
                   <button

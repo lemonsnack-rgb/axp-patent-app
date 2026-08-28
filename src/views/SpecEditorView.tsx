@@ -118,8 +118,10 @@ const EDITOR_SECTIONS = [
   { id: 'technical_solution',     label: '해결수단',                          short: '해결수단' },
   { id: 'advantageous_effects',   label: '발명의 효과',                        short: '효과' },
   { id: 'drawing_descriptions',   label: '도면의 간단한 설명',                  short: '도면설명' },
+  { id: 'reference_signs',        label: '부호의 설명',                        short: '부호' },       // A7: 구성요소 부호표
   { id: 'embodiment_description', label: '발명을 실시하기 위한 구체적인 내용',   short: '구체적 내용' },
   { id: 'claims',                 label: '청구범위',                           short: '청구범위' },
+  { id: 'abstract',               label: '요약',                              short: '요약' },       // A7: 요약서 (확정 개요 + 대표도)
 ] as const;
 type SectionId = typeof EDITOR_SECTIONS[number]['id'];
 
@@ -485,6 +487,17 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
   ): string {
     if (id === 'title') return confirmedTitle || name
     if (id === 'claims') return confirmedClaimsText || `청구항 1.\n${name} 장치.`
+    // A7: 요약 = 제목·요약 단계에서 확정한 개요 + 대표도 / 부호의 설명 = 구성요소 부호표 (InventionContext 단일 원천)
+    if (id === 'abstract') {
+      const summary = (context?.summary ?? '').trim()
+      const repIdx = (context?.drawings ?? []).filter(d => d.included !== false && d.useForSpec).findIndex(d => d.isRepresentative)
+      const rep = repIdx >= 0 ? `\n\n【대표도】 도 ${repIdx + 1}` : ''
+      return (summary || `${name}에 관한 발명의 요약을 입력하세요.`) + rep
+    }
+    if (id === 'reference_signs') {
+      const els = (context?.elements ?? []).filter(e => e.symbol)
+      return els.length ? els.map(e => `${e.symbol}: ${e.value_ko}`).join('\n') : '부호와 명칭을 "100: 데이터 수집부" 형식으로 입력하세요.'
+    }
     const text = getMidspecText(id as keyof InventionSpecification)
     if (text) return text
     const fallback: Partial<Record<SectionId, string>> = {
@@ -495,8 +508,10 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       technical_solution:     '해결수단을 기술하세요.',
       advantageous_effects:   '발명의 효과를 기술하세요.',
       drawing_descriptions:   '도면에 대한 설명을 기술하세요.',
+      reference_signs:        '부호와 명칭을 "100: 데이터 수집부" 형식으로 입력하세요.',
       embodiment_description: '발명의 구체적인 내용을 기술하세요.',
       claims:                 `청구항 1.\n${name} 장치.`,
+      abstract:               `${name}에 관한 발명의 요약을 입력하세요.`,
     }
     return fallback[id] || ''
   }
@@ -506,7 +521,11 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     if (task?.id) {
       const saved = loadSpecState(task.id);
       if (saved?.editorBlocks && Object.keys(saved.editorBlocks).length > 0) {
-        return saved.editorBlocks as Record<SectionId, string[]>;
+        // 저장본에 없는 섹션(요약·부호의 설명 등 신규)은 초기 콘텐츠로 채운다 (A7 마이그레이션)
+        const savedBlocks = saved.editorBlocks as Partial<Record<SectionId, string[]>>;
+        return Object.fromEntries(
+          EDITOR_SECTIONS.map(s => [s.id, savedBlocks[s.id] ?? toBlocks(getInitialContent(s.id, effectiveTitle))])
+        ) as Record<SectionId, string[]>;
       }
     }
     return Object.fromEntries(
@@ -1065,6 +1084,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       <PreviewModal
         taskName={task?.name}
         sections={editorPreviewSections}
+        drawings={exportDrawings}
         onClose={() => setEditorPreviewOpen(false)}
       />
     )}

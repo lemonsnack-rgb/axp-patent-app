@@ -10,9 +10,12 @@ export interface PreviewSection {
   content: string;
 }
 
+export interface PreviewDrawing { symbol: string; name: string; dataUrl: string }
+
 interface Props {
   taskName?: string;
   sections?: PreviewSection[];
+  drawings?: PreviewDrawing[];   // 【도면】 섹션 — 채택 도면 이미지 (A7)
   onClose: () => void;
 }
 
@@ -32,7 +35,7 @@ function defaultSections(taskName?: string): PreviewSection[] {
   ];
 }
 
-export function PreviewModal({ taskName, sections: propSections, onClose }: Props) {
+export function PreviewModal({ taskName, sections: propSections, drawings = [], onClose }: Props) {
   const [fullscreen, setFullscreen] = useState(false);
   const [exporting, setExporting] = useState<'docx' | 'pdf' | null>(null);
   const [pdfBlocked, setPdfBlocked] = useState(false);
@@ -44,7 +47,7 @@ export function PreviewModal({ taskName, sections: propSections, onClose }: Prop
   const handleDocx = async () => {
     setExporting('docx');
     try {
-      await exportDocx(taskName ?? '특허명세서', sections);
+      await exportDocx(taskName ?? '특허명세서', sections, drawings);
     } catch {
       alert('DOCX 생성 중 오류가 발생했습니다.');
     } finally {
@@ -55,7 +58,7 @@ export function PreviewModal({ taskName, sections: propSections, onClose }: Prop
   const handlePdf = () => {
     setExporting('pdf');
     setPdfBlocked(false);
-    const opened = exportPdf(taskName ?? '특허명세서', sections);
+    const opened = exportPdf(taskName ?? '특허명세서', sections, drawings);
     if (!opened) {
       setPdfBlocked(true);
     }
@@ -114,6 +117,19 @@ export function PreviewModal({ taskName, sections: propSections, onClose }: Prop
               <p className="text-md2 text-gray-700 leading-relaxed whitespace-pre-line">{s.content}</p>
             </div>
           ))}
+          {drawings.length > 0 && (
+            <div className="mb-5">
+              <h4 className="text-sm2 font-bold text-gray-700 mb-1.5 pb-1 border-b border-gray-100">【도면】</h4>
+              <div className="grid grid-cols-2 gap-4">
+                {drawings.map((d, i) => (
+                  <figure key={i} className="m-0 border border-gray-200 rounded-lg p-3 bg-white">
+                    <img src={d.dataUrl} alt={`도 ${d.symbol} ${d.name}`} className="w-full max-h-[260px] object-contain" />
+                    <figcaption className="mt-2 text-xs2 text-gray-600 text-center">【도 {d.symbol}】 {d.name}</figcaption>
+                  </figure>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 푸터 */}

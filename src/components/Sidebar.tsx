@@ -236,20 +236,18 @@ function TaskRow({ t, active, onSelect, onToggleFav, menuOpen, onMenuToggle, onR
           <span className={clsx('text-md2 font-medium leading-tight truncate', active ? 'text-brand-400' : 'text-zinc-800')}>
             {t.name}
           </span>
+          {stage && (
+            <span className={clsx('ml-auto shrink-0 text-xs2 px-1.5 py-px rounded font-medium',
+              stage.tone === 'done' ? 'bg-green-50 text-green-700' : 'bg-brand-50 text-brand-600')} title="진행 단계">{stage.text}</span>
+          )}
           {(t.name === '직무발명서' || t.name === '미지정') && (
             <span className="shrink-0 text-xs2 px-1 py-px bg-zinc-100 text-zinc-400 rounded font-medium">샘플</span>
           )}
         </div>
-        <div className="text-xs2 text-zinc-400 mt-0.5 truncate flex items-center gap-1 min-w-0">
-          {stage && (
-            <span className={clsx('shrink-0 px-1.5 py-px rounded font-medium',
-              stage.tone === 'done' ? 'bg-green-50 text-green-700' : 'bg-brand-50 text-brand-600')}>{stage.text}</span>
-          )}
-          <span className="truncate">
-            {t.techField
-              ? <><span className="text-zinc-500 font-medium">{t.techField}</span> · {ago}</>
-              : ago}
-          </span>
+        <div className="text-xs2 text-zinc-400 mt-0.5 truncate" title={t.techField ? `${t.techField} · ${ago}` : ago}>
+          {t.techField
+            ? <><span className="text-zinc-500 font-medium">{t.techField}</span> · {ago}</>
+            : ago}
         </div>
       </span>
       <button

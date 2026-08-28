@@ -110,6 +110,7 @@ export interface Drawing {
   included?: boolean
   useForSpec?: boolean
   isRepresentative?: boolean
+  cadConverted?: boolean   // 도면 편집기(새 탭)에서 CAD 변환 결과를 받아 반영했는지 (B13)
 }
 
 // ── 명세서 타입 ──────────────────────────────────────────────────────────────
