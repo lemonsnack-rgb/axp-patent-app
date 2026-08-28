@@ -113,6 +113,8 @@ const FORMULA_TEMPLATES = [
 // ── 섹션 정의 ──────────────────────────────────────────────────────────────
 // 이번 버전 범위: 표 삽입은 제외(사용자 결정 2026-08-28). API SpecificationBlock은 table 타입을 지원하므로 후속 버전에서 플래그만 켜면 된다.
 const ENABLE_TABLE_INSERT = false;
+// 도면 참조 '(도 N 참조)' 삽입도 이번 버전 제외(사용자 결정 2026-08-28) — API 없음, 실시예 생성이 표기를 포함하므로 보조 도구로만 유효
+const ENABLE_DRAWING_REF = false;
 
 const EDITOR_SECTIONS = [
   { id: 'title',                  label: '발명의 명칭',                       short: '명칭' },
@@ -1211,7 +1213,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
             <span className="font-serif text-base2 leading-none">∑</span><span>수식</span>
           </button>
-          {/* 도면 참조 삽입 — 선택한 본문 블록의 커서 위치에 '(도 N 참조)' 삽입 */}
+          {/* 도면 참조 삽입 — 선택한 본문 블록의 커서 위치에 '(도 N 참조)' 삽입 (이번 버전 제외, ENABLE_DRAWING_REF) */}
+          {ENABLE_DRAWING_REF && (
           <div className="relative">
             <button onClick={() => setDrawingRefMenuOpen(o => !o)} disabled={!sel || drawings.length === 0}
               title={drawings.length === 0 ? '채택된 도면이 없습니다' : "선택한 단락의 커서 위치에 '(도 N 참조)' 문구를 넣습니다 — 실시예 본문이 어느 도면을 설명하는지 표시"}
@@ -1237,6 +1240,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
               </>
             )}
           </div>
+          )}
           <div className="w-px h-5 bg-zinc-200 mx-1" />
           <button onClick={() => setFindOpen(o => !o)} title="찾기/바꾸기 (Ctrl+F)"
             className={clsx('flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md transition-colors text-xs2', findOpen ? 'bg-blue-50 text-blue-700' : 'hover:bg-zinc-100 text-zinc-500')}>
@@ -1245,7 +1249,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           </button>
         </div>
         {!sel && (
-          <span className="hidden xl:block flex-1 min-w-0 text-xs2 text-zinc-400 ml-3 truncate">단락을 클릭하면 수식·도면 참조 삽입 가능</span>
+          <span className="hidden xl:block flex-1 min-w-0 text-xs2 text-zinc-400 ml-3 truncate">단락을 클릭하면 수식을 삽입할 수 있습니다</span>
         )}
         {/* 출력 그룹 — 편집 도구와 분리해 우측 정렬 (미리보기 · DOCX · PDF) */}
         <div className="ml-auto flex items-center gap-0.5 pr-2 shrink-0">
