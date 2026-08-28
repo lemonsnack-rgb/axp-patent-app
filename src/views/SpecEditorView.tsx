@@ -26,7 +26,6 @@ import { diffWords } from '../utils/diffWords';
 import { particle } from '../utils/korean';
 import { DiffText } from '../components/DiffText';
 import { ElementText, type ElementLike } from '../components/ElementText';
-import { detectRenameInEdit } from '../features/spec/elementRename';
 import { exportDocx } from '../utils/exportDocx';
 import { exportPdf } from '../utils/exportPdf';
 
@@ -621,10 +620,6 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     onRenameElement?.(oldName, next);
   };
 
-  // 단락 편집 종료 시 "구성요소 이름 변경" 감지 → 인라인 확인 바
-  const [renameHint, setRenameHint] = useState<{ sid: SectionId; idx: number; oldName: string; newName: string; symbol: string; prevText: string } | null>(null);
-  const editStartRef = useRef<{ sid: SectionId; idx: number; text: string } | null>(null);
-
   // 도구 모달
   const [tableModal, setTableModal] = useState(false);
   const [tableRows, setTableRows] = useState(3);
@@ -1118,11 +1113,10 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           className="bg-white rounded-2xl shadow-card-deep w-80 p-5"
           onClick={e => e.stopPropagation()}
         >
-          <p className="text-base2 font-bold text-zinc-800 mb-1">구성요소 이름 변경</p>
+          <p className="text-base2 font-bold text-zinc-800 mb-1">구성요소 이름 전체 변경</p>
           <p className="text-xs2 text-zinc-500 mb-3 leading-relaxed">
-            명세서 전체에서{' '}
-            <span className="font-semibold text-zinc-700">"{renamingComp.name}"</span>이
-            일괄 변경됩니다.
+            <span className="font-semibold text-zinc-700">"{renamingComp.name}"</span>{' '}
+            → 본문·청구범위·부호의 설명과 작성 단계(구성요소·청구항·중간명세서)의 모든 언급이 한 번에 바뀝니다. 부호는 유지됩니다.
           </p>
           <Input
             autoFocus
@@ -1445,6 +1439,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                           </button>
                         )}
                         {isEditing ? (
+                          <>
                           <textarea
                             className="w-full text-base2 text-zinc-800 bg-transparent outline-none border-0 resize-none leading-relaxed overflow-hidden py-1.5 px-3"
                             value={blockText}
@@ -1459,18 +1454,16 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                               t.style.height = t.scrollHeight + 'px';
                             }}
                             onSelect={e => { caretRef.current = { sid: sec.id, idx: blockIdx, start: e.currentTarget.selectionStart, end: e.currentTarget.selectionEnd }; }}
-                            onFocus={() => { if (!editStartRef.current || editStartRef.current.sid !== sec.id || editStartRef.current.idx !== blockIdx) editStartRef.current = { sid: sec.id, idx: blockIdx, text: blockText }; }}
-                            onBlur={() => {
-                              const st = editStartRef.current;
-                              if (st && st.sid === sec.id && st.idx === blockIdx && st.text !== blockText) {
-                                const d = detectRenameInEdit(st.text, blockText, context?.elements ?? []);
-                                if (d) setRenameHint({ sid: sec.id, idx: blockIdx, ...d, prevText: st.text });
-                              }
-                              editStartRef.current = null;
-                            }}
                             ref={el => { blockTaRef.current = el; if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                             onClick={e => e.stopPropagation()}
                           />
+                          {/* 편집 모드 안내 — 구성요소 이름이 들어 있는 단락에서만: 여기서 고치면 이 자리만 바뀜을 알린다 */}
+                          {(context?.elements ?? []).some(el => el.value_ko && blockText.includes(el.value_ko)) && (
+                            <p className="mx-3 mb-1.5 text-xs2 text-zinc-400">
+                              구성요소 이름은 여기서 고쳐도 이 단락에만 반영됩니다. 명세서 전체에서 바꾸려면 편집을 끝낸 뒤 <span className="text-brand-600 font-medium border-b border-dashed border-brand-400">점선 밑줄 이름</span>을 클릭하세요.
+                            </p>
+                          )}
+                          </>
                         ) : isMarkdownTable(blockText) ? (
                           <div className="py-1.5 px-3 overflow-x-auto"><MarkdownTable text={blockText} /></div>
                         ) : blockText.includes('$') ? (
@@ -1485,18 +1478,6 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                               ? <ElementText text={blockText} elements={context?.elements ?? []} onClickElement={(name) => setRenamingComp({ name, draft: name })} />
                               : '단락 내용을 입력하세요...'}
                           </p>
-                        )}
-                        {/* 구성요소 이름 변경 감지 — 편집 종료 시 "정의를 바꿀지 / 이 자리만 바꿀지" 확인 (기본: 이 자리만) */}
-                        {renameHint && renameHint.sid === sec.id && renameHint.idx === blockIdx && (
-                          <div className="mx-3 mb-2 flex flex-wrap items-center gap-2 rounded-md border border-brand-200 bg-brand-50/60 px-2.5 py-1.5 text-xs2 text-zinc-700" onClick={e => e.stopPropagation()}>
-                            <span>ⓘ '{renameHint.oldName}({renameHint.symbol})' → '{renameHint.newName}({renameHint.symbol})'로 바뀌었습니다. 다른 곳도 함께 바꿀까요?</span>
-                            <button type="button" onClick={() => { renameComp(renameHint.oldName, renameHint.newName); setRenameHint(null); }}
-                              className="inline-flex items-center h-6 px-2 rounded-md text-xs2 font-semibold bg-brand-400 text-white hover:bg-brand-500">전체 변경</button>
-                            <button type="button" onClick={() => setRenameHint(null)}
-                              className="inline-flex items-center h-6 px-2 rounded-md text-xs2 text-zinc-600 border border-zinc-200 bg-white hover:bg-zinc-50">이 자리만</button>
-                            <button type="button" onClick={() => { updateBlock(renameHint.sid, renameHint.idx, renameHint.prevText); setRenameHint(null); }}
-                              className="inline-flex items-center h-6 px-2 rounded-md text-xs2 text-zinc-500 hover:bg-zinc-100">되돌리기</button>
-                          </div>
                         )}
                       </div>
                     );

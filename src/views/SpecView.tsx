@@ -150,7 +150,8 @@ export function SpecView() {
         saveSpecState(task.id, { editorBlocks: eb });
       }
     }
-    toast(`'${oldName}' → '${newName}'로 바꿨습니다`);
+    const c = countElementMentionsAll(oldName);
+    toast(c.total ? `'${oldName}' → '${newName}' — 본문 ${c.total}곳도 함께 바꿨습니다` : `'${oldName}' → '${newName}'로 바꿨습니다`);
   };
 
   // ── 명세서 생성 진행 (중간명세서 → 에디터) ─────────────────────────────
@@ -806,7 +807,6 @@ export function SpecView() {
                                 done={isDone}
                                 onConfirm={() => confirm('components')}
                                 onUpdate={v => setGSel(p => ({ ...p, components: v }))}
-                                onCountMentions={countElementMentionsAll}
                                 onRenameEverywhere={(o, n) => renameElementEverywhere(o, n)}
                                 onComponentsChange={(comps) => {
                                   setAiComponents(comps);
@@ -2152,13 +2152,12 @@ function compItemToSpecItem(item: CompItem): SpecComponentItem {
   };
 }
 
-function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onCountMentions, onRenameEverywhere }: {
+function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onRenameEverywhere }: {
   done: boolean;
   onConfirm: () => void;
   onUpdate: (v: string) => void;
   onComponentsChange?: (comps: SpecComponentItem[]) => void;
   initialItems?: SpecComponentItem[];
-  onCountMentions?: (oldName: string) => { desc: number; claims: number; midspec: number; editor: number; total: number };
   onRenameEverywhere?: (oldName: string, newName: string) => void;
 }) {
   // 명칭 입력란 포커스 시점의 이름 — blur 시 변경 감지용 (정의 지점 이름 변경 → 인용 텍스트 전파 확인)
@@ -2433,20 +2432,12 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onC
                           onChange={e => upd(items.map(it => it.id===item.id ? {...it, value_ko: e.target.value} : it))}
                           onFocus={() => { focusNameRef.current[item.id] = item.value_ko; }}
                           onBlur={() => {
+                            // 정의 지점에서 이름이 바뀌면 인용 텍스트 전체에 즉시 적용 (단일 규칙: 구성요소를 고치면 한 번에 바뀐다)
                             const old = (focusNameRef.current[item.id] ?? '').trim();
                             const nw = item.value_ko.trim();
                             delete focusNameRef.current[item.id];
-                            if (!old || !nw || old === nw || !onCountMentions || !onRenameEverywhere) return;
-                            const c = onCountMentions(old);
-                            if (!c.total) return;
-                            openAlertDialog(
-                              {
-                                title: '구성요소 명칭 변경',
-                                description: `'${old}' → '${nw}'\n이미 작성된 텍스트에도 반영할까요? (발명 설명 ${c.desc}곳 · 청구항 ${c.claims}곳 · 중간명세서 ${c.midspec}곳 · 명세서 본문 ${c.editor}곳) 부호는 유지됩니다.`,
-                                confirm: '함께 바꾸기', cancel: '이 항목만',
-                              },
-                              { theme: 'primary', onConfirm: (ctrl) => { ctrl.close(); onRenameEverywhere(old, nw); } },
-                            );
+                            if (!old || !nw || old === nw || !onRenameEverywhere) return;
+                            onRenameEverywhere(old, nw);
                           }}
                         />
                       ) : (
