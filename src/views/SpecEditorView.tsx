@@ -111,6 +111,9 @@ const FORMULA_TEMPLATES = [
 ];
 
 // ── 섹션 정의 ──────────────────────────────────────────────────────────────
+// 이번 버전 범위: 표 삽입은 제외(사용자 결정 2026-08-28). API SpecificationBlock은 table 타입을 지원하므로 후속 버전에서 플래그만 켜면 된다.
+const ENABLE_TABLE_INSERT = false;
+
 const EDITOR_SECTIONS = [
   { id: 'title',                  label: '발명의 명칭',                       short: '명칭' },
   { id: 'technical_field',        label: '기술분야',                          short: '기술분야' },
@@ -1198,10 +1201,12 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             <RedoIcon /><span>다시 실행</span>
           </button>
           <div className="w-px h-5 bg-zinc-200 mx-1" />
-          <button onClick={() => setTableModal(true)} disabled={!sel} title="표 삽입"
-            className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
-            <TableIcon /><span>표</span>
-          </button>
+          {ENABLE_TABLE_INSERT && (
+            <button onClick={() => setTableModal(true)} disabled={!sel} title="표 삽입"
+              className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
+              <TableIcon /><span>표</span>
+            </button>
+          )}
           <button onClick={() => setFormulaModal(true)} disabled={!sel} title="수식 입력"
             className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
             <span className="font-serif text-base2 leading-none">∑</span><span>수식</span>
@@ -1209,7 +1214,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           {/* 도면 참조 삽입 — 선택한 본문 블록의 커서 위치에 '(도 N 참조)' 삽입 */}
           <div className="relative">
             <button onClick={() => setDrawingRefMenuOpen(o => !o)} disabled={!sel || drawings.length === 0}
-              title={drawings.length === 0 ? '도면이 없습니다' : '본문에 도면 참조 (도 N 참조) 삽입'}
+              title={drawings.length === 0 ? '채택된 도면이 없습니다' : "선택한 단락의 커서 위치에 '(도 N 참조)' 문구를 넣습니다 — 실시예 본문이 어느 도면을 설명하는지 표시"}
               className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2.5 11l3.5-3 2.5 2 3-3.5 2 2"/></svg>
               <span>도면 참조</span><span className="text-xs2 leading-none">▾</span>
@@ -1240,7 +1245,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           </button>
         </div>
         {!sel && (
-          <span className="hidden xl:block flex-1 min-w-0 text-xs2 text-zinc-400 ml-3 truncate">단락을 클릭하면 표·수식·도면 참조 삽입 가능</span>
+          <span className="hidden xl:block flex-1 min-w-0 text-xs2 text-zinc-400 ml-3 truncate">단락을 클릭하면 수식·도면 참조 삽입 가능</span>
         )}
         {/* 출력 그룹 — 편집 도구와 분리해 우측 정렬 (미리보기 · DOCX · PDF) */}
         <div className="ml-auto flex items-center gap-0.5 pr-2 shrink-0">
