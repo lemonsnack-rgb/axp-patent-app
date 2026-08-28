@@ -60,7 +60,7 @@ const STEP_LABEL: Partial<Record<StepId, string>> = {
 const SPEC_GEN_STAGES = [
   { label: '확정 내용 정리',          detail: '구성요소·도면·청구항을 명세서 구조에 배치합니다' },
   { label: '발명의 상세한 설명 작성', detail: '기술분야·배경기술·과제·해결수단·효과를 다듬습니다' },
-  { label: '실시예 작성',             detail: '도면과 부호를 참조해 구체적인 내용을 씁니다 — 가장 오래 걸리는 단계입니다' },
+  { label: '실시예 작성',             detail: '도면과 부호를 참조해 구체적인 내용을 씁니다' },
   { label: '청구범위·요약 정리',      detail: '청구항 번호·인용을 맞추고 요약서를 작성합니다' },
   { label: '명세서 조립·검수',        detail: '섹션 순서와 부호의 설명을 최종 점검합니다' },
 ];
@@ -111,17 +111,13 @@ export function SpecView() {
   // ── 명세서 생성 진행 (중간명세서 → 에디터) ─────────────────────────────
   // 실시예를 포함한 명세서 생성은 실제 API에서 1분 이상 걸린다. 단계 체크리스트 + 진행 바 + 경과 시간을 보여주고
   // 완료 시 에디터로 전환한다. mock은 SPEC_GEN_STAGE_MS 타이밍으로 단계를 진행한다. (실 API: 진행 이벤트를 setSpecGenStage로 연결)
-  const [specGen, setSpecGen] = useState<{ stage: number; startedAt: number; now: number } | null>(null);
+  // 경과 시간은 표시하지 않는다(사용자 결정: 오래 걸림을 강조할 필요 없음) — 진행 중 표시와 단계만.
+  const [specGen, setSpecGen] = useState<{ stage: number } | null>(null);
   const specGenTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const specGenTick = useRef<ReturnType<typeof setInterval> | null>(null);
-  const clearSpecGenTimers = () => {
-    specGenTimers.current.forEach(clearTimeout); specGenTimers.current = [];
-    if (specGenTick.current) { clearInterval(specGenTick.current); specGenTick.current = null; }
-  };
+  const clearSpecGenTimers = () => { specGenTimers.current.forEach(clearTimeout); specGenTimers.current = []; };
   const startSpecGeneration = (onDone: () => void) => {
     clearSpecGenTimers();
-    setSpecGen(() => { const t = Date.now(); return { stage: 0, startedAt: t, now: t }; });
-    specGenTick.current = setInterval(() => setSpecGen(g => g ? { ...g, now: Date.now() } : g), 1000);
+    setSpecGen({ stage: 0 });
     SPEC_GEN_STAGE_MS.forEach((ms, i) => {
       specGenTimers.current.push(setTimeout(() => setSpecGen(g => g ? { ...g, stage: i + 1 } : g), ms));
     });
@@ -972,8 +968,6 @@ export function SpecView() {
 
         {/* 명세서 생성 진행 오버레이 — 중간명세서 → 에디터 */}
         {specGen && (() => {
-          const elapsed = Math.max(0, Math.floor((specGen.now - specGen.startedAt) / 1000));
-          const mm = String(Math.floor(elapsed / 60)).padStart(2, '0'), ss = String(elapsed % 60).padStart(2, '0');
           const pct = Math.min(96, Math.round((specGen.stage / SPEC_GEN_STAGES.length) * 100) + 4);
           return (
             <div className="fixed inset-0 z-[60] bg-white/92 backdrop-blur-sm flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-labelledby="specgen-title">
@@ -981,9 +975,9 @@ export function SpecView() {
                 <div className="flex items-center gap-2.5 mb-1">
                   <span className="w-8 h-8 rounded-lg bg-brand-400 text-white flex items-center justify-center shrink-0"><AiIcon size={14} /></span>
                   <h3 id="specgen-title" className="text-base2 font-bold text-gray-800">명세서를 생성하고 있습니다</h3>
-                  <span className="ml-auto font-mono text-sm2 text-neutral-500 tabular-nums">{mm}:{ss}</span>
+                  <span className="ml-auto w-4 h-4 border-2 border-brand-400 border-t-transparent rounded-full animate-spin inline-block" aria-hidden="true" />
                 </div>
-                <p className="text-xs2 text-neutral-500 mb-4">실시예를 포함한 초안 생성에는 <b className="text-neutral-700">1분 이상</b> 걸릴 수 있습니다. 완료되면 에디터로 자동 이동합니다.</p>
+                <p className="text-xs2 text-neutral-500 mb-4">실시예를 포함한 명세서 초안을 만들고 있습니다. 완료되면 에디터로 자동 이동합니다.</p>
                 <div className="relative h-1.5 bg-neutral-100 rounded-full overflow-hidden mb-4">
                   <div className="absolute inset-y-0 left-0 bg-brand-400 rounded-full transition-[width] duration-700" style={{ width: `${pct}%` }} />
                   <div className="absolute inset-y-0 w-1/4 bg-white/40" style={{ animation: 'loading-indeterminate 1.4s ease-in-out infinite' }} />
@@ -1008,7 +1002,7 @@ export function SpecView() {
                   })}
                 </ol>
                 <div className="flex items-center justify-between mt-5">
-                  <span className="text-xs2 text-neutral-400">이 창을 닫아도 작업은 저장됩니다 · 생성 결과는 에디터에서 계속 수정할 수 있습니다</span>
+                  <span className="text-xs2 text-neutral-400">생성 결과는 에디터에서 계속 수정할 수 있습니다</span>
                   <button
                     type="button"
                     onClick={cancelSpecGeneration}

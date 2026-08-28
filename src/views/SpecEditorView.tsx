@@ -595,12 +595,6 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
   const chatTextareaRef = useRef<HTMLTextAreaElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const msgIdRef = useRef(0);
-  // 버전 기록 — 데모 정합: 초기 버전 + AI 수정 적용 이력
-  type VersionEntry = { time: string; label: string };
-  const nowHM = () => { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
-  const [versions, setVersions] = useState<VersionEntry[]>([{ time: nowHM(), label: '초기 버전' }]);
-  const [versionsOpen, setVersionsOpen] = useState(false);
-  const pushVersion = (label: string) => setVersions(v => [...v, { time: nowHM(), label }]);
   // 제안 확대 보기 모달
   const [zoomProposal, setZoomProposal] = useState<EditProposal | null>(null);
 
@@ -764,7 +758,6 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       return next;
     });
     setProposalStatus(msgId, pi, 'accepted');
-    pushVersion(`AI 수정 적용 (${p.action})`);
   };
   const declineProposal = (msgId: number, pi: number) => setProposalStatus(msgId, pi, 'declined');
 
@@ -821,7 +814,6 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     setChatMessages(prev => prev.map(x => x.id === msgId
       ? { ...x, replacements: x.replacements?.map((rr, i) => i === ri ? { ...rr, status: 'accepted' as const } : rr) }
       : x));
-    pushVersion(`용어 교체 (${r.source} → ${r.target})`);
     toast('용어가 교체되었습니다');
   };
   const declineReplacement = (msgId: number, ri: number) => {
@@ -1241,11 +1233,17 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             )}
           </div>
           <div className="w-px h-5 bg-zinc-200 mx-1" />
-          <button onClick={() => setFindOpen(o => !o)} title="찾기/바꾸기"
+          <button onClick={() => setFindOpen(o => !o)} title="찾기/바꾸기 (Ctrl+F)"
             className={clsx('flex items-center gap-1 px-2 py-1 rounded-md transition-colors text-xs2', findOpen ? 'bg-blue-50 text-blue-700' : 'hover:bg-zinc-100 text-zinc-500')}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
             <span>찾기</span>
           </button>
+        </div>
+        {!sel && (
+          <span className="hidden lg:inline text-xs2 text-zinc-400 ml-2 truncate">단락을 클릭하면 표·수식·도면 참조를 넣을 수 있습니다</span>
+        )}
+        {/* 출력 그룹 — 편집 도구와 분리해 우측 정렬 (미리보기 · DOCX · PDF) */}
+        <div className="ml-auto flex items-center gap-0.5 pr-2">
           <button onClick={() => setEditorPreviewOpen(true)} title="미리보기"
             className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-zinc-100 transition-colors text-zinc-500 text-xs2">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
@@ -1261,31 +1259,6 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><path d="M9 2v4h4"/><path d="M5.5 9.5h5M5.5 11.5h3"/></svg>
             <span>PDF</span>
           </button>
-          <div className="w-px h-5 bg-zinc-200 mx-1" />
-          {/* 버전 기록 — 데모 정합: AI 수정 반영 이력 */}
-          <div className="relative">
-            <button onClick={() => setVersionsOpen(o => !o)} title="버전 기록 (AI 수정 반영 이력)"
-              className={clsx('flex items-center gap-1 px-2 py-1 rounded-md transition-colors text-xs2', versionsOpen ? 'bg-blue-50 text-blue-700' : 'hover:bg-zinc-100 text-zinc-500')}>
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5V8l2.5 1.5"/></svg>
-              <span>버전</span>
-              <span className="text-xs2 px-1 rounded-md bg-zinc-100 text-zinc-500 font-semibold">{versions.length}</span>
-            </button>
-            {versionsOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setVersionsOpen(false)} />
-                <div className="absolute left-0 top-full mt-1 z-20 w-64 max-h-72 overflow-y-auto scroll-thin rounded-lg border border-zinc-200 bg-white shadow-lg py-1">
-                  <p className="px-3 py-1.5 text-xs2 font-bold text-zinc-400 border-b border-zinc-100">버전 기록</p>
-                  {[...versions].reverse().map((v, i) => (
-                    <div key={versions.length - 1 - i} className="px-3 py-1.5 flex items-center gap-2 text-xs2">
-                      <span className="font-semibold text-zinc-600 shrink-0">{v.time}</span>
-                      <span className="text-zinc-500 truncate">{v.label}</span>
-                      {i === 0 && <span className="ml-auto shrink-0 text-xs2 px-1 rounded-md bg-emerald-50 text-emerald-600 font-semibold">현재</span>}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
         </div>
       </div>
 
@@ -1322,7 +1295,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             className={clsx(
               'px-3 py-2 text-xs2 whitespace-nowrap border-b-2 transition-colors shrink-0',
               activeSec === s.id
-                ? 'border-blue-600 text-blue-700 font-semibold'
+                ? 'border-brand-400 text-brand-600 font-semibold'
                 : 'border-transparent text-zinc-500 hover:text-zinc-700'
             )}>
             {s.short}
@@ -1536,7 +1509,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                       setBlocks(p => ({ ...p, [sec.id]: [...p[sec.id], ''] }));
                       setTimeout(() => selectBlock(sec.id, newIdx), 50);
                     }}
-                    className="w-full py-1.5 text-xs2 text-zinc-400 hover:text-zinc-600 border border-dashed border-zinc-200 rounded-lg hover:border-zinc-400 transition-colors"
+                    className="ml-auto flex items-center h-7 px-2.5 text-xs2 text-zinc-400 hover:text-brand-500 border border-dashed border-zinc-200 rounded-lg hover:border-brand-300 hover:bg-brand-50/40 transition-colors"
                   >
                     + 단락 추가
                   </button>
