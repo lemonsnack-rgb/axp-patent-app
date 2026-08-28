@@ -26,6 +26,7 @@ import { diffWords } from '../utils/diffWords';
 import { particle } from '../utils/korean';
 import { DiffText } from '../components/DiffText';
 import { ElementText, type ElementLike } from '../components/ElementText';
+import { replaceElementName } from '../features/spec/elementRename';
 import { exportDocx } from '../utils/exportDocx';
 import { exportPdf } from '../utils/exportPdf';
 
@@ -184,11 +185,11 @@ function remapClaimRefs(items: { value: string }[], map: Record<number, number>)
     }),
   }));
 }
+// 청구범위 블록은 '청구항 N.' 단락만 보관한다(요약 헤더 없음 — 미리보기·내보내기에 섞이지 않도록)
 function serializeClaimItems(items: { value: string }[]): string[] {
-  const indep = items.filter(it => claimDependsOn(it.value) === null).length;
-  const header = `독립항 ${indep}개, 종속항 ${items.length - indep}개`;
-  return [header, ...items.map((it, i) => `청구항 ${i + 1}.\n${it.value}`)];
+  return items.map((it, i) => `청구항 ${i + 1}.\n${it.value}`);
 }
+const isClaimBlock = (b: string) => /^청구항\s*\d+\./.test(b.trim());
 
 function ClaimsEditor({ blocks, onChange, elements = [], onClickElement }: {
   blocks: string[];
@@ -245,10 +246,10 @@ function ClaimsEditor({ blocks, onChange, elements = [], onClickElement }: {
 
   if (items.length === 0) {
     return (
-      <div className="space-y-2">
+      <div data-spec="SPC-EDT-090" className="space-y-2">
         <p className="text-xs2 text-zinc-400 py-3 text-center">청구항이 없습니다. 아래에서 추가하세요.</p>
         <div className="flex gap-2">
-          <button onClick={addIndep} className="flex-1 py-1.5 text-xs2 font-semibold text-blue-600 border border-dashed border-blue-300 rounded-lg hover:bg-blue-50 transition-colors">+ 독립항 추가</button>
+          <button data-spec="SPC-EDT-094" onClick={addIndep} className="flex-1 py-1.5 text-xs2 font-semibold text-blue-600 border border-dashed border-blue-300 rounded-lg hover:bg-blue-50 transition-colors">+ 독립항 추가</button>
           <button onClick={addDep} className="flex-1 py-1.5 text-xs2 font-semibold text-amber-600 border border-dashed border-amber-300 rounded-lg hover:bg-amber-50 transition-colors">+ 종속항 추가</button>
         </div>
       </div>
@@ -277,13 +278,13 @@ function ClaimsEditor({ blocks, onChange, elements = [], onClickElement }: {
                 </span>
               )}
               <div className="ml-auto flex gap-0.5">
-                <button onClick={() => move(idx, -1)} disabled={idx === 0} className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-all" title="위로">
+                <button data-spec="SPC-EDT-092" onClick={() => move(idx, -1)} disabled={idx === 0} className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-all" title="위로">
                   <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="11" height="11"><path d="M2 7l3-4 3 4"/></svg>
                 </button>
                 <button onClick={() => move(idx, 1)} disabled={idx === items.length - 1} className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-all" title="아래로">
                   <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="11" height="11"><path d="M2 3l3 4 3-4"/></svg>
                 </button>
-                <button onClick={() => remove(idx)} className="w-5 h-5 rounded-md flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 transition-all" title="삭제">
+                <button data-spec="SPC-EDT-093" onClick={() => remove(idx)} className="w-5 h-5 rounded-md flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 transition-all" title="삭제">
                   <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" width="11" height="11"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>
                 </button>
               </div>
@@ -301,7 +302,7 @@ function ClaimsEditor({ blocks, onChange, elements = [], onClickElement }: {
             ) : (
               <p
                 onClick={() => setEditing(idx)}
-                title="클릭하여 편집"
+                data-spec="SPC-EDT-091" title="클릭하여 편집"
                 className="text-base2 text-zinc-800 leading-relaxed whitespace-pre-wrap px-1.5 py-1 rounded-md cursor-text hover:bg-white hover:ring-1 hover:ring-zinc-200 transition-colors"
               ><ElementText text={it.value} elements={elements} onClickElement={onClickElement} /></p>
             )}
@@ -309,7 +310,7 @@ function ClaimsEditor({ blocks, onChange, elements = [], onClickElement }: {
         );
       })}
       <div className="flex gap-2 pt-1">
-        <button onClick={addIndep} className="flex-1 py-1.5 text-xs2 font-semibold text-blue-600 border border-dashed border-blue-300 rounded-lg hover:bg-blue-50 transition-colors">+ 독립항 추가</button>
+        <button data-spec="SPC-EDT-094" onClick={addIndep} className="flex-1 py-1.5 text-xs2 font-semibold text-blue-600 border border-dashed border-blue-300 rounded-lg hover:bg-blue-50 transition-colors">+ 독립항 추가</button>
         <button onClick={addDep} className="flex-1 py-1.5 text-xs2 font-semibold text-amber-600 border border-dashed border-amber-300 rounded-lg hover:bg-amber-50 transition-colors">+ 종속항 추가</button>
       </div>
     </div>
@@ -606,11 +607,11 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     setUndoStack(p => [...p.slice(-20), blocks]);
     setRedoStack([]);
     setBlocks(prev => {
-      const escaped = oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const re = new RegExp(escaped, 'g');
+      // 위저드(renameElementEverywhere)와 같은 엔진 — 긴 이름 우선 매칭·부호 보존
+      const allNames = (context?.elements ?? []).map(e => e.value_ko);
       const result = {} as Record<SectionId, string[]>;
       for (const sid of Object.keys(prev) as SectionId[]) {
-        result[sid] = prev[sid].map(text => text.replace(re, next));
+        result[sid] = prev[sid].map(text => replaceElementName(text, oldName, next, allNames).text);
       }
       if (task?.id) {
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -813,9 +814,11 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     const handler = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       const tag = el?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) return;
       if (!(e.ctrlKey || e.metaKey)) return;
       const k = e.key.toLowerCase();
+      // Ctrl+F: 브라우저 찾기 대신 문서 찾기/바꾸기 바 (입력 중에도 동작)
+      if (k === 'f' && !e.shiftKey && !e.altKey) { e.preventDefault(); setFindOpen(true); return; }
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) return;
       if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
       else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
     };
@@ -841,7 +844,15 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
   // ── 단락 삭제 (확인 후) — 실행 취소 스택에 저장 ─────────────────────────
   const deleteBlock = (sid: SectionId, idx: number) => {
     setUndoStack(p => [...p.slice(-20), blocks]);
-    setBlocks(p => ({ ...p, [sid]: p[sid].filter((_, i) => i !== idx) }));
+    setRedoStack([]);
+    setBlocks(p => {
+      const result = { ...p, [sid]: p[sid].filter((_, i) => i !== idx) };
+      if (task?.id) {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() => saveSpecState(task.id, { editorBlocks: result as any }), 500);
+      }
+      return result;
+    });
     if (sel?.sid === sid && sel?.idx === idx) setSel(null);
     setSelSet(prev => { const n = new Set(prev); n.delete(`${sid}-${idx}`); return n; });
   };
@@ -1049,7 +1060,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
   // 에디터 미리보기 섹션 (#80 fix)
   const editorPreviewSections: PreviewSection[] = EDITOR_SECTIONS.map(s => ({
     label: s.label,
-    content: (blocks[s.id] ?? []).join('\n\n'),
+    // 청구범위는 위저드 확정 텍스트의 요약 헤더('독립항 N개, …')를 제외하고 항만 출력
+    content: (blocks[s.id] ?? []).filter(b => s.id !== 'claims' || isClaimBlock(b)).join('\n\n'),
   })).filter(s => s.content.trim());
 
   // 내보내기용 도면 — 명세서에 포함(useForSpec)된 도면을 data URI로
@@ -1115,7 +1127,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
         className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4"
         onClick={() => setRenamingComp(null)}
       >
-        <div
+        <div data-spec="SPC-EDT-086"
           className="bg-white rounded-2xl shadow-card-deep w-80 p-5"
           onClick={e => e.stopPropagation()}
         >
@@ -1157,9 +1169,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
 
       {/* 서브헤더 Row 1: 편집 툴바 */}
-      <div className="flex items-center border-b border-zinc-200 bg-white shrink-0 h-10 pl-2">
+      <div data-spec="SPC-EDT-060" className="flex items-center border-b border-zinc-200 bg-white shrink-0 h-10 pl-2">
         <div className="flex items-center gap-0.5 shrink-0">
-          <button onClick={undo} disabled={!undoStack.length} title="실행 취소 (Ctrl+Z)"
+          <button onClick={undo} disabled={!undoStack.length} data-spec="SPC-EDT-061" title="실행 취소 (Ctrl+Z)"
             className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
             <UndoIcon /><span>실행 취소</span>
           </button>
@@ -1174,7 +1186,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
               <TableIcon /><span>표</span>
             </button>
           )}
-          <button onClick={() => setFormulaModal(true)} disabled={!sel} title="수식 입력"
+          <button onClick={() => setFormulaModal(true)} disabled={!sel} data-spec="SPC-EDT-062" title="수식 입력"
             className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors text-zinc-500 text-xs2">
             <span className="font-serif text-base2 leading-none">∑</span><span>수식</span>
           </button>
@@ -1207,7 +1219,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           </div>
           )}
           <div className="w-px h-5 bg-zinc-200 mx-1" />
-          <button onClick={() => setFindOpen(o => !o)} title="찾기/바꾸기 (Ctrl+F)"
+          <button onClick={() => setFindOpen(o => !o)} data-spec="SPC-EDT-063" title="찾기/바꾸기 (Ctrl+F)"
             className={clsx('flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md transition-colors text-xs2', findOpen ? 'bg-blue-50 text-blue-700' : 'hover:bg-zinc-100 text-zinc-500')}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
             <span>찾기</span>
@@ -1218,17 +1230,17 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
         )}
         {/* 출력 그룹 — 편집 도구와 분리해 우측 정렬 (미리보기 · DOCX · PDF) */}
         <div className="ml-auto flex items-center gap-0.5 pr-2 shrink-0">
-          <button onClick={() => setEditorPreviewOpen(true)} title="미리보기"
+          <button onClick={() => setEditorPreviewOpen(true)} data-spec="SPC-EDT-064" title="미리보기"
             className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 transition-colors text-zinc-500 text-xs2">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>
             <span>미리보기</span>
           </button>
-          <button onClick={() => exportDocx(task?.name ?? '명세서', editorPreviewSections, exportDrawings)} title="DOCX 내보내기 (도면 포함)"
+          <button onClick={() => exportDocx(task?.name ?? '명세서', editorPreviewSections, exportDrawings)} data-spec="SPC-EDT-065" title="DOCX 내보내기 (도면 포함)"
             className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 transition-colors text-zinc-600 text-xs2 font-medium">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><path d="M9 2v4h4"/><path d="M5 9h6M5 11h4"/></svg>
             <span>DOCX</span>
           </button>
-          <button onClick={() => exportPdf(task?.name ?? '명세서', editorPreviewSections, exportDrawings)} title="PDF 내보내기 (도면 포함, 인쇄)"
+          <button onClick={() => exportPdf(task?.name ?? '명세서', editorPreviewSections, exportDrawings)} data-spec="SPC-EDT-065" title="PDF 내보내기 (도면 포함, 인쇄)"
             className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-zinc-100 transition-colors text-zinc-600 text-xs2 font-medium">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><path d="M9 2v4h4"/><path d="M5.5 9.5h5M5.5 11.5h3"/></svg>
             <span>PDF</span>
@@ -1263,16 +1275,16 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       )}
 
       {/* 서브헤더 Row 2: 내비게이션 — [← 작성 단계로] + 섹션 탭 (툴바는 편집 도구만, 이동은 이 줄에) */}
-      <div className="flex items-stretch border-b border-zinc-200 bg-white shrink-0">
+      <div data-spec="SPC-EDT-070" className="flex items-stretch border-b border-zinc-200 bg-white shrink-0">
         <div className="flex items-center pl-3 pr-2 shrink-0 border-r border-zinc-200 my-1.5">
-          <button onClick={onBack} title="위저드(작성 단계)로 돌아갑니다 — 편집 내용은 저장됩니다"
+          <button onClick={onBack} data-spec="SPC-EDT-071" title="위저드(작성 단계)로 돌아갑니다 — 편집 내용은 저장됩니다"
             className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border border-brand-300 text-brand-600 text-xs2 font-semibold whitespace-nowrap hover:bg-brand-50 transition-colors">
             ← 작성 단계로
           </button>
         </div>
       <div className="flex flex-1 min-w-0 overflow-x-auto scroll-thin [mask-image:linear-gradient(to_right,transparent_0,black_8px,black_calc(100%-32px),transparent_100%)]">
         {EDITOR_SECTIONS.map(s => (
-          <button key={s.id} onClick={() => goToSection(s.id)}
+          <button key={s.id} data-spec="SPC-EDT-072" onClick={() => goToSection(s.id)}
             className={clsx(
               'px-3 py-2 text-xs2 whitespace-nowrap border-b-2 transition-colors shrink-0',
               activeSec === s.id
@@ -1302,7 +1314,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           <div className="max-w-3xl mx-auto py-6 px-8">
             {/* 섹션별 단락 */}
             {EDITOR_SECTIONS.map(sec => (
-              <div key={sec.id} data-section={sec.id} className="mb-10">
+              <div key={sec.id} data-section={sec.id} data-spec="SPC-EDT-080" className="mb-10">
                 <h2 className="text-base2 font-bold text-zinc-800 mb-3 pb-1.5 border-b border-zinc-200">
                   {sec.label}
                 </h2>
@@ -1346,7 +1358,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             <div className="border-t border-zinc-100 px-3 py-1.5 flex items-center justify-end">
                               <button
                                 onClick={() => openEditorTab({ drawingId: String(idx), drawings: drawings.map(toWorkflowDrawingItem), components: [], references: [], drawingName: d.detail.name, timestamp: Date.now() })}
-                                title="도면 편집기를 새 탭에서 엽니다 (범위 조정·CAD 변환)"
+                                data-spec="SPC-EDT-100" title="도면 편집기를 새 탭에서 엽니다 (범위 조정·CAD 변환)"
                                 className="inline-flex items-center gap-0.5 h-7 px-2 rounded-md text-xs2 font-semibold text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 transition-colors shrink-0"
                               >도면 편집기 <span className="text-xs2">↗</span></button>
                             </div>
@@ -1386,7 +1398,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                     return (
                       <div
                         key={blockIdx}
-                        onClick={() => { if (!isEditing) selectBlock(sec.id, blockIdx); }}
+                        data-spec="SPC-EDT-082" onClick={() => { if (!isEditing) selectBlock(sec.id, blockIdx); }}
                         className={clsx(
                           'group relative pl-8 pr-4 py-2.5 transition-all rounded-lg border',
                           isEditing
@@ -1401,7 +1413,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                         {/* 체크박스 — 상시 표시 (다중 선택용), 선택 시 강조 */}
                         <div
                           onClick={e => toggleSelSet(sec.id, blockIdx, e)}
-                          title="여러 단락을 한번에 AI 수정하려면 체크하세요"
+                          data-spec="SPC-EDT-081" title="여러 단락을 한번에 AI 수정하려면 체크하세요"
                           className={clsx(
                             'absolute left-2 top-2.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer shrink-0',
                             isChecked
@@ -1418,7 +1430,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                               onClick={e => { e.stopPropagation(); moveBlock(sec.id, blockIdx, -1); }}
                               disabled={blockIdx === 0}
                               className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-all"
-                              title="위로 이동"
+                              data-spec="SPC-EDT-083" title="위로 이동"
                             ><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="11" height="11"><path d="M2 7l3-4 3 4"/></svg></button>
                             <button
                               onClick={e => { e.stopPropagation(); moveBlock(sec.id, blockIdx, 1); }}
@@ -1440,7 +1452,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                               );
                             }}
                             className="absolute top-1.5 right-1.5 w-6 h-6 rounded-md flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
-                            title="단락 삭제"
+                            data-spec="SPC-EDT-084" title="단락 삭제"
                           >
                             <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" width="10" height="10">
                               <line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/>
@@ -1493,11 +1505,12 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                   })}
 
                   {/* 단락 추가 */}
-                  <button
+                  <button data-spec="SPC-EDT-085"
                     onClick={() => {
                       setUndoStack(p => [...p.slice(-20), blocks]);
+                      setRedoStack([]);
                       const newIdx = blocks[sec.id].length;
-                      setBlocks(p => ({ ...p, [sec.id]: [...p[sec.id], ''] }));
+                      setBlocks(p => ({ ...p, [sec.id]: [...p[sec.id], ''] }));  // 빈 단락은 입력 시점에 저장
                       setTimeout(() => selectBlock(sec.id, newIdx), 50);
                     }}
                     className="ml-auto flex items-center h-7 px-2.5 text-xs2 text-zinc-400 hover:text-brand-500 border border-dashed border-zinc-200 rounded-lg hover:border-brand-300 hover:bg-brand-50/40 transition-colors"
@@ -1550,7 +1563,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           </div>
 
           {/* ── 상단: 정보 영역(선택 단락) — 하단 대화 영역과 영역 제목 바로 구분 ── */}
-          <div className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 bg-zinc-50 border-b border-zinc-200">
+          <div data-spec="SPC-EDT-011" className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 bg-zinc-50 border-b border-zinc-200">
             <Icon name="check" size={11} className="text-zinc-400" />
             <span className="text-xs2 font-semibold text-zinc-500 tracking-wide">선택 단락</span>
             <span className="ml-auto text-xs2 text-zinc-400">{selSet.size > 0 ? `${selSet.size}개 선택` : '미선택 · 전체 문서 대상'}</span>
@@ -1808,7 +1821,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           'shadow-lg flex items-center justify-center transition-all',
           mobileAiOpen && 'hidden',
         )}
-        title="AI 어시스턴트 열기"
+        data-spec="SPC-EDT-110" title="AI 어시스턴트 열기"
         aria-label="AI 어시스턴트 열기"
       >
         <svg viewBox="0 0 20 20" fill="white" width="22" height="22">

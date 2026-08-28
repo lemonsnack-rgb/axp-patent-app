@@ -492,14 +492,14 @@ export function SpecView() {
 
 
           {/* Stepper — 3분할(다시시작 / 단계 / 진행표시)로 겹침 방지 */}
-          <div className="flex items-center border-b border-ck-border shrink-0 px-2 gap-1" style={{ height: 48 }}>
+          <div data-spec="SPC-WIZ-020" className="flex items-center border-b border-ck-border shrink-0 px-2 gap-1" style={{ height: 48 }}>
             {/* 좌: 다시 시작 (아이콘, 폭 최소화) */}
             <div className="shrink-0">
               {(phase === 'flow' || phase === 'done') && (
                 <button
                   onClick={resetAnalysis}
                   className="w-7 h-7 flex items-center justify-center rounded-full text-base text-zinc-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                  title="처음부터 다시 시작"
+                  data-spec="SPC-WIZ-022" title="처음부터 다시 시작"
                   aria-label="처음부터 다시 시작"
                 >
                   ↺
@@ -522,7 +522,7 @@ export function SpecView() {
                     )}
                     <button
                       type="button"
-                      onClick={() => gotoFlowStep(s.id)}
+                      data-spec="SPC-WIZ-021" onClick={() => gotoFlowStep(s.id)}
                       disabled={!navigable}
                       title={navigable ? `${s.label}(으)로 이동` : locked ? '이전 단계를 먼저 완료하세요' : s.label}
                       className={clsx(
@@ -581,7 +581,7 @@ export function SpecView() {
                     e.target.value = '';
                   }}
                 />
-                <div
+                <div data-spec="SPC-UPL-010"
                   onClick={() => fileInputRef.current?.click()}
                   className="border-2 border-dashed border-gray-300 rounded-xl p-10 mb-5 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all">
                   <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 text-gray-400">
@@ -589,7 +589,7 @@ export function SpecView() {
                   </svg>
                   <p className="text-base2 text-gray-700">직무발명서 PDF를 여기에 끌어 놓으세요</p>
                   <p className="text-xs2 text-gray-400 mt-1 mb-3">.pdf 지원</p>
-                  <button
+                  <button data-spec="SPC-UPL-011"
                     type="button"
                     onClick={e => { e.stopPropagation(); fileInputRef.current?.click(); }}
                     className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg text-sm2 font-semibold bg-brand-400 text-white hover:bg-brand-500 transition-colors"
@@ -670,7 +670,7 @@ export function SpecView() {
                     <textarea className="input py-2" rows={2} placeholder="기존 기술의 문제점 또는 본 발명이 해결하려는 과제를 입력하세요..." value={diProblem} onChange={e => setDiProblem(e.target.value)} />
                   </div>
                   <div>
-                    <label className="block text-sm2 font-semibold text-gray-700 mb-1">참고 키워드 / 선행기술</label>
+                    <label data-spec="SPC-IMG-020" className="block text-sm2 font-semibold text-gray-700 mb-1">참고 키워드 / 선행기술</label>
                     <Input className="py-2" placeholder="예: 트랜스포머, GPT, KR10-2023-0012345" value={diKeywords} onChange={e => setDiKeywords(e.target.value)} />
                   </div>
                 </div>
@@ -706,15 +706,15 @@ export function SpecView() {
                     <div key={s.id} data-flowstep={s.id} className="space-y-3 scroll-mt-3">
                       {collapsed ? (
                         /* 완료 단계 — 1줄 요약 (펼치기 / 다시 선택) */
-                        <div className="flex items-center gap-2.5 rounded-xl border border-green-200 bg-green-50/60 px-3.5 py-2.5">
+                        <div data-spec="SPC-WIZ-040" className="flex items-center gap-2.5 rounded-xl border border-green-200 bg-green-50/60 px-3.5 py-2.5">
                           <span className="w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center shrink-0"><Icon name="check" size={10} /></span>
                           <span className="text-sm2 font-semibold text-gray-800 shrink-0">{STEP_LABEL[s.id]}</span>
                           <span className="text-xs2 text-gray-500 truncate flex-1 min-w-0">{doneSummary(s.id)}</span>
-                          <button
+                          <button data-spec="SPC-WIZ-041"
                             onClick={() => setExpandedDone(p => ({ ...p, [s.id]: true }))}
                             className="shrink-0 inline-flex items-center h-7 px-2.5 rounded-lg text-xs2 font-medium text-neutral-500 border border-neutral-200 bg-white hover:bg-neutral-50 transition-colors"
                           >펼치기</button>
-                          <button
+                          <button data-spec="SPC-WIZ-042"
                             onClick={() => reselect(s.id)}
                             className="shrink-0 inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-xs2 font-medium text-brand-500 border border-brand-200 bg-white hover:bg-brand-50 transition-colors"
                           ><Icon name="edit" size={10} /> 다시 선택</button>
@@ -866,7 +866,7 @@ export function SpecView() {
                             onClick={() => setExpandedDone(p => ({ ...p, [s.id]: false }))}
                             className="inline-flex items-center h-7 px-2.5 rounded-lg text-xs2 text-gray-500 hover:bg-gray-100 transition-colors"
                           >접기</button>
-                          <button
+                          <button data-spec="SPC-WIZ-042"
                             onClick={() => reselect(s.id)}
                             className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-xs2 font-medium text-brand-500 border border-brand-200 bg-white hover:bg-brand-50 transition-colors"
                           ><Icon name="edit" size={10} /> 다시 선택</button>
@@ -880,7 +880,7 @@ export function SpecView() {
                 {/* 다음 단계 분석 로딩 바 */}
                 {stepLoading && (
                   <div className="rounded-xl border border-blue-100 bg-white px-4 py-4 shadow-card">
-                    <div className="flex items-center gap-2 mb-2.5">
+                    <div data-spec="SPC-WIZ-060" className="flex items-center gap-2 mb-2.5">
                       <span className="inline-block animate-spin text-brand-400 leading-none">↻</span>
                       <span className="text-sm2 font-semibold text-gray-700">
                         {STEP_LABEL[stepLoading] ?? '다음 단계'} 분석 중…
@@ -897,7 +897,7 @@ export function SpecView() {
                 )}
 
                 {phase === 'done' && (
-                  <div className="text-center py-8">
+                  <div data-spec="SPC-WIZ-070" className="text-center py-8">
                     <Icon name="logo" size={40} className="text-brand-400 mx-auto mb-3" />
                     <h3 className="text-lg2 font-bold text-gray-800 mb-2">모든 분석 항목이 확정되었습니다</h3>
                     <p className="text-md2 text-gray-500 mb-5">확정된 내용을 바탕으로 명세서 초안을 편집하세요.</p>
@@ -918,11 +918,11 @@ export function SpecView() {
         </div>
         {/* 네비게이션 바 — 본문 하단 */}
         {(phase === 'flow' || phase === 'done') && (
-          <div className="shrink-0 border-t border-ck-border bg-white w-full">
+          <div data-spec="SPC-WIZ-050" className="shrink-0 border-t border-ck-border bg-white w-full">
             <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
               <div>
                 {si(curStep) > 1 && (
-                  <button
+                  <button data-spec="SPC-WIZ-051"
                     onClick={() => {
                       // 보기 이동만 — 확정 상태는 바꾸지 않는다 (재확정은 '다시 선택'으로) (U4)
                       const prev = STEPS[si(curStep) - 1].id;
@@ -944,7 +944,7 @@ export function SpecView() {
                     return (<>
                       {stepAction.disabled && stepAction.hint && <span className="text-xs2 text-gray-400">{stepAction.hint}</span>}
                       <button
-                        onClick={stepAction.onClick}
+                        data-spec="SPC-WIZ-052" onClick={stepAction.onClick}
                         disabled={stepAction.disabled}
                         className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-brand-500 disabled:opacity-40 transition-colors"
                       >{stepAction.label}</button>
@@ -1004,14 +1004,14 @@ export function SpecView() {
 
         {/* 명세서 생성 진행 오버레이 — 중간명세서 → 에디터 (세부 단계·진행 바 없이 '작성 중' 표시만) */}
         {specGen && (
-          <div className="fixed inset-0 z-[60] bg-white/92 backdrop-blur-sm flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-labelledby="specgen-title">
+          <div className="fixed inset-0 z-[60] bg-white/92 backdrop-blur-sm flex items-center justify-center px-4" data-spec="SPC-WIZ-080" role="dialog" aria-modal="true" aria-labelledby="specgen-title">
             <div className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white shadow-xl px-6 py-7 text-center">
               <span className="mx-auto mb-4 block w-10 h-10 border-[3px] border-brand-200 border-t-brand-400 rounded-full animate-spin" aria-hidden="true" />
               <h3 id="specgen-title" className="text-base2 font-bold text-gray-800">명세서를 작성하고 있습니다</h3>
               <p className="mt-1.5 text-xs2 text-neutral-500">완료되면 에디터로 자동 이동합니다.</p>
               <button
                 type="button"
-                onClick={cancelSpecGeneration}
+                data-spec="SPC-WIZ-080" onClick={cancelSpecGeneration}
                 className="mt-5 inline-flex items-center h-8 px-3 rounded-lg text-xs2 text-neutral-500 border border-neutral-200 bg-white hover:bg-neutral-50 transition-colors"
               >취소</button>
             </div>
@@ -1057,7 +1057,7 @@ export function SpecView() {
 
 function AiMsg({ text }: { text: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-2.5 border-l-2 border-blue-200 pl-3">
+    <div data-spec="SPC-WIZ-030" className="flex items-start gap-2.5 border-l-2 border-blue-200 pl-3">
       <div className="text-md2 text-zinc-500 leading-relaxed py-0.5">
         {text}
       </div>
@@ -1075,6 +1075,14 @@ type GuideChatMsg = {
   intentOptions?: string[];             // clarify 선택지
   sourceMsg?: string;
 };
+
+// ── 덮어쓰기 확인 — 재생성·재분석처럼 편집 내용을 대체하는 동작 (중간명세서 '다시 생성'과 같은 규칙) ──
+function confirmOverwrite(title: string, description: string, confirmLabel: string, onConfirm: () => void) {
+  openAlertDialog(
+    { title, description, confirm: confirmLabel, cancel: '취소' },
+    { theme: 'primary', onConfirm: (ctrl) => { ctrl.close(); onConfirm(); } },
+  );
+}
 
 // ── 삭제 확인 (정책: 모든 삭제는 확인 다이얼로그) ─────────────────────────
 function confirmDelete(what: string, onOk: () => void, detail?: string) {
@@ -1099,7 +1107,7 @@ function AiEditButton({ active, onClick, title = 'AI 수정', className }: {
   className?: string;
 }) {
   return (
-    <button
+    <button data-spec="SPC-WIZ-091"
       type="button"
       onClick={onClick}
       title={title}
@@ -1152,7 +1160,7 @@ function AiPendingCard({ title, instruction, changes, onApply, onCancel, classNa
   className?: string;
 }) {
   return (
-    <div className={clsx('rounded-lg border border-brand-200 bg-white overflow-hidden', className)} onClick={e => e.stopPropagation()}>
+    <div data-spec="SPC-WIZ-093" className={clsx('rounded-lg border border-brand-200 bg-white overflow-hidden', className)} onClick={e => e.stopPropagation()}>
       <div className="flex items-center gap-2 px-3 py-1.5 bg-brand-50/60 border-b border-brand-100">
         <AiIcon />
         <span className="text-xs2 font-semibold text-brand-600 shrink-0 whitespace-nowrap">{title}</span>
@@ -1237,7 +1245,7 @@ function AiGlobalBar({ placeholder, value, onChange, propose, onApply, title, do
     }, AI_MOCK_DELAY_MS);
   };
   return (
-    <div className={clsx('space-y-2', className)}>
+    <div data-spec="SPC-WIZ-092" className={clsx('space-y-2', className)}>
       <div className="flex gap-2 items-center">
         <input
           className="flex-1 min-w-0 text-xs2 h-8 px-3 border border-neutral-200 rounded-lg bg-white outline-none placeholder:text-neutral-400 hover:border-neutral-300 focus:border-brand-400 focus:ring-[3px] focus:ring-brand-400/15 transition-all disabled:bg-neutral-50"
@@ -1294,7 +1302,7 @@ function InlineAiEdit({ placeholder, original, label, onApply, targets, onClose,
   const list: InlineAiTarget[] = targets ?? [{ original: original ?? '', label: label ?? '항목', onApply: onApply ?? (() => {}) }];
   const apply = (changes: PendingChange[]) => {
     changes.forEach(c => c.apply?.());
-    toast(doneMsg ?? '항목이 수정했습니다');
+    toast(doneMsg ?? '항목을 수정했습니다');
     onClose();
   };
   const submit = () => {
@@ -1322,7 +1330,7 @@ function InlineAiEdit({ placeholder, original, label, onApply, targets, onClose,
     );
   }
   return (
-    <div className="mt-1.5 rounded-lg border border-brand-200 bg-brand-50/50 p-2" onClick={e => e.stopPropagation()}>
+    <div data-spec="SPC-WIZ-091" className="mt-1.5 rounded-lg border border-brand-200 bg-brand-50/50 p-2" onClick={e => e.stopPropagation()}>
       <textarea
         autoFocus
         className="w-full text-xs2 bg-white border border-neutral-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-brand-400 focus:ring-[3px] focus:ring-brand-400/15 transition-all resize-none min-h-[40px]"
@@ -1446,12 +1454,12 @@ function TitleCandidateCards({
                   { original: titleVal, label: '발명의 명칭', onApply: newText => { setTitleEdits(prev => ({ ...prev, [c.id]: newText })); setGSel(p => ({ ...p, title: newText })); } },
                   { original: abstractVal, label: '요약', onApply: newText => setAbstractEdits(prev => ({ ...prev, [c.id]: newText })) },
                 ]}
-                doneMsg="명칭·요약이 수정했습니다"
+                doneMsg="명칭·요약을 수정했습니다"
               />
             )}
             {/* 추천 이유 행 */}
             {c.reason && (
-              <div className="pt-1.5 border-t border-gray-100 mt-1">
+              <div data-spec="SPC-TTL-013" className="pt-1.5 border-t border-gray-100 mt-1">
                 <span className="text-xs2 text-gray-300 font-medium block mb-0.5">추천 이유</span>
                 <p className="text-xs2 text-gray-400 leading-relaxed italic">{c.reason}</p>
               </div>
@@ -1463,7 +1471,7 @@ function TitleCandidateCards({
         'rounded-xl border-2 p-3 bg-white transition-all',
         !isFromCandidates(curSel) && curSel.trim() ? 'border-brand-400 bg-brand-50/60' : 'border-zinc-200',
       )}>
-        <div className="flex items-center gap-2 mb-1.5">
+        <div data-spec="SPC-TTL-020" className="flex items-center gap-2 mb-1.5">
           <span className={clsx(
             'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center shrink-0',
             !isFromCandidates(curSel) && curSel.trim() ? 'border-brand-400 bg-brand-400' : 'border-neutral-300 bg-white',
@@ -1499,7 +1507,7 @@ function TitleCandidateCards({
       </div>
       {onRegenerate && (
         <div className="flex justify-end">
-          <button
+          <button data-spec="SPC-TTL-030"
             onClick={onRegenerate}
             className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-xs2 font-medium text-brand-500 border border-brand-200 bg-white hover:bg-brand-50 transition-colors"
           >↻ 후보 다시 생성</button>
@@ -1615,14 +1623,14 @@ function DescriptionItemCards({
                           ? 'bg-brand-400 border-brand-400 text-white'
                           : 'border-gray-400 bg-white hover:border-brand-400',
                       )}
-                      title={isAdopted ? '채택 해제' : '채택'}
+                      data-spec="SPC-DSC-011" title={isAdopted ? '채택 해제' : '채택'}
                       aria-label={isAdopted ? '채택됨' : '채택'}
                     >
                       {isAdopted && <Icon name="check" size={10} />}
                     </button>
                   ) : (
                     <button
-                      onClick={() => confirmDelete('항목', () => onRemove(type, idx), item.content.trim() ? `"${item.content.trim().slice(0, 40)}${item.content.trim().length > 40 ? '…' : ''}" 항목을 삭제할까요?` : undefined)}
+                      data-spec="SPC-DSC-015" onClick={() => confirmDelete('항목', () => onRemove(type, idx), item.content.trim() ? `"${item.content.trim().slice(0, 40)}${item.content.trim().length > 40 ? '…' : ''}" 항목을 삭제할까요?` : undefined)}
                       className="shrink-0 w-5 h-5 rounded-md flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
                       title="삭제"
                     >✕</button>
@@ -1632,7 +1640,7 @@ function DescriptionItemCards({
                     onDragStart={() => setDragSrc({ type, idx })}
                     onDragEnd={() => { setDragSrc(null); setDropHint(null); }}
                     className="flex items-center gap-0.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 cursor-grab active:cursor-grabbing shrink-0 select-none text-xs2 leading-none px-1 py-0.5 rounded-md border border-gray-200 hover:border-blue-300 transition-colors"
-                    title="끌어서 순서 변경 (반대편 기술로도 끌어 놓을 수 있음)"
+                    data-spec="SPC-DSC-012" title="끌어서 순서 변경 (반대편 기술로도 끌어 놓을 수 있음)"
                     aria-label="끌어서 순서 변경"
                   >
                     <svg viewBox="0 0 10 10" width="11" height="11" fill="currentColor"><circle cx="3" cy="2" r="1"/><circle cx="7" cy="2" r="1"/><circle cx="3" cy="5" r="1"/><circle cx="7" cy="5" r="1"/><circle cx="3" cy="8" r="1"/><circle cx="7" cy="8" r="1"/></svg>
@@ -1657,7 +1665,7 @@ function DescriptionItemCards({
                       <span className="inline-block w-[64px] h-6 shrink-0" aria-hidden="true" />
                     )}
                     {/* 반대편 기술로 보내기 — 헤더에 배치해 카드 높이 절감 (B3) */}
-                    <button
+                    <button data-spec="SPC-DSC-012"
                       onClick={() => onMoveAcross(type, idx)}
                       className={clsx(
                         'inline-flex items-center h-6 px-2 rounded-lg text-xs2 font-medium border transition-colors',
@@ -1690,7 +1698,7 @@ function DescriptionItemCards({
                   disabled={!isAdopted}
                   rows={1}
                   onChange={e => onChange(type, idx, e.target.value)}
-                  placeholder="항목 내용..."
+                  data-spec="SPC-DSC-013" placeholder="항목 내용..."
                   ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                 />
                 )}
@@ -1713,7 +1721,7 @@ function DescriptionItemCards({
           )}>
             <div className="flex items-center gap-2 mb-1.5">
               <select
-                value={addLabel[type]}
+                data-spec="SPC-DSC-016" value={addLabel[type]}
                 onChange={e => setAddLabel(p => ({ ...p, [type]: e.target.value as InventionDescriptionItem['label'] }))}
                 className="text-xs2 border border-gray-200 rounded-md px-1.5 py-0.5 bg-white text-gray-600 outline-none"
               >
@@ -1722,7 +1730,6 @@ function DescriptionItemCards({
                 <option value="etc">기타</option>
                 <option value="objective">목적</option>
                 <option value="effect">효과</option>
-                          <option value="etc">기타</option>
               </select>
             </div>
             <div className="flex gap-1.5 items-end">
@@ -1947,7 +1954,7 @@ function GuidePanel({ step, confirmed, summary, mobileOpen, onMobileClose, chatI
       </div>
 
       {/* ── 상단: 정보 영역(확정 내용) — 하단 대화 영역과 영역 제목 바로 구분 ── */}
-      <div className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 ml-1.5 bg-neutral-50 border-b border-ck-border">
+      <div data-spec="SPC-AST-011" className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 ml-1.5 bg-neutral-50 border-b border-ck-border">
         <Icon name="check" size={11} className="text-neutral-400" />
         <span className="text-xs2 font-semibold text-neutral-500 tracking-wide">확정 내용</span>
         {!!summary?.length && <span className="ml-auto text-xs2 text-neutral-400">{summary.length + 1}/{STEPS.length} 단계</span>}
@@ -1972,7 +1979,7 @@ function GuidePanel({ step, confirmed, summary, mobileOpen, onMobileClose, chatI
       </p>
 
       {/* ── 하단: 대화 영역 — 영역 제목 바 ── */}
-      <div className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 ml-1.5 bg-neutral-50 border-y border-ck-border">
+      <div data-spec="SPC-AST-012" className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 ml-1.5 bg-neutral-50 border-y border-ck-border">
         <AiIcon size={11} className="text-neutral-400" />
         <span className="text-xs2 font-semibold text-neutral-500 tracking-wide">대화 · 작성 안내</span>
         <span className="ml-auto text-xs2 text-neutral-400">단계 진행·작성 방법 질문</span>
@@ -2032,7 +2039,7 @@ function GuidePanel({ step, confirmed, summary, mobileOpen, onMobileClose, chatI
             ref={chatInputRef ?? localTextareaRef}
             rows={2}
             className="flex-1 px-3 py-2"
-            placeholder="단계 진행·작성 방법을 질문하세요..."
+            data-spec="SPC-AST-050" placeholder="단계 진행·작성 방법을 질문하세요..."
             value={guideChatInput}
             onChange={e => setGuideChatInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendGuideChat(); } }}
@@ -2196,13 +2203,15 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
   // 다시 분석 — AI 추출 결과로 재생성 (mock)
   const reanalyze = () => {
     if (done) return;
-    setGlobalBusy(true);
-    setTimeout(() => {
-      const regen = generateComponentCandidates({ title: '', field: '', content: '' }).map(specItemToCompItem);
-      upd(regen);
-      setGlobalBusy(false);
-      toast('구성요소를 다시 분석했습니다');
-    }, 900);
+    confirmOverwrite('구성요소 다시 분석', '현재 구성요소 목록(명칭·정의·순서·부호)이 AI 추출 결과로 대체됩니다. 계속할까요?', '다시 분석', () => {
+      setGlobalBusy(true);
+      setTimeout(() => {
+        const regen = generateComponentCandidates({ title: '', field: '', content: '' }).map(specItemToCompItem);
+        upd(regen);
+        setGlobalBusy(false);
+        toast('구성요소를 다시 분석했습니다');
+      }, 900);
+    });
   };
 
   // → 활성 조건: idx>0이고 바로 위 항목이 유효한 부모(depth <= 현재 depth)
@@ -2245,14 +2254,14 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
           />
         )}
         {/* 헤더 + 부호 자동 부여 */}
-        <div className="flex items-center justify-between mb-1">
+        <div data-spec="SPC-CMP-020" className="flex items-center justify-between mb-1">
           <span className="text-xs2 font-semibold text-gray-600">구성요소 목록</span>
           {!done && (
             <div className="flex items-center gap-1">
               <button onClick={reanalyze}
                 disabled={globalBusy}
                 className="inline-flex items-center gap-1 h-6 px-2 rounded-lg text-xs2 font-medium text-brand-500 border border-brand-200 bg-white hover:bg-brand-50 hover:border-brand-300 disabled:opacity-40 transition-colors"
-                title="AI 추출을 다시 실행">
+                data-spec="SPC-CMP-021" title="AI 추출을 다시 실행">
                 ↻ 다시 분석
               </button>
               <button onClick={() => setAiOpen(o => !o)}
@@ -2260,11 +2269,11 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
                   'inline-flex items-center gap-1 h-6 px-2 rounded-lg text-xs2 font-medium border transition-colors',
                   aiOpen ? 'bg-brand-400 border-brand-400 text-white' : 'text-brand-500 border-brand-200 bg-white hover:bg-brand-50 hover:border-brand-300',
                 )}
-                title="자연어 지시로 AI가 구성요소를 추가">
+                data-spec="SPC-CMP-022" title="자연어 지시로 AI가 구성요소를 추가">
                 <AiIcon />
                 AI 추가
               </button>
-              <button onClick={autoAssign}
+              <button data-spec="SPC-CMP-023" onClick={autoAssign}
                 className="inline-flex items-center gap-1 h-6 px-2 rounded-lg text-xs2 font-semibold bg-brand-400 border border-brand-400 text-white hover:bg-brand-500 transition-colors">
                 <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="10" height="10">
                   <path d="M2 6h8M8 4l2 2-2 2"/>
@@ -2331,13 +2340,13 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
                           ? 'bg-brand-400 border-brand-400 text-white'
                           : 'border-gray-400 bg-white hover:border-brand-400',
                       )}
-                      title={item.sel ? '채택 해제' : '채택'}
+                      data-spec="SPC-CMP-011" title={item.sel ? '채택 해제' : '채택'}
                       aria-label={item.sel ? '채택됨' : '채택'}
                     >
                       {item.sel && <Icon name="check" size={10} />}
                     </button>
                   )}
-                  <span className="w-6 h-6 inline-flex items-center justify-center rounded-md text-gray-300 hover:text-gray-500 hover:bg-gray-100 cursor-grab active:cursor-grabbing shrink-0 select-none" title="끌어서 순서 변경" aria-label="끌어서 순서 변경">
+                  <span className="w-6 h-6 inline-flex items-center justify-center rounded-md text-gray-300 hover:text-gray-500 hover:bg-gray-100 cursor-grab active:cursor-grabbing shrink-0 select-none" data-spec="SPC-CMP-012" title="끌어서 순서 변경" aria-label="끌어서 순서 변경">
                     <svg viewBox="0 0 10 10" width="11" height="11" fill="currentColor"><circle cx="3" cy="2" r="1"/><circle cx="7" cy="2" r="1"/><circle cx="3" cy="5" r="1"/><circle cx="7" cy="5" r="1"/><circle cx="3" cy="8" r="1"/><circle cx="7" cy="8" r="1"/></svg>
                   </span>
                   <span className={clsx(
@@ -2347,7 +2356,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
                     {item.num || '—'}
                   </span>
                   {item.sel && (!item.value_en.trim() || !item.hypernym_ko.trim() || !item.description.trim()) && (
-                    <span className="text-xs2 px-1.5 py-px rounded-md bg-amber-50 text-amber-700 font-medium shrink-0" title="영문명·상위어·정의 중 빈 항목이 있습니다. 채워 넣거나 채택을 해제하세요.">보완 필요</span>
+                    <span className="text-xs2 px-1.5 py-px rounded-md bg-amber-50 text-amber-700 font-medium shrink-0" data-spec="SPC-CMP-015" title="영문명·상위어·정의 중 빈 항목이 있습니다. 채워 넣거나 채택을 해제하세요.">보완 필요</span>
                   )}
                   {!done && (
                     <div className="flex items-center gap-px shrink-0 ml-auto">
@@ -2391,7 +2400,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
                           ref={el => { if (el && item.id === focusId) { el.focus(); setFocusId(null); } }}
                           className="w-full text-xs2 text-gray-800 font-medium bg-gray-50 border border-gray-200 rounded-md px-2 py-0.5 outline-none focus:border-blue-300 focus:bg-white transition-colors min-w-0"
                           value={item.value_ko}
-                          placeholder="구성요소 명칭"
+                          data-spec="SPC-CMP-013" placeholder="구성요소 명칭"
                           onChange={e => upd(items.map(it => it.id===item.id ? {...it, value_ko: e.target.value} : it))}
                           onFocus={() => { focusNameRef.current[item.id] = item.value_ko; }}
                           onBlur={() => {
@@ -2474,7 +2483,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
                       onApply={newText => {
                           upd(items.map(it => it.id === item.id ? { ...it, description: newText } : it));
                         }}
-                      doneMsg="구성요소가 수정했습니다"
+                      doneMsg="구성요소를 수정했습니다"
                     />
                   )}
                 </div>
@@ -2496,7 +2505,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
 
         {/* 새 구성요소 추가 — 빈 카드 생성 후 인라인 편집 */}
         {!done && (
-          <button
+          <button data-spec="SPC-CMP-024"
             onClick={add}
             className="w-full mt-3 flex items-center justify-center gap-1 px-3 py-2 rounded-lg border-2 border-dashed border-gray-200 text-xs2 font-semibold text-gray-500 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50/30 transition-colors"
           >
@@ -2726,7 +2735,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
           <button
             className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 w-7 h-7 inline-flex items-center justify-center bg-white/95 border border-gray-200 shadow-sm rounded-lg text-gray-500 hover:text-brand-500 transition-opacity text-xs2 leading-none"
             onClick={e => { e.stopPropagation(); openDrawingInNewTab(d.image.file.data, d.image.file.media_type, bbox); }}
-            title="새 탭에서 열기"
+            data-spec="SPC-IMG-015" title="새 탭에서 열기"
           >↗</button>
         )}
         {extra}
@@ -2763,7 +2772,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                         <button
                           onClick={() => toggleIncluded(idx)}
                           className="absolute top-1.5 left-1.5 flex items-center gap-1 h-7 px-2 rounded-lg shadow-sm bg-white/95 border border-gray-200 transition-all"
-                          title={included ? '선택 해제 (맥락에서 제외)' : '선택 (맥락에 사용)'}
+                          data-spec="SPC-IMG-011" title={included ? '선택 해제 (맥락에서 제외)' : '선택 (맥락에 사용)'}
                         >
                           <span className={clsx('w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all', included ? 'bg-brand-400 border-brand-400 text-white' : 'border-gray-400 bg-white')}>
                             {included && <Icon name="check" size={10} />}
@@ -2775,7 +2784,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                         <button
                           onClick={() => setRepresentative(idx)}
                           className="absolute top-1.5 right-1.5 flex items-center gap-1 h-7 px-2 rounded-lg shadow-sm bg-white/95 border border-gray-200 transition-all"
-                          title="대표 이미지 (1개만)"
+                          data-spec="SPC-IMG-012" title="대표 이미지 (1개만)"
                         >
                           <span className={clsx('w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center', isRep ? 'border-brand-400 bg-brand-400' : 'border-gray-300 bg-white')}>
                             {isRep && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -2796,7 +2805,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                           value={d.detail.label}
                           onChange={e => setDrawingLabel(idx, e.target.value as Drawing['detail']['label'])}
                           className={clsx('text-xs2 px-1 py-px rounded-full font-medium border-0 outline-none cursor-pointer', labelInfo.cls)}
-                          title="분류 변경"
+                          data-spec="SPC-IMG-013" title="분류 변경"
                         >
                           <option value="proposed_implementation">제안기술</option>
                           <option value="previous_implementation">종래기술</option>
@@ -2814,7 +2823,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                         onClick={() => removeDrawing(idx)}
                         className="ml-auto inline-flex items-center justify-center w-7 h-7 mr-1 my-0.5 rounded-md text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors"
                         title="삭제"
-                        aria-label="이미지 삭제"
+                        data-spec="SPC-IMG-014" aria-label="이미지 삭제"
                       >✕</button>
                     </div>
                   )}
@@ -2868,7 +2877,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                         <button
                           onClick={() => setRepresentative(idx)}
                           className="absolute top-1.5 right-1.5 flex items-center gap-1 h-7 px-2 rounded-lg shadow-sm bg-white/95 border border-gray-200 transition-all"
-                          title="대표도면 (1개만)"
+                          data-spec="SPC-DRW-012" title="대표도면 (1개만)"
                         >
                           <span className={clsx('w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center', isRep ? 'border-brand-400 bg-brand-400' : 'border-gray-300 bg-white')}>
                             {isRep && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -2887,7 +2896,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                           ? <span className="text-xs2 px-1.5 py-px rounded-full font-bold bg-brand-400 text-white">도 {myFig}</span>
                           : <span className="text-xs2 px-1.5 py-px rounded-full font-medium bg-gray-200 text-gray-500">참고만</span>
                       ) : (
-                        <span className="inline-flex rounded-full border border-neutral-200 overflow-hidden text-xs2 font-semibold" role="group" aria-label="도면 채택 여부">
+                        <span className="inline-flex rounded-full border border-neutral-200 overflow-hidden text-xs2 font-semibold" data-spec="SPC-DRW-011" role="group" aria-label="도면 채택 여부">
                           <button
                             type="button"
                             onClick={() => { if (!isForSpec) toggleUseForSpec(idx); }}
@@ -2896,7 +2905,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                             className={clsx('px-2 py-px transition-colors', isForSpec ? 'bg-brand-400 text-white' : 'bg-white text-gray-500 hover:bg-brand-50')}
                           >{isForSpec ? `도 ${myFig}` : '도면 채택'}</button>
                           {isForSpec && d.cadConverted && (
-                            <span className="ml-1 text-xs2 px-1.5 py-px rounded-full bg-green-50 text-green-700 font-medium" title="도면 편집기에서 CAD 변환 결과를 반영했습니다">CAD 변환 완료</span>
+                            <span className="ml-1 text-xs2 px-1.5 py-px rounded-full bg-green-50 text-green-700 font-medium" data-spec="SPC-DRW-015" title="도면 편집기에서 CAD 변환 결과를 반영했습니다">CAD 변환 완료</span>
                           )}
                           <button
                             type="button"
@@ -2914,7 +2923,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                           value={d.detail.label}
                           onChange={e => setDrawingLabel(idx, e.target.value as Drawing['detail']['label'])}
                           className={clsx('text-xs2 px-1 py-px rounded-full font-medium border-0 outline-none cursor-pointer', labelInfo.cls)}
-                          title="분류 변경"
+                          data-spec="SPC-DRW-013" title="분류 변경"
                         >
                           <option value="proposed_implementation">제안기술</option>
                           <option value="previous_implementation">종래기술</option>
@@ -2928,7 +2937,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                   </div>
                   {!done && isForSpec && (
                     <div className="flex border-t border-gray-100">
-                      <button
+                      <button data-spec="SPC-DRW-014"
                         onClick={() => openEditorTab({ drawingId: String(idx), drawings: drawings.map(toWorkflowDrawingItem), components: [], references: [], drawingName: d.detail.name, timestamp: Date.now() })}
                         className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs2 font-semibold text-blue-500 hover:bg-blue-50 transition-colors"
                         title="범위 조정·CAD 변환"
@@ -3213,7 +3222,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
         </div>
 
         {/* Preference UI — API independent-claim/set 의 preference (abstraction_level + claims[]) */}
-        <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 space-y-2.5">
+        <div data-spec="SPC-CLM-010" className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 space-y-2.5">
           <p className="text-xs2 font-semibold text-gray-600">권리범위 설정</p>
           {/* 용어 도움말 — 처음 쓰는 사용자(대학원생)용 1줄 설명 (B11) */}
           <p className="text-xs2 text-gray-400 leading-relaxed">
@@ -3227,7 +3236,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
               {(['BROAD', 'INTERMEDIATE', 'NARROW'] as const).map(level => (
                 <button
                   key={level}
-                  onClick={() => { if (!done) { setPreference(p => ({ ...p, abstraction: level })); resetGen(); } }}
+                  data-spec="SPC-CLM-011" onClick={() => { if (!done) { setPreference(p => ({ ...p, abstraction: level })); resetGen(); } }}
                   title={SCOPE_LABELS[level]?.sub}
                   className={clsx(
                     'flex-1 py-1 text-xs2 font-semibold rounded-lg border transition-colors',
@@ -3259,7 +3268,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                     className="text-xs2 font-semibold text-neutral-700 bg-neutral-100 border border-neutral-200 rounded-lg px-1.5 py-1 outline-none focus:border-brand-400 transition-colors shrink-0 disabled:opacity-60"
                     value={slot.category}
                     disabled={done}
-                    onChange={e => updateSlotCategory(i, e.target.value)}
+                    data-spec="SPC-CLM-012" onChange={e => updateSlotCategory(i, e.target.value)}
                     title="장치항: 구성요소의 결합으로 청구 · 방법항: 단계·동작으로 청구(소프트웨어 유리) · 제조항: 제조 방법으로 얻은 물건 · 조성물항: 성분·배합"
                   >
                     {CLAIM_CATEGORIES.map(cat => (
@@ -3303,7 +3312,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
           <div className="text-center py-6 text-gray-400 text-xs2">선택한 조건에 맞는 세트가 없습니다.</div>
         )}
 
-        <div data-claimsets />
+        <div data-claimsets data-spec="SPC-CLM-020" />
         {filteredSetIndices.map(setIdx => {
           const set = claimSets[setIdx];
           const isSelected = selectedSetIndex === setIdx;
@@ -3311,7 +3320,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
           return (
             <div
               key={setIdx}
-              onClick={() => { if (!done) { setSelectedSetIndex(setIdx); syncUpdate(setIdx, depGroupsMap); } }}
+              data-spec="SPC-CLM-021" onClick={() => { if (!done) { setSelectedSetIndex(setIdx); syncUpdate(setIdx, depGroupsMap); } }}
               className={clsx(
                 'rounded-xl border-2 transition-all cursor-pointer',
                 isSelected
@@ -3381,7 +3390,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                           original={text}
                           label="독립항"
                           onApply={newText => { setClaimText(setIdx, ci, newText); syncUpdate(setIdx, depGroupsMap); }}
-                          doneMsg="독립항이 수정했습니다"
+                          doneMsg="독립항을 수정했습니다"
                         />
                       )}
                     </div>
@@ -3438,7 +3447,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
           {' '}— 독립항 {selectedSet.claims.length}개, 종속항 {totalDep}개
         </span>
         {!done && (
-          <button onClick={() => setClaimsPhase('indep')} className="text-xs2 text-blue-600 hover:underline">
+          <button data-spec="SPC-CLM-031" onClick={() => setClaimsPhase('indep')} className="text-xs2 text-blue-600 hover:underline">
             ← 세트 다시 선택
           </button>
         )}
@@ -3446,7 +3455,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
 
       {/* 종속항 개수 레벨 (API claim_count_level) */}
       {!done && (
-        <div className="flex items-center gap-2 rounded-lg bg-gray-50 border border-gray-200 px-3 py-2">
+        <div data-spec="SPC-CLM-032" className="flex items-center gap-2 rounded-lg bg-gray-50 border border-gray-200 px-3 py-2">
           <span className="text-xs2 font-semibold text-gray-500 shrink-0">종속항 분량</span>
           <div className="flex gap-1">
             {([['LOW', '적게'], ['MEDIUM', '보통'], ['HIGH', '많이']] as const).map(([lv, label]) => (
@@ -3495,19 +3504,19 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                   original={claimText}
                   label="독립항"
                   onApply={newText => setClaimText(selectedSetIndex, ci, newText)}
-                  doneMsg="독립항이 수정했습니다"
+                  doneMsg="독립항을 수정했습니다"
                 />
               )}
             </div>
 
             <div className="p-2.5 space-y-1.5">
-              <div className="flex items-center gap-2 mb-1">
+              <div data-spec="SPC-CLM-030" className="flex items-center gap-2 mb-1">
                 <span className="text-xs2 font-semibold text-gray-500">
                   종속항 · 채택 {grp.items.filter(d => d.sel).length}
                 </span>
                 {!done && grp.generated && (
                   <button
-                    onClick={() => {
+                    onClick={() => confirmOverwrite('종속항 다시 생성', `청구항 ${indepNum}의 종속항이 새 초안으로 대체됩니다(편집·채택 내용 소실). 계속할까요?`, '다시 생성', () => {
                       const isDevice = claim.category === 'MACHINE';
                       const suffix = isDevice ? '데이터 처리 시스템.' : '데이터 처리 방법.';
                       const ref = `제${indepNum}`;
@@ -3521,9 +3530,9 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                       const nextMap = { ...depGroupsMap, [selectedSetIndex]: next };
                       setDepGroupsMap(nextMap);
                       syncUpdate(selectedSetIndex, nextMap);
-                    }}
+                    })}
                     className="ml-auto inline-flex items-center gap-1 h-6 px-2 rounded-lg text-xs2 font-medium text-brand-500 border border-brand-200 bg-white hover:bg-brand-50 transition-colors"
-                    title="이 독립항의 종속항을 다시 생성"
+                    data-spec="SPC-CLM-036" title="이 독립항의 종속항을 다시 생성"
                   >↻ 다시 생성</button>
                 )}
               </div>
@@ -3538,7 +3547,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                         onClick={e => { e.stopPropagation(); toggleDep(ci, dep.id); }}
                         className={clsx('w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all',
                           dep.sel ? 'bg-brand-400 border-brand-400 text-white' : 'border-gray-400 bg-white hover:border-brand-400')}
-                        title={dep.sel ? '채택 해제' : '채택'}
+                        data-spec="SPC-CLM-033" title={dep.sel ? '채택 해제' : '채택'}
                       >
                         {dep.sel && <Icon name="check" size={10} />}
                       </button>
@@ -3558,7 +3567,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                           <button
                             onClick={e => { e.stopPropagation(); confirmDelete(`종속항 ${depNum}`, () => removeDep(ci, dep.id), `종속항 ${depNum}을(를) 삭제할까요? 명세서에서 빼기만 하려면 체크를 해제하세요.`.replace('을(를)', particle(String(depNum), '을', '를'))); }}
                             className="w-6 h-6 inline-flex items-center justify-center rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                            title="종속항 삭제"
+                            data-spec="SPC-CLM-035" title="종속항 삭제"
                           >✕</button>
                         </div>
                       )}
@@ -3604,7 +3613,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                               setDepGroupsMap(nextMap);
                               syncUpdate(selectedSetIndex, nextMap);
                             }}
-                          doneMsg="종속항이 수정했습니다"
+                          doneMsg="종속항을 수정했습니다"
                         />
                       )}
                     </div>
@@ -3618,7 +3627,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                     value={grp.newText}
                     onChange={e => updateDepNewText(ci, e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && addDep(ci)}
-                    placeholder={`제${indepNum}항에 있어서, ...`}
+                    data-spec="SPC-CLM-037" placeholder={`제${indepNum}항에 있어서, ...`}
                     className="flex-1 text-xs2 px-2.5 py-1.5 border border-zinc-200 rounded-lg bg-zinc-50 focus:outline-none focus:border-blue-400 focus:bg-white"
                   />
                   <button
@@ -3732,7 +3741,7 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange, 
 
   return (
     <div className="flex-1 overflow-y-auto scroll-thin p-3 ml-1.5 space-y-3">
-      <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2">
+      <div data-spec="SPC-MID-010" className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2">
         <p className="text-xs2 text-brand-400 font-medium">AI가 중간명세서를 초안 작성했습니다.</p>
         <p className="text-xs2 text-gray-500 mt-0.5">각 항목을 직접 편집하거나 단락을 추가·삭제할 수 있습니다.</p>
       </div>
@@ -3748,7 +3757,7 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange, 
             disabled={genBusy}
             onChange={e => setGenInstr(e.target.value)}
           />
-          <button
+          <button data-spec="SPC-MID-020"
             onClick={regenerate}
             disabled={genBusy}
             className="inline-flex items-center gap-1 h-8 px-3 rounded-lg text-xs2 font-medium text-brand-500 border border-brand-200 bg-white hover:bg-brand-50 disabled:opacity-50 transition-colors"
@@ -3806,11 +3815,11 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange, 
                           />
                           <button
                             onClick={() => { setEditing({ sectionKey: section.key, blockIdx: bIdx }); setEditVal(block.content); }}
-                            title="직접 편집"
+                            data-spec="SPC-MID-011" title="직접 편집"
                             className="h-6 w-6 inline-flex items-center justify-center rounded-lg text-neutral-400 hover:text-brand-500 hover:bg-brand-50 transition-colors"
                           ><Icon name="edit" size={11} /></button>
                           <button
-                            onClick={() => confirmDelete(`'${section.label}' 단락`, () => removeBlock(section.key, bIdx))}
+                            data-spec="SPC-MID-013" onClick={() => confirmDelete(`'${section.label}' 단락`, () => removeBlock(section.key, bIdx))}
                             title="삭제"
                             className="h-6 w-6 inline-flex items-center justify-center rounded-lg text-neutral-300 hover:text-red-500 hover:bg-red-50 transition-colors"
                           >✕</button>
@@ -3825,7 +3834,7 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange, 
                           original={block.content}
                           label="중간명세서 단락"
                           onApply={newText => updateBlock(section.key, bIdx, newText)}
-                          doneMsg="단락이 수정했습니다"
+                          doneMsg="단락을 수정했습니다"
                         />
                       </div>
                     )}
@@ -3841,7 +3850,7 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange, 
                   value={newTexts[section.key] ?? ''}
                   onChange={e => setNewTexts(p => ({ ...p, [section.key]: e.target.value }))}
                   onKeyDown={e => e.key === 'Enter' && !e.shiftKey && addBlock(section.key)}
-                  placeholder="단락 추가..."
+                  data-spec="SPC-MID-014" placeholder="단락 추가..."
                   className="flex-1 text-xs2 px-2.5 py-1.5 border border-zinc-200 rounded-lg bg-zinc-50 focus:outline-none focus:border-blue-400 focus:bg-white"
                 />
                 <button
@@ -3857,7 +3866,7 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange, 
 
       {/* 다음 동작 안내 — 실행 버튼은 하단 바 '명세서 생성 →' 하나로 (D3) */}
       {!done && onGoToEditor && (
-        <p className="text-xs2 text-gray-500 px-1">
+        <p data-spec="SPC-MID-030" className="text-xs2 text-gray-500 px-1">
           편집을 마쳤으면 하단의 <b className="text-gray-700">명세서 생성 →</b>을 누르세요. AI가 구성요소·도면·청구항을 기반으로 실시예를 포함한 명세서 초안을 만들고 에디터로 이동합니다.
         </p>
       )}

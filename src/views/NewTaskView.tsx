@@ -64,8 +64,8 @@ export function NewTaskView() {
           />
         </Field>
         <div className="flex justify-end gap-2 mt-3 pt-3.5 border-t border-zinc-100">
-          <Button variant="outlined" color="primary" size="sm" onClick={cancel}>취소</Button>
-          <Button variant="filled" color="primary" size="sm" onClick={submit}>명세서 작성 시작</Button>
+          <Button variant="outlined" color="primary" size="sm" data-spec="SPC-WIZ-012" onClick={cancel}>취소</Button>
+          <Button variant="filled" color="primary" size="sm" data-spec="SPC-WIZ-011" onClick={submit}>명세서 작성 시작</Button>
         </div>
       </Card>
       {/* 서비스 푸터 — 하단 고정(빈 공간 채움), px-8 상쇄해 풀블리드 */}

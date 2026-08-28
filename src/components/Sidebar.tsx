@@ -248,7 +248,7 @@ function TaskRow({ t, active, onSelect, onToggleFav, menuOpen, onMenuToggle, onR
           </span>
           {stage && (
             <span className={clsx('ml-auto shrink-0 px-1.5 py-px rounded font-medium',
-              stage.tone === 'done' ? 'bg-green-50 text-green-700' : 'bg-brand-50 text-brand-600')} title="진행 단계">{stage.text}</span>
+              stage.tone === 'done' ? 'bg-green-50 text-green-700' : 'bg-brand-50 text-brand-600')} data-spec="SPC-WIZ-120" title="진행 단계">{stage.text}</span>
           )}
         </div>
       </span>
