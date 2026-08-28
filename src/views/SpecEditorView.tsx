@@ -23,6 +23,7 @@ import {
 } from '../features/ai/specAgentMock';
 import { toast } from '../components/Toast';
 import { diffWords } from '../utils/diffWords';
+import { particle } from '../utils/korean';
 import { DiffText } from '../components/DiffText';
 import { exportDocx } from '../utils/exportDocx';
 import { exportPdf } from '../utils/exportPdf';
@@ -250,11 +251,17 @@ function ClaimsEditor({ blocks, onChange }: {
       commit(remapClaimRefs(kept, map));
       setEditing(null);
     };
-    if (dependents.length === 0) { doRemove(false); return; }
+    if (dependents.length === 0) {
+      openAlertDialog(
+        { title: `청구항 ${no} 삭제`, description: `청구항 ${no}${particle(String(no), '을', '를')} 삭제할까요? 뒤 항의 번호와 인용이 자동으로 당겨집니다.`, confirm: '삭제', cancel: '취소' },
+        { theme: 'danger', onConfirm: (ctrl) => { ctrl.close(); doRemove(false); } },
+      );
+      return;
+    }
     openAlertDialog(
       {
         title: `청구항 ${no} 삭제`,
-        description: `청구항 ${no}을(를) 인용하는 종속항 ${dependents.length}개(${dependents.map(d => `청구항 ${d.i + 1}`).join(', ')})가 있습니다. 함께 삭제할까요? '이 항만 삭제'를 누르면 종속항은 남고 인용 번호가 ⚠로 표시됩니다.`,
+        description: `청구항 ${no}${particle(String(no), '을', '를')} 인용하는 종속항 ${dependents.length}개(${dependents.map(d => `청구항 ${d.i + 1}`).join(', ')})가 있습니다. 함께 삭제할까요? '이 항만 삭제'를 누르면 종속항은 남고 인용 번호가 ⚠로 표시됩니다.`,
         confirm: '함께 삭제', cancel: '이 항만 삭제',
       },
       { theme: 'danger', onConfirm: (ctrl) => { ctrl.close(); doRemove(true); }, onCancel: (ctrl) => { ctrl.close(); doRemove(false); } },
@@ -409,12 +416,12 @@ function ProposalCard({ p, onAccept, onDecline, onRefine, onZoom }: {
       <div className="flex gap-1.5 mt-2" data-spec="SPC-EDT-032">
         {p.status === 'pending' ? (
           <>
-            <button onClick={onAccept} className="flex-1 py-1 text-xs2 font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">✓ 반영</button>
-            <button onClick={onDecline} className="flex-1 py-1 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50">✕ 무시</button>
+            <button onClick={onAccept} className="flex-1 py-1 text-xs2 font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">✓ 적용</button>
+            <button onClick={onDecline} className="flex-1 py-1 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50">✕ 취소</button>
           </>
         ) : (
           <span className={clsx('text-xs2 font-semibold', p.status === 'accepted' ? 'text-emerald-600' : 'text-zinc-400')}>
-            {p.status === 'accepted' ? '✓ 반영됨' : '✕ 무시됨'}
+            {p.status === 'accepted' ? '✓ 적용됨' : '✕ 취소됨'}
           </span>
         )}
       </div>
@@ -866,6 +873,14 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     setSelSet(new Set([`${sid}-${idx}`]));
   };
 
+  // ── 단락 삭제 (확인 후) — 실행 취소 스택에 저장 ─────────────────────────
+  const deleteBlock = (sid: SectionId, idx: number) => {
+    setUndoStack(p => [...p.slice(-20), blocks]);
+    setBlocks(p => ({ ...p, [sid]: p[sid].filter((_, i) => i !== idx) }));
+    if (sel?.sid === sid && sel?.idx === idx) setSel(null);
+    setSelSet(prev => { const n = new Set(prev); n.delete(`${sid}-${idx}`); return n; });
+  };
+
   // ── AI 컨텍스트 다중 선택 toggle ───────────────────────────────────────
   const toggleSelSet = (sid: SectionId, idx: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1177,7 +1192,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       {/* 서브헤더 Row 1: 편집 툴바 */}
       <div className="flex items-center border-b border-zinc-200 bg-white shrink-0 h-10">
         <button onClick={onBack}
-          className="flex items-center gap-1 text-xs2 text-blue-600 hover:text-blue-800 px-3 h-full hover:bg-zinc-50 transition-colors shrink-0">
+          className="flex items-center gap-1 text-xs2 font-medium text-brand-600 hover:text-brand-700 px-3 h-7 mx-1 rounded-md hover:bg-zinc-100 transition-colors shrink-0">
           ← 작성 단계로
         </button>
         <div className="w-px h-5 bg-zinc-200 mx-1 self-center shrink-0" />
@@ -1368,7 +1383,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             {/* 캡션 */}
                             <div className="px-3 pt-2 pb-1.5">
                               <div className="flex items-center gap-1.5 mb-0.5">
-                                <span className="text-xs2 font-bold text-zinc-700">{d.detail.symbol}</span>
+                                <span className="text-xs2 font-bold text-zinc-700" title={`원본 기호: ${d.detail.symbol}`}>도 {idx + 1}</span>
                                 <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', DRAWING_LABEL_STYLES[labelKo] ?? 'bg-zinc-100 text-zinc-500')}>{labelKo}</span>
                               </div>
                               <p className="text-xs2 text-zinc-600 leading-snug">{d.detail.name}</p>
@@ -1377,9 +1392,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             <div className="border-t border-zinc-100 px-3 py-1.5 flex items-center justify-end">
                               <button
                                 onClick={() => openEditorTab({ drawingId: String(idx), drawings: drawings.map(toWorkflowDrawingItem), components: [], references: [], drawingName: d.detail.name, timestamp: Date.now() })}
-                                title="도면 수정모드를 새 탭에서 엽니다 (범위 조정·CAD 변환)"
+                                title="도면 편집기를 새 탭에서 엽니다 (범위 조정·CAD 변환)"
                                 className="inline-flex items-center gap-0.5 h-7 px-2 rounded-md text-xs2 font-semibold text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 transition-colors shrink-0"
-                              >수정모드 <span className="text-xs2">↗</span></button>
+                              >도면 편집기 <span className="text-xs2">↗</span></button>
                             </div>
                           </div>
                         );
@@ -1417,7 +1432,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                         key={blockIdx}
                         onClick={() => { if (!isEditing) selectBlock(sec.id, blockIdx); }}
                         className={clsx(
-                          'group relative pl-7 pr-4 py-2.5 transition-all rounded-lg border',
+                          'group relative pl-8 pr-4 py-2.5 transition-all rounded-lg border',
                           isEditing
                             ? 'border-blue-400 bg-white shadow-sm cursor-text'
                             : isChecked
@@ -1432,13 +1447,13 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                           onClick={e => toggleSelSet(sec.id, blockIdx, e)}
                           title="여러 단락을 한번에 AI 수정하려면 체크하세요"
                           className={clsx(
-                            'absolute left-2 top-3 w-4 h-4 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer shrink-0',
+                            'absolute left-2 top-2.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer shrink-0',
                             isChecked
                               ? 'bg-brand-400 border-brand-400 text-white'
                               : 'border-gray-400 bg-white opacity-90 group-hover:opacity-100 group-hover:border-brand-400'
                           )}
                         >
-                          {isChecked && <Icon name="check" size={8} />}
+                          {isChecked && <Icon name="check" size={10} />}
                         </div>
                         {/* 단락 이동 (위/아래) */}
                         {blocks[sec.id].length > 1 && (
@@ -1462,13 +1477,11 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                           <button
                             onClick={e => {
                               e.stopPropagation();
-                              setUndoStack(p => [...p.slice(-20), blocks]);
-                              setBlocks(p => {
-                                const next = p[sec.id].filter((_, i) => i !== blockIdx);
-                                return { ...p, [sec.id]: next };
-                              });
-                                                        if (sel?.sid === sec.id && sel?.idx === blockIdx) { setSel(null); }
-                            setSelSet(prev => { const n = new Set(prev); n.delete(`${sec.id}-${blockIdx}`); return n; });
+                              const preview = blockText.trim().slice(0, 40);
+                              openAlertDialog(
+                                { title: '단락 삭제', description: preview ? `"${preview}${blockText.trim().length > 40 ? '…' : ''}" 단락을 삭제할까요? (실행 취소로 되돌릴 수 있습니다)` : '빈 단락을 삭제할까요?', confirm: '삭제', cancel: '취소' },
+                                { theme: 'danger', onConfirm: (ctrl) => { ctrl.close(); deleteBlock(sec.id, blockIdx); } },
+                              );
                             }}
                             className="absolute top-1.5 right-1.5 w-6 h-6 rounded-md flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
                             title="단락 삭제"
@@ -1569,6 +1582,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             <div className="w-5 h-5 rounded-md flex items-center justify-center text-white text-xs font-bold shrink-0"
               style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
             <span className="text-base2 font-bold text-gray-800">AI 어시스턴트</span>
+            <span className="text-xs2 text-zinc-400 font-medium">본문 수정</span>
           </div>
 
           {/* 선택된 블록 컨텍스트 */}
@@ -1725,7 +1739,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                               ))}
                             </div>
                             <div className="px-2.5 pb-2.5">
-                              <button onClick={() => regenerate(m)} className="text-xs2 font-semibold text-zinc-500 hover:text-blue-600">↺ 다시 생성</button>
+                              <button onClick={() => regenerate(m)} className="text-xs2 font-semibold text-zinc-500 hover:text-blue-600">↻ 다시 생성</button>
                             </div>
                           </>
                         )}
@@ -1746,7 +1760,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                                     </>
                                   ) : (
                                     <span className={clsx('text-xs2 font-semibold', r.status === 'accepted' ? 'text-emerald-600' : 'text-zinc-400')}>
-                                      {r.status === 'accepted' ? '✓ 반영됨' : '✕ 무시됨'}
+                                      {r.status === 'accepted' ? '✓ 적용됨' : '✕ 취소됨'}
                                     </span>
                                   )}
                                 </div>
