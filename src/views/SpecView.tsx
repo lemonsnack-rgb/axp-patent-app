@@ -56,6 +56,16 @@ const STEP_LABEL: Partial<Record<StepId, string>> = {
   drawings: '명세서 도면', claims: '청구항', midspec: '중간명세서',
 };
 
+// 명세서 생성 단계 (중간명세서 → 에디터). mock 타이밍은 누적 ms; 실 API에서는 진행 이벤트에 맞춰 stage를 올린다.
+const SPEC_GEN_STAGES = [
+  { label: '확정 내용 정리',          detail: '구성요소·도면·청구항을 명세서 구조에 배치합니다' },
+  { label: '발명의 상세한 설명 작성', detail: '기술분야·배경기술·과제·해결수단·효과를 다듬습니다' },
+  { label: '실시예 작성',             detail: '도면과 부호를 참조해 구체적인 내용을 씁니다 — 가장 오래 걸리는 단계입니다' },
+  { label: '청구범위·요약 정리',      detail: '청구항 번호·인용을 맞추고 요약서를 작성합니다' },
+  { label: '명세서 조립·검수',        detail: '섹션 순서와 부호의 설명을 최종 점검합니다' },
+];
+const SPEC_GEN_STAGE_MS = [900, 2300, 4600, 5800, 6600];
+
 // 단계별 실질 안내 — 8단계 동일 템플릿 대신 이 단계에서 실제로 할 일 1~2문장 (D7)
 const STEP_HINT: Partial<Record<StepId, string>> = {
   description: '채택할 항목만 체크해 두세요. 카드를 끌어 순서를 바꾸거나 제안/종래 기술 사이로 보낼 수 있고, 표 항목은 원문 그대로 반영됩니다.',
@@ -97,6 +107,32 @@ export function SpecView() {
 
   const [mainView, setMainView] = useState<'analysis' | 'editor'>(savedSpec?.mainView ?? 'analysis');
   const handleSetMainView = (v: 'analysis' | 'editor') => setMainView(v);
+
+  // ── 명세서 생성 진행 (중간명세서 → 에디터) ─────────────────────────────
+  // 실시예를 포함한 명세서 생성은 실제 API에서 1분 이상 걸린다. 단계 체크리스트 + 진행 바 + 경과 시간을 보여주고
+  // 완료 시 에디터로 전환한다. mock은 SPEC_GEN_STAGE_MS 타이밍으로 단계를 진행한다. (실 API: 진행 이벤트를 setSpecGenStage로 연결)
+  const [specGen, setSpecGen] = useState<{ stage: number; startedAt: number; now: number } | null>(null);
+  const specGenTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const specGenTick = useRef<ReturnType<typeof setInterval> | null>(null);
+  const clearSpecGenTimers = () => {
+    specGenTimers.current.forEach(clearTimeout); specGenTimers.current = [];
+    if (specGenTick.current) { clearInterval(specGenTick.current); specGenTick.current = null; }
+  };
+  const startSpecGeneration = (onDone: () => void) => {
+    clearSpecGenTimers();
+    setSpecGen(() => { const t = Date.now(); return { stage: 0, startedAt: t, now: t }; });
+    specGenTick.current = setInterval(() => setSpecGen(g => g ? { ...g, now: Date.now() } : g), 1000);
+    SPEC_GEN_STAGE_MS.forEach((ms, i) => {
+      specGenTimers.current.push(setTimeout(() => setSpecGen(g => g ? { ...g, stage: i + 1 } : g), ms));
+    });
+    specGenTimers.current.push(setTimeout(() => {
+      clearSpecGenTimers();
+      setSpecGen(null);
+      onDone();
+    }, SPEC_GEN_STAGE_MS[SPEC_GEN_STAGE_MS.length - 1] + 500));
+  };
+  const cancelSpecGeneration = () => { clearSpecGenTimers(); setSpecGen(null); toast('명세서 생성을 취소했습니다'); };
+  useEffect(() => () => clearSpecGenTimers(), []);
   const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
   // AI 수정은 본문 내 삽입형(인라인)으로 통일 — 사이드패널로 포커스를 넘기지 않는다 (데모 정합)
   const guidePanelInputRef = useRef<HTMLTextAreaElement>(null);
@@ -779,9 +815,12 @@ export function SpecView() {
                                     ...(midspec ?? []).filter(s => s.key !== 'embodiment_description'),
                                     embodimentSection,
                                   ];
-                                  setMidspec(nextMidspec);
-                                  confirm('midspec');
-                                  handleSetMainView('editor');
+                                  // 생성 진행 화면을 띄우고 완료 시 에디터로 전환 (실 API: 1분 이상)
+                                  startSpecGeneration(() => {
+                                    setMidspec(nextMidspec);
+                                    confirm('midspec');
+                                    handleSetMainView('editor');
+                                  });
                                 }}
                               />
                             )}
@@ -930,6 +969,56 @@ export function SpecView() {
           </div>
         )}
         </div>
+
+        {/* 명세서 생성 진행 오버레이 — 중간명세서 → 에디터 */}
+        {specGen && (() => {
+          const elapsed = Math.max(0, Math.floor((specGen.now - specGen.startedAt) / 1000));
+          const mm = String(Math.floor(elapsed / 60)).padStart(2, '0'), ss = String(elapsed % 60).padStart(2, '0');
+          const pct = Math.min(96, Math.round((specGen.stage / SPEC_GEN_STAGES.length) * 100) + 4);
+          return (
+            <div className="fixed inset-0 z-[60] bg-white/92 backdrop-blur-sm flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-labelledby="specgen-title">
+              <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white shadow-xl p-6">
+                <div className="flex items-center gap-2.5 mb-1">
+                  <span className="w-8 h-8 rounded-lg bg-brand-400 text-white flex items-center justify-center shrink-0"><AiIcon size={14} /></span>
+                  <h3 id="specgen-title" className="text-base2 font-bold text-gray-800">명세서를 생성하고 있습니다</h3>
+                  <span className="ml-auto font-mono text-sm2 text-neutral-500 tabular-nums">{mm}:{ss}</span>
+                </div>
+                <p className="text-xs2 text-neutral-500 mb-4">실시예를 포함한 초안 생성에는 <b className="text-neutral-700">1분 이상</b> 걸릴 수 있습니다. 완료되면 에디터로 자동 이동합니다.</p>
+                <div className="relative h-1.5 bg-neutral-100 rounded-full overflow-hidden mb-4">
+                  <div className="absolute inset-y-0 left-0 bg-brand-400 rounded-full transition-[width] duration-700" style={{ width: `${pct}%` }} />
+                  <div className="absolute inset-y-0 w-1/4 bg-white/40" style={{ animation: 'loading-indeterminate 1.4s ease-in-out infinite' }} />
+                </div>
+                <ol className="space-y-2">
+                  {SPEC_GEN_STAGES.map((st, i) => {
+                    const done = specGen.stage > i, cur = specGen.stage === i;
+                    return (
+                      <li key={st.label} className={clsx('flex items-start gap-2.5 rounded-lg px-2.5 py-1.5 transition-colors', cur && 'bg-brand-50/70')}>
+                        <span className={clsx('mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0',
+                          done ? 'bg-green-500 text-white' : cur ? 'bg-brand-400 text-white' : 'bg-neutral-100 text-neutral-400')}>
+                          {done ? <Icon name="check" size={10} /> : cur
+                            ? <span className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                            : <span className="text-xs2">{i + 1}</span>}
+                        </span>
+                        <span className="min-w-0">
+                          <span className={clsx('block text-sm2', done ? 'text-neutral-500' : cur ? 'text-gray-800 font-semibold' : 'text-neutral-400')}>{st.label}</span>
+                          {cur && <span className="block text-xs2 text-neutral-500 mt-0.5">{st.detail}</span>}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ol>
+                <div className="flex items-center justify-between mt-5">
+                  <span className="text-xs2 text-neutral-400">이 창을 닫아도 작업은 저장됩니다 · 생성 결과는 에디터에서 계속 수정할 수 있습니다</span>
+                  <button
+                    type="button"
+                    onClick={cancelSpecGeneration}
+                    className="inline-flex items-center h-8 px-3 rounded-lg text-xs2 text-neutral-500 border border-neutral-200 bg-white hover:bg-neutral-50 transition-colors shrink-0"
+                  >취소</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* 모바일 배경 오버레이 */}
         {mobileGuideOpen && (
