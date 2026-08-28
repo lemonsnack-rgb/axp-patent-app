@@ -25,6 +25,8 @@ import { toast } from '../components/Toast';
 import { diffWords } from '../utils/diffWords';
 import { particle } from '../utils/korean';
 import { DiffText } from '../components/DiffText';
+import { ElementText, type ElementLike } from '../components/ElementText';
+import { detectRenameInEdit } from '../features/spec/elementRename';
 import { exportDocx } from '../utils/exportDocx';
 import { exportPdf } from '../utils/exportPdf';
 
@@ -54,41 +56,6 @@ function renderBlockWithTeX(text: string): string {
       : html;
   });
   return result;
-}
-
-function renderWithCompHighlights(
-  text: string,
-  compNames: string[],
-  onClickComp?: (name: string) => void,
-): React.ReactNode {
-  if (!compNames.length || !text.trim()) return text;
-  const escaped = [...compNames]
-    .sort((a, b) => b.length - a.length)
-    .map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  const pattern = new RegExp(`(${escaped.join('|')})`, 'g');
-  const parts = text.split(pattern);
-  return (
-    <>
-      {parts.map((part, i) =>
-        compNames.includes(part) ? (
-          <mark
-            key={i}
-            className={clsx(
-              'bg-blue-50 text-blue-700 rounded-sm px-0.5 font-medium not-italic',
-              onClickComp && 'cursor-pointer hover:bg-blue-100 transition-colors'
-            )}
-            style={{ textDecoration: 'none' }}
-            onClick={onClickComp ? (e) => { e.stopPropagation(); onClickComp(part); } : undefined}
-            title={onClickComp ? '클릭하여 전체 이름 변경' : undefined}
-          >
-            {part}
-          </mark>
-        ) : (
-          <span key={i}>{part}</span>
-        )
-      )}
-    </>
-  );
 }
 
 // ── 수식 템플릿 (모듈 레벨 — 매 렌더 재생성 방지) ─────────────────────────
@@ -224,9 +191,10 @@ function serializeClaimItems(items: { value: string }[]): string[] {
   return [header, ...items.map((it, i) => `청구항 ${i + 1}.\n${it.value}`)];
 }
 
-function ClaimsEditor({ blocks, onChange }: {
+function ClaimsEditor({ blocks, onChange, elements = [] }: {
   blocks: string[];
   onChange: (next: string[]) => void;
+  elements?: ElementLike[];
 }) {
   const items = parseClaimItems(blocks);
   const commit = (next: { value: string }[]) => onChange(serializeClaimItems(next));
@@ -335,7 +303,7 @@ function ClaimsEditor({ blocks, onChange }: {
                 onClick={() => setEditing(idx)}
                 title="클릭하여 편집"
                 className="text-base2 text-zinc-800 leading-relaxed whitespace-pre-wrap px-1.5 py-1 rounded-md cursor-text hover:bg-white hover:ring-1 hover:ring-zinc-200 transition-colors"
-              >{it.value}</p>
+              ><ElementText text={it.value} elements={elements} /></p>
             )}
           </div>
         );
@@ -476,13 +444,14 @@ function ThinkingProgress({ steps, done }: { steps: ProgressStep[]; done: number
 }
 
 // ── 메인 컴포넌트 ──────────────────────────────────────────────────────────
-export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context, confirmedClaimsText }: {
+export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context, confirmedClaimsText, onRenameElement }: {
   task: any
   onBack: () => void
   confirmedTitle?: string
   midspec?: MidspecSection[]
   context?: InventionContext
   confirmedClaimsText?: string
+  onRenameElement?: (oldName: string, newName: string) => void   // 원천(context.elements)·위저드 텍스트 동기화
 }) {
   const taskName: string = task?.name || '새 명세서';
   const effectiveTitle = confirmedTitle || taskName;
@@ -626,10 +595,6 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     '효과':     'bg-brand-50 text-brand-600',
   };
 
-  const compNames = (context?.elements ?? [])
-    .map(el => el.value_ko)
-    .filter(Boolean);
-
   // 구성요소 이름 변경 모달
   const [renamingComp, setRenamingComp] = useState<{ name: string; draft: string } | null>(null);
 
@@ -653,7 +618,12 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       }
       return result;
     });
+    onRenameElement?.(oldName, next);
   };
+
+  // 단락 편집 종료 시 "구성요소 이름 변경" 감지 → 인라인 확인 바
+  const [renameHint, setRenameHint] = useState<{ sid: SectionId; idx: number; oldName: string; newName: string; symbol: string; prevText: string } | null>(null);
+  const editStartRef = useRef<{ sid: SectionId; idx: number; text: string } | null>(null);
 
   // 도구 모달
   const [tableModal, setTableModal] = useState(false);
@@ -1389,6 +1359,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                 {sec.id === 'claims' && (
                   <ClaimsEditor
                     blocks={blocks['claims']}
+                    elements={context?.elements ?? []}
                     onChange={(next) => {
                       setUndoStack(p => [...p.slice(-20), blocks]);
                       setRedoStack([]);
@@ -1488,6 +1459,15 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                               t.style.height = t.scrollHeight + 'px';
                             }}
                             onSelect={e => { caretRef.current = { sid: sec.id, idx: blockIdx, start: e.currentTarget.selectionStart, end: e.currentTarget.selectionEnd }; }}
+                            onFocus={() => { if (!editStartRef.current || editStartRef.current.sid !== sec.id || editStartRef.current.idx !== blockIdx) editStartRef.current = { sid: sec.id, idx: blockIdx, text: blockText }; }}
+                            onBlur={() => {
+                              const st = editStartRef.current;
+                              if (st && st.sid === sec.id && st.idx === blockIdx && st.text !== blockText) {
+                                const d = detectRenameInEdit(st.text, blockText, context?.elements ?? []);
+                                if (d) setRenameHint({ sid: sec.id, idx: blockIdx, ...d, prevText: st.text });
+                              }
+                              editStartRef.current = null;
+                            }}
                             ref={el => { blockTaRef.current = el; if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                             onClick={e => e.stopPropagation()}
                           />
@@ -1502,9 +1482,21 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             blockText.trim() ? 'text-zinc-800' : 'text-zinc-400 italic'
                           )}>
                             {blockText.trim()
-                              ? renderWithCompHighlights(blockText, compNames, compNames.length ? (name) => setRenamingComp({ name, draft: name }) : undefined)
+                              ? <ElementText text={blockText} elements={context?.elements ?? []} onClickElement={(name) => setRenamingComp({ name, draft: name })} />
                               : '단락 내용을 입력하세요...'}
                           </p>
+                        )}
+                        {/* 구성요소 이름 변경 감지 — 편집 종료 시 "정의를 바꿀지 / 이 자리만 바꿀지" 확인 (기본: 이 자리만) */}
+                        {renameHint && renameHint.sid === sec.id && renameHint.idx === blockIdx && (
+                          <div className="mx-3 mb-2 flex flex-wrap items-center gap-2 rounded-md border border-brand-200 bg-brand-50/60 px-2.5 py-1.5 text-xs2 text-zinc-700" onClick={e => e.stopPropagation()}>
+                            <span>ⓘ '{renameHint.oldName}({renameHint.symbol})' → '{renameHint.newName}({renameHint.symbol})'로 바뀌었습니다. 다른 곳도 함께 바꿀까요?</span>
+                            <button type="button" onClick={() => { renameComp(renameHint.oldName, renameHint.newName); setRenameHint(null); }}
+                              className="inline-flex items-center h-6 px-2 rounded-md text-xs2 font-semibold bg-brand-400 text-white hover:bg-brand-500">전체 변경</button>
+                            <button type="button" onClick={() => setRenameHint(null)}
+                              className="inline-flex items-center h-6 px-2 rounded-md text-xs2 text-zinc-600 border border-zinc-200 bg-white hover:bg-zinc-50">이 자리만</button>
+                            <button type="button" onClick={() => { updateBlock(renameHint.sid, renameHint.idx, renameHint.prevText); setRenameHint(null); }}
+                              className="inline-flex items-center h-6 px-2 rounded-md text-xs2 text-zinc-500 hover:bg-zinc-100">되돌리기</button>
+                          </div>
                         )}
                       </div>
                     );

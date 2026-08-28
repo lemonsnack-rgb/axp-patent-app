@@ -21,6 +21,8 @@ import { toast } from '../components/Toast';
 import { uid } from '../utils/uid';
 import { particle, withParticle } from '../utils/korean';
 import { diffWords } from '../utils/diffWords';
+import { replaceElementName, countElementMentions } from '../features/spec/elementRename';
+import { ElementText, type ElementLike } from '../components/ElementText';
 import { DiffText } from '../components/DiffText';
 import type { DrawingItem as WorkflowDrawingItem } from '../features/drawing-workflow/types';
 import { openEditorTab, onEditorResult } from '../features/drawing-workflow/editorChannel';
@@ -107,6 +109,49 @@ export function SpecView() {
 
   const [mainView, setMainView] = useState<'analysis' | 'editor'>(savedSpec?.mainView ?? 'analysis');
   const handleSetMainView = (v: 'analysis' | 'editor') => setMainView(v);
+
+  // ── 구성요소 명칭 전역 치환 (원천 = context.elements) ─────────────────────
+  // 정의 지점(구성요소 단계)·인용 지점(에디터 하이라이트 클릭)이 같은 엔진을 쓴다. 텍스트 치환은 elementRename.ts.
+  const elementNames = () => context.elements.map(e => e.value_ko).filter(Boolean);
+  const collectRenameTargets = () => ({
+    desc: [...context.proposed, ...context.previous].map(i => i.content),
+    claims: [gSel['claims'] ?? '', confirmed['claims'] ?? ''],
+    midspec: (midspec ?? []).flatMap(sec => sec.blocks.map(b => b.content)),
+    editor: (Object.values((task?.id && loadSpecState(task.id)?.editorBlocks) ?? {}) as string[][]).flat(),
+  });
+  const countElementMentionsAll = (oldName: string) => {
+    const t = collectRenameTargets(); const names = elementNames();
+    const c = {
+      desc: countElementMentions(t.desc, oldName, names),
+      claims: countElementMentions(t.claims, oldName, names),
+      midspec: countElementMentions(t.midspec, oldName, names),
+      editor: countElementMentions(t.editor, oldName, names),
+    };
+    return { ...c, total: c.desc + c.claims + c.midspec + c.editor };
+  };
+  const renameElementEverywhere = (oldName: string, newName: string, opts?: { skipEditorBlocks?: boolean }) => {
+    const names = elementNames();
+    const R = (v: string) => replaceElementName(v, oldName, newName, names).text;
+    setContext(p => ({
+      ...p,
+      title: R(p.title), summary: R(p.summary),
+      elements: p.elements.map(e => e.value_ko === oldName ? { ...e, value_ko: newName } : e),
+      proposed: p.proposed.map(i => ({ ...i, content: R(i.content) })),
+      previous: p.previous.map(i => ({ ...i, content: R(i.content) })),
+    }));
+    setMidspec(m => m ? m.map(sec => ({ ...sec, blocks: sec.blocks.map(b => ({ ...b, content: R(b.content) })) })) : m);
+    setGSel(g => Object.fromEntries(Object.entries(g).map(([k, v]) => [k, typeof v === 'string' ? R(v) : v])) as typeof g);
+    setConfirmed(c => Object.fromEntries(Object.entries(c).map(([k, v]) => [k, typeof v === 'string' ? R(v) : v])) as typeof c);
+    setAiComponents(list => list.map(c => c.value_ko === oldName ? { ...c, value_ko: newName } : c));
+    if (!opts?.skipEditorBlocks && task?.id) {
+      const saved = loadSpecState(task.id);
+      if (saved?.editorBlocks) {
+        const eb = Object.fromEntries(Object.entries(saved.editorBlocks).map(([k, arr]) => [k, (arr as string[]).map(R)]));
+        saveSpecState(task.id, { editorBlocks: eb });
+      }
+    }
+    toast(`'${oldName}' → '${newName}'로 바꿨습니다`);
+  };
 
   // ── 명세서 생성 진행 (중간명세서 → 에디터) ─────────────────────────────
   // 실시예를 포함한 명세서 생성은 실제 API에서 1분 이상 걸린다. 단계 체크리스트 + 진행 바 + 경과 시간을 보여주고
@@ -410,6 +455,7 @@ export function SpecView() {
           midspec={midspec}
           context={context}
           confirmedClaimsText={gSel['claims'] || confirmed['claims'] || ''}
+          onRenameElement={(o, n) => renameElementEverywhere(o, n, { skipEditorBlocks: true })}
         />
         {previewOpen && <PreviewModal taskName={task?.name} sections={makePreviewSections()} onClose={() => setPreviewOpen(false)} />}
       </>
@@ -760,6 +806,8 @@ export function SpecView() {
                                 done={isDone}
                                 onConfirm={() => confirm('components')}
                                 onUpdate={v => setGSel(p => ({ ...p, components: v }))}
+                                onCountMentions={countElementMentionsAll}
+                                onRenameEverywhere={(o, n) => renameElementEverywhere(o, n)}
                                 onComponentsChange={(comps) => {
                                   setAiComponents(comps);
                                   // 채택된 구성요소를 InventionContext.elements 단일 원천에 동기화 (InventionElement로 정제)
@@ -787,6 +835,7 @@ export function SpecView() {
                             {s.id === 'claims' && (
                               <ClaimsPanel
                                 done={isDone}
+                                elements={context.elements}
                                 onConfirm={() => confirm('claims')}
                                 onUpdate={v => setGSel(p => ({ ...p, claims: v }))}
                                 onActionChange={setStepAction}
@@ -795,6 +844,7 @@ export function SpecView() {
                             {s.id === 'midspec' && (
                               <MidspecPanel
                                 done={isDone}
+                                elements={context.elements}
                                 onActionChange={setStepAction}
                                 sections={midspec ?? []}
                                 onUpdate={(next) => {
@@ -2102,13 +2152,17 @@ function compItemToSpecItem(item: CompItem): SpecComponentItem {
   };
 }
 
-function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
+function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onCountMentions, onRenameEverywhere }: {
   done: boolean;
   onConfirm: () => void;
   onUpdate: (v: string) => void;
   onComponentsChange?: (comps: SpecComponentItem[]) => void;
   initialItems?: SpecComponentItem[];
+  onCountMentions?: (oldName: string) => { desc: number; claims: number; midspec: number; editor: number; total: number };
+  onRenameEverywhere?: (oldName: string, newName: string) => void;
 }) {
+  // 명칭 입력란 포커스 시점의 이름 — blur 시 변경 감지용 (정의 지점 이름 변경 → 인용 텍스트 전파 확인)
+  const focusNameRef = useRef<Record<string, string>>({});
   const initData: CompItem[] = (initialItems && initialItems.length > 0)
     ? initialItems.map(specItemToCompItem)
     : INIT_COMPS;
@@ -2377,6 +2431,23 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                           value={item.value_ko}
                           placeholder="구성요소 명칭"
                           onChange={e => upd(items.map(it => it.id===item.id ? {...it, value_ko: e.target.value} : it))}
+                          onFocus={() => { focusNameRef.current[item.id] = item.value_ko; }}
+                          onBlur={() => {
+                            const old = (focusNameRef.current[item.id] ?? '').trim();
+                            const nw = item.value_ko.trim();
+                            delete focusNameRef.current[item.id];
+                            if (!old || !nw || old === nw || !onCountMentions || !onRenameEverywhere) return;
+                            const c = onCountMentions(old);
+                            if (!c.total) return;
+                            openAlertDialog(
+                              {
+                                title: '구성요소 명칭 변경',
+                                description: `'${old}' → '${nw}'\n이미 작성된 텍스트에도 반영할까요? (발명 설명 ${c.desc}곳 · 청구항 ${c.claims}곳 · 중간명세서 ${c.midspec}곳 · 명세서 본문 ${c.editor}곳) 부호는 유지됩니다.`,
+                                confirm: '함께 바꾸기', cancel: '이 항목만',
+                              },
+                              { theme: 'primary', onConfirm: (ctrl) => { ctrl.close(); onRenameEverywhere(old, nw); } },
+                            );
+                          }}
                         />
                       ) : (
                         <span className="text-xs2 text-gray-800 font-medium truncate block">{item.value_ko || <span className="text-gray-300">—</span>}</span>
@@ -2958,11 +3029,12 @@ interface DepGroupState { generated: boolean; items: DepItemState[]; newText: st
 // 선택된 세트의 각 claim별 종속항 그룹 (key: claimIndex 숫자)
 type DepGroupsForSet = Record<number, DepGroupState>;
 
-function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
+function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] }: {
   done: boolean;
   onConfirm: () => void;
   onUpdate: (v: string) => void;
   onActionChange?: (a: StepAction | null) => void;   // 하단 바 주 동작 등록 (U1/D3)
+  elements?: ElementLike[];                          // 구성요소 하이라이트용 원천
 }) {
   const [claimsPhase, setClaimsPhase] = useState<'indep' | 'dep'>('indep');
   const [claimSets] = useState(MOCK_INDEPENDENT_CLAIM_SETS);
@@ -3340,7 +3412,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
                           ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                         />
                       ) : (
-                        <p className="text-sm2 text-gray-600 leading-relaxed line-clamp-3">{text}</p>
+                        <p className="text-sm2 text-gray-600 leading-relaxed line-clamp-3"><ElementText text={text} elements={elements} /></p>
                       )}
                       {aiKey === `indep-${setIdx}-${ci}` && isSelected && !done && (
                         <InlineAiEdit
@@ -3455,7 +3527,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
                   />
                 )}
               </div>
-              <p className="text-sm2 text-gray-700 leading-relaxed whitespace-pre-wrap px-1">{claimText}</p>
+              <p className="text-sm2 text-gray-700 leading-relaxed whitespace-pre-wrap px-1"><ElementText text={claimText} elements={elements} /></p>
               {aiKey === `indepB-${ci}` && !done && (
                 <InlineAiEdit
                   placeholder="이 독립항을 어떻게 수정할지 지시해주세요"
@@ -3546,7 +3618,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
                           ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                         />
                       ) : (
-                        <p className="text-sm2 text-gray-700 leading-relaxed">{displayText}</p>
+                        <p className="text-sm2 text-gray-700 leading-relaxed"><ElementText text={displayText} elements={elements} /></p>
                       )}
                       {/* 선행 근거 경고 — "상기 X"가 인용 독립항에 없으면 표시 (A2) */}
                       {dep.sel && (() => {
@@ -3621,8 +3693,9 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
 }
 
 // ── 중간명세서 패널 (#22) ─────────────────────────────────────────────────────
-function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange }: {
+function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange, elements = [] }: {
   done: boolean;
+  elements?: ElementLike[];
   sections: MidspecSection[];
   onUpdate: (next: MidspecSection[]) => void;
   onGoToEditor?: () => void;
@@ -3761,7 +3834,7 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange }
                   ) : (
                     <>
                     <div className="flex gap-2 px-3 py-2">
-                      <p className="flex-1 text-sm2 text-gray-700 leading-relaxed whitespace-pre-wrap">{block.content}</p>
+                      <p className="flex-1 text-sm2 text-gray-700 leading-relaxed whitespace-pre-wrap"><ElementText text={block.content} elements={elements} /></p>
                       {!done && (
                         <div className={clsx(
                           'flex items-center gap-1 shrink-0 self-start transition-opacity',
