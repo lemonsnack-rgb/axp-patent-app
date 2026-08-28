@@ -17,8 +17,11 @@ import { PreviewModal } from '../components/PreviewModal';
 import type { PreviewSection } from '../components/PreviewModal';
 import {
   routeIntent, buildProposal, EDIT_ACTION_LABEL, INTENT_LABEL,
-  type EditProposal, type PlanStepDef, type AgentIntent,
+  resolveEditIntent, progressStepsFor, buildExpressionReplacements,
+  type EditProposal, type PlanStepDef, type AgentIntent, type RoutedIntent,
+  type ExpressionReplacement, type ProgressStep,
 } from '../features/ai/specAgentMock';
+import { toast } from '../components/Toast';
 import { exportDocx } from '../utils/exportDocx';
 import { exportPdf } from '../utils/exportPdf';
 
@@ -305,6 +308,157 @@ const TableIcon = () => (
   </svg>
 );
 
+// ── 단어 단위 diff (데모 정합: 제안 카드 Before/After 하이라이트) ────────────
+type DiffSeg = { text: string; type: 'same' | 'removed' | 'added' };
+
+function diffWords(source: string, target: string): { before: DiffSeg[]; after: DiffSeg[] } {
+  const tok = (s: string) => s.split(/(\s+)/).filter(t => t.length > 0);
+  const a = tok(source), b = tok(target);
+  // 아주 긴 텍스트는 diff 생략 (성능)
+  if (a.length * b.length > 250000) {
+    return { before: [{ text: source, type: 'removed' }], after: [{ text: target, type: 'added' }] };
+  }
+  const m = a.length, n = b.length;
+  const dp: Uint16Array[] = Array.from({ length: m + 1 }, () => new Uint16Array(n + 1));
+  for (let i = m - 1; i >= 0; i--) {
+    for (let j = n - 1; j >= 0; j--) {
+      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  const before: DiffSeg[] = [], after: DiffSeg[] = [];
+  const push = (arr: DiffSeg[], text: string, type: DiffSeg['type']) => {
+    const last = arr[arr.length - 1];
+    if (last && last.type === type) last.text += text;
+    else arr.push({ text, type });
+  };
+  let i = 0, j = 0;
+  while (i < m && j < n) {
+    if (a[i] === b[j]) { push(before, a[i], 'same'); push(after, b[j], 'same'); i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) { push(before, a[i], 'removed'); i++; }
+    else { push(after, b[j], 'added'); j++; }
+  }
+  while (i < m) { push(before, a[i], 'removed'); i++; }
+  while (j < n) { push(after, b[j], 'added'); j++; }
+  return { before, after };
+}
+
+function DiffText({ segs, mode }: { segs: DiffSeg[]; mode: 'before' | 'after' }) {
+  return (
+    <>
+      {segs.map((s, i) => s.type === 'same'
+        ? <span key={i}>{s.text}</span>
+        : mode === 'before'
+          ? <span key={i} className="bg-red-100 text-red-700 line-through rounded-sm">{s.text}</span>
+          : <span key={i} className="bg-emerald-100 text-emerald-800 rounded-sm">{s.text}</span>)}
+    </>
+  );
+}
+
+// ── 수정 제안 카드 (데모 정합: 단어 diff · 확대 · ACCEPT/DECLINE · 보강 지시) ──
+function ProposalCard({ p, onAccept, onDecline, onRefine, onZoom }: {
+  p: EditProposal;
+  onAccept: () => void;
+  onDecline: () => void;
+  onRefine: (instruction: string) => void;
+  onZoom: () => void;
+}) {
+  const [refine, setRefine] = useState('');
+  const diff = (p.action === 'REPLACE' || p.action === 'REWRITE')
+    ? diffWords(p.source, p.target)
+    : null;
+  const sendRefine = () => {
+    const v = refine.trim();
+    if (!v) return;
+    setRefine('');
+    onRefine(v);
+  };
+  return (
+    <div data-spec="SPC-EDT-031" className="rounded-lg bg-white border border-zinc-200 p-2.5">
+      <div className="flex items-center gap-1.5 mb-1">
+        <span className={clsx('px-1.5 py-0.5 rounded text-[10px] font-bold',
+          p.action === 'DELETE' ? 'bg-red-100 text-red-600'
+          : p.action === 'INSERT' ? 'bg-emerald-100 text-emerald-700'
+          : p.action === 'REWRITE' ? 'bg-amber-100 text-amber-700'
+          : 'bg-blue-100 text-blue-700')}>
+          {EDIT_ACTION_LABEL[p.action]}
+        </span>
+        <span className="text-[11px] text-zinc-500 truncate">{p.targetDesc}</span>
+        <button onClick={onZoom} className="ml-auto shrink-0 text-[11px] text-zinc-400 hover:text-blue-600 transition-colors" title="크게 보기">↗ 확대</button>
+      </div>
+      {p.summary && <p className="text-[11px] text-zinc-400 mb-1.5">{p.summary}</p>}
+      {p.action !== 'INSERT' && p.source && (
+        <div className="mb-1">
+          <p className="text-[10px] text-zinc-400 mb-0.5">Before</p>
+          <p className="text-xs2 leading-relaxed rounded px-2 py-1 bg-red-50/60 text-zinc-700 whitespace-pre-wrap max-h-32 overflow-y-auto scroll-thin">
+            {diff ? <DiffText segs={diff.before} mode="before" /> : <span className="bg-red-100 text-red-700 line-through">{p.source}</span>}
+          </p>
+        </div>
+      )}
+      {p.action !== 'DELETE' && (
+        <div>
+          <p className="text-[10px] text-zinc-400 mb-0.5">After</p>
+          <p className="text-xs2 leading-relaxed rounded px-2 py-1 bg-emerald-50/60 text-zinc-700 whitespace-pre-wrap max-h-32 overflow-y-auto scroll-thin">
+            {diff ? <DiffText segs={diff.after} mode="after" /> : <span className="bg-emerald-100 text-emerald-800">{p.target}</span>}
+          </p>
+        </div>
+      )}
+      <div className="flex gap-1.5 mt-2" data-spec="SPC-EDT-032">
+        {p.status === 'pending' ? (
+          <>
+            <button onClick={onAccept} className="flex-1 py-1 text-xs2 font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">✓ 반영</button>
+            <button onClick={onDecline} className="flex-1 py-1 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50">✕ 무시</button>
+          </>
+        ) : (
+          <span className={clsx('text-xs2 font-semibold', p.status === 'accepted' ? 'text-emerald-600' : 'text-zinc-400')}>
+            {p.status === 'accepted' ? '✓ 반영됨' : '✕ 무시됨'}
+          </span>
+        )}
+      </div>
+      {/* 보강 지시 — 데모 정합: "대신 이렇게 해줘" 재지시 */}
+      {p.status === 'pending' && (
+        <div className="flex gap-1 mt-1.5">
+          <input
+            className="flex-1 min-w-0 text-[11px] px-2 py-1 border border-zinc-200 rounded-lg bg-zinc-50 outline-none focus:border-blue-400 focus:bg-white transition-colors"
+            placeholder="대신 이렇게 해줘 (보강 지시)..."
+            value={refine}
+            onChange={e => setRefine(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); sendRefine(); } }}
+          />
+          <button
+            onClick={sendRefine}
+            disabled={!refine.trim()}
+            className="shrink-0 text-[11px] font-semibold px-2 py-1 rounded-lg bg-zinc-800 text-white hover:bg-zinc-700 disabled:opacity-40 transition-colors"
+          >보내기</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── 요청 분석 진행 트리 (데모 SSE 진행 이벤트 정합) ─────────────────────────
+function ThinkingProgress({ steps, done }: { steps: ProgressStep[]; done: number }) {
+  return (
+    <div className="rounded-xl px-3 py-2 bg-zinc-100 border border-zinc-200">
+      <p className="text-[11px] font-semibold text-zinc-500 mb-1">요청 분석 중...</p>
+      <div className="space-y-0.5">
+        {steps.slice(0, done + 1).map((s, i) => {
+          const finished = i < done;
+          return (
+            <div key={i} className="flex items-center gap-1.5" style={{ paddingLeft: s.depth * 14 }}>
+              {finished ? (
+                <span className="text-emerald-600 text-[10px] shrink-0">✓</span>
+              ) : (
+                <span className="w-2.5 h-2.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin shrink-0 inline-block" />
+              )}
+              <span className={clsx('text-[11px]', finished ? 'text-zinc-400' : 'text-blue-700 font-semibold')}>{s.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── 메인 컴포넌트 ──────────────────────────────────────────────────────────
 export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context, confirmedClaimsText }: {
   task: any
@@ -320,7 +474,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
   // ── 초기 콘텐츠 헬퍼 (MidspecSection 기반) ──
   function getMidspecText(key: string): string {
     const section = midspec?.find(s => s.key === key)
-    return section?.blocks.map(b => b.text).join('\n\n') ?? ''
+    return section?.blocks.map(b => b.content).join('\n\n') ?? ''
   }
 
   function getInitialContent(
@@ -372,24 +526,55 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
   // 모바일 AI 패널 오픈 상태
   const [mobileAiOpen, setMobileAiOpen] = useState(false);
 
-  // 채팅 UI — 개발노트 ChatMessage 정합(intent / edit_proposals / plan)
+  // 채팅 UI — API SpecificationEditorChatMessage 정합(intent / edit_proposals / expression_replacements / plan)
   type ChatMsg = {
     id: number;
     role: 'user' | 'ai';
     text: string;
-    intent?: AgentIntent;                                    // 라우팅된 의도 (edit/clarify/answer/plan/terminate)
+    intent?: AgentIntent;                                    // 라우팅된 의도 (answer/clarify/edit_body/edit_claims/edit_drawing_description/plan/replace_expression/terminate)
     refs?: { sid: SectionId; idx: number }[];                // 대상 단락
     proposals?: EditProposal[];                              // 블록 수정 제안 (action·diff·status)
+    replacements?: ExpressionReplacement[];                  // 용어 교체 제안 (replace_expression)
     intentOptions?: string[];                                // clarify 선택지
     sourceMsg?: string;                                      // 재생성/플랜용 원본 지시
     plan?: { steps: PlanStepDef[]; current: number; status: 'running' | 'stopped' | 'done' };
   };
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
   const [chatInput, setChatInput] = useState('');
-  const [aiThinking, setAiThinking] = useState(false);
+  // 요청 분석 진행 트리 (데모 SSE 진행 이벤트 정합) — null이면 대기 상태
+  const [thinking, setThinking] = useState<{ steps: ProgressStep[]; done: number } | null>(null);
+  const aiThinking = thinking !== null;
+  const thinkingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 진행 트리를 단계별로 애니메이션한 뒤 결과를 push
+  const runThinking = (steps: ProgressStep[], onDone: () => void) => {
+    if (thinkingTimerRef.current) clearInterval(thinkingTimerRef.current);
+    setThinking({ steps, done: 0 });
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    let d = 0;
+    thinkingTimerRef.current = setInterval(() => {
+      d++;
+      if (d >= steps.length) {
+        if (thinkingTimerRef.current) clearInterval(thinkingTimerRef.current);
+        thinkingTimerRef.current = null;
+        setThinking(null);
+        onDone();
+      } else {
+        setThinking({ steps, done: d });
+      }
+    }, 450);
+  };
+  useEffect(() => () => { if (thinkingTimerRef.current) clearInterval(thinkingTimerRef.current); }, []);
   const chatTextareaRef = useRef<HTMLTextAreaElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const msgIdRef = useRef(0);
+  // 버전 기록 — 데모 정합: 초기 버전 + AI 수정 적용 이력
+  type VersionEntry = { time: string; label: string };
+  const nowHM = () => { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  const [versions, setVersions] = useState<VersionEntry[]>([{ time: nowHM(), label: '초기 버전' }]);
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const pushVersion = (label: string) => setVersions(v => [...v, { time: nowHM(), label }]);
+  // 제안 확대 보기 모달
+  const [zoomProposal, setZoomProposal] = useState<EditProposal | null>(null);
 
   useEffect(() => {
     const el = chatTextareaRef.current;
@@ -551,6 +736,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       return next;
     });
     setProposalStatus(msgId, pi, 'accepted');
+    pushVersion(`AI 수정 적용 (${p.action})`);
   };
   const declineProposal = (msgId: number, pi: number) => setProposalStatus(msgId, pi, 'declined');
 
@@ -559,14 +745,61 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     setChatMessages(prev => [...prev, { id: ++msgIdRef.current, role: 'ai', ...partial }]);
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
   };
-  // ── 선택 단락별 수정 제안 생성(edit) ───────────────────────────────────
+  // ── 선택 단락별 수정 제안 생성(edit_body / edit_claims / edit_drawing_description) ──
   const pushEditProposals = (instruction: string, refs: { sid: SectionId; idx: number }[]) => {
     const proposals = refs.map(r => buildProposal(
       r.sid, r.idx,
       EDITOR_SECTIONS.find(s => s.id === r.sid)?.label ?? r.sid,
       blocks[r.sid]?.[r.idx] || '', instruction,
     ));
-    pushAi({ text: `요청하신 내용을 반영하여 ${proposals.length}건의 수정을 제안합니다.`, intent: 'edit', proposals, refs, sourceMsg: instruction });
+    const intent = resolveEditIntent(refs.map(r => r.sid));
+    pushAi({ text: `요청하신 내용을 반영하여 ${proposals.length}건의 수정을 제안합니다.`, intent, proposals, refs, sourceMsg: instruction });
+  };
+
+  // ── 제안별 보강 지시("대신 이렇게 해줘") — 해당 제안만 재생성 ────────────
+  const refineProposal = (msgId: number, pi: number, refineInstr: string) => {
+    setChatMessages(prev => prev.map(m => {
+      if (m.id !== msgId || !m.proposals) return m;
+      const proposals = m.proposals.map((p, i) => {
+        if (i !== pi) return p;
+        const original = blocks[p.sid as SectionId]?.[p.idx] ?? p.source;
+        // 보강 지시를 우선 반영 (원 지시는 뒤에 유지) — mock 수정문구에 보강 내용이 드러나도록
+        const combined = m.sourceMsg ? `${refineInstr} · ${m.sourceMsg}` : refineInstr;
+        return { ...buildProposal(p.sid, p.idx, p.targetDesc.split(' ')[0].replace(/['"]/g, '') || p.sid, original, combined), targetDesc: p.targetDesc, status: 'pending' as const };
+      });
+      return { ...m, proposals };
+    }));
+    toast('보강 지시를 반영해 제안을 다시 생성했습니다');
+  };
+
+  // ── 용어 교체(replace_expression) 반영 — 문서 전체 치환 ──────────────────
+  const applyReplacement = (msgId: number, ri: number) => {
+    const m = chatMessages.find(x => x.id === msgId);
+    const r = m?.replacements?.[ri];
+    if (!r) return;
+    setUndoStack(s => [...s.slice(-20), blocks]);
+    setRedoStack([]);
+    setBlocks(prev => {
+      const updated = {} as Record<SectionId, string[]>;
+      (Object.keys(prev) as SectionId[]).forEach(sid => {
+        updated[sid] = prev[sid].map(b => b.split(r.source).join(r.target));
+      });
+      if (task?.id) {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() => saveSpecState(task.id, { editorBlocks: updated as any }), 500);
+      }
+      return updated;
+    });
+    setChatMessages(prev => prev.map(x => x.id === msgId
+      ? { ...x, replacements: x.replacements?.map((rr, i) => i === ri ? { ...rr, status: 'accepted' as const } : rr) }
+      : x));
+    pushVersion(`용어 교체 (${r.source} → ${r.target})`);
+    toast('용어가 교체되었습니다');
+  };
+  const declineReplacement = (msgId: number, ri: number) => {
+    setChatMessages(prev => prev.map(x => x.id === msgId
+      ? { ...x, replacements: x.replacements?.map((rr, i) => i === ri ? { ...rr, status: 'declined' as const } : rr) }
+      : x));
   };
 
   const undo = () => {
@@ -664,15 +897,28 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     });
 
     setChatMessages(prev => [...prev, { id: ++msgIdRef.current, role: 'user', text: msg }]);
-    setAiThinking(true);
 
-    setTimeout(() => {
-      setAiThinking(false);
-      const route = routeIntent(msg, { hasSelection: refs.length > 0 });
-      // 청구항 언급 시 — 청구항은 전용 에디터라 selSet 선택 없이도 '독립항→종속항' 파이프라인으로 처리(전체 세트 단위)
-      const mentionsClaims = /청구항|독립항|종속항|claim/i.test(msg) || refs.some(r => r.sid === 'claims');
+    const route = routeIntent(msg, { hasSelection: refs.length > 0 });
+    // 청구항 언급 시 — 청구항은 전용 에디터라 selSet 선택 없이도 '독립항→종속항' 파이프라인으로 처리(전체 세트 단위)
+    const mentionsClaims = /청구항|독립항|종속항|claim/i.test(msg) || refs.some(r => r.sid === 'claims');
+    // 진행 트리용 intent 확정 (edit → 대상 섹션으로 세분화)
+    const progressIntent: RoutedIntent =
+      route.intent === 'terminate' || route.intent === 'answer' ? route.intent
+      : mentionsClaims && route.intent !== 'clarify' ? 'edit_claims'
+      : route.intent === 'edit' ? resolveEditIntent(refs.map(r => r.sid))
+      : route.intent;
+
+    // 요청 분석 진행 트리 표출 후 결과 push (데모 SSE 정합)
+    runThinking(progressStepsFor(progressIntent), () => {
       if (route.intent === 'terminate' || route.intent === 'answer') {
         pushAi({ text: route.answer ?? generateWholeDocReply(msg), intent: route.intent });
+      } else if (route.intent === 'replace_expression') {
+        const reps = buildExpressionReplacements(msg, Object.values(blocks).flat().join('\n'));
+        if (reps.length) {
+          pushAi({ text: `문서 전체에서 ${reps.length}건의 용어(표현) 교체를 제안합니다. 각 항목을 반영하거나 무시하세요.`, intent: 'replace_expression', replacements: reps, sourceMsg: msg });
+        } else {
+          pushAi({ text: '문서에서 교체가 필요한 용어를 찾지 못했습니다. "A를 B로 바꿔줘"처럼 구체적으로 지시하면 해당 표현을 일괄 교체합니다.', intent: 'answer' });
+        }
       } else if (mentionsClaims) {
         // 청구항 수정 — 개발노트: 독립항 → 종속항 순으로 고정 파이프라인 (전체 세트 단위)
         const claimRefs = (blocks['claims'] && blocks['claims'].length) ? [{ sid: 'claims' as SectionId, idx: 0 }] : [];
@@ -693,7 +939,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       } else {
         pushEditProposals(msg, refs);
       }
-    }, 500);
+    });
   };
 
   // ── clarify 선택지 선택 → 해당 방향으로 진행 ───────────────────────────
@@ -821,6 +1067,43 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       />
     )}
 
+    {/* 수정 제안 확대 보기 — Before/After 전체 diff */}
+    {zoomProposal && (
+      <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-6" onClick={() => setZoomProposal(null)}>
+        <div className="bg-white rounded-2xl shadow-card-deep max-w-3xl w-full max-h-[82vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-200 shrink-0">
+            <span className={clsx('px-1.5 py-0.5 rounded text-[10px] font-bold',
+              zoomProposal.action === 'DELETE' ? 'bg-red-100 text-red-600'
+              : zoomProposal.action === 'INSERT' ? 'bg-emerald-100 text-emerald-700'
+              : zoomProposal.action === 'REWRITE' ? 'bg-amber-100 text-amber-700'
+              : 'bg-blue-100 text-blue-700')}>
+              {EDIT_ACTION_LABEL[zoomProposal.action]}
+            </span>
+            <span className="text-sm2 font-semibold text-zinc-700">{zoomProposal.targetDesc}</span>
+            <button onClick={() => setZoomProposal(null)} className="ml-auto text-zinc-400 hover:text-zinc-600 text-sm px-1">✕</button>
+          </div>
+          <div className="flex-1 overflow-y-auto scroll-thin p-4 space-y-3">
+            {zoomProposal.action !== 'INSERT' && zoomProposal.source && (
+              <div>
+                <p className="text-xs2 font-semibold text-zinc-400 mb-1">Before</p>
+                <p className="text-sm2 leading-relaxed rounded-lg px-3 py-2 bg-red-50/60 text-zinc-700 whitespace-pre-wrap">
+                  <DiffText segs={diffWords(zoomProposal.source, zoomProposal.target).before} mode="before" />
+                </p>
+              </div>
+            )}
+            {zoomProposal.action !== 'DELETE' && (
+              <div>
+                <p className="text-xs2 font-semibold text-zinc-400 mb-1">After</p>
+                <p className="text-sm2 leading-relaxed rounded-lg px-3 py-2 bg-emerald-50/60 text-zinc-700 whitespace-pre-wrap">
+                  <DiffText segs={diffWords(zoomProposal.source, zoomProposal.target).after} mode="after" />
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+
     {/* 구성요소 이름 일괄 변경 모달 */}
     {renamingComp && (
       <div
@@ -941,6 +1224,31 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><path d="M9 2v4h4"/><path d="M5.5 9.5h5M5.5 11.5h3"/></svg>
             <span>PDF</span>
           </button>
+          <div className="w-px h-5 bg-zinc-200 mx-1" />
+          {/* 버전 기록 — 데모 정합: AI 수정 반영 이력 */}
+          <div className="relative">
+            <button onClick={() => setVersionsOpen(o => !o)} title="버전 기록 (AI 수정 반영 이력)"
+              className={clsx('flex items-center gap-1 px-2 py-1 rounded transition-colors text-xs2', versionsOpen ? 'bg-blue-50 text-blue-700' : 'hover:bg-zinc-100 text-zinc-500')}>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="13" height="13"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5V8l2.5 1.5"/></svg>
+              <span>버전</span>
+              <span className="text-[10px] px-1 rounded bg-zinc-100 text-zinc-500 font-semibold">{versions.length}</span>
+            </button>
+            {versionsOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setVersionsOpen(false)} />
+                <div className="absolute left-0 top-full mt-1 z-20 w-64 max-h-72 overflow-y-auto scroll-thin rounded-lg border border-zinc-200 bg-white shadow-lg py-1">
+                  <p className="px-3 py-1.5 text-[10px] font-bold text-zinc-400 border-b border-zinc-100">버전 기록</p>
+                  {[...versions].reverse().map((v, i) => (
+                    <div key={versions.length - 1 - i} className="px-3 py-1.5 flex items-center gap-2 text-xs2">
+                      <span className="font-semibold text-zinc-600 shrink-0">{v.time}</span>
+                      <span className="text-zinc-500 truncate">{v.label}</span>
+                      {i === 0 && <span className="ml-auto shrink-0 text-[10px] px-1 rounded bg-emerald-50 text-emerald-600 font-semibold">현재</span>}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1324,9 +1632,10 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                         {m.intent && (
                           <div className="px-3 pt-2">
                             <span className={clsx('inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold',
-                              m.intent === 'edit' ? 'bg-blue-100 text-blue-700'
+                              m.intent.startsWith('edit') ? 'bg-blue-100 text-blue-700'
                               : m.intent === 'plan' ? 'bg-violet-100 text-violet-700'
                               : m.intent === 'clarify' ? 'bg-amber-100 text-amber-700'
+                              : m.intent === 'replace_expression' ? 'bg-cyan-100 text-cyan-700'
                               : m.intent === 'terminate' ? 'bg-gray-200 text-gray-500'
                               : 'bg-emerald-100 text-emerald-700')}>
                               {INTENT_LABEL[m.intent]}
@@ -1377,42 +1686,19 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                           </div>
                         )}
 
-                        {/* 수정 제안 카드 (블록 단위 · action·diff·Accept/Decline) */}
+                        {/* 수정 제안 카드 (블록 단위 · 단어 diff · 확대 · Accept/Decline · 보강 지시) */}
                         {m.proposals && m.proposals.length > 0 && (
                           <>
                             <div className="mx-2.5 mb-2 space-y-1.5">
                               {m.proposals.map((p, pi) => (
-                                <div key={pi} data-spec="SPC-EDT-031" className="rounded-lg bg-white border border-zinc-200 p-2.5">
-                                  <div className="flex items-center gap-1.5 mb-1">
-                                    <span className={clsx('px-1.5 py-0.5 rounded text-[10px] font-bold',
-                                      p.action === 'DELETE' ? 'bg-red-100 text-red-600'
-                                      : p.action === 'INSERT' ? 'bg-emerald-100 text-emerald-700'
-                                      : p.action === 'REWRITE' ? 'bg-amber-100 text-amber-700'
-                                      : 'bg-blue-100 text-blue-700')}>
-                                      {EDIT_ACTION_LABEL[p.action]}
-                                    </span>
-                                    <span className="text-[11px] text-zinc-500 truncate">{p.targetDesc}</span>
-                                  </div>
-                                  <p className="text-[11px] text-zinc-400 mb-1.5">{p.summary}</p>
-                                  {p.action !== 'INSERT' && p.source && (
-                                    <p className="text-xs2 leading-relaxed rounded px-2 py-1 mb-1 bg-red-50 text-red-700 line-through whitespace-pre-wrap">{p.source}</p>
-                                  )}
-                                  {p.action !== 'DELETE' && (
-                                    <p className="text-xs2 leading-relaxed rounded px-2 py-1 bg-emerald-50 text-emerald-800 whitespace-pre-wrap">{p.target}</p>
-                                  )}
-                                  <div className="flex gap-1.5 mt-2" data-spec="SPC-EDT-032">
-                                    {p.status === 'pending' ? (
-                                      <>
-                                        <button onClick={() => acceptProposal(m.id, pi)} className="flex-1 py-1 text-xs2 font-semibold bg-brand-400 text-white rounded-lg hover:bg-brand-400">✓ 반영</button>
-                                        <button onClick={() => declineProposal(m.id, pi)} className="flex-1 py-1 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50">✕ 무시</button>
-                                      </>
-                                    ) : (
-                                      <span className={clsx('text-xs2 font-semibold', p.status === 'accepted' ? 'text-blue-600' : 'text-zinc-400')}>
-                                        {p.status === 'accepted' ? '✓ 반영됨' : '✕ 무시됨'}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
+                                <ProposalCard
+                                  key={pi}
+                                  p={p}
+                                  onAccept={() => acceptProposal(m.id, pi)}
+                                  onDecline={() => declineProposal(m.id, pi)}
+                                  onRefine={instr => refineProposal(m.id, pi, instr)}
+                                  onZoom={() => setZoomProposal(p)}
+                                />
                               ))}
                             </div>
                             <div className="px-2.5 pb-2.5">
@@ -1420,21 +1706,42 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             </div>
                           </>
                         )}
+
+                        {/* 용어(표현) 교체 제안 — API ExpressionReplacement 정합 */}
+                        {m.replacements && m.replacements.length > 0 && (
+                          <div className="mx-2.5 mb-2.5 space-y-1.5">
+                            {m.replacements.map((r, ri) => (
+                              <div key={ri} className="rounded-lg bg-white border border-zinc-200 px-2.5 py-2 flex items-center gap-2">
+                                <span className="text-xs2 bg-red-50 text-red-600 line-through rounded px-1.5 py-0.5 shrink-0 max-w-[38%] truncate" title={r.source}>{r.source}</span>
+                                <span className="text-zinc-400 text-xs2 shrink-0">→</span>
+                                <span className="text-xs2 bg-emerald-50 text-emerald-700 rounded px-1.5 py-0.5 shrink-0 max-w-[38%] truncate" title={r.target}>{r.target}</span>
+                                <div className="ml-auto flex gap-1 shrink-0">
+                                  {r.status === 'pending' ? (
+                                    <>
+                                      <button onClick={() => applyReplacement(m.id, ri)} className="px-2 py-0.5 text-[11px] font-semibold bg-emerald-600 text-white rounded hover:bg-emerald-700">반영</button>
+                                      <button onClick={() => declineReplacement(m.id, ri)} className="px-2 py-0.5 text-[11px] font-semibold text-zinc-500 bg-white border border-zinc-200 rounded hover:bg-zinc-50">무시</button>
+                                    </>
+                                  ) : (
+                                    <span className={clsx('text-[11px] font-semibold', r.status === 'accepted' ? 'text-emerald-600' : 'text-zinc-400')}>
+                                      {r.status === 'accepted' ? '✓ 반영됨' : '✕ 무시됨'}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
                 ))}
-                {aiThinking && (
+                {thinking && (
                   <div className="flex gap-2 justify-start">
                     <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center shrink-0 mt-0.5">
                       <span className="text-[9px] font-bold text-white">AI</span>
                     </div>
-                    <div className="rounded-xl px-3 py-2 bg-zinc-100">
-                      <span className="inline-flex gap-1 items-center">
-                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-                      </span>
+                    <div className="max-w-[88%] flex-1">
+                      <ThinkingProgress steps={thinking.steps} done={thinking.done} />
                     </div>
                   </div>
                 )}
@@ -1453,10 +1760,10 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
               <Textarea
                 ref={chatTextareaRef}
                 className="flex-1 px-3 py-2"
-                placeholder={planRunning ? '플랜 진행 중 — 입력 잠금' : selSet.size > 0 ? `선택한 ${selSet.size}개 단락에 대해 명령하세요...` : "명령을 입력하세요... (Enter 전송)"}
+                placeholder={planRunning ? '플랜 진행 중 — 입력 잠금' : aiThinking ? '요청 분석 중...' : selSet.size > 0 ? `선택한 ${selSet.size}개 단락에 대해 명령하세요...` : "명령을 입력하세요... (Enter 전송)"}
                 value={chatInput}
                 rows={2}
-                disabled={planRunning}
+                disabled={planRunning || aiThinking}
                 onChange={e => setChatInput(e.target.value)}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -1468,7 +1775,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
               />
               <button
                 onClick={() => sendChat()}
-                disabled={!chatInput.trim() || planRunning}
+                disabled={!chatInput.trim() || planRunning || aiThinking}
                 className="shrink-0 w-8 h-8 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center transition-colors">
                 <svg viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" width="13" height="13">
                   <path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z" fill="white" stroke="none"/>

@@ -15,8 +15,10 @@ import {
   MOCK_DRAWINGS,
   MOCK_EMBODIMENT,
   getMockExtractResult,
-  mockPartialModify,
 } from '../features/spec/mockAiService';
+import { generateMockModification } from '../features/ai/clarityAnalyzer';
+import { toast } from '../components/Toast';
+import { uid } from '../utils/uid';
 import type { DrawingItem as WorkflowDrawingItem } from '../features/drawing-workflow/types';
 import { openEditorTab, onEditorResult } from '../features/drawing-workflow/editorChannel';
 import type {
@@ -26,8 +28,8 @@ import type {
 } from '../features/spec/types';
 import { loadSpecState, saveSpecState } from '../features/spec/specStore';
 import {
-  routeIntent, buildProposal, EDIT_ACTION_LABEL, INTENT_LABEL,
-  type EditProposal, type AgentIntent,
+  routeIntent, INTENT_LABEL,
+  type AgentIntent,
 } from '../features/ai/specAgentMock';
 
 type StepId = SpecStepId;
@@ -79,13 +81,7 @@ export function SpecView() {
   const [mainView, setMainView] = useState<'analysis' | 'editor'>(savedSpec?.mainView ?? 'analysis');
   const handleSetMainView = (v: 'analysis' | 'editor') => setMainView(v);
   const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
-  const [specFocusCtx, setSpecFocusCtx] = useState<FocusCtx | null>(null);
-  // AI 수정 등으로 포커스 컨텍스트가 설정되면 모바일에서 AI 패널을 자동으로 연다
-  // (데스크톱은 패널이 상시 표시되어 영향 없음)
-  const focusForAi = (ctx: FocusCtx | null) => {
-    setSpecFocusCtx(ctx);
-    if (ctx) setMobileGuideOpen(true);
-  };
+  // AI 수정은 본문 내 삽입형(인라인)으로 통일 — 사이드패널로 포커스를 넘기지 않는다 (데모 정합)
   const guidePanelInputRef = useRef<HTMLTextAreaElement>(null);
   const [context, setContext] = useState<InventionContext>(
     savedSpec?.context ?? {
@@ -114,7 +110,7 @@ export function SpecView() {
   );
   const [aiComponents, setAiComponents] = useState<SpecComponentItem[]>(
     savedSpec?.context?.elements
-      ? savedSpec.context.elements.map((el, i) => ({ ...el, id: i + 1, depth: 0, sel: true }))
+      ? savedSpec.context.elements.map(el => ({ ...el, depth: 0, sel: true }))
       : []
   );
   const [analyzing, setAnalyzing] = useState(false);
@@ -198,7 +194,8 @@ export function SpecView() {
         const fallback = MOCK_MIDSPEC.find(s => s.key === 'drawing_descriptions')?.blocks ?? [];
         const drawingBlocks = specDrawings.length
           ? specDrawings.map(d => ({
-              text: `도 ${d.detail.symbol}은(는) ${d.detail.name || '발명의 구성'}을(를) 나타낸 도면이다.${d.isRepresentative ? ' (대표도면)' : ''}`,
+              id: uid(), type: 'text' as const,
+              content: `도 ${d.detail.symbol}은(는) ${d.detail.name || '발명의 구성'}을(를) 나타낸 도면이다.${d.isRepresentative ? ' (대표도면)' : ''}`,
             }))
           : fallback;
         const next = MOCK_MIDSPEC.map(s => s.key === 'drawing_descriptions' ? { ...s, blocks: drawingBlocks } : s);
@@ -565,8 +562,10 @@ export function SpecView() {
                             candidates={titleCandidates}
                             gSel={gSel}
                             setGSel={setGSel}
-                            setFocusCtx={focusForAi}
-                            guidePanelInputRef={guidePanelInputRef}
+                            onRegenerate={() => {
+                              setTitleCandidates(generateTitleCandidates({ title: diTitle, field: diField, content: diContent }));
+                              toast('명칭 후보를 다시 생성했습니다');
+                            }}
                           />
                         )}
                         {s.id === 'description' && (
@@ -579,11 +578,11 @@ export function SpecView() {
                             }))}
                             onChange={(type, idx, text) => setContext(p => ({
                               ...p,
-                              [type]: p[type].map((item, i) => i === idx ? { ...item, text } : item),
+                              [type]: p[type].map((item, i) => i === idx ? { ...item, content: text } : item),
                             }))}
                             onAdd={(type, text, label) => setContext(p => ({
                               ...p,
-                              [type]: [...p[type], { label, text }],
+                              [type]: [...p[type], { id: uid(), type: 'text' as const, label, content: text }],
                             }))}
                             onRemove={(type, idx) => setContext(p => ({
                               ...p,
@@ -605,8 +604,6 @@ export function SpecView() {
                               dst.splice(toIdx ?? dst.length, 0, m);
                               return { ...p, [fromType]: src, [toType]: dst };
                             })}
-                            setFocusCtx={focusForAi}
-                            guidePanelInputRef={guidePanelInputRef}
                           />
                         )}
                         {(s.id === 'images' || s.id === 'components' || s.id === 'drawings' || s.id === 'claims' || s.id === 'midspec') && (
@@ -632,7 +629,7 @@ export function SpecView() {
                                   setContext(p => ({
                                     ...p,
                                     elements: comps.filter(c => c.sel).map(c => ({
-                                      symbol: c.symbol, value_ko: c.value_ko, value_en: c.value_en,
+                                      id: c.id, symbol: c.symbol, value_ko: c.value_ko, value_en: c.value_en,
                                       description: c.description, hypernym_ko: c.hypernym_ko, hypernym_en: c.hypernym_en,
                                     })),
                                   }));
@@ -655,19 +652,15 @@ export function SpecView() {
                                 done={isDone}
                                 onConfirm={() => confirm('claims')}
                                 onUpdate={v => setGSel(p => ({ ...p, claims: v }))}
-                                onFocusContext={focusForAi}
-                                guidePanelInputRef={guidePanelInputRef}
                               />
                             )}
                             {s.id === 'midspec' && (
                               <MidspecPanel
                                 done={isDone}
-                                onFocusContext={focusForAi}
-                                guidePanelInputRef={guidePanelInputRef}
                                 sections={midspec ?? []}
                                 onUpdate={(next) => {
                                   setMidspec(next);
-                                  setGSel(p => ({ ...p, midspec: next.map(s => `【${s.label}】\n${s.blocks.map(b => b.text).join('\n')}`).join('\n\n') }));
+                                  setGSel(p => ({ ...p, midspec: next.map(s => `【${s.label}】\n${s.blocks.map(b => b.content).join('\n')}`).join('\n\n') }));
                                 }}
                                 onGoToEditor={() => {
                                   const embodimentSection: MidspecSection = {
@@ -792,8 +785,6 @@ export function SpecView() {
             confirmed={confirmed}
             mobileOpen={mobileGuideOpen}
             onMobileClose={() => setMobileGuideOpen(false)}
-            focusCtx={specFocusCtx}
-            setFocusCtx={focusForAi}
             chatInputRef={guidePanelInputRef}
           />
         )}
@@ -826,71 +817,300 @@ function AiMsg({ text }: { text: React.ReactNode }) {
 }
 
 // ── GuidePanel 공유 타입 ────────────────────────────────────────
-type FocusCtx = { text: string; label: string; apply: (newText: string) => void };
+// AI 수정은 본문 내 삽입형(인라인)으로 통일 — GuidePanel은 단계 안내 Q&A 전용
 type GuideChatMsg = {
   id: number;
   role: 'user' | 'ai';
   text: string;
   intent?: AgentIntent;                 // 라우팅된 의도
-  proposal?: EditProposal;              // 단일 섹션 수정 제안(action·diff·status)
   intentOptions?: string[];             // clarify 선택지
   sourceMsg?: string;
-  sourceFocusCtx?: FocusCtx;
 };
 
-// ── 텍스트 선택 AI 수정 팝오버 ──────────────────────────────────────────────
-type SelState = { start: number; end: number; originalValue: string; apply: (newText: string) => void; top: number; left: number } | null;
+// ── AI 수정 공통 UI (일관성: 동일 역할 버튼은 동일 형태·위치) ────────────────
+// - AiEditButton: 항목 단위 'AI 수정' 토글 — 항목 헤더 행의 우측 끝(ml-auto)에 배치
+// - AiGlobalBar : 단계 전체 대상 지시 입력 + '전체 AI 수정' — 목록 상단에 배치
+// 색상은 brand(#3B8EF5) 계열로 통일 (index.css btn-primary 규약)
+const AiIcon = ({ size = 9 }: { size?: number }) => (
+  <svg viewBox="0 0 16 16" fill="currentColor" width={size} height={size} aria-hidden="true"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
+);
 
-function TextSelectionPopover({
-  position, preview, onApply, onClose,
-}: {
-  position: { top: number; left: number };
-  preview: string;
-  onApply: (instruction: string) => void;
-  onClose: () => void;
+function AiEditButton({ active, onClick, title = 'AI 수정', className }: {
+  active?: boolean;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  title?: string;
+  className?: string;
 }) {
-  const [instruction, setInstruction] = useState('');
   return (
-    <div
-      style={{ position: 'fixed', top: position.top, left: position.left, zIndex: 9999 }}
-      className="bg-white border border-blue-200 rounded-xl shadow-xl px-3 py-2 flex items-center gap-2"
-      onMouseDown={e => e.preventDefault()}
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-pressed={!!active}
+      className={clsx(
+        'shrink-0 inline-flex items-center gap-1 h-6 px-2 rounded-lg text-xs2 font-medium border transition-colors',
+        active
+          ? 'bg-brand-400 border-brand-400 text-white'
+          : 'text-brand-500 border-brand-200 bg-white hover:bg-brand-50 hover:border-brand-300',
+        className,
+      )}
     >
-      <span className="text-xs2 text-gray-400 shrink-0 max-w-[80px] truncate">&ldquo;{preview}&rdquo;</span>
-      <input
-        autoFocus
-        className="text-xs2 border border-gray-200 rounded-lg px-2 py-1 outline-none w-32 focus:border-blue-400"
-        placeholder="수정 지시..."
-        value={instruction}
-        onChange={e => setInstruction(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter') { e.preventDefault(); onApply(instruction); }
-          if (e.key === 'Escape') { e.preventDefault(); onClose(); }
-        }}
-      />
-      <button
-        onClick={() => onApply(instruction)}
-        className="shrink-0 text-xs2 px-2.5 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-      >적용</button>
-      <button onClick={onClose} className="shrink-0 text-xs2 text-gray-400 hover:text-gray-600">✕</button>
+      <AiIcon />
+      AI 수정
+    </button>
+  );
+}
+
+// ── AI 수정 제안 확인 (사람이 확인 → 적용) ───────────────────────────────────
+// 데모(10.77.0.133:8002) renderPendingInto 정합: 제목 · N건 · 지시사항 · 항목별 Before/After · 설명(✦) · [취소][적용]
+// AI_EDIT_CONFIRM=false 로 바꾸면 확인 없이 즉시 반영(데모의 항목별 AI 수정 동작)으로 전환된다 — 호출부 수정 불필요.
+const AI_EDIT_CONFIRM = true;
+const AI_MOCK_DELAY_MS = 800;
+
+export type PendingChange = {
+  tag: '수정' | '추가' | '삭제';
+  label?: string;
+  before?: string;
+  after?: string;
+  explanation?: string;
+  apply?: () => void;   // 적용 시 실행 (호출부 내부용, 렌더되지 않음)
+};
+
+// mock 제안 생성 — 단일 텍스트 항목
+function proposeMock(original: string, instruction: string, label?: string, apply?: (next: string) => void): PendingChange {
+  const after = generateMockModification(original, instruction);
+  return {
+    tag: '수정', label, before: original, after,
+    explanation: `"${instruction.slice(0, 30)}${instruction.length > 30 ? '…' : ''}" 지시를 반영해 표현을 보완했습니다.`,
+    apply: apply ? () => apply(after) : undefined,
+  };
+}
+
+function AiPendingCard({ title, instruction, changes, onApply, onCancel, className }: {
+  title: string;
+  instruction: string;
+  changes: PendingChange[];
+  onApply: () => void;
+  onCancel: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={clsx('rounded-lg border border-brand-200 bg-white overflow-hidden', className)} onClick={e => e.stopPropagation()}>
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-brand-50/60 border-b border-brand-100">
+        <AiIcon />
+        <span className="text-xs2 font-semibold text-brand-600 shrink-0 whitespace-nowrap">{title}</span>
+        <span className="text-xs2 text-neutral-500 truncate">{changes.length}건 · 지시사항: {instruction}</span>
+      </div>
+      <div className="divide-y divide-neutral-100 max-h-[320px] overflow-y-auto scroll-thin">
+        {changes.map((c, i) => (
+          <div key={i} className="px-3 py-2 space-y-1">
+            <div className="flex items-center gap-1.5">
+              <span className={clsx(
+                'text-[10px] font-bold px-1.5 py-0.5 rounded',
+                c.tag === '추가' ? 'bg-green-50 text-green-700' : c.tag === '삭제' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-700',
+              )}>{c.tag}</span>
+              {c.label && <span className="text-xs2 font-semibold text-neutral-700">{c.label}</span>}
+            </div>
+            {c.before && (
+              <p className="text-xs2 leading-relaxed text-neutral-400 line-through decoration-neutral-300 whitespace-pre-wrap">{c.before}</p>
+            )}
+            {c.after && (
+              <p className="text-xs2 leading-relaxed text-neutral-800 bg-green-50/60 rounded px-2 py-1 whitespace-pre-wrap">{c.after}</p>
+            )}
+            {c.explanation && <p className="text-xs2 text-brand-500">✦ {c.explanation}</p>}
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center justify-end gap-1.5 px-3 py-2 border-t border-neutral-100 bg-neutral-50/60">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="inline-flex items-center h-7 px-2.5 rounded-lg text-xs2 text-neutral-500 border border-neutral-200 bg-white hover:bg-neutral-50 transition-colors"
+        >취소</button>
+        <button
+          type="button"
+          onClick={onApply}
+          disabled={!changes.length}
+          className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-xs2 font-semibold bg-brand-400 text-white hover:bg-brand-500 disabled:opacity-40 transition-colors"
+        >적용</button>
+      </div>
     </div>
   );
 }
 
+// 전체(단계 범위) AI 수정 바 — 입력 → 제안 생성(mock 지연) → AiPendingCard 확인 → 적용
+function AiGlobalBar({ placeholder, value, onChange, propose, onApply, title, doneMsg, disabled, className }: {
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+  propose: (instruction: string) => PendingChange[];   // 지시사항 → 변경 제안 목록 (mock)
+  onApply?: (changes: PendingChange[]) => void;        // 기본: 각 change.apply 실행
+  title: string;                                       // 제안 카드 제목 (예: 발명 설명 수정 제안)
+  doneMsg?: string;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<{ instruction: string; changes: PendingChange[] } | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const applyChanges = (changes: PendingChange[]) => {
+    if (onApply) onApply(changes); else changes.forEach(c => c.apply?.());
+    toast(doneMsg ?? '적용되었습니다');
+    setPending(null);
+    setStatus(null);
+    onChange('');
+  };
+  const submit = () => {
+    const instruction = value.trim();
+    if (!instruction || busy || disabled) return;
+    setBusy(true);
+    setStatus(null);
+    setPending(null);
+    setTimeout(() => {
+      const changes = propose(instruction);
+      setBusy(false);
+      if (!changes.length) { setStatus('변경이 필요 없다고 판단했습니다'); return; }
+      if (!AI_EDIT_CONFIRM) { applyChanges(changes); return; }
+      setPending({ instruction, changes });
+    }, AI_MOCK_DELAY_MS);
+  };
+  return (
+    <div className={clsx('space-y-2', className)}>
+      <div className="flex gap-2 items-center">
+        <input
+          className="flex-1 min-w-0 text-xs2 h-8 px-3 border border-neutral-200 rounded-lg bg-white outline-none placeholder:text-neutral-400 hover:border-neutral-300 focus:border-brand-400 focus:ring-[3px] focus:ring-brand-400/15 transition-all disabled:bg-neutral-50"
+          placeholder={placeholder}
+          value={value}
+          disabled={busy || disabled}
+          onChange={e => onChange(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
+        />
+        <button
+          type="button"
+          onClick={submit}
+          disabled={!value.trim() || busy || disabled}
+          className="shrink-0 inline-flex items-center gap-1 h-8 px-3 rounded-lg text-xs2 font-semibold bg-brand-400 text-white hover:bg-brand-500 disabled:opacity-40 transition-colors"
+        >
+          {busy ? (
+            <><span className="w-3 h-3 border-2 border-white/60 border-t-transparent rounded-full animate-spin inline-block" /> 수정안 생성 중...</>
+          ) : (
+            <><AiIcon /> 전체 AI 수정</>
+          )}
+        </button>
+      </div>
+      {status && <p className="text-xs2 text-neutral-500 px-1">{status}</p>}
+      {pending && (
+        <AiPendingCard
+          title={title}
+          instruction={pending.instruction}
+          changes={pending.changes}
+          onApply={() => applyChanges(pending.changes)}
+          onCancel={() => { setPending(null); setStatus('수정을 적용하지 않았습니다'); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── 본문 내 삽입형(인라인) AI 수정 입력 ─────────────────────────────────────
+// 데모 정합: 카드/블록의 'AI 수정' 클릭 → 그 자리에서 지시 입력 + 수정 요청/취소.
+// 사이드패널을 사용하지 않고, 요청 후 해당 항목만 교체된다.
+function InlineAiEdit({ placeholder, original, label, onApply, onClose, doneMsg }: {
+  placeholder: string;
+  original: string;                      // 수정 대상 원문 (제안 카드 Before)
+  label?: string;                        // 제안 카드 항목명 (예: 발명의 명칭)
+  onApply: (next: string) => void;       // 적용 시 호출
+  onClose: () => void;
+  doneMsg?: string;
+}) {
+  const [instruction, setInstruction] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<{ instruction: string; change: PendingChange } | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const apply = (change: PendingChange) => {
+    onApply(change.after ?? original);
+    toast(doneMsg ?? '항목이 수정되었습니다');
+    onClose();
+  };
+  const submit = () => {
+    const instr = instruction.trim();
+    if (!instr || busy) return;
+    setBusy(true);
+    setStatus(null);
+    setTimeout(() => {
+      const change = proposeMock(original, instr, label);
+      setBusy(false);
+      if (!AI_EDIT_CONFIRM) { apply(change); return; }
+      setPending({ instruction: instr, change });
+    }, AI_MOCK_DELAY_MS);
+  };
+  if (pending) {
+    return (
+      <AiPendingCard
+        className="mt-1.5"
+        title={`${label ?? '항목'} 수정 제안`}
+        instruction={pending.instruction}
+        changes={[pending.change]}
+        onApply={() => apply(pending.change)}
+        onCancel={() => { setPending(null); setStatus('수정을 적용하지 않았습니다 — 지시를 고쳐 다시 요청할 수 있습니다'); }}
+      />
+    );
+  }
+  return (
+    <div className="mt-1.5 rounded-lg border border-brand-200 bg-brand-50/50 p-2" onClick={e => e.stopPropagation()}>
+      <textarea
+        autoFocus
+        className="w-full text-xs2 bg-white border border-neutral-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-brand-400 focus:ring-[3px] focus:ring-brand-400/15 transition-all resize-none min-h-[40px]"
+        placeholder={placeholder}
+        rows={2}
+        value={instruction}
+        disabled={busy}
+        onChange={e => setInstruction(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
+          if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+        }}
+      />
+      <div className="flex items-center gap-1.5 mt-1.5">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={!instruction.trim() || busy}
+          className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-xs2 font-semibold bg-brand-400 text-white hover:bg-brand-500 disabled:opacity-40 transition-colors"
+        ><AiIcon /> 수정 요청</button>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={busy}
+          className="inline-flex items-center h-7 px-2.5 rounded-lg text-xs2 text-neutral-500 border border-neutral-200 bg-white hover:bg-neutral-50 disabled:opacity-40 transition-colors"
+        >취소</button>
+        {busy && (
+          <span className="flex items-center gap-1 text-xs2 text-brand-500 ml-1">
+            <span className="w-3 h-3 border-2 border-brand-400 border-t-transparent rounded-full animate-spin inline-block" />
+            수정안을 만들고 있습니다...
+          </span>
+        )}
+        {!busy && status && <span className="text-xs2 text-neutral-500 ml-1">{status}</span>}
+      </div>
+    </div>
+  );
+}
+
+
 // ── 발명의 명칭 후보 카드 (title + abstract) ──────────────────────
 function TitleCandidateCards({
-  candidates, gSel, setGSel, setFocusCtx, guidePanelInputRef,
+  candidates, gSel, setGSel, onRegenerate,
 }: {
   candidates: TitleCandidate[];
   gSel: Partial<Record<StepId, string>>;
   setGSel: React.Dispatch<React.SetStateAction<Partial<Record<StepId, string>>>>;
-  setFocusCtx: (ctx: FocusCtx | null) => void;
-  guidePanelInputRef: React.RefObject<HTMLTextAreaElement | null>;
+  onRegenerate?: () => void;
 }) {
-  const letters = ['A', 'B', 'C', 'D', 'E'];
   const curSel = gSel['title'] || '';
   const [titleEdits, setTitleEdits] = useState<Record<string, string>>({});
   const [abstractEdits, setAbstractEdits] = useState<Record<string, string>>({});
+  // 인라인 AI 수정 — 열린 대상 키 (`${후보id}-title` | `${후보id}-abstract`)
+  const [aiKey, setAiKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!gSel['title'] && candidates[0]) {
@@ -901,17 +1121,11 @@ function TitleCandidateCards({
   const isFromCandidates = (val: string) =>
     candidates.some(c => (titleEdits[c.id] ?? c.title) === val || c.title === val);
 
-  const requestAI = (text: string, label: string, applyFn: (t: string) => void) => {
-    setFocusCtx({ text, label, apply: applyFn });
-    setTimeout(() => guidePanelInputRef.current?.focus(), 50);
-  };
-
   return (
     <div className="space-y-2 mt-3">
-      {candidates.map((c, i) => {
+      {candidates.map(c => {
         const titleVal = titleEdits[c.id] ?? c.title;
         const abstractVal = abstractEdits[c.id] ?? c.summary;
-        const letter = letters[i] || String(i + 1);
         const isSelected = curSel === titleVal || curSel === c.title;
         return (
           <div
@@ -919,64 +1133,67 @@ function TitleCandidateCards({
             onClick={() => setGSel(p => ({ ...p, title: titleVal }))}
             className={clsx(
               'rounded-xl border-2 p-3 cursor-pointer transition-all bg-white',
-              isSelected && 'border-blue-600 bg-blue-50 shadow-sm',
-              !isSelected && 'border-zinc-200 hover:border-blue-300 hover:bg-blue-50/30',
+              isSelected && 'border-brand-400 bg-brand-50/60 shadow-sm',
+              !isSelected && 'border-zinc-200 hover:border-brand-300 hover:bg-brand-50/30',
             )}
           >
-            {/* 카드 헤더 — 라디오(단일 선택) + 후보 글자 */}
-            <div className="flex items-center gap-2 mb-2">
+            {/* 카드 헤더 — 라디오 + 명칭(선택 라벨) + AI 수정 (기호 라벨 없음: 명칭 자체가 선택 항목) */}
+            <div className="flex items-start gap-2">
               <span className={clsx(
-                'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0',
-                isSelected ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white',
+                'w-4 h-4 mt-0.5 rounded-full border-2 flex items-center justify-center shrink-0',
+                isSelected ? 'border-brand-400 bg-brand-400' : 'border-neutral-300 bg-white',
               )}>
                 {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
               </span>
-              <span className={clsx(
-                'w-5 h-5 rounded-full text-xs2 font-bold flex items-center justify-center shrink-0',
-                isSelected ? 'bg-brand-400 text-white' : 'bg-gray-200 text-gray-500',
-              )}>{letter}</span>
-              {isSelected && <span className="text-xs2 text-blue-600 font-semibold">✓ 선택됨</span>}
-            </div>
-            {/* 명칭 행 */}
-            <div className="flex items-start gap-2 mb-1.5">
-              <div className="flex-1 min-w-0">
-                <span className="text-xs2 text-gray-400 font-medium block mb-0.5">명칭</span>
-                <p className="text-sm2 font-semibold text-gray-800 leading-snug">{titleVal}</p>
-              </div>
-              <button
+              <p className="flex-1 min-w-0 text-sm2 font-semibold text-gray-800 leading-snug">{titleVal}</p>
+              <AiEditButton
+                active={aiKey === `${c.id}-title`}
                 onClick={e => {
                   e.stopPropagation();
                   setGSel(p => ({ ...p, title: titleVal }));
-                  requestAI(titleVal, '발명의 명칭', (newText) => {
+                  setAiKey(k => k === `${c.id}-title` ? null : `${c.id}-title`);
+                }}
+              />
+            </div>
+            {aiKey === `${c.id}-title` && (
+              <InlineAiEdit
+                placeholder="명칭을 어떻게 수정할지 지시해주세요 (예: 방법(method) 청구 관점으로 바꿔줘)"
+                onClose={() => setAiKey(null)}
+                original={titleVal}
+                label="발명의 명칭"
+                onApply={newText => {
                     setTitleEdits(prev => ({ ...prev, [c.id]: newText }));
                     setGSel(p => ({ ...p, title: newText }));
-                  });
-                }}
-                className="shrink-0 flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors mt-4"
-              >
-                <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                AI 수정
-              </button>
-            </div>
+                  }}
+                doneMsg="명칭이 수정되었습니다"
+              />
+            )}
             {/* 개요 행 */}
             <div className="flex items-start gap-2 pt-1.5 border-t border-gray-100">
               <div className="flex-1 min-w-0">
                 <span className="text-xs2 text-gray-400 font-medium block mb-0.5">개요</span>
                 <p className="text-xs2 text-gray-500 leading-relaxed">{abstractVal}</p>
               </div>
-              <button
+              <AiEditButton
+                active={aiKey === `${c.id}-abstract`}
                 onClick={e => {
                   e.stopPropagation();
-                  requestAI(abstractVal, '개요', (newText) => {
-                    setAbstractEdits(prev => ({ ...prev, [c.id]: newText }));
-                  });
+                  setAiKey(k => k === `${c.id}-abstract` ? null : `${c.id}-abstract`);
                 }}
-                className="shrink-0 flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors mt-4"
-              >
-                <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                AI 수정
-              </button>
+              />
             </div>
+            {aiKey === `${c.id}-abstract` && (
+              <InlineAiEdit
+                placeholder="개요를 어떻게 수정할지 지시해주세요"
+                onClose={() => setAiKey(null)}
+                original={abstractVal}
+                label="개요"
+                onApply={newText => {
+                    setAbstractEdits(prev => ({ ...prev, [c.id]: newText }));
+                  }}
+                doneMsg="개요가 수정되었습니다"
+              />
+            )}
             {/* 추천 이유 행 */}
             {c.reason && (
               <div className="pt-1.5 border-t border-gray-100 mt-1">
@@ -989,11 +1206,14 @@ function TitleCandidateCards({
       })}
       <div className={clsx(
         'rounded-xl border-2 p-3 bg-white transition-all',
-        !isFromCandidates(curSel) && curSel.trim() ? 'border-blue-600 bg-blue-50' : 'border-zinc-200',
+        !isFromCandidates(curSel) && curSel.trim() ? 'border-brand-400 bg-brand-50/60' : 'border-zinc-200',
       )}>
         <div className="flex items-center gap-2 mb-1.5">
-          <span className="w-5 h-5 rounded-full text-xs2 font-bold flex items-center justify-center shrink-0 bg-gray-200 text-gray-500">
-            {letters[candidates.length] || 'D'}
+          <span className={clsx(
+            'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0',
+            !isFromCandidates(curSel) && curSel.trim() ? 'border-brand-400 bg-brand-400' : 'border-neutral-300 bg-white',
+          )}>
+            {!isFromCandidates(curSel) && curSel.trim() && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
           </span>
           <span className="text-xs2 text-gray-500 font-semibold">직접 입력</span>
         </div>
@@ -1010,6 +1230,14 @@ function TitleCandidateCards({
           rows={2}
         />
       </div>
+      {onRegenerate && (
+        <div className="flex justify-end">
+          <button
+            onClick={onRegenerate}
+            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-xs2 font-medium text-brand-500 border border-brand-200 bg-white hover:bg-brand-50 transition-colors"
+          >↻ 후보 다시 생성</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1020,7 +1248,7 @@ const DESC_LABEL_MAP: Record<string, string> = {
 };
 
 function DescriptionItemCards({
-  previous, proposed, onToggle, onChange, onAdd, onRemove, onReorder, onMoveAcross, setFocusCtx, guidePanelInputRef,
+  previous, proposed, onToggle, onChange, onAdd, onRemove, onReorder, onMoveAcross,
 }: {
   previous: InventionDescriptionItem[];
   proposed: InventionDescriptionItem[];
@@ -1030,11 +1258,22 @@ function DescriptionItemCards({
   onRemove: (type: 'previous' | 'proposed', idx: number) => void;
   onReorder: (type: 'previous' | 'proposed', from: number, to: number) => void;
   onMoveAcross: (fromType: 'previous' | 'proposed', fromIdx: number, toIdx?: number) => void;
-  setFocusCtx?: (ctx: FocusCtx | null) => void;
-  guidePanelInputRef?: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const [tab, setTab] = useState<'previous' | 'proposed'>('proposed');
-  const [selState, setSelState] = useState<SelState>(null);
+  // 인라인 AI 수정 — 열린 카드 키 (`${type}-${idx}`)
+  const [aiKey, setAiKey] = useState<string | null>(null);
+  // 전체 AI 수정 바 (데모: "발명 설명 전반에 대한 AI 지시사항" + 전체 AI 수정)
+  const [globalInstr, setGlobalInstr] = useState('');
+  // 전체 AI 수정 제안 — 채택된 텍스트 항목 전부에 지시 반영 (표 항목 제외). 확인 후 적용은 AiGlobalBar가 담당.
+  const proposeGlobal = (instr: string): PendingChange[] =>
+    (['proposed', 'previous'] as const).flatMap(type => {
+      const items = type === 'proposed' ? proposed : previous;
+      return items.flatMap((item, idx) => {
+        if (item.adopted === false || item.type === 'table') return [];
+        const secKo = type === 'proposed' ? '제안기술' : '종래기술';
+        return [proposeMock(item.content, instr, `${secKo} · ${DESC_LABEL_MAP[item.label] ?? item.label}`, next => onChange(type, idx, next))];
+      });
+    });
   const [dragSrc, setDragSrc] = useState<{ type: 'previous' | 'proposed'; idx: number } | null>(null);
   const [dropHint, setDropHint] = useState<string | null>(null);
   const handleDrop = (toType: 'previous' | 'proposed', toIdx: number) => {
@@ -1140,36 +1379,47 @@ function DescriptionItemCards({
                       className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20 transition-colors" title="아래로">
                       <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 3l3 4 3-4"/></svg>
                     </button>
-                    {setFocusCtx && isAdopted && (
-                      <button
-                        onClick={() => {
-                          setFocusCtx({ text: item.text, label: sublabel, apply: (newText) => onChange(type, idx, newText) });
-                          setTimeout(() => guidePanelInputRef?.current?.focus(), 50);
-                        }}
-                        className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
-                      >
-                        <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                        AI 수정
-                      </button>
+                    {isAdopted && item.type !== 'table' && (
+                      <AiEditButton
+                        active={aiKey === `${type}-${idx}`}
+                        onClick={() => setAiKey(k => k === `${type}-${idx}` ? null : `${type}-${idx}`)}
+                      />
                     )}
                   </div>
                 </div>
+                {item.type === 'table' ? (
+                  // API InventionDescriptionItem type='table' — 표 항목 (데모 정합: 표 캡션 + 표 렌더)
+                  <div className={clsx(!isAdopted && 'opacity-60')}>
+                    {item.caption && (
+                      <p className="text-xs2 text-gray-500 mb-1">
+                        <span className="px-1 py-0.5 rounded bg-gray-100 text-gray-500 font-semibold mr-1">표 캡션</span>
+                        {item.caption}
+                      </p>
+                    )}
+                    <div
+                      className="desc-table overflow-x-auto text-xs2 text-gray-700 [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-zinc-300 [&_th]:bg-zinc-50 [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_td]:border [&_td]:border-zinc-200 [&_td]:px-2 [&_td]:py-1"
+                      dangerouslySetInnerHTML={{ __html: item.content }}
+                    />
+                  </div>
+                ) : (
                 <textarea
                   className="w-full text-sm2 text-gray-700 leading-relaxed bg-transparent outline-none resize-none min-h-[48px]"
-                  value={item.text}
+                  value={item.content}
                   disabled={!isAdopted}
-                  rows={Math.max(2, Math.ceil(item.text.length / 42))}
+                  rows={Math.max(2, Math.ceil(item.content.length / 42))}
                   onChange={e => onChange(type, idx, e.target.value)}
                   placeholder="항목 내용..."
-                  onMouseUp={e => {
-                    if (!isAdopted) return;
-                    const ta = e.currentTarget;
-                    if (ta.selectionStart !== ta.selectionEnd) {
-                      const rect = ta.getBoundingClientRect();
-                      setSelState({ start: ta.selectionStart, end: ta.selectionEnd, originalValue: ta.value, apply: (newText) => onChange(type, idx, newText), top: rect.bottom + 4, left: rect.left });
-                    }
-                  }}
                 />
+                )}
+                {aiKey === `${type}-${idx}` && (
+                  <InlineAiEdit
+                    placeholder="어떻게 수정할지 지시해주세요 (예: 구성 요소의 결합 관계를 더 구체적으로 써줘)"
+                    onClose={() => setAiKey(null)}
+                    original={item.content}
+                    label="발명 설명 항목"
+                    onApply={newText => onChange(type, idx, newText)}
+                  />
+                )}
                 {/* 종래↔제안 이동 — 방향·이름·목적지 색상으로 명확화 */}
                 <div className="flex justify-end mt-1.5">
                   <button
@@ -1231,21 +1481,17 @@ function DescriptionItemCards({
 
   return (
     <>
-    {selState && (
-      <TextSelectionPopover
-        position={{ top: selState.top, left: selState.left }}
-        preview={selState.originalValue.slice(selState.start, selState.end).slice(0, 20)}
-        onApply={instruction => {
-          const before = selState.originalValue.slice(0, selState.start);
-          const selected = selState.originalValue.slice(selState.start, selState.end);
-          const after = selState.originalValue.slice(selState.end);
-          selState.apply(before + mockPartialModify(selected, instruction) + after);
-          setSelState(null);
-        }}
-        onClose={() => setSelState(null)}
-      />
-    )}
     <div className="mt-3">
+      {/* 전체 AI 수정 바 — 데모 정합: 발명 설명 전반에 대한 지시 */}
+      <AiGlobalBar
+        className="mb-3"
+        title="발명 설명 수정 제안"
+        placeholder="발명 설명 전반에 대한 AI 지시사항 (예: 종래 기술의 문제점을 배경/한계로 나눠서 정리해줘)"
+        value={globalInstr}
+        onChange={setGlobalInstr}
+        propose={proposeGlobal}
+        doneMsg="발명 설명에 적용되었습니다"
+      />
       {/* lg+: 2컬럼 */}
       <div className="max-lg:hidden lg:grid lg:grid-cols-2 lg:gap-4">
         {renderColumn('proposed', proposed)}
@@ -1278,13 +1524,11 @@ function DescriptionItemCards({
   );
 }
 
-function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setFocusCtx, chatInputRef }: {
+function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, chatInputRef }: {
   step: StepId;
   confirmed: Partial<Record<StepId, string>>;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
-  focusCtx: FocusCtx | null;
-  setFocusCtx: (ctx: FocusCtx | null) => void;
   chatInputRef?: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -1295,8 +1539,6 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
   const localTextareaRef = useRef<HTMLTextAreaElement>(null);
   const guideChatIdRef = useRef(0);
   const guideChatEndRef = useRef<HTMLDivElement>(null);
-  const [localText, setLocalText] = useState('');
-  const [isEditingCtx, setIsEditingCtx] = useState(false);
 
   useEffect(() => {
     const el = (chatInputRef?.current ?? localTextareaRef.current);
@@ -1304,12 +1546,6 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }, [guideChatInput, chatInputRef]);
-
-  // focusCtx 변경(섹션 선택, AI 적용) 시 편집 텍스트 동기화 + 편집 모드 리셋
-  useEffect(() => {
-    setLocalText(focusCtx?.text ?? '');
-    setIsEditingCtx(false);
-  }, [focusCtx]);
 
   const QA_REPLIES: Record<string, string> = {
     '청구항': '청구항은 특허 보호 범위를 정의합니다. 독립항과 종속항으로 구성됩니다.',
@@ -1323,46 +1559,30 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
     setTimeout(() => guideChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
   };
 
-  // 단일 섹션(focusCtx) 수정 제안 생성 (action·diff·status)
-  const runGuideEdit = (instruction: string, ctx: FocusCtx, sourceMsg: string) => {
-    const proposal = buildProposal('section', 0, ctx.label, ctx.text, instruction);
-    pushGuideAi({ text: '요청하신 내용을 반영한 수정 제안입니다.', intent: 'edit', proposal, sourceMsg, sourceFocusCtx: ctx });
-  };
-
   const sendGuideChat = (override?: string) => {
     const msg = (override ?? guideChatInput).trim();
     if (!msg) return;
     if (!override) setGuideChatInput('');
-    // 사용자가 textarea에서 직접 편집한 내용을 AI 컨텍스트로 사용
-    const capturedCtx = focusCtx ? { ...focusCtx, text: localText } : null;
     setGuideChatMsgs(prev => [...prev, { id: ++guideChatIdRef.current, role: 'user', text: msg }]);
 
     setTimeout(() => {
-      const route = routeIntent(msg, { hasSelection: !!capturedCtx });
+      const route = routeIntent(msg, { hasSelection: false });
       if (route.intent === 'terminate') { pushGuideAi({ text: route.answer ?? '요청하신 작업은 지원하지 않습니다.', intent: 'terminate' }); return; }
       if (route.intent === 'plan') {
-        // 어시스턴트 모드는 단일 섹션 대상 — 다단계 플랜은 명세서 에디터에서 진행
-        pushGuideAi({ text: '여러 단계 작업(플랜)은 명세서 에디터의 AI 어시스턴트에서 진행해 주세요. 여기서는 선택한 섹션 하나를 수정합니다.', intent: 'answer' });
+        // 어시스턴트 모드는 단계 안내 전용 — 다단계 플랜은 명세서 에디터에서 진행
+        pushGuideAi({ text: '여러 단계 작업(플랜)은 명세서 에디터의 AI 어시스턴트에서 진행해 주세요.', intent: 'answer' });
         return;
       }
-      if (route.intent === 'answer') {
-        const matchKey = capturedCtx ? null : Object.keys(QA_REPLIES).find(k => msg.includes(k));
+      if (route.intent === 'answer' || route.intent === 'replace_expression') {
+        const matchKey = Object.keys(QA_REPLIES).find(k => msg.includes(k));
         const aiText = route.answer
           ?? (matchKey ? QA_REPLIES[matchKey]
-            : capturedCtx ? `"${capturedCtx.label}" 섹션 기준으로 답변드립니다. 수정을 원하면 수정 방향을 지시해 주세요.`
-            : `"${msg.slice(0, 20)}"에 대해 답변드립니다. 텍스트 영역을 클릭하면 해당 내용을 수정해드릴 수 있습니다.`);
+            : `"${msg.slice(0, 20)}"에 대해 답변드립니다. 항목 내용 수정은 각 카드의 'AI 수정' 버튼으로 바로 요청할 수 있습니다.`);
         pushGuideAi({ text: aiText, intent: 'answer' });
         return;
       }
-      if (!capturedCtx) {
-        pushGuideAi({ text: '수정할 섹션을 먼저 클릭해 선택해 주세요. 또는 전체 문서 기준으로 답변드릴까요?', intent: 'clarify', intentOptions: ['전체 문서 기준으로 답변'], sourceMsg: msg });
-        return;
-      }
-      if (route.intent === 'clarify') {
-        pushGuideAi({ text: '어떤 방향으로 수정할까요?', intent: 'clarify', intentOptions: route.clarifyOptions, sourceMsg: msg, sourceFocusCtx: capturedCtx });
-        return;
-      }
-      runGuideEdit(msg, capturedCtx, msg);
+      // 수정 지시 — 인라인 AI 수정으로 안내 (사이드패널에서 직접 수정하지 않음)
+      pushGuideAi({ text: '항목 수정은 본문 각 카드의 "AI 수정" 버튼을 눌러 그 자리에서 지시해 주세요. 여기서는 단계 진행과 작성 방법에 대해 답변드립니다.', intent: 'answer' });
     }, 500);
   };
 
@@ -1370,28 +1590,8 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
     const msg = guideChatMsgs.find(m => m.id === msgId);
     setGuideChatMsgs(prev => prev.map(m => m.id === msgId ? { ...m, intentOptions: undefined, text: `[${opt}] 선택됨` } : m));
     setTimeout(() => {
-      if (msg?.sourceFocusCtx) runGuideEdit(msg.sourceMsg ? `${msg.sourceMsg} · ${opt}` : opt, msg.sourceFocusCtx, msg.sourceMsg || opt);
-      else pushGuideAi({ text: '전체 문서 기준 상세 답변·수정은 명세서 에디터의 AI 어시스턴트에서 제공됩니다.', intent: 'answer' });
+      pushGuideAi({ text: `"${msg?.sourceMsg ?? opt}" 기준으로 안내드립니다. 항목 내용 수정은 각 카드의 'AI 수정' 버튼을 이용해 주세요.`, intent: 'answer' });
     }, 300);
-  };
-
-  // 제안 Accept/Decline
-  const acceptGuideProposal = (msgId: number) => {
-    const m = guideChatMsgs.find(x => x.id === msgId);
-    const p = m?.proposal, ctx = m?.sourceFocusCtx;
-    if (!p || !ctx) return;
-    const applied = p.action === 'DELETE' ? '' : p.target;
-    ctx.apply(applied);
-    setFocusCtx(focusCtx ? { ...focusCtx, text: applied } : null);
-    setGuideChatMsgs(prev => prev.map(x => x.id === msgId && x.proposal ? { ...x, proposal: { ...x.proposal, status: 'accepted' } } : x));
-  };
-  const declineGuideProposal = (msgId: number) =>
-    setGuideChatMsgs(prev => prev.map(x => x.id === msgId && x.proposal ? { ...x, proposal: { ...x.proposal, status: 'declined' } } : x));
-
-  const regenerateGuideChat = (msg: GuideChatMsg) => {
-    if (!msg.sourceFocusCtx || !msg.sourceMsg) return;
-    setGuideChatMsgs(prev => prev.filter(m => m.id !== msg.id));
-    setTimeout(() => runGuideEdit(msg.sourceMsg!, msg.sourceFocusCtx!, msg.sourceMsg!), 300);
   };
 
   // 리사이즈 핸들 — 원본 artifact-resize-handle 동일
@@ -1454,11 +1654,6 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
         <div className="w-5 h-5 rounded flex items-center justify-center text-white text-xs font-bold shrink-0"
           style={{ background: 'linear-gradient(135deg,#7c3aed,#1d4ed8)' }}>AI</div>
         <span className="text-sm font-bold text-gray-800">AI 어시스턴트</span>
-        {focusCtx && !isDone && (
-          <span className="ml-auto inline-flex items-center gap-1 text-xs2 px-2 py-0.5 rounded-full bg-blue-100 text-brand-400 font-medium">
-            ✎ {focusCtx.label} 수정 중
-          </span>
-        )}
         {isDone && (
           <span className="ml-auto inline-flex items-center gap-1 text-xs2 px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
             <Icon name="check" size={10} /> 확정됨
@@ -1479,50 +1674,12 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
         </div>
       </div>
 
-      {/* 선택된 콘텐츠 — 미리보기/편집 모드 토글 */}
-      {focusCtx ? (
-        <div className="shrink-0 mx-3 mt-2 mb-1">
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs2 text-blue-600 font-semibold">✎ 선택됨</span>
-              <span className="text-xs2 text-zinc-400">· {focusCtx.label}</span>
-            </div>
-            <button
-              onClick={() => setIsEditingCtx(prev => !prev)}
-              className="text-xs2 text-blue-500 hover:text-brand-400 transition-colors font-medium"
-            >
-              {isEditingCtx ? '접기' : '편집'}
-            </button>
-          </div>
-          {isEditingCtx ? (
-            <Textarea
-              className="w-full text-sm2 text-gray-800 bg-blue-50 px-3 py-2 leading-relaxed scroll-thin"
-              value={localText}
-              rows={4}
-              autoFocus
-              onChange={e => {
-                setLocalText(e.target.value);
-                focusCtx.apply(e.target.value);
-              }}
-            />
-          ) : (
-            <div
-              className="w-full text-sm2 text-gray-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 leading-relaxed line-clamp-3 cursor-pointer hover:bg-blue-100 hover:border-blue-300 transition-colors"
-              onClick={() => setIsEditingCtx(true)}
-              title="클릭하여 직접 편집"
-            >
-              {localText}
-            </div>
-          )}
-          {!isEditingCtx && (
-            <p className="text-xs2 text-zinc-400 mt-0.5 pl-1">클릭하거나 '편집'을 눌러 직접 수정할 수 있습니다.</p>
-          )}
-        </div>
-      ) : (
-        <div className="shrink-0 mx-3 mt-2 mb-1 px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg">
-          <p className="text-xs2 text-zinc-400">왼쪽 본문에서 카드를 선택하면 AI에게 수정을 요청할 수 있습니다.</p>
-        </div>
-      )}
+      {/* 안내 — 항목 수정은 본문 인라인 AI 수정으로 통일 (사이드패널 미사용) */}
+      <div className="shrink-0 mx-3 mt-2 mb-1 px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg">
+        <p className="text-xs2 text-zinc-400">
+          항목 수정은 각 카드의 <span className="text-blue-500 font-semibold">AI 수정</span> 버튼으로 그 자리에서 요청하세요. 여기서는 단계 진행·작성 방법을 질문할 수 있습니다.
+        </p>
+      </div>
 
 
       {/* 채팅 영역 — flex-1로 남은 공간 차지 */}
@@ -1545,7 +1702,7 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
                     {m.intent && (
                       <div className="px-2.5 pt-1.5">
                         <span className={clsx('inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold',
-                          m.intent === 'edit' ? 'bg-blue-100 text-blue-700'
+                          m.intent.startsWith('edit') ? 'bg-blue-100 text-blue-700'
                           : m.intent === 'clarify' ? 'bg-amber-100 text-amber-700'
                           : m.intent === 'terminate' ? 'bg-gray-200 text-gray-500'
                           : 'bg-emerald-100 text-emerald-700')}>
@@ -1566,43 +1723,6 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
                         ))}
                       </div>
                     )}
-                    {/* 수정 제안 카드 (action·diff·Accept/Decline) */}
-                    {m.proposal && (
-                      <>
-                        <div data-spec="SPC-AST-031" className="mx-2 mb-1.5 rounded-lg bg-white border border-zinc-300 p-2">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <span className={clsx('px-1.5 py-0.5 rounded text-[10px] font-bold',
-                              m.proposal.action === 'DELETE' ? 'bg-red-100 text-red-600'
-                              : m.proposal.action === 'INSERT' ? 'bg-emerald-100 text-emerald-700'
-                              : m.proposal.action === 'REWRITE' ? 'bg-amber-100 text-amber-700'
-                              : 'bg-blue-100 text-blue-700')}>
-                              {EDIT_ACTION_LABEL[m.proposal.action]}
-                            </span>
-                            <span className="text-[11px] text-zinc-500 truncate">{m.proposal.targetDesc}</span>
-                          </div>
-                          <p className="text-[11px] text-zinc-400 mb-1">{m.proposal.summary}</p>
-                          {m.proposal.action !== 'INSERT' && m.proposal.source && (
-                            <p className="text-xs2 rounded px-2 py-1 mb-1 bg-red-50 text-red-700 line-through whitespace-pre-wrap">{m.proposal.source}</p>
-                          )}
-                          {m.proposal.action !== 'DELETE' && (
-                            <p className="text-xs2 rounded px-2 py-1 bg-emerald-50 text-emerald-800 whitespace-pre-wrap">{m.proposal.target}</p>
-                          )}
-                        </div>
-                        <div data-spec="SPC-AST-032" className="flex gap-1 px-2 pb-2">
-                          {m.proposal.status === 'pending' ? (
-                            <>
-                              <button onClick={() => acceptGuideProposal(m.id)} className="flex-1 py-1 text-xs2 font-semibold rounded-lg bg-brand-400 text-white hover:bg-brand-400">✓ 반영</button>
-                              <button onClick={() => declineGuideProposal(m.id)} className="flex-1 py-1 text-xs2 font-semibold text-zinc-500 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50">✕ 무시</button>
-                              <button onClick={() => regenerateGuideChat(m)} className="px-2 py-1 text-xs2 text-zinc-500 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50" title="다시 생성">↺</button>
-                            </>
-                          ) : (
-                            <span className={clsx('text-xs2 font-semibold px-1', m.proposal.status === 'accepted' ? 'text-green-700' : 'text-zinc-400')}>
-                              {m.proposal.status === 'accepted' ? '✓ 반영됨' : '✕ 무시됨'}
-                            </span>
-                          )}
-                        </div>
-                      </>
-                    )}
                   </div>
                 )}
               </div>
@@ -1611,26 +1731,13 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
           </div>
         )}
         {guideChatMsgs.length === 0 && <div className="flex-1" />}
-        {/* 컨텍스트 표시 */}
-        {!focusCtx && (
-          <div className="shrink-0 px-3 pt-1.5 pb-0">
-          </div>
-        )}
-        {focusCtx && (
-          <div className="shrink-0 px-3 pt-1.5 pb-0">
-            <div className="flex items-center gap-1 text-xs2">
-              <span className="text-blue-600 font-semibold shrink-0">수정 요청 중</span>
-              <span className="text-zinc-400">· {focusCtx.label}</span>
-            </div>
-          </div>
-        )}
         {/* 입력창 — 항상 표시 */}
         <div className="shrink-0 flex gap-2 items-end px-3 py-2">
           <Textarea
             ref={chatInputRef ?? localTextareaRef}
             rows={2}
             className="flex-1 px-3 py-2"
-            placeholder={focusCtx ? `"${focusCtx.label}" 수정 요청...` : 'AI에게 질문하세요...'}
+            placeholder="단계 진행·작성 방법을 질문하세요..."
             value={guideChatInput}
             onChange={e => setGuideChatInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendGuideChat(); } }}
@@ -1653,17 +1760,17 @@ function GuidePanel({ step, confirmed, mobileOpen, onMobileClose, focusCtx, setF
 
 // 구성요소 패널 (#20)
 interface CompItem {
-  id: number; num: string; depth: number; sel: boolean;
+  id: string; num: string; depth: number; sel: boolean;  // id: InventionElement.id(UUID) 정합
   value_ko: string; value_en: string;          // 명칭 / 명칭 영문명
   hypernym_ko: string; hypernym_en: string;     // 상위어 / 상위어 영문명
   description: string;                          // 정의
 }
 const INIT_COMPS: CompItem[] = [
-  { id: 1, num: '', depth: 0, sel: true, value_ko: '데이터 수집부', value_en: 'Data Collector', hypernym_ko: '수집 장치', hypernym_en: 'Collecting Device', description: '라이다 센서로부터 3D 포인트 클라우드 데이터를 수집' },
-  { id: 2, num: '', depth: 0, sel: true, value_ko: '전처리부', value_en: 'Preprocessor', hypernym_ko: '처리 장치', hypernym_en: 'Processing Device', description: '노이즈 제거 및 다운샘플링을 통해 데이터 전처리 수행' },
-  { id: 3, num: '', depth: 0, sel: true, value_ko: '특징 추출부', value_en: 'Feature Extractor', hypernym_ko: '처리 장치', hypernym_en: 'Processing Device', description: 'PointNet++ 아키텍처를 적용하여 포인트 특징 추출' },
-  { id: 4, num: '', depth: 0, sel: true, value_ko: '인식부', value_en: 'Recognizer', hypernym_ko: '처리 장치', hypernym_en: 'Processing Device', description: '딥러닝 모델을 이용하여 객체 분류 및 위치 추정' },
-  { id: 5, num: '', depth: 0, sel: true, value_ko: '출력부', value_en: 'Output Unit', hypernym_ko: '출력 장치', hypernym_en: 'Output Device', description: '인식된 객체의 3D 위치, 크기, 종류를 출력' },
+  { id: uid(), num: '', depth: 0, sel: true, value_ko: '데이터 수집부', value_en: 'Data Collector', hypernym_ko: '수집 장치', hypernym_en: 'Collecting Device', description: '라이다 센서로부터 3D 포인트 클라우드 데이터를 수집' },
+  { id: uid(), num: '', depth: 0, sel: true, value_ko: '전처리부', value_en: 'Preprocessor', hypernym_ko: '처리 장치', hypernym_en: 'Processing Device', description: '노이즈 제거 및 다운샘플링을 통해 데이터 전처리 수행' },
+  { id: uid(), num: '', depth: 0, sel: true, value_ko: '특징 추출부', value_en: 'Feature Extractor', hypernym_ko: '처리 장치', hypernym_en: 'Processing Device', description: 'PointNet++ 아키텍처를 적용하여 포인트 특징 추출' },
+  { id: uid(), num: '', depth: 0, sel: true, value_ko: '인식부', value_en: 'Recognizer', hypernym_ko: '처리 장치', hypernym_en: 'Processing Device', description: '딥러닝 모델을 이용하여 객체 분류 및 위치 추정' },
+  { id: uid(), num: '', depth: 0, sel: true, value_ko: '출력부', value_en: 'Output Unit', hypernym_ko: '출력 장치', hypernym_en: 'Output Device', description: '인식된 객체의 3D 위치, 크기, 종류를 출력' },
 ];
 
 // depth+순서 기반 부호 자동 계산
@@ -1724,7 +1831,12 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
     ? initialItems.map(specItemToCompItem)
     : INIT_COMPS;
   const [items, setItems] = useState<CompItem[]>(initData);
-  const [focusId, setFocusId] = useState<number | null>(null);
+  const [focusId, setFocusId] = useState<string | null>(null);
+  // 인라인 AI 수정 — 열린 카드 id
+  const [aiEditId, setAiEditId] = useState<string | null>(null);
+  // 전체 AI 지시 바 (데모: "구성 요소 전반에 대한 AI 지시사항" + AI 수정)
+  const [globalInstr, setGlobalInstr] = useState('');
+  const [globalBusy, setGlobalBusy] = useState(false);
 
   const serializeLine = (it: CompItem) => `${it.num || '—'} ${it.value_ko}${it.value_en ? ` (${it.value_en})` : ''}`;
 
@@ -1748,13 +1860,13 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
 
   const moveUp   = (idx: number) => { if (idx===0||done) return; const a=[...items]; [a[idx-1],a[idx]]=[a[idx],a[idx-1]]; applyUpd(a); };
   const moveDown = (idx: number) => { if (idx===items.length-1||done) return; const a=[...items]; [a[idx],a[idx+1]]=[a[idx+1],a[idx]]; applyUpd(a); };
-  const indent   = (id: number)  => { if (!done) applyUpd(items.map(it => it.id===id ? {...it, depth: Math.min(it.depth+1,2)} : it)); };
-  const outdent  = (id: number)  => { if (!done) applyUpd(items.map(it => it.id===id ? {...it, depth: Math.max(it.depth-1,0)} : it)); };
+  const indent   = (id: string)  => { if (!done) applyUpd(items.map(it => it.id===id ? {...it, depth: Math.min(it.depth+1,2)} : it)); };
+  const outdent  = (id: string)  => { if (!done) applyUpd(items.map(it => it.id===id ? {...it, depth: Math.max(it.depth-1,0)} : it)); };
   const autoAssign = () => { if (!done) upd(calcAutoNums(items)); };
   const EMPTY_COMP = { num: '', depth: 0, sel: true, value_ko: '', value_en: '', hypernym_ko: '', hypernym_en: '', description: '' };
   const add = () => {
     if (done) return;
-    const id = Date.now();
+    const id = uid();
     upd([...items, { id, ...EMPTY_COMP }]);
     setFocusId(id);
   };
@@ -1764,7 +1876,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
   const submitAiComponent = () => {
     const instr = aiInput.trim();
     if (!instr || done) return;
-    const id = Date.now();
+    const id = uid();
     upd([...items, {
       id, ...EMPTY_COMP,
       value_ko: instr.length > 24 ? instr.slice(0, 24) : instr,
@@ -1773,6 +1885,25 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
     setAiInput('');
     setAiOpen(false);
     setFocusId(id);
+  };
+
+  // 전체 AI 수정 제안 — 선택된 구성요소 정의에 지시 반영 (mock). 확인 후 적용은 AiGlobalBar가 담당.
+  const proposeGlobal = (instr: string): PendingChange[] =>
+    items.filter(it => it.sel).map(it => proposeMock(it.description, instr, `${it.num ? it.num + ' ' : ''}${it.value_ko}`));
+  const applyGlobal = (changes: PendingChange[]) => {
+    const byBefore = new Map(changes.map(c => [c.before, c.after ?? c.before]));
+    upd(items.map(it => it.sel && byBefore.has(it.description) ? { ...it, description: byBefore.get(it.description)! } : it));
+  };
+  // 다시 분석 — AI 추출 결과로 재생성 (mock)
+  const reanalyze = () => {
+    if (done) return;
+    setGlobalBusy(true);
+    setTimeout(() => {
+      const regen = generateComponentCandidates({ title: '', field: '', content: '' }).map(specItemToCompItem);
+      upd(regen);
+      setGlobalBusy(false);
+      toast('구성요소를 다시 분석했습니다');
+    }, 900);
   };
 
   // → 활성 조건: idx>0이고 바로 위 항목이 유효한 부모(depth <= 현재 depth)
@@ -1800,18 +1931,38 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
   return (
     <>
       <div className="flex-1 overflow-y-auto scroll-thin p-3 ml-1.5">
+        {/* 전체 AI 지시 바 — 데모 정합: 구성 요소 전반에 대한 AI 지시사항 */}
+        {!done && (
+          <AiGlobalBar
+            className="mb-2.5"
+            title="구성요소 수정 제안"
+            placeholder="구성 요소 전반에 대한 AI 지시사항 (예: 가이드 레일 설명에 설치 간격 내용을 보강해줘)"
+            value={globalInstr}
+            onChange={setGlobalInstr}
+            propose={proposeGlobal}
+            onApply={applyGlobal}
+            doneMsg="구성요소에 적용되었습니다"
+            disabled={done}
+          />
+        )}
         {/* 헤더 + 부호 자동 부여 */}
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs2 font-semibold text-gray-600">AI 추출 구성요소</span>
           {!done && (
             <div className="flex items-center gap-1">
+              <button onClick={reanalyze}
+                disabled={globalBusy}
+                className="flex items-center gap-1 px-2 py-1 rounded text-xs2 font-semibold bg-white border border-gray-200 text-gray-500 hover:border-blue-300 hover:text-blue-600 disabled:opacity-40 transition-colors"
+                title="AI 추출을 다시 실행">
+                ↻ 다시 분석
+              </button>
               <button onClick={() => setAiOpen(o => !o)}
                 className={clsx(
-                  'flex items-center gap-1 px-2 py-1 rounded text-xs2 font-semibold border transition-colors',
-                  aiOpen ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100',
+                  'inline-flex items-center gap-1 h-6 px-2 rounded-lg text-xs2 font-medium border transition-colors',
+                  aiOpen ? 'bg-brand-400 border-brand-400 text-white' : 'text-brand-500 border-brand-200 bg-white hover:bg-brand-50 hover:border-brand-300',
                 )}
                 title="자연어 지시로 AI가 구성요소를 추가">
-                <svg viewBox="0 0 16 16" fill="currentColor" width="10" height="10"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
+                <AiIcon />
                 AI 추가
               </button>
               <button onClick={autoAssign}
@@ -1895,6 +2046,14 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                   </span>
                   {!done && (
                     <div className="flex items-center gap-px shrink-0 ml-auto">
+                      {item.sel && (
+                        <AiEditButton
+                          className="mr-1"
+                          active={aiEditId === item.id}
+                          title="이 구성요소를 AI로 수정"
+                          onClick={() => setAiEditId(k => k === item.id ? null : item.id)}
+                        />
+                      )}
                       <button onClick={() => moveUp(idx)} disabled={idx===0}
                         className="p-0.5 text-gray-400 hover:text-blue-500 disabled:opacity-20" title="위로">
                         <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="9" height="9"><path d="M2 7l3-4 3 4"/></svg>
@@ -1992,6 +2151,18 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems }: {
                       <span className="text-xs2 text-gray-500 leading-relaxed block">{item.description || <span className="text-gray-300">—</span>}</span>
                     )}
                   </div>
+                  {aiEditId === item.id && !done && (
+                    <InlineAiEdit
+                      placeholder="이 구성요소를 어떻게 수정할지 지시해주세요 (예: 정의에 센서 융합 기능을 보강해줘)"
+                      onClose={() => setAiEditId(null)}
+                      original={item.description}
+                      label="구성요소 정의"
+                      onApply={newText => {
+                          upd(items.map(it => it.id === item.id ? { ...it, description: newText } : it));
+                        }}
+                      doneMsg="구성요소가 수정되었습니다"
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -2466,19 +2637,22 @@ interface DepGroupState { generated: boolean; items: DepItemState[]; newText: st
 // 선택된 세트의 각 claim별 종속항 그룹 (key: claimIndex 숫자)
 type DepGroupsForSet = Record<number, DepGroupState>;
 
-function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
+function ClaimsPanel({ done, onUpdate }: {
   done: boolean;
   onConfirm: () => void;
   onUpdate: (v: string) => void;
-  onFocusContext?: (ctx: { text: string; label: string; apply: (t: string) => void }) => void;
-  guidePanelInputRef?: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const [claimsPhase, setClaimsPhase] = useState<'indep' | 'dep'>('indep');
   const [claimSets] = useState(MOCK_INDEPENDENT_CLAIM_SETS);
   // 생성 전에는 세트를 미리 선택하지 않는다 (C1: preference 설정 → 생성 순서 강제)
   const [selectedSetIndex, setSelectedSetIndex] = useState<number | null>(done ? 2 : null);
   const [generated, setGenerated] = useState(done); // 독립항 세트 생성 여부 — 생성 후에만 후보 표시
-  const [claimSelState, setClaimSelState] = useState<SelState>(null);
+  // 인라인 AI 수정 — 열린 항 키 (`indep-${setIdx}-${ci}` | `dep-${ci}-${depId}`)
+  const [aiKey, setAiKey] = useState<string | null>(null);
+  // 독립항 세트 생성 추가 지시사항 (데모: preference와 함께 전달)
+  const [genInstruction, setGenInstruction] = useState('');
+  // 종속항 전체 수정 지시 (데모: dependent-claim/modification)
+  const [depGlobalInstr, setDepGlobalInstr] = useState('');
   // preference.slots = API independent-claim/set 의 preference.claims[] (각 슬롯 = category + description, 2~3개) (C2)
   const [preference, setPreference] = useState<{ abstraction: string; slots: { category: string; description: string }[] }>({
     abstraction: 'INTERMEDIATE',
@@ -2640,20 +2814,6 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
 
     return (
       <>
-      {claimSelState && (
-        <TextSelectionPopover
-          position={{ top: claimSelState.top, left: claimSelState.left }}
-          preview={claimSelState.originalValue.slice(claimSelState.start, claimSelState.end).slice(0, 20)}
-          onApply={instruction => {
-            const before = claimSelState.originalValue.slice(0, claimSelState.start);
-            const selected = claimSelState.originalValue.slice(claimSelState.start, claimSelState.end);
-            const after = claimSelState.originalValue.slice(claimSelState.end);
-            claimSelState.apply(before + mockPartialModify(selected, instruction) + after);
-            setClaimSelState(null);
-          }}
-          onClose={() => setClaimSelState(null)}
-        />
-      )}
       <div className="flex-1 overflow-y-auto scroll-thin p-3 space-y-2.5 ml-1.5">
         <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2.5">
           {generated ? (
@@ -2735,10 +2895,19 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
         </div>
 
         {!generated && !done && (
-          <button
-            onClick={() => { setGenerated(true); setSelectedSetIndex(null); }}
-            className="w-full py-2.5 bg-brand-400 text-white rounded-lg text-sm2 font-semibold hover:bg-brand-500 transition-colors"
-          >독립항 세트 생성 →</button>
+          <>
+            {/* 추가 지시사항 (선택) — 데모 정합: 생성 preference와 함께 전달 */}
+            <input
+              className="w-full text-xs2 px-2.5 py-1.5 border border-gray-200 rounded-lg bg-white outline-none focus:border-blue-400 transition-colors"
+              placeholder="추가 지시사항 (선택) — 예: 방법 청구항 위주로 작성해줘"
+              value={genInstruction}
+              onChange={e => setGenInstruction(e.target.value)}
+            />
+            <button
+              onClick={() => { setGenerated(true); setSelectedSetIndex(null); }}
+              className="w-full py-2.5 bg-brand-400 text-white rounded-lg text-sm2 font-semibold hover:bg-brand-500 transition-colors"
+            >독립항 세트 생성 →</button>
+          </>
         )}
 
         {generated && (<>
@@ -2794,13 +2963,11 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                       <div className="flex items-center gap-1.5 mb-1">
                         <span className="text-xs2 px-1.5 py-0.5 rounded font-medium bg-purple-100 text-purple-700">{catLabel}</span>
                         {!done && isSelected && (
-                          <button
-                            onClick={e => { e.stopPropagation(); onFocusContext?.({ text, label: `${scopeInfo.label} — ${catLabel}`, apply: (newText) => setClaimText(setIdx, ci, newText) }); setTimeout(() => guidePanelInputRef?.current?.focus(), 50); }}
-                            className="ml-auto flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
-                          >
-                            <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                            AI 수정
-                          </button>
+                          <AiEditButton
+                            className="ml-auto"
+                            active={aiKey === `indep-${setIdx}-${ci}`}
+                            onClick={e => { e.stopPropagation(); setAiKey(k => k === `indep-${setIdx}-${ci}` ? null : `indep-${setIdx}-${ci}`); }}
+                          />
                         )}
                       </div>
                       {isSelected && !done ? (
@@ -2810,12 +2977,20 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                           rows={Math.max(3, Math.ceil(text.length / 44))}
                           onClick={e => e.stopPropagation()}
                           onChange={e => { setClaimText(setIdx, ci, e.target.value); syncUpdate(setIdx, depGroupsMap); }}
-                          onFocus={() => onFocusContext?.({ text, label: `${scopeInfo.label} — ${catLabel}`, apply: (newText) => setClaimText(setIdx, ci, newText) })}
-                          onMouseUp={e => { const ta = e.currentTarget; if (ta.selectionStart !== ta.selectionEnd) { const rect = ta.getBoundingClientRect(); setClaimSelState({ start: ta.selectionStart, end: ta.selectionEnd, originalValue: ta.value, apply: (newText) => { setClaimText(setIdx, ci, newText); syncUpdate(setIdx, depGroupsMap); }, top: rect.bottom + 4, left: rect.left }); } }}
                           ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                         />
                       ) : (
                         <p className="text-xs2 text-gray-600 leading-relaxed line-clamp-3">{text}</p>
+                      )}
+                      {aiKey === `indep-${setIdx}-${ci}` && isSelected && !done && (
+                        <InlineAiEdit
+                          placeholder="이 독립항을 어떻게 수정할지 지시해주세요 (예: 권리범위를 조금 더 넓혀줘)"
+                          onClose={() => setAiKey(null)}
+                          original={text}
+                          label="독립항"
+                          onApply={newText => { setClaimText(setIdx, ci, newText); syncUpdate(setIdx, depGroupsMap); }}
+                          doneMsg="독립항이 수정되었습니다"
+                        />
                       )}
                     </div>
                   );
@@ -2850,22 +3025,31 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
 
   let globalClaimNum = 0;
 
+  // 종속항 전체 수정 제안 — 선택된 종속항 전체에 지시 반영 (mock, API dependent-claim/modification). 확인 후 적용은 AiGlobalBar가 담당.
+  const proposeDepGlobal = (instr: string): PendingChange[] => {
+    if (selectedSetIndex === null) return [];
+    const groups = depGroupsMap[selectedSetIndex] ?? {};
+    return Object.values(groups).flatMap(grp =>
+      (grp as DepGroupState).items.filter(d => d.sel).map((d, i) => proposeMock(d.text, instr, `종속항 ${i + 1}`)));
+  };
+  const applyDepGlobal = (changes: PendingChange[]) => {
+    if (selectedSetIndex === null) return;
+    const byBefore = new Map(changes.map(c => [c.before, c.after ?? c.before]));
+    const groups = depGroupsMap[selectedSetIndex] ?? {};
+    const nextGroups: DepGroupsForSet = {};
+    Object.entries(groups).forEach(([k, grp]) => {
+      nextGroups[Number(k)] = {
+        ...(grp as DepGroupState),
+        items: (grp as DepGroupState).items.map(d => d.sel && byBefore.has(d.text) ? { ...d, text: byBefore.get(d.text)! } : d),
+      };
+    });
+    const nextMap = { ...depGroupsMap, [selectedSetIndex]: nextGroups };
+    setDepGroupsMap(nextMap);
+    syncUpdate(selectedSetIndex, nextMap);
+  };
+
   return (
     <>
-    {claimSelState && (
-      <TextSelectionPopover
-        position={{ top: claimSelState.top, left: claimSelState.left }}
-        preview={claimSelState.originalValue.slice(claimSelState.start, claimSelState.end).slice(0, 20)}
-        onApply={instruction => {
-          const before = claimSelState.originalValue.slice(0, claimSelState.start);
-          const selected = claimSelState.originalValue.slice(claimSelState.start, claimSelState.end);
-          const after = claimSelState.originalValue.slice(claimSelState.end);
-          claimSelState.apply(before + mockPartialModify(selected, instruction) + after);
-          setClaimSelState(null);
-        }}
-        onClose={() => setClaimSelState(null)}
-      />
-    )}
     <div className="flex-1 overflow-y-auto scroll-thin p-3 ml-1.5 space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-xs2 font-semibold text-gray-600">
@@ -2910,22 +3094,29 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
         return (
           <div key={ci} className="rounded-xl border border-zinc-200 overflow-hidden">
             <div className="border-b px-3 py-2.5 bg-blue-50 border-blue-200">
-              <div className="flex items-center gap-2 mb-1.5 cursor-pointer"
-                onClick={() => !done && onFocusContext?.({ text: claimText, label: `독립항 ${ci + 1} (${catLabel})`, apply: (newText) => setClaimText(selectedSetIndex, ci, newText) })}>
+              <div className="flex items-center gap-2 mb-1.5">
                 <Icon name="check" size={11} className="text-blue-600" />
                 <span className="text-xs2 font-bold text-brand-400">청구항 {indepNum}</span>
                 <span className="text-xs2 px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium">{catLabel}</span>
                 {!done && (
-                  <button
-                    onClick={e => { e.stopPropagation(); onFocusContext?.({ text: claimText, label: `독립항 ${ci + 1} (${catLabel})`, apply: (newText) => setClaimText(selectedSetIndex, ci, newText) }); setTimeout(() => guidePanelInputRef?.current?.focus(), 50); }}
-                    className="ml-auto flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs2 text-blue-500 hover:bg-blue-100 border border-blue-200 transition-colors"
-                  >
-                    <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg>
-                    AI 수정
-                  </button>
+                  <AiEditButton
+                    className="ml-auto"
+                    active={aiKey === `indepB-${ci}`}
+                    onClick={e => { e.stopPropagation(); setAiKey(k => k === `indepB-${ci}` ? null : `indepB-${ci}`); }}
+                  />
                 )}
               </div>
               <p className="text-xs2 text-gray-700 leading-relaxed whitespace-pre-wrap px-1">{claimText}</p>
+              {aiKey === `indepB-${ci}` && !done && (
+                <InlineAiEdit
+                  placeholder="이 독립항을 어떻게 수정할지 지시해주세요"
+                  onClose={() => setAiKey(null)}
+                  original={claimText}
+                  label="독립항"
+                  onApply={newText => setClaimText(selectedSetIndex, ci, newText)}
+                  doneMsg="독립항이 수정되었습니다"
+                />
+              )}
             </div>
 
             <div className="p-2.5 space-y-1.5">
@@ -2960,13 +3151,7 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                 const displayText = dep.text.replace(new RegExp(`제${ci + 1}항에 있어서`, 'g'), `제${indepNum}항에 있어서`);
                 return (
                   <div key={dep.id} className={clsx('rounded-lg border overflow-hidden', dep.sel ? 'border-zinc-200 bg-white' : 'border-zinc-100 bg-zinc-50 opacity-60')}>
-                    <div className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer"
-                      onClick={() => !done && onFocusContext?.({ text: displayText, label: `종속항 ${depNum}`, apply: (newText) => {
-                        const next = { ...setGroups, [ci]: { ...grp, items: grp.items.map(d => d.id === dep.id ? { ...d, text: newText } : d) } };
-                        const nextMap = { ...depGroupsMap, [selectedSetIndex]: next };
-                        setDepGroupsMap(nextMap);
-                        syncUpdate(selectedSetIndex, nextMap);
-                      } })}>
+                    <div className="flex items-center gap-2 px-2.5 py-1.5">
                       <button
                         onClick={e => { e.stopPropagation(); toggleDep(ci, dep.id); }}
                         className={clsx('w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all',
@@ -2975,10 +3160,17 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                         {dep.sel && <Icon name="check" size={8} />}
                       </button>
                       <span className="text-xs2 text-gray-500 font-medium shrink-0">종속항 {depNum}</span>
+                      {!done && dep.sel && (
+                        <AiEditButton
+                          className="ml-auto"
+                          active={aiKey === `dep-${ci}-${dep.id}`}
+                          onClick={e => { e.stopPropagation(); setAiKey(k => k === `dep-${ci}-${dep.id}` ? null : `dep-${ci}-${dep.id}`); }}
+                        />
+                      )}
                       {!done && (
                         <button
                           onClick={e => { e.stopPropagation(); removeDep(ci, dep.id); }}
-                          className="ml-auto text-xs2 text-gray-300 hover:text-red-400 transition-colors"
+                          className={clsx('text-xs2 text-gray-300 hover:text-red-400 transition-colors', !(dep.sel) && 'ml-auto')}
                         >✕</button>
                       )}
                     </div>
@@ -2994,11 +3186,25 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
                             setDepGroupsMap(nextMap);
                             syncUpdate(selectedSetIndex, nextMap);
                           }}
-                          onMouseUp={e => { const ta = e.currentTarget; if (ta.selectionStart !== ta.selectionEnd) { const rect = ta.getBoundingClientRect(); setClaimSelState({ start: ta.selectionStart, end: ta.selectionEnd, originalValue: ta.value, apply: (newText) => { const next = { ...setGroups, [ci]: { ...grp, items: grp.items.map(d => d.id === dep.id ? { ...d, text: newText } : d) } }; const nextMap = { ...depGroupsMap, [selectedSetIndex]: next }; setDepGroupsMap(nextMap); syncUpdate(selectedSetIndex, nextMap); }, top: rect.bottom + 4, left: rect.left }); } }}
                           ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                         />
                       ) : (
                         <p className="text-xs2 text-gray-700 leading-relaxed">{displayText}</p>
+                      )}
+                      {aiKey === `dep-${ci}-${dep.id}` && !done && dep.sel && (
+                        <InlineAiEdit
+                          placeholder="이 종속항을 어떻게 수정할지 지시해주세요 (예: 한정 요소를 더 구체화해줘)"
+                          onClose={() => setAiKey(null)}
+                          original={displayText}
+                          label="종속항"
+                          onApply={newText => {
+                              const next = { ...setGroups, [ci]: { ...grp, items: grp.items.map(d => d.id === dep.id ? { ...d, text: newText } : d) } };
+                              const nextMap = { ...depGroupsMap, [selectedSetIndex]: next };
+                              setDepGroupsMap(nextMap);
+                              syncUpdate(selectedSetIndex, nextMap);
+                            }}
+                          doneMsg="종속항이 수정되었습니다"
+                        />
                       )}
                     </div>
                   </div>
@@ -3025,23 +3231,41 @@ function ClaimsPanel({ done, onUpdate, onFocusContext, guidePanelInputRef }: {
           </div>
         );
       })}
+
+      {/* 종속항 전체 수정 지시 — 데모 정합: dependent-claim/modification */}
+      {!done && (
+        <AiGlobalBar
+          className="pt-1"
+          title="종속항 수정 제안"
+          placeholder="종속항 전반에 대한 AI 지시사항 (예: 각 독립항당 한정 요소를 다양하게 / 3항을 더 넓게)"
+          value={depGlobalInstr}
+          onChange={setDepGlobalInstr}
+          propose={proposeDepGlobal}
+          onApply={applyDepGlobal}
+          doneMsg="종속항에 적용되었습니다"
+          disabled={done || selectedSetIndex === null}
+        />
+      )}
     </div>
     </>
   );
 }
 
 // ── 중간명세서 패널 (#22) ─────────────────────────────────────────────────────
-function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onFocusContext, guidePanelInputRef }: {
+function MidspecPanel({ done, sections, onUpdate, onGoToEditor }: {
   done: boolean;
   sections: MidspecSection[];
   onUpdate: (next: MidspecSection[]) => void;
   onGoToEditor?: () => void;
-  onFocusContext?: (ctx: { text: string; label: string; apply: (t: string) => void }) => void;
-  guidePanelInputRef?: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const [editing, setEditing] = useState<{ sectionKey: string; blockIdx: number } | null>(null);
   const [editVal, setEditVal] = useState('');
   const [newTexts, setNewTexts] = useState<Record<string, string>>({});
+  // 인라인 AI 수정 — 열린 블록 키 (`${sectionKey}-${blockIdx}`)
+  const [aiKey, setAiKey] = useState<string | null>(null);
+  // 생성 지시·선호 사항 + 다시 생성 (데모 정합)
+  const [genInstr, setGenInstr] = useState('');
+  const [genBusy, setGenBusy] = useState(false);
 
   if (sections.length === 0) {
     return (
@@ -3054,7 +3278,7 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onFocusContext, 
   const updateBlock = (sKey: string, bIdx: number, text: string) => {
     const next = sections.map(s => s.key !== sKey ? s : {
       ...s,
-      blocks: s.blocks.map((b, i) => i === bIdx ? { text } : b),
+      blocks: s.blocks.map((b, i) => i === bIdx ? { ...b, content: text } : b),
     });
     onUpdate(next);
   };
@@ -3062,7 +3286,7 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onFocusContext, 
   const addBlock = (sKey: string) => {
     const text = (newTexts[sKey] ?? '').trim();
     if (!text) return;
-    const next = sections.map(s => s.key !== sKey ? s : { ...s, blocks: [...s.blocks, { text }] });
+    const next = sections.map(s => s.key !== sKey ? s : { ...s, blocks: [...s.blocks, { id: uid(), type: 'text' as const, content: text }] });
     onUpdate(next);
     setNewTexts(p => ({ ...p, [sKey]: '' }));
   };
@@ -3072,12 +3296,48 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onFocusContext, 
     onUpdate(next);
   };
 
+  // 중간명세서 다시 생성 — 생성 지시·선호 사항 반영 (mock: 전체 블록에 지시 반영)
+  const regenerate = () => {
+    if (genBusy || done) return;
+    setGenBusy(true);
+    setTimeout(() => {
+      const instr = genInstr.trim() || '초안 재생성';
+      onUpdate(sections.map(s => ({
+        ...s,
+        blocks: s.blocks.map(b => ({ ...b, content: generateMockModification(b.content, instr) })),
+      })));
+      setGenBusy(false);
+      toast('중간명세서를 다시 생성했습니다');
+    }, 1100);
+  };
+
   return (
     <div className="flex-1 overflow-y-auto scroll-thin p-3 ml-1.5 space-y-3">
       <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2">
         <p className="text-xs2 text-brand-400 font-medium">AI가 중간명세서를 초안 작성했습니다.</p>
         <p className="text-xs2 text-gray-500 mt-0.5">각 항목을 직접 편집하거나 블록을 추가·삭제할 수 있습니다.</p>
       </div>
+
+      {/* 생성 지시·선호 사항 + 다시 생성 — 데모 정합 */}
+      {!done && (
+        <div className="space-y-1.5">
+          <textarea
+            className="w-full text-xs2 px-2.5 py-1.5 border border-gray-200 rounded-lg bg-white outline-none focus:border-blue-400 resize-none transition-colors disabled:bg-gray-50"
+            placeholder="생성 지시·선호 사항 (선택) — 예: 배경기술은 규제 동향부터 서술해줘 / 효과는 정량 수치를 강조해줘"
+            rows={2}
+            value={genInstr}
+            disabled={genBusy}
+            onChange={e => setGenInstr(e.target.value)}
+          />
+          <button
+            onClick={regenerate}
+            disabled={genBusy}
+            className="w-full py-2 text-sm2 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {genBusy ? '중간명세서를 생성하고 있습니다...' : '중간명세서 다시 생성'}
+          </button>
+        </div>
+      )}
 
       {sections.map(section => (
         <div key={section.key} className="rounded-xl border border-zinc-200 overflow-hidden">
@@ -3113,33 +3373,44 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onFocusContext, 
                       </div>
                     </div>
                   ) : (
+                    <>
                     <div className="flex gap-2 px-3 py-2">
-                      <p className="flex-1 text-xs2 text-gray-700 leading-relaxed whitespace-pre-wrap">{block.text}</p>
+                      <p className="flex-1 text-xs2 text-gray-700 leading-relaxed whitespace-pre-wrap">{block.content}</p>
                       {!done && (
-                        <div className="flex flex-col gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className={clsx(
+                          'flex items-center gap-1 shrink-0 self-start transition-opacity',
+                          aiKey === `${section.key}-${bIdx}` ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100',
+                        )}>
+                          <AiEditButton
+                            active={aiKey === `${section.key}-${bIdx}`}
+                            onClick={() => setAiKey(k => k === `${section.key}-${bIdx}` ? null : `${section.key}-${bIdx}`)}
+                          />
                           <button
-                            onClick={() => { setEditing({ sectionKey: section.key, blockIdx: bIdx }); setEditVal(block.text); }}
+                            onClick={() => { setEditing({ sectionKey: section.key, blockIdx: bIdx }); setEditVal(block.content); }}
                             title="직접 편집"
-                            className="text-xs2 text-blue-500 hover:text-blue-700"
+                            className="h-6 w-6 inline-flex items-center justify-center rounded-lg text-neutral-400 hover:text-brand-500 hover:bg-brand-50 transition-colors"
                           ><Icon name="edit" size={11} /></button>
-                          {onFocusContext && (
-                            <button
-                              onClick={() => {
-                                onFocusContext({ text: block.text, label: `${section.label} 블록`, apply: (newText) => updateBlock(section.key, bIdx, newText) });
-                                setTimeout(() => guidePanelInputRef?.current?.focus(), 50);
-                              }}
-                              title="AI 수정"
-                              className="text-xs2 text-blue-500 hover:text-blue-700"
-                            ><svg viewBox="0 0 16 16" fill="currentColor" width="11" height="11"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg></button>
-                          )}
                           <button
                             onClick={() => removeBlock(section.key, bIdx)}
                             title="삭제"
-                            className="text-xs2 text-gray-300 hover:text-red-400"
+                            className="h-6 w-6 inline-flex items-center justify-center rounded-lg text-neutral-300 hover:text-red-500 hover:bg-red-50 transition-colors"
                           >✕</button>
                         </div>
                       )}
                     </div>
+                    {aiKey === `${section.key}-${bIdx}` && !done && (
+                      <div className="px-3 pb-2">
+                        <InlineAiEdit
+                          placeholder={`'${section.label}' 블록을 어떻게 수정할지 지시해주세요`}
+                          onClose={() => setAiKey(null)}
+                          original={block.content}
+                          label="중간명세서 블록"
+                          onApply={newText => updateBlock(section.key, bIdx, newText)}
+                          doneMsg="블록이 수정되었습니다"
+                        />
+                      </div>
+                    )}
+                    </>
                   )}
                 </div>
               );

@@ -16,6 +16,7 @@ export interface InventionContext {
 }
 
 export interface InventionElement {
+  id: string            // API: 요소 UUID — 청구항 element_ids가 참조
   symbol: string        // 도면 기호 번호 (예: "100")
   value_ko: string      // 한국어 명칭
   value_en: string      // 영어 명칭
@@ -25,8 +26,11 @@ export interface InventionElement {
 }
 
 export interface InventionDescriptionItem {
+  id: string                    // API: 항목 UUID (item/modification 대상 지정)
   label: 'background' | 'implementation' | 'objective' | 'effect'
-  text: string
+  type: 'text' | 'table'        // API: 표 항목 지원 (table이면 content는 HTML <table>)
+  content: string               // API 필드명 (구 text)
+  caption?: string | null       // 표 캡션 (type === 'table')
   adopted?: boolean
 }
 
@@ -40,7 +44,7 @@ export interface IndependentClaimSet {
   claims: Array<{
     value: string
     category: ClaimCategory
-    element_idxs: number[]
+    element_ids: string[]     // API: InventionElement.id(UUID) 참조 (구 element_idxs)
   }>
 }
 
@@ -49,7 +53,7 @@ export interface DepClaimItem {
   no: number
   value: string
   depends_on: number
-  element_idxs: number[]
+  element_ids: string[]        // API: InventionElement.id(UUID) 참조 (구 element_idxs)
   sel: boolean
 }
 
@@ -77,7 +81,6 @@ export interface TitleCandidate {
 // ── 구성요소 (InventionElement 확장) ────────────────────────────────────────
 
 export interface SpecComponentItem extends InventionElement {
-  id: number
   depth: number
   sel: boolean
 }
@@ -112,7 +115,9 @@ export interface Drawing {
 // ── 명세서 타입 ──────────────────────────────────────────────────────────────
 
 export interface SpecificationBlock {
-  text: string
+  id: string                    // API: 블록 UUID — 에디터 selected_blocks/제안 ref가 참조
+  type?: 'text' | 'table'
+  content: string               // API 필드명 (구 text)
 }
 
 export interface DrawingDescription {

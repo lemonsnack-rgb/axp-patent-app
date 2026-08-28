@@ -25,3 +25,6 @@ dist-ssr
 
 .vercel
 .env*.local
+
+# 대용량 수집 데이터 원본 (127MB) — 커밋 금지
+docs/데이터/patent.json

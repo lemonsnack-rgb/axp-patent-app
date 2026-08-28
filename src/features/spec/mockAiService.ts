@@ -1,4 +1,5 @@
 // src/features/spec/mockAiService.ts
+import { uid } from '../../utils/uid';
 import type {
   InventionInput,
   InventionContext,
@@ -10,7 +11,11 @@ import type {
   IndependentClaimSet,
   DepClaimItem,
   MidspecSection,
+  SpecificationBlock,
 } from './types';
+
+// 텍스트 블록 생성 헬퍼 (SpecificationBlock {id, content} 정합)
+const tb = (content: string): SpecificationBlock => ({ id: uid(), type: 'text', content });
 
 // ── 제목 후보 mock ────────────────────────────────────────────────────────────
 
@@ -45,29 +50,36 @@ export function generateTitleCandidates(_input: InventionInput): TitleCandidate[
 // ── 발명 설명 mock ────────────────────────────────────────────────────────────
 
 export const MOCK_PREVIOUS: InventionDescriptionItem[] = [
-  { label: 'background',     text: '기존 시스템은 단일 프로세서 기반의 직렬 처리 방식으로 처리 속도가 느리고 오류율이 높은 문제가 있었다.' },
-  { label: 'implementation', text: '종래 기술은 하나의 중앙 처리 장치가 모든 데이터를 순차적으로 처리하는 구조를 사용하였다.' },
+  { id: uid(), type: 'text', label: 'background',     content: '기존 시스템은 단일 프로세서 기반의 직렬 처리 방식으로 처리 속도가 느리고 오류율이 높은 문제가 있었다.' },
+  { id: uid(), type: 'text', label: 'implementation', content: '종래 기술은 하나의 중앙 처리 장치가 모든 데이터를 순차적으로 처리하는 구조를 사용하였다.' },
 ]
 
 export const MOCK_PROPOSED: InventionDescriptionItem[] = [
-  { label: 'objective',      text: '본 발명은 병렬 처리 방식을 도입하여 처리 속도를 획기적으로 향상시키는 것을 목적으로 한다.' },
-  { label: 'implementation', text: '복수의 처리 모듈이 데이터를 분산 처리하고, 결과를 통합하는 구조를 채택한다.' },
-  { label: 'effect',         text: '처리 속도 300% 향상 및 오류율 90% 감소 효과를 달성한다.' },
+  { id: uid(), type: 'text', label: 'objective',      content: '본 발명은 병렬 처리 방식을 도입하여 처리 속도를 획기적으로 향상시키는 것을 목적으로 한다.' },
+  { id: uid(), type: 'text', label: 'implementation', content: '복수의 처리 모듈이 데이터를 분산 처리하고, 결과를 통합하는 구조를 채택한다.' },
+  // API InventionDescriptionItem type='table' — 문서에서 추출된 표 항목 (content는 HTML table)
+  {
+    id: uid(), type: 'table', label: 'implementation', caption: '처리 모듈 구성',
+    content: '<table><thead><tr><th>모듈명</th><th>기능 설명</th></tr></thead><tbody><tr><td>데이터 수집부</td><td>외부 장치로부터 원시 데이터를 수집</td></tr><tr><td>병렬 처리부</td><td>복수의 스레드로 데이터를 동시 처리</td></tr><tr><td>결과 통합부</td><td>처리 결과를 통합하여 최종 출력 생성</td></tr></tbody></table>',
+  },
+  { id: uid(), type: 'text', label: 'effect',         content: '처리 속도 300% 향상 및 오류율 90% 감소 효과를 달성한다.' },
 ]
 
 // ── 구성요소 mock ─────────────────────────────────────────────────────────────
 
 export const MOCK_ELEMENTS: InventionElement[] = [
-  { symbol: '100', value_ko: '데이터 수집부',  value_en: 'Data Collector',    description: '외부 장치로부터 원시 데이터를 수집하는 모듈', hypernym_ko: '수집 장치', hypernym_en: 'Collecting Device' },
-  { symbol: '200', value_ko: '전처리부',       value_en: 'Preprocessor',       description: '수집된 데이터를 정규화·필터링하는 모듈',         hypernym_ko: '처리 장치', hypernym_en: 'Processing Device' },
-  { symbol: '300', value_ko: '병렬 처리부',    value_en: 'Parallel Processor', description: '복수의 스레드로 데이터를 동시에 처리하는 모듈',   hypernym_ko: '처리 장치', hypernym_en: 'Processing Device' },
-  { symbol: '400', value_ko: '결과 통합부',    value_en: 'Result Integrator',  description: '처리 결과를 통합하여 최종 출력을 생성하는 모듈',  hypernym_ko: '통합 장치', hypernym_en: 'Integration Device' },
+  { id: uid(), symbol: '100', value_ko: '데이터 수집부',  value_en: 'Data Collector',    description: '외부 장치로부터 원시 데이터를 수집하는 모듈', hypernym_ko: '수집 장치', hypernym_en: 'Collecting Device' },
+  { id: uid(), symbol: '200', value_ko: '전처리부',       value_en: 'Preprocessor',       description: '수집된 데이터를 정규화·필터링하는 모듈',         hypernym_ko: '처리 장치', hypernym_en: 'Processing Device' },
+  { id: uid(), symbol: '300', value_ko: '병렬 처리부',    value_en: 'Parallel Processor', description: '복수의 스레드로 데이터를 동시에 처리하는 모듈',   hypernym_ko: '처리 장치', hypernym_en: 'Processing Device' },
+  { id: uid(), symbol: '400', value_ko: '결과 통합부',    value_en: 'Result Integrator',  description: '처리 결과를 통합하여 최종 출력을 생성하는 모듈',  hypernym_ko: '통합 장치', hypernym_en: 'Integration Device' },
 ]
 
+// element_ids(UUID) 참조 헬퍼 — mock 데이터의 idx를 실제 요소 id로 변환
+const elIds = (...idxs: number[]): string[] => idxs.map(i => MOCK_ELEMENTS[i]?.id).filter(Boolean);
+
 export function generateComponentCandidates(_input: InventionInput): SpecComponentItem[] {
-  return MOCK_ELEMENTS.map((el, i) => ({
+  return MOCK_ELEMENTS.map(el => ({
     ...el,
-    id: i + 1,
     depth: 0,
     sel: true,
   }))
@@ -105,33 +117,33 @@ export const MOCK_INDEPENDENT_CLAIM_SETS: IndependentClaimSet[] = [
   {
     abstraction_level: 'BROAD',
     claims: [
-      { value: '데이터를 수집하는 수집부; 수집된 데이터를 병렬로 처리하는 처리부; 처리 결과를 통합하는 통합부를 포함하는 데이터 처리 시스템.', category: 'MACHINE', element_idxs: [0, 2, 3] },
-      { value: '데이터를 수집하는 단계; 수집된 데이터를 병렬로 처리하는 단계; 처리 결과를 통합하는 단계를 포함하는 데이터 처리 방법.', category: 'PROCESS', element_idxs: [0, 2, 3] },
+      { value: '데이터를 수집하는 수집부; 수집된 데이터를 병렬로 처리하는 처리부; 처리 결과를 통합하는 통합부를 포함하는 데이터 처리 시스템.', category: 'MACHINE', element_ids: elIds(0, 2, 3) },
+      { value: '데이터를 수집하는 단계; 수집된 데이터를 병렬로 처리하는 단계; 처리 결과를 통합하는 단계를 포함하는 데이터 처리 방법.', category: 'PROCESS', element_ids: elIds(0, 2, 3) },
     ],
   },
   {
     abstraction_level: 'BROAD',
     claims: [
-      { value: '입력 데이터를 복수의 처리 경로로 분산하는 분산부; 각 처리 경로에서 데이터를 처리하는 처리부; 처리된 결과를 병합하는 병합부를 포함하는 데이터 처리 장치.', category: 'MACHINE', element_idxs: [0, 2, 3] },
+      { value: '입력 데이터를 복수의 처리 경로로 분산하는 분산부; 각 처리 경로에서 데이터를 처리하는 처리부; 처리된 결과를 병합하는 병합부를 포함하는 데이터 처리 장치.', category: 'MACHINE', element_ids: elIds(0, 2, 3) },
     ],
   },
   {
     abstraction_level: 'INTERMEDIATE',
     claims: [
-      { value: '원시 데이터를 수집하는 데이터 수집부(100); 수집된 데이터를 정규화하는 전처리부(200); 복수의 스레드로 데이터를 동시 처리하는 병렬 처리부(300); 처리 결과를 통합하는 결과 통합부(400)를 포함하는 데이터 처리 시스템.', category: 'MACHINE', element_idxs: [0, 1, 2, 3] },
-      { value: '원시 데이터를 수집하는 단계; 수집된 데이터를 정규화하는 단계; 복수의 스레드로 데이터를 동시 처리하는 단계; 처리 결과를 통합하는 단계를 포함하는 데이터 처리 방법.', category: 'PROCESS', element_idxs: [0, 1, 2, 3] },
+      { value: '원시 데이터를 수집하는 데이터 수집부(100); 수집된 데이터를 정규화하는 전처리부(200); 복수의 스레드로 데이터를 동시 처리하는 병렬 처리부(300); 처리 결과를 통합하는 결과 통합부(400)를 포함하는 데이터 처리 시스템.', category: 'MACHINE', element_ids: elIds(0, 1, 2, 3) },
+      { value: '원시 데이터를 수집하는 단계; 수집된 데이터를 정규화하는 단계; 복수의 스레드로 데이터를 동시 처리하는 단계; 처리 결과를 통합하는 단계를 포함하는 데이터 처리 방법.', category: 'PROCESS', element_ids: elIds(0, 1, 2, 3) },
     ],
   },
   {
     abstraction_level: 'INTERMEDIATE',
     claims: [
-      { value: '외부 장치로부터 원시 데이터를 수집하는 수집부(100); 수집 데이터의 오류를 검출하고 보정하는 전처리부(200); 병렬 알고리즘으로 데이터를 처리하는 처리부(300); 처리 결과를 가중 합산하는 통합부(400)를 포함하는 데이터 처리 시스템.', category: 'MACHINE', element_idxs: [0, 1, 2, 3] },
+      { value: '외부 장치로부터 원시 데이터를 수집하는 수집부(100); 수집 데이터의 오류를 검출하고 보정하는 전처리부(200); 병렬 알고리즘으로 데이터를 처리하는 처리부(300); 처리 결과를 가중 합산하는 통합부(400)를 포함하는 데이터 처리 시스템.', category: 'MACHINE', element_ids: elIds(0, 1, 2, 3) },
     ],
   },
   {
     abstraction_level: 'NARROW',
     claims: [
-      { value: 'IoT 센서 신호를 수신하는 데이터 수집부(100); 신호에서 노이즈를 제거하고 표준 포맷으로 변환하는 전처리부(200); 4개 이상의 독립 스레드로 분산 처리하는 병렬 처리부(300); 가중 평균 방식으로 결과를 통합하는 결과 통합부(400)를 포함하는 실시간 데이터 처리 시스템.', category: 'MACHINE', element_idxs: [0, 1, 2, 3] },
+      { value: 'IoT 센서 신호를 수신하는 데이터 수집부(100); 신호에서 노이즈를 제거하고 표준 포맷으로 변환하는 전처리부(200); 4개 이상의 독립 스레드로 분산 처리하는 병렬 처리부(300); 가중 평균 방식으로 결과를 통합하는 결과 통합부(400)를 포함하는 실시간 데이터 처리 시스템.', category: 'MACHINE', element_ids: elIds(0, 1, 2, 3) },
     ],
   },
 ]
@@ -139,9 +151,9 @@ export const MOCK_INDEPENDENT_CLAIM_SETS: IndependentClaimSet[] = [
 // ── 종속항 mock ───────────────────────────────────────────────────────────────
 
 export const MOCK_DEPENDENT_CLAIMS: Omit<DepClaimItem, 'id' | 'sel'>[] = [
-  { no: 2, value: '제1항에 있어서, 상기 병렬 처리부(300)는 처리 결과의 신뢰도를 수치화하는 신뢰도 산출 모듈을 더 포함하는 데이터 처리 시스템.', depends_on: 1, element_idxs: [2] },
-  { no: 3, value: '제1항에 있어서, 상기 전처리부(200)는 이상치 검출 알고리즘을 포함하는 데이터 처리 시스템.', depends_on: 1, element_idxs: [1] },
-  { no: 4, value: '제2항에 있어서, 신뢰도가 기준값 미만인 경우 재처리를 요청하는 피드백 모듈을 더 포함하는 데이터 처리 시스템.', depends_on: 2, element_idxs: [2] },
+  { no: 2, value: '제1항에 있어서, 상기 병렬 처리부(300)는 처리 결과의 신뢰도를 수치화하는 신뢰도 산출 모듈을 더 포함하는 데이터 처리 시스템.', depends_on: 1, element_ids: elIds(2) },
+  { no: 3, value: '제1항에 있어서, 상기 전처리부(200)는 이상치 검출 알고리즘을 포함하는 데이터 처리 시스템.', depends_on: 1, element_ids: elIds(1) },
+  { no: 4, value: '제2항에 있어서, 신뢰도가 기준값 미만인 경우 재처리를 요청하는 피드백 모듈을 더 포함하는 데이터 처리 시스템.', depends_on: 2, element_ids: elIds(2) },
 ]
 
 // ── 중간명세서 mock ───────────────────────────────────────────────────────────
@@ -150,37 +162,37 @@ export const MOCK_MIDSPEC: MidspecSection[] = [
   {
     key: 'technical_field',
     label: '기술분야',
-    blocks: [{ text: '본 발명은 병렬 분산 처리 기반의 데이터 처리 시스템 및 방법에 관한 것이다.' }],
+    blocks: [tb('본 발명은 병렬 분산 처리 기반의 데이터 처리 시스템 및 방법에 관한 것이다.')],
   },
   {
     key: 'background_art',
     label: '배경기술',
     blocks: [
-      { text: '종래의 데이터 처리 시스템은 단일 프로세서 기반의 직렬 처리 방식을 사용하였다.' },
-      { text: '이러한 방식은 처리 속도가 느리고 오류율이 높은 문제점이 있었다.' },
+      tb('종래의 데이터 처리 시스템은 단일 프로세서 기반의 직렬 처리 방식을 사용하였다.'),
+      tb('이러한 방식은 처리 속도가 느리고 오류율이 높은 문제점이 있었다.'),
     ],
   },
   {
     key: 'technical_problem',
     label: '해결과제',
-    blocks: [{ text: '본 발명이 해결하려는 과제는 병렬 처리를 통해 데이터 처리 속도를 향상시키고 오류율을 낮추는 것이다.' }],
+    blocks: [tb('본 발명이 해결하려는 과제는 병렬 처리를 통해 데이터 처리 속도를 향상시키고 오류율을 낮추는 것이다.')],
   },
   {
     key: 'technical_solution',
     label: '해결수단',
-    blocks: [{ text: '상기 과제를 해결하기 위하여, 본 발명은 복수의 처리 모듈이 데이터를 병렬로 분산 처리하고 결과를 통합하는 구조를 채택한다.' }],
+    blocks: [tb('상기 과제를 해결하기 위하여, 본 발명은 복수의 처리 모듈이 데이터를 병렬로 분산 처리하고 결과를 통합하는 구조를 채택한다.')],
   },
   {
     key: 'advantageous_effects',
     label: '발명의 효과',
-    blocks: [{ text: '본 발명에 따르면 데이터 처리 속도를 300% 향상시키고 오류율을 90% 감소시키는 효과가 있다.' }],
+    blocks: [tb('본 발명에 따르면 데이터 처리 속도를 300% 향상시키고 오류율을 90% 감소시키는 효과가 있다.')],
   },
   {
     key: 'drawing_descriptions',
     label: '도면의 간단한 설명',
     blocks: [
-      { text: '도 1은 본 발명의 일 실시예에 따른 데이터 처리 시스템의 전체 구성을 나타낸 블록도이다.' },
-      { text: '도 2는 종래 기술에 따른 데이터 처리 구조를 나타낸 도면이다.' },
+      tb('도 1은 본 발명의 일 실시예에 따른 데이터 처리 시스템의 전체 구성을 나타낸 블록도이다.'),
+      tb('도 2는 종래 기술에 따른 데이터 처리 구조를 나타낸 도면이다.'),
     ],
   },
 ]
@@ -201,12 +213,12 @@ export function getMockExtractResult(): InventionContext {
 // ── 실시예 mock (B2) ─────────────────────────────────────────────────────────
 
 export const MOCK_EMBODIMENT: import('./types').SpecificationBlock[] = [
-  { text: '이하, 첨부된 도면을 참조하여 본 발명의 바람직한 실시예를 상세히 설명한다.' },
-  { text: '도 1을 참조하면, 본 발명의 일 실시예에 따른 데이터 처리 시스템(10)은 데이터 수집부(100), 전처리부(200), 병렬 처리부(300) 및 결과 통합부(400)를 포함한다.' },
-  { text: '데이터 수집부(100)는 외부 장치로부터 원시 데이터를 수집하며, 수집된 데이터를 전처리부(200)로 전달한다.' },
-  { text: '전처리부(200)는 수집된 데이터에서 노이즈를 제거하고 표준 포맷으로 변환한 후, 병렬 처리부(300)로 전달한다.' },
-  { text: '병렬 처리부(300)는 복수의 독립 스레드를 이용하여 데이터를 동시에 분산 처리하고, 처리 결과를 결과 통합부(400)로 전달한다.' },
-  { text: '결과 통합부(400)는 각 스레드의 처리 결과를 가중 평균 방식으로 통합하여 최종 출력을 생성한다.' },
+  tb('이하, 첨부된 도면을 참조하여 본 발명의 바람직한 실시예를 상세히 설명한다.'),
+  tb('도 1을 참조하면, 본 발명의 일 실시예에 따른 데이터 처리 시스템(10)은 데이터 수집부(100), 전처리부(200), 병렬 처리부(300) 및 결과 통합부(400)를 포함한다.'),
+  tb('데이터 수집부(100)는 외부 장치로부터 원시 데이터를 수집하며, 수집된 데이터를 전처리부(200)로 전달한다.'),
+  tb('전처리부(200)는 수집된 데이터에서 노이즈를 제거하고 표준 포맷으로 변환한 후, 병렬 처리부(300)로 전달한다.'),
+  tb('병렬 처리부(300)는 복수의 독립 스레드를 이용하여 데이터를 동시에 분산 처리하고, 처리 결과를 결과 통합부(400)로 전달한다.'),
+  tb('결과 통합부(400)는 각 스레드의 처리 결과를 가중 평균 방식으로 통합하여 최종 출력을 생성한다.'),
 ]
 
 // ── AI 부분 수정 mock ─────────────────────────────────────────────────────────

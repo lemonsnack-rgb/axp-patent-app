@@ -5,8 +5,23 @@
  */
 import { generateMockModification } from './clarityAnalyzer';
 
-// 라우팅되는 의도 (개발노트: edit / clarify / answer / plan / terminate)
-export type AgentIntent = 'edit' | 'clarify' | 'answer' | 'plan' | 'terminate';
+// 라우팅되는 의도 — API SpecificationEditorChatMessage.intent 정합
+// (answer / clarify / edit_body / edit_claims / edit_drawing_description / plan / replace_expression / terminate)
+export type AgentIntent =
+  | 'answer' | 'clarify' | 'plan' | 'terminate'
+  | 'edit_body' | 'edit_claims' | 'edit_drawing_description'
+  | 'replace_expression';
+
+// routeIntent 단계에서는 수정 대상이 확정되지 않으므로 'edit'로 반환하고,
+// 대상 섹션 확정 후 resolveEditIntent로 세분화한다.
+export type RoutedIntent = AgentIntent | 'edit';
+
+// 수정 대상 섹션 → edit 계열 intent 세분화 (API intent 정합)
+export function resolveEditIntent(sids: string[]): AgentIntent {
+  if (sids.length && sids.every(s => s === 'claims')) return 'edit_claims';
+  if (sids.length && sids.every(s => s === 'drawing_descriptions')) return 'edit_drawing_description';
+  return 'edit_body';
+}
 
 // 블록 수정 액션 (EditProposalMeta.action)
 export type EditAction = 'REWRITE' | 'REPLACE' | 'INSERT' | 'DELETE';
@@ -35,8 +50,15 @@ export interface PlanStepDef {
   instruction: string;   // 실제 지시
 }
 
+// 용어(표현) 교체 제안 — API ExpressionReplacement 정합
+export interface ExpressionReplacement {
+  source: string;                                   // 교체 전 표현
+  target: string;                                   // 교체 후 표현
+  status: 'pending' | 'accepted' | 'declined';
+}
+
 export interface RouteResult {
-  intent: AgentIntent;
+  intent: RoutedIntent;
   answer?: string;         // answer/terminate 시 표시 텍스트
   clarifyOptions?: string[];
   planSteps?: PlanStepDef[];
@@ -52,9 +74,14 @@ const RE_INSERT = /(추가|삽입|넣어|덧붙|보태)/;
 const RE_REWRITE = /(재작성|전면\s*수정|처음부터|새로\s*써|통째로)/;
 // 플랜: "먼저 ~하고 그 다음/그에 맞춰 ~" 처럼 순차 다단계 지시
 const RE_PLAN = /(먼저|우선).*(그\s*다음|그다음|그\s*후|이후|그에\s*맞[춰추]|맞춰서|반영해|다듬)/;
+// 용어/표현 일괄 교체: "A를 B로 바꿔/통일/교체" 혹은 "용어를 일관되게"
+const RE_REPLACE_EXPR = /((용어|표현|명칭)[^가-힣]*(일괄|일관|통일|교체))|((일관|통일)된?\s*(용어|표현))|문서\s*전체에서.*(바꿔|교체|통일)/;
 
 export function routeIntent(msg: string, opts: { hasSelection: boolean }): RouteResult {
   const m = msg.trim();
+  if (RE_REPLACE_EXPR.test(m)) {
+    return { intent: 'replace_expression' };
+  }
   if (RE_TERMINATE.test(m)) {
     return {
       intent: 'terminate',
@@ -127,14 +154,89 @@ export const GUIDE_ANSWER =
   '• 본문 수정: 기술분야·배경기술·해결과제·해결수단·효과·실시예 (단락 선택 후 지시)\n' +
   '• 청구항 수정: 독립항→종속항 순으로 검토·수정\n' +
   '• 도면의 설명 수정\n' +
+  '• 용어/표현 일괄 교체: "문서 전체에서 용어를 일관된 표현으로 통일해줘"\n' +
   '• 명세서 내용 질의응답 / 작성 방향 추천\n' +
   '• 여러 단계 작업(플랜): "배경기술 먼저 보완하고 그에 맞춰 해결과제도 다듬어줘"\n\n' +
   '외부 검색·도면 이미지 생성·기타 요청은 지원하지 않습니다.';
 
 export const INTENT_LABEL: Record<AgentIntent, string> = {
-  edit: '수정 제안',
-  clarify: '방향 확인',
   answer: '답변',
+  clarify: '방향 확인',
   plan: '플랜',
   terminate: '미지원',
+  edit_body: '본문 수정',
+  edit_claims: '청구항 수정',
+  edit_drawing_description: '도면 설명 수정',
+  replace_expression: '용어 교체',
 };
+
+// ── 용어(표현) 교체 mock ─────────────────────────────────────────────────────
+// 데모/API: intent=replace_expression 시 ExpressionReplacement[] 제안.
+// 1) 지시에 "A를 B로" 패턴이 있으면 그대로 사용
+// 2) 없으면 문서에서 자주 쓰이는 표기 변형 후보를 탐색 (결정론적)
+const COMMON_VARIANTS: Array<[string, string]> = [
+  ['본원 발명', '본 발명'],
+  ['상기한', '상기'],
+  ['브레이크액', '브레이크 액'],
+  ['디스크브레이크', '디스크 브레이크'],
+  ['제동 기구', '제동기구'],
+  ['씨스템', '시스템'],
+  ['데이타', '데이터'],
+];
+
+export function buildExpressionReplacements(instruction: string, docText: string): ExpressionReplacement[] {
+  const out: ExpressionReplacement[] = [];
+  // "A를 B로 바꿔/교체/통일" 명시 패턴 — 따옴표 구문은 공백 포함 허용, 일반 구문은 단일 어절만
+  const m = instruction.match(/['"“”]([^'"“”]{1,30})['"“”]\s*[을를]\s*['"“”]?([^'"“”\s]{1,30}?)['"“”]?(?:으로|로)\s*(바꿔|교체|통일)/)
+    || instruction.match(/([\w가-힣]{1,20})[을를]\s*([\w가-힣]{1,20}?)(?:으로|로)\s*(바꿔|교체|통일)/);
+  if (m) out.push({ source: m[1].trim(), target: m[2].trim(), status: 'pending' });
+  // 문서 내 표기 변형 탐색
+  for (const [src, tgt] of COMMON_VARIANTS) {
+    if (out.length >= 3) break;
+    if (docText.includes(src) && !out.some(r => r.source === src)) {
+      out.push({ source: src, target: tgt, status: 'pending' });
+    }
+  }
+  return out;
+}
+
+// ── 요청 분석 진행 트리 (데모 SSE 이벤트 {label, depth} 정합) ────────────────
+export interface ProgressStep { label: string; depth: number }
+
+export function progressStepsFor(intent: RoutedIntent): ProgressStep[] {
+  const head: ProgressStep = { label: '요청 의도 파악', depth: 0 };
+  switch (intent) {
+    case 'edit':
+    case 'edit_body':
+      return [head,
+        { label: '본문 편집', depth: 0 },
+        { label: '참고 문단 수집', depth: 1 },
+        { label: '도면 확인', depth: 1 },
+        { label: '본문 수정안 작성', depth: 1 }];
+    case 'edit_claims':
+      return [head,
+        { label: '청구항 편집', depth: 0 },
+        { label: '관련 청구항 수집', depth: 1 },
+        { label: '구성요소 대응 확인', depth: 1 },
+        { label: '청구항 수정안 작성', depth: 1 }];
+    case 'edit_drawing_description':
+      return [head,
+        { label: '도면 설명 편집', depth: 0 },
+        { label: '도면 확인', depth: 1 },
+        { label: '설명 수정안 작성', depth: 1 }];
+    case 'replace_expression':
+      return [head,
+        { label: '용어 교체', depth: 0 },
+        { label: '문서 내 용례 수집', depth: 1 },
+        { label: '교체안 작성', depth: 1 }];
+    case 'plan':
+      return [head, { label: '작업 계획 수립', depth: 0 }];
+    case 'clarify':
+      return [head, { label: '선택지 구성', depth: 0 }];
+    case 'terminate':
+      return [head];
+    case 'answer':
+    default:
+      return [head, { label: '문서 검토·답변 작성', depth: 0 }];
+  }
+}
