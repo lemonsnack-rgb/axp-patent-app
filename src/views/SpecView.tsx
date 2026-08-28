@@ -19,7 +19,7 @@ import {
 import { generateMockModification } from '../features/ai/clarityAnalyzer';
 import { toast } from '../components/Toast';
 import { uid } from '../utils/uid';
-import { particle } from '../utils/korean';
+import { particle, withParticle } from '../utils/korean';
 import { diffWords } from '../utils/diffWords';
 import { DiffText } from '../components/DiffText';
 import type { DrawingItem as WorkflowDrawingItem } from '../features/drawing-workflow/types';
@@ -228,6 +228,14 @@ export function SpecView() {
         setMidspec(next);
       });
     }
+    // 이미지 선별 확정 시 대표 이미지가 없으면 첫 선택 이미지를 대표로 (A5)
+    if (id === 'images') {
+      setContext(p => {
+        if (p.drawings.some(d => d.included !== false && d.isRepresentative)) return p;
+        let set = false;
+        return { ...p, drawings: p.drawings.map(d => (!set && d.included !== false) ? (set = true, { ...d, isRepresentative: true }) : d) };
+      });
+    }
     // 명세서 도면 단계 진입 시 — 이미지 선별(3단계) 결과를 도면 채택 기본값으로 프리셋 (U2)
     // (이미 채택된 도면이 있으면 사용자 선택을 존중)
     if (id === 'components') {
@@ -271,7 +279,7 @@ export function SpecView() {
     };
     // 이후 단계가 이미 확정되어 있으면 재확정이 필요함을 먼저 알린다 (U4)
     const later = STEPS.filter(st => si(st.id) > si(id) && confirmed[st.id] && STEP_LABEL[st.id]).map(st => STEP_LABEL[st.id]);
-    if (later.length) showConfirm(`"${STEP_LABEL[id]}"을(를) 다시 선택하면 이후 단계(${later.join(' · ')})를 다시 확정해야 합니다. 계속할까요?`, doIt);
+    if (later.length) showConfirm(`${withParticle(`"${STEP_LABEL[id]}"`.replace(/"$/, ''), '을', '를').replace(/^"([^"]+)/, '"$1"')} 다시 선택하면 이후 단계(${later.join(' · ')})를 다시 확정해야 합니다. 계속할까요?`, doIt);
     else doIt();
   };
   const scrollToStep = (id: StepId) => {
@@ -658,6 +666,7 @@ export function SpecView() {
                             candidates={titleCandidates}
                             gSel={gSel}
                             setGSel={setGSel}
+                            onSummaryChange={summary => setContext(p => p.summary === summary ? p : { ...p, summary })}
                             onRegenerate={() => {
                               setTitleCandidates(generateTitleCandidates({ title: diTitle, field: diField, content: diContent }));
                               toast('명칭 후보를 다시 생성했습니다');
@@ -881,6 +890,18 @@ export function SpecView() {
                           : confirm('drawings')}
                         className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-brand-500 transition-colors"
                       >{specCount === 0 ? '도면 없이 다음 →' : '다음 →'}</button>
+                    );
+                  }
+                  if (curStep === 'images') {
+                    // 선택 이미지 0개면 확인 후 진행 — 이후 도면·도면 설명이 비게 됨을 알린다 (A5)
+                    const inc = context.drawings.filter(d => d.included !== false).length;
+                    return (
+                      <button
+                        onClick={() => inc === 0
+                          ? showConfirm('선택한 이미지가 없습니다. 이미지 없이 진행하면 명세서 도면과 도면 설명이 비게 됩니다. 계속할까요?', () => confirm('images'))
+                          : confirm('images')}
+                        className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-brand-500 transition-colors"
+                      >{inc === 0 ? '이미지 없이 다음 →' : '다음 →'}</button>
                     );
                   }
                   const canGo = isSpecialStep(curStep) || !!gSel[curStep]?.trim();
@@ -1149,20 +1170,23 @@ function AiGlobalBar({ placeholder, value, onChange, propose, onApply, title, do
 // ── 본문 내 삽입형(인라인) AI 수정 입력 ─────────────────────────────────────
 // 데모 정합: 카드/블록의 'AI 수정' 클릭 → 그 자리에서 지시 입력 + 수정 요청/취소.
 // 사이드패널을 사용하지 않고, 요청 후 해당 항목만 교체된다.
-function InlineAiEdit({ placeholder, original, label, onApply, onClose, doneMsg }: {
+type InlineAiTarget = { original: string; label: string; onApply: (next: string) => void };
+function InlineAiEdit({ placeholder, original, label, onApply, targets, onClose, doneMsg }: {
   placeholder: string;
-  original: string;                      // 수정 대상 원문 (제안 카드 Before)
+  original?: string;                     // 수정 대상 원문 (단일 대상)
   label?: string;                        // 제안 카드 항목명 (예: 발명의 명칭)
-  onApply: (next: string) => void;       // 적용 시 호출
+  onApply?: (next: string) => void;      // 적용 시 호출 (단일 대상)
+  targets?: InlineAiTarget[];            // 다중 대상 (예: 명칭 + 개요를 한 번에) — 지정 시 original/onApply 대신 사용 (B1)
   onClose: () => void;
   doneMsg?: string;
 }) {
   const [instruction, setInstruction] = useState('');
   const [busy, setBusy] = useState(false);
-  const [pending, setPending] = useState<{ instruction: string; change: PendingChange } | null>(null);
+  const [pending, setPending] = useState<{ instruction: string; changes: PendingChange[] } | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const apply = (change: PendingChange) => {
-    onApply(change.after ?? original);
+  const list: InlineAiTarget[] = targets ?? [{ original: original ?? '', label: label ?? '항목', onApply: onApply ?? (() => {}) }];
+  const apply = (changes: PendingChange[]) => {
+    changes.forEach(c => c.apply?.());
     toast(doneMsg ?? '항목이 수정되었습니다');
     onClose();
   };
@@ -1172,20 +1196,20 @@ function InlineAiEdit({ placeholder, original, label, onApply, onClose, doneMsg 
     setBusy(true);
     setStatus(null);
     setTimeout(() => {
-      const change = proposeMock(original, instr, label);
+      const changes = list.map(t => proposeMock(t.original, instr, t.label, t.onApply));
       setBusy(false);
-      if (!AI_EDIT_CONFIRM) { apply(change); return; }
-      setPending({ instruction: instr, change });
+      if (!AI_EDIT_CONFIRM) { apply(changes); return; }
+      setPending({ instruction: instr, changes });
     }, AI_MOCK_DELAY_MS);
   };
   if (pending) {
     return (
       <AiPendingCard
         className="mt-1.5"
-        title={`${label ?? '항목'} 수정 제안`}
+        title={`${targets ? targets.map(t => t.label).join('·') : (label ?? '항목')} 수정 제안`}
         instruction={pending.instruction}
-        changes={[pending.change]}
-        onApply={() => apply(pending.change)}
+        changes={pending.changes}
+        onApply={() => apply(pending.changes)}
         onCancel={() => { setPending(null); setStatus('수정을 적용하지 않았습니다 — 지시를 고쳐 다시 요청할 수 있습니다'); }}
       />
     );
@@ -1233,17 +1257,19 @@ function InlineAiEdit({ placeholder, original, label, onApply, onClose, doneMsg 
 
 // ── 발명의 명칭 후보 카드 (title + abstract) ──────────────────────
 function TitleCandidateCards({
-  candidates, gSel, setGSel, onRegenerate,
+  candidates, gSel, setGSel, onRegenerate, onSummaryChange,
 }: {
   candidates: TitleCandidate[];
   gSel: Partial<Record<StepId, string>>;
   setGSel: React.Dispatch<React.SetStateAction<Partial<Record<StepId, string>>>>;
   onRegenerate?: () => void;
+  onSummaryChange?: (summary: string) => void;   // 선택된 후보/직접 입력의 개요를 InventionContext.summary로 전파 (A9)
 }) {
   const curSel = gSel['title'] || '';
   const [titleEdits, setTitleEdits] = useState<Record<string, string>>({});
   const [abstractEdits, setAbstractEdits] = useState<Record<string, string>>({});
-  // 인라인 AI 수정 — 열린 대상 키 (`${후보id}-title` | `${후보id}-abstract`)
+  const [directAbstract, setDirectAbstract] = useState('');
+  // 인라인 AI 수정 — 열린 카드 키 (`${후보id}`; 명칭+개요를 한 번에 수정) (B1)
   const [aiKey, setAiKey] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1254,6 +1280,15 @@ function TitleCandidateCards({
 
   const isFromCandidates = (val: string) =>
     candidates.some(c => (titleEdits[c.id] ?? c.title) === val || c.title === val);
+
+  // 선택 변화·개요 편집 시 요약(개요) 전파 — 직접 입력이면 직접 입력 개요, 후보면 그 후보의 개요
+  const summaryRef = useRef(onSummaryChange);
+  useEffect(() => { summaryRef.current = onSummaryChange; });
+  useEffect(() => {
+    const sel = candidates.find(c => (titleEdits[c.id] ?? c.title) === curSel || c.title === curSel);
+    summaryRef.current?.(sel ? (abstractEdits[sel.id] ?? sel.summary) : directAbstract);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSel, abstractEdits, titleEdits, directAbstract, candidates]);
 
   return (
     <div className="space-y-2 mt-3">
@@ -1280,52 +1315,31 @@ function TitleCandidateCards({
                 {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
               </span>
               <p className="flex-1 min-w-0 text-sm2 font-semibold text-gray-800 leading-snug">{titleVal}</p>
+              {/* 카드당 AI 수정 1개 — 명칭·개요를 한 번에 지시 (데모 "명칭·개요를 어떻게 수정할지" 정합) (B1) */}
               <AiEditButton
-                active={aiKey === `${c.id}-title`}
+                active={aiKey === c.id}
+                title="명칭과 개요를 AI로 수정"
                 onClick={e => {
                   e.stopPropagation();
                   setGSel(p => ({ ...p, title: titleVal }));
-                  setAiKey(k => k === `${c.id}-title` ? null : `${c.id}-title`);
+                  setAiKey(k => k === c.id ? null : c.id);
                 }}
               />
             </div>
-            {aiKey === `${c.id}-title` && (
-              <InlineAiEdit
-                placeholder="명칭을 어떻게 수정할지 지시해주세요 (예: 방법(method) 청구 관점으로 바꿔줘)"
-                onClose={() => setAiKey(null)}
-                original={titleVal}
-                label="발명의 명칭"
-                onApply={newText => {
-                    setTitleEdits(prev => ({ ...prev, [c.id]: newText }));
-                    setGSel(p => ({ ...p, title: newText }));
-                  }}
-                doneMsg="명칭이 수정되었습니다"
-              />
-            )}
             {/* 개요 행 */}
-            <div className="flex items-start gap-2 pt-1.5 border-t border-gray-100">
-              <div className="flex-1 min-w-0">
-                <span className="text-xs2 text-gray-400 font-medium block mb-0.5">개요</span>
-                <p className="text-xs2 text-gray-500 leading-relaxed">{abstractVal}</p>
-              </div>
-              <AiEditButton
-                active={aiKey === `${c.id}-abstract`}
-                onClick={e => {
-                  e.stopPropagation();
-                  setAiKey(k => k === `${c.id}-abstract` ? null : `${c.id}-abstract`);
-                }}
-              />
+            <div className="pt-1.5 mt-1.5 border-t border-gray-100">
+              <span className="text-xs2 text-gray-400 font-medium block mb-0.5">개요</span>
+              <p className="text-sm2 text-gray-600 leading-relaxed">{abstractVal}</p>
             </div>
-            {aiKey === `${c.id}-abstract` && (
+            {aiKey === c.id && (
               <InlineAiEdit
-                placeholder="개요를 어떻게 수정할지 지시해주세요"
+                placeholder="명칭·개요를 어떻게 수정할지 지시해주세요 (예: 방법(method) 청구 관점으로 바꿔줘)"
                 onClose={() => setAiKey(null)}
-                original={abstractVal}
-                label="개요"
-                onApply={newText => {
-                    setAbstractEdits(prev => ({ ...prev, [c.id]: newText }));
-                  }}
-                doneMsg="개요가 수정되었습니다"
+                targets={[
+                  { original: titleVal, label: '발명의 명칭', onApply: newText => { setTitleEdits(prev => ({ ...prev, [c.id]: newText })); setGSel(p => ({ ...p, title: newText })); } },
+                  { original: abstractVal, label: '개요', onApply: newText => setAbstractEdits(prev => ({ ...prev, [c.id]: newText })) },
+                ]}
+                doneMsg="명칭·개요가 수정되었습니다"
               />
             )}
             {/* 추천 이유 행 */}
@@ -1363,6 +1377,18 @@ function TitleCandidateCards({
           onClick={e => e.stopPropagation()}
           rows={2}
         />
+        {/* 직접 입력 개요 — 요약서의 원천. 후보 카드와 동일하게 명칭+개요 쌍으로 입력 (A9) */}
+        <div className="pt-1.5 mt-1 border-t border-gray-100">
+          <span className="text-xs2 text-gray-400 font-medium block mb-0.5">개요 <span className="text-gray-300">(선택 — 요약서에 반영)</span></span>
+          <textarea
+            className="w-full text-sm2 text-gray-700 bg-transparent outline-none resize-none leading-relaxed"
+            placeholder="발명의 개요를 1~2문장으로 입력하세요"
+            value={directAbstract}
+            onChange={e => setDirectAbstract(e.target.value)}
+            onClick={e => e.stopPropagation()}
+            rows={2}
+          />
+        </div>
       </div>
       {onRegenerate && (
         <div className="flex justify-end">
@@ -1378,7 +1404,7 @@ function TitleCandidateCards({
 
 // ── 발명의 설명 항목 카드 (제안기술 / 종래기술 그룹) ──────────────────
 const DESC_LABEL_MAP: Record<string, string> = {
-  background: '배경기술', implementation: '구현', objective: '목적', effect: '효과',
+  background: '배경기술', implementation: '구성', objective: '목적', effect: '효과',
 };
 
 function DescriptionItemCards({
@@ -1456,7 +1482,10 @@ function DescriptionItemCards({
           {items.map((item, idx) => {
             const isAdopted = item.adopted !== false;
             const isAiItem = item.adopted !== undefined;
-            const sublabel = DESC_LABEL_MAP[item.label] ?? item.label;
+            // 표시 라벨 — 특허 문법 용어로 (제안: 목적·구성(해결수단)·효과 / 종래: 배경기술·종래 구성·문제점) (B4). API 라벨은 유지
+            const sublabel = item.label === 'implementation'
+              ? (type === 'previous' ? '종래 구성' : '구성(해결수단)')
+              : (DESC_LABEL_MAP[item.label] ?? item.label);
             return (
               <div
                 key={idx}
@@ -1477,15 +1506,15 @@ function DescriptionItemCards({
                     <button
                       onClick={() => onToggle(type, idx)}
                       className={clsx(
-                        'shrink-0 w-4 h-4 rounded-md border-2 flex items-center justify-center transition-all',
+                        'shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all',
                         isAdopted
-                          ? 'bg-brand-400 border-blue-600 text-white'
-                          : 'border-gray-300 bg-white hover:border-blue-400',
+                          ? 'bg-brand-400 border-brand-400 text-white'
+                          : 'border-gray-400 bg-white hover:border-brand-400',
                       )}
                       title={isAdopted ? '채택 해제' : '채택'}
                       aria-label={isAdopted ? '채택됨' : '채택'}
                     >
-                      {isAdopted && <Icon name="check" size={8} />}
+                      {isAdopted && <Icon name="check" size={10} />}
                     </button>
                   ) : (
                     <button
@@ -1520,6 +1549,17 @@ function DescriptionItemCards({
                         onClick={() => setAiKey(k => k === `${type}-${idx}` ? null : `${type}-${idx}`)}
                       />
                     )}
+                    {/* 반대편 기술로 보내기 — 헤더에 배치해 카드 높이 절감 (B3) */}
+                    <button
+                      onClick={() => onMoveAcross(type, idx)}
+                      className={clsx(
+                        'inline-flex items-center h-6 px-2 rounded-lg text-xs2 font-medium border transition-colors',
+                        type === 'previous'
+                          ? 'text-blue-600 border-blue-200 bg-white hover:bg-blue-50'
+                          : 'text-amber-700 border-amber-200 bg-white hover:bg-amber-50',
+                      )}
+                      title={type === 'previous' ? '이 항목을 제안기술 목록으로 보냅니다' : '이 항목을 종래기술 목록으로 보냅니다'}
+                    >{type === 'previous' ? '← 제안기술로' : '종래기술로 →'}</button>
                   </div>
                 </div>
                 {item.type === 'table' ? (
@@ -1538,12 +1578,13 @@ function DescriptionItemCards({
                   </div>
                 ) : (
                 <textarea
-                  className="w-full text-sm2 text-gray-700 leading-relaxed bg-transparent outline-none resize-none min-h-[48px]"
+                  className="w-full text-sm2 text-gray-700 leading-relaxed bg-transparent outline-none resize-none overflow-hidden"
                   value={item.content}
                   disabled={!isAdopted}
-                  rows={Math.max(2, Math.ceil(item.content.length / 42))}
+                  rows={1}
                   onChange={e => onChange(type, idx, e.target.value)}
                   placeholder="항목 내용..."
+                  ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                 />
                 )}
                 {aiKey === `${type}-${idx}` && (
@@ -1555,21 +1596,6 @@ function DescriptionItemCards({
                     onApply={newText => onChange(type, idx, newText)}
                   />
                 )}
-                {/* 종래↔제안 이동 — 방향·이름·목적지 색상으로 명확화 */}
-                <div className="flex justify-end mt-1.5">
-                  <button
-                    onClick={() => onMoveAcross(type, idx)}
-                    className={clsx(
-                      'flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs2 font-semibold border transition-colors',
-                      type === 'previous'
-                        ? 'text-blue-600 border-blue-200 hover:bg-blue-50'
-                        : 'text-amber-600 border-amber-200 hover:bg-amber-50',
-                    )}
-                    title={type === 'previous' ? '이 항목을 제안기술 목록으로 보냅니다' : '이 항목을 종래기술 목록으로 보냅니다'}
-                  >
-                    {type === 'previous' ? '← 제안기술로 보내기' : '종래기술로 보내기 →'}
-                  </button>
-                </div>
               </div>
             );
           })}
@@ -1585,7 +1611,7 @@ function DescriptionItemCards({
                 className="text-xs2 border border-gray-200 rounded-md px-1.5 py-0.5 bg-white text-gray-600 outline-none"
               >
                 <option value="background">배경기술</option>
-                <option value="implementation">구현방법</option>
+                <option value="implementation">구성(해결수단)</option>
                 <option value="objective">목적</option>
                 <option value="effect">효과</option>
               </select>
@@ -2534,7 +2560,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
     if (done) return;
     const name = drawings[idx]?.detail.name || drawings[idx]?.detail.symbol || '이 이미지';
     openAlertDialog(
-      { title: '이미지 삭제', description: `"${name}"을(를) 목록에서 삭제하시겠습니까?`, confirm: '삭제', cancel: '취소' },
+      { title: '이미지 삭제', description: `"${name}"${particle(name, '을', '를')} 목록에서 삭제하시겠습니까?`, confirm: '삭제', cancel: '취소' },
       { theme: 'danger', onConfirm: (ctrl) => { updateDrawings(drawings.filter((_, i) => i !== idx)); ctrl.close(); } }
     );
   };
@@ -2595,8 +2621,8 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                           className="absolute top-1.5 left-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-lg shadow-sm bg-white/95 border border-gray-200 transition-all"
                           title={included ? '선택 해제 (맥락에서 제외)' : '선택 (맥락에 사용)'}
                         >
-                          <span className={clsx('w-3.5 h-3.5 rounded-md border-2 flex items-center justify-center transition-all', included ? 'bg-brand-400 border-blue-600 text-white' : 'border-gray-300 bg-white')}>
-                            {included && <Icon name="check" size={8} />}
+                          <span className={clsx('w-4.5 h-4.5 min-w-[18px] min-h-[18px] rounded-md border-2 flex items-center justify-center transition-all', included ? 'bg-brand-400 border-brand-400 text-white' : 'border-gray-400 bg-white')}>
+                            {included && <Icon name="check" size={10} />}
                           </span>
                           <span className={clsx('text-xs2 font-semibold', included ? 'text-blue-700' : 'text-gray-500')}>선택</span>
                         </button>
@@ -3020,6 +3046,12 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
         {/* Preference UI — API independent-claim/set 의 preference (abstraction_level + claims[]) */}
         <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 space-y-2.5">
           <p className="text-xs2 font-semibold text-gray-600">권리범위 설정</p>
+          {/* 용어 도움말 — 처음 쓰는 사용자(대학원생)용 1줄 설명 (B11) */}
+          <p className="text-xs2 text-gray-400 leading-relaxed">
+            <b className="text-gray-500">추상화 수준</b>은 청구항을 얼마나 넓게 쓸지(넓을수록 보호 범위↑·등록 난이도↑),
+            <b className="text-gray-500"> 청구항 구성</b>은 어떤 종류의 항으로 청구할지입니다 —
+            장치항(구성요소의 결합) · 방법항(단계·동작, 소프트웨어 발명에 유리) · 제조항(제조 방법으로 얻은 물건) · 조성물항(성분·배합).
+          </p>
           <div>
             <p className="text-xs2 text-gray-400 mb-1">추상화 수준</p>
             <div className="flex gap-1.5">
@@ -3027,11 +3059,12 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
                 <button
                   key={level}
                   onClick={() => { if (!done) { setPreference(p => ({ ...p, abstraction: level })); resetGen(); } }}
+                  title={SCOPE_LABELS[level]?.sub}
                   className={clsx(
                     'flex-1 py-1 text-xs2 font-semibold rounded-lg border transition-colors',
                     preference.abstraction === level
-                      ? 'bg-brand-400 text-white border-blue-600'
-                      : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300',
+                      ? 'bg-brand-400 text-white border-brand-400'
+                      : 'bg-white text-gray-500 border-gray-200 hover:border-brand-300',
                   )}
                 >
                   {SCOPE_LABELS[level]?.label.replace(' 권리범위', '') ?? level}
@@ -3058,6 +3091,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
                     value={slot.category}
                     disabled={done}
                     onChange={e => updateSlotCategory(i, e.target.value)}
+                    title="장치항: 구성요소의 결합으로 청구 · 방법항: 단계·동작으로 청구(소프트웨어 유리) · 제조항: 제조 방법으로 얻은 물건 · 조성물항: 성분·배합"
                   >
                     {CLAIM_CATEGORIES.map(cat => (
                       <option key={cat} value={cat}>{CATEGORY_LABEL[cat] ?? cat}</option>
@@ -3328,7 +3362,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
                 const depNum = ++globalClaimNum;
                 const displayText = dep.text.replace(new RegExp(`제${ci + 1}항에 있어서`, 'g'), `제${indepNum}항에 있어서`);
                 return (
-                  <div key={dep.id} className={clsx('rounded-lg border overflow-hidden', dep.sel ? 'border-zinc-200 bg-white' : 'border-zinc-100 bg-zinc-50 opacity-60')}>
+                  <div key={dep.id} className={clsx('group rounded-lg border overflow-hidden', dep.sel ? 'border-zinc-200 bg-white' : 'border-zinc-100 bg-zinc-50 opacity-60')}>
                     <div className="flex items-center gap-2 px-2.5 py-1.5">
                       <button
                         onClick={e => { e.stopPropagation(); toggleDep(ci, dep.id); }}
@@ -3338,18 +3372,24 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange }: {
                         {dep.sel && <Icon name="check" size={8} />}
                       </button>
                       <span className="text-xs2 text-gray-500 font-medium shrink-0">종속항 {depNum}</span>
-                      {!done && dep.sel && (
-                        <AiEditButton
-                          className="ml-auto"
-                          active={aiKey === `dep-${ci}-${dep.id}`}
-                          onClick={e => { e.stopPropagation(); setAiKey(k => k === `dep-${ci}-${dep.id}` ? null : `dep-${ci}-${dep.id}`); }}
-                        />
-                      )}
+                      {/* 행 액션은 hover/포커스/열림 상태에서만 노출 — 8행 반복 버튼 기둥 제거 (B2) */}
                       {!done && (
-                        <button
-                          onClick={e => { e.stopPropagation(); removeDep(ci, dep.id); }}
-                          className={clsx('text-xs2 text-gray-300 hover:text-red-400 transition-colors', !(dep.sel) && 'ml-auto')}
-                        >✕</button>
+                        <div className={clsx(
+                          'ml-auto flex items-center gap-1 transition-opacity',
+                          aiKey === `dep-${ci}-${dep.id}` ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100',
+                        )}>
+                          {dep.sel && (
+                            <AiEditButton
+                              active={aiKey === `dep-${ci}-${dep.id}`}
+                              onClick={e => { e.stopPropagation(); setAiKey(k => k === `dep-${ci}-${dep.id}` ? null : `dep-${ci}-${dep.id}`); }}
+                            />
+                          )}
+                          <button
+                            onClick={e => { e.stopPropagation(); removeDep(ci, dep.id); }}
+                            className="w-6 h-6 inline-flex items-center justify-center rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                            title="종속항 삭제"
+                          >✕</button>
+                        </div>
                       )}
                     </div>
                     <div className="px-2.5 pb-2">

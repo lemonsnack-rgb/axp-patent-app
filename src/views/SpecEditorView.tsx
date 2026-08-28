@@ -8,7 +8,7 @@ import clsx from 'clsx';
 import katex from 'katex';
 import { Icon } from '../components/Icon';
 import { Input } from '../components/ui';
-import { Button, Textarea } from '@muhayu/axp-ui';
+import { Button, Textarea, openAlertDialog } from '@muhayu/axp-ui';
 import type { InventionContext, MidspecSection, InventionSpecification, Drawing } from '../features/spec/types';
 import type { DrawingItem as WorkflowDrawingItem } from '../features/drawing-workflow/types';
 import { openEditorTab } from '../features/drawing-workflow/editorChannel';
@@ -201,6 +201,15 @@ function claimDependsOn(value: string): number | null {
   const m = value.match(/제\s*(\d+)\s*항/);
   return m ? parseInt(m[1], 10) : null;
 }
+// "제N항" 인용 번호를 매핑에 따라 갱신 (A8) — 매핑에 없는 번호는 그대로 둔다
+function remapClaimRefs(items: { value: string }[], map: Record<number, number>): { value: string }[] {
+  return items.map(it => ({
+    value: it.value.replace(/제\s*(\d+)\s*항/g, (m, n: string) => {
+      const to = map[parseInt(n, 10)];
+      return to ? `제${to}항` : m;
+    }),
+  }));
+}
 function serializeClaimItems(items: { value: string }[]): string[] {
   const indep = items.filter(it => claimDependsOn(it.value) === null).length;
   const header = `독립항 ${indep}개, 종속항 ${items.length - indep}개`;
@@ -214,14 +223,41 @@ function ClaimsEditor({ blocks, onChange }: {
   const items = parseClaimItems(blocks);
   const commit = (next: { value: string }[]) => onChange(serializeClaimItems(next));
   const editVal = (idx: number, v: string) => commit(items.map((it, i) => i === idx ? { value: v } : it));
+  // 클릭-편집 모델: 본문 단락과 동일하게 읽기 → 클릭 시 편집 (B12)
+  const [editing, setEditing] = useState<number | null>(null);
+  // 순서 변경 시 두 항의 번호가 바뀌므로 인용 "제N항"도 함께 갱신 (A8)
   const move = (idx: number, dir: -1 | 1) => {
     const j = idx + dir;
     if (j < 0 || j >= items.length) return;
     const a = [...items];
     [a[idx], a[j]] = [a[j], a[idx]];
-    commit(a);
+    commit(remapClaimRefs(a, { [idx + 1]: j + 1, [j + 1]: idx + 1 }));
+    setEditing(null);
   };
-  const remove = (idx: number) => commit(items.filter((_, i) => i !== idx));
+  // 삭제 시: 뒤 항 번호가 당겨지므로 인용 갱신, 삭제 항을 인용하는 종속항은 함께 삭제할지 확인 (A8)
+  const remove = (idx: number) => {
+    const no = idx + 1;
+    const dependents = items.map((it, i) => ({ it, i })).filter(({ it, i }) => i !== idx && claimDependsOn(it.value) === no);
+    const doRemove = (alsoDependents: boolean) => {
+      const drop = new Set<number>([idx, ...(alsoDependents ? dependents.map(d => d.i) : [])]);
+      const kept = items.filter((_, i) => !drop.has(i));
+      // 남은 항의 (구 번호 → 새 번호) 매핑
+      const map: Record<number, number> = {};
+      let newNo = 0;
+      items.forEach((_, i) => { if (!drop.has(i)) { newNo++; map[i + 1] = newNo; } });
+      commit(remapClaimRefs(kept, map));
+      setEditing(null);
+    };
+    if (dependents.length === 0) { doRemove(false); return; }
+    openAlertDialog(
+      {
+        title: `청구항 ${no} 삭제`,
+        description: `청구항 ${no}을(를) 인용하는 종속항 ${dependents.length}개(${dependents.map(d => `청구항 ${d.i + 1}`).join(', ')})가 있습니다. 함께 삭제할까요? '이 항만 삭제'를 누르면 종속항은 남고 인용 번호가 ⚠로 표시됩니다.`,
+        confirm: '함께 삭제', cancel: '이 항만 삭제',
+      },
+      { theme: 'danger', onConfirm: (ctrl) => { ctrl.close(); doRemove(true); }, onCancel: (ctrl) => { ctrl.close(); doRemove(false); } },
+    );
+  };
   const addIndep = () => commit([...items, { value: '새 독립 청구항 내용을 입력하세요.' }]);
   const addDep = () => commit([...items, { value: `제1항에 있어서, ...인, 장치.` }]);
 
@@ -240,7 +276,7 @@ function ClaimsEditor({ blocks, onChange }: {
   return (
     <div className="space-y-2">
       <p className="text-xs2 text-zinc-400 mb-1">
-        번호는 위치에 따라 자동 부여됩니다. <span className="text-amber-600 font-medium">본문의 "제N항" 참조는 자동 변경되지 않으니 직접 수정하세요.</span>
+        번호는 위치에 따라 자동 부여되며, 순서 변경·삭제 시 본문의 "제N항" 인용도 함께 갱신됩니다. 항을 클릭하면 편집할 수 있습니다.
       </p>
       {items.map((it, idx) => {
         const no = idx + 1;
@@ -270,13 +306,23 @@ function ClaimsEditor({ blocks, onChange }: {
                 </button>
               </div>
             </div>
-            <textarea
-              value={it.value}
-              onChange={e => editVal(idx, e.target.value)}
-              rows={Math.max(2, Math.ceil(it.value.length / 50))}
-              className="w-full text-base2 text-zinc-800 leading-relaxed bg-transparent outline-none resize-none border border-transparent focus:border-blue-300 focus:bg-white rounded-md px-1.5 py-1 transition-colors"
-              ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
-            />
+            {editing === idx ? (
+              <textarea
+                autoFocus
+                value={it.value}
+                onChange={e => editVal(idx, e.target.value)}
+                onBlur={() => setEditing(null)}
+                rows={Math.max(2, Math.ceil(it.value.length / 50))}
+                className="w-full text-base2 text-zinc-800 leading-relaxed bg-white outline-none resize-none border border-brand-300 rounded-md px-1.5 py-1 transition-colors"
+                ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+              />
+            ) : (
+              <p
+                onClick={() => setEditing(idx)}
+                title="클릭하여 편집"
+                className="text-base2 text-zinc-800 leading-relaxed whitespace-pre-wrap px-1.5 py-1 rounded-md cursor-text hover:bg-white hover:ring-1 hover:ring-zinc-200 transition-colors"
+              >{it.value}</p>
+            )}
           </div>
         );
       })}
