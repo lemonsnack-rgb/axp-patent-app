@@ -734,7 +734,7 @@ export function SpecView() {
                         </div>
                       ) : (<>
                       <AiMsg text={
-                        <><strong className="text-base2 font-semibold text-neutral-800">{STEP_LABEL[s.id]}</strong><br />
+                        <><strong className="text-lg2 font-bold text-neutral-800">{STEP_LABEL[s.id]}</strong><br />
                         {STEP_HINT[s.id] ?? `${STEP_LABEL[s.id]} 항목을 확인하고 채우세요.`}</>
                       } />
                       {/* 단계 콘텐츠 — isDone 시 전체 딤 처리 */}
@@ -1617,7 +1617,7 @@ function DescriptionItemCards({
                 onDragOver={e => { if (dragSrc) { e.preventDefault(); setDropHint(`${type}-${idx}`); } }}
                 onDrop={() => handleDrop(type, idx)}
                 className={clsx(
-                  'rounded-xl border p-3.5 bg-white transition-all',
+                  'group rounded-xl border p-3.5 bg-white transition-all',
                   // 기본 상태는 중립 테두리 — 색 테두리는 편집/선택 상태 전용 (심미성 C2)
                   isAdopted ? 'border-neutral-200 hover:border-neutral-300' : 'border-neutral-200 opacity-50',
                   dragSrc && dropHint === `${type}-${idx}` && !(dragSrc.type === type && dragSrc.idx === idx) && 'ring-2 ring-brand-400 ring-offset-1',
@@ -1641,11 +1641,7 @@ function DescriptionItemCards({
                       {isAdopted && <Icon name="check" size={10} />}
                     </button>
                   ) : (
-                    <button
-                      data-spec="SPC-DSC-015" onClick={() => confirmDelete('항목', () => onRemove(type, idx), item.content.trim() ? `"${item.content.trim().slice(0, 40)}${item.content.trim().length > 40 ? '…' : ''}" 항목을 삭제할까요?` : undefined)}
-                      className="shrink-0 w-5 h-5 rounded-md flex items-center justify-center text-neutral-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                      title="삭제"
-                    >✕</button>
+                    <span className="shrink-0 w-5 h-5 inline-flex items-center justify-center text-neutral-300" aria-hidden="true">—</span>
                   )}
                   <span
                     draggable
@@ -1658,7 +1654,8 @@ function DescriptionItemCards({
                     <svg viewBox="0 0 10 10" width="11" height="11" fill="currentColor"><circle cx="3" cy="2" r="1"/><circle cx="7" cy="2" r="1"/><circle cx="3" cy="5" r="1"/><circle cx="7" cy="5" r="1"/><circle cx="3" cy="8" r="1"/><circle cx="7" cy="8" r="1"/></svg>
                   </span>
                   <span className="text-xs2 text-neutral-400 font-medium">{sublabel}</span>
-                  <div className="ml-auto flex items-center gap-0.5 shrink-0">
+                  <div className={clsx('ml-auto flex items-center gap-0.5 shrink-0 transition-opacity',
+                    aiKey === `${type}-${idx}` ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100')}>
                     <button onClick={() => onReorder(type, idx, idx - 1)} disabled={idx === 0}
                       className="w-6 h-6 inline-flex items-center justify-center rounded-md text-neutral-400 hover:text-brand-500 hover:bg-brand-50 disabled:opacity-20 transition-colors" title="위로">
                       <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="11" height="11"><path d="M2 7l3-4 3 4"/></svg>
@@ -1685,6 +1682,11 @@ function DescriptionItemCards({
                       )}
                       title={type === 'previous' ? '이 항목을 제안기술 목록으로 보냅니다' : '이 항목을 종래기술 목록으로 보냅니다'}
                     >{type === 'previous' ? '← 제안기술로' : '종래기술로 →'}</button>
+                    {!isAiItem && <button
+                        data-spec="SPC-DSC-015" onClick={() => confirmDelete('항목', () => onRemove(type, idx), item.content.trim() ? `"${item.content.trim().slice(0, 40)}${item.content.trim().length > 40 ? '…' : ''}" 항목을 삭제할까요?` : undefined)}
+                        className="shrink-0 w-5 h-5 rounded-md flex items-center justify-center text-neutral-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        title="삭제"
+                    >✕</button>}
                   </div>
                 </div>
                 {item.type === 'table' ? (
@@ -2067,9 +2069,9 @@ function GuidePanel({ step, confirmed, summary, mobileOpen, onMobileClose, chatI
           <button
             onClick={() => sendGuideChat()}
             disabled={!guideChatInput.trim()}
-            className="shrink-0 w-7 h-7 rounded-xl bg-brand-400 hover:bg-brand-400 disabled:opacity-40 flex items-center justify-center transition-colors">
+            className="shrink-0 w-7 h-7 rounded-xl bg-brand-400 hover:bg-brand-500 text-white disabled:bg-transparent disabled:text-neutral-300 flex items-center justify-center transition-colors">
             <svg viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" width="12" height="12">
-              <path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z" fill="white" stroke="none"/>
+              <path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z" fill="currentColor" stroke="none"/>
             </svg>
           </button>
         </div>
@@ -3760,10 +3762,6 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange, 
 
   return (
     <div className="flex-1 overflow-y-auto scroll-thin p-3 ml-1.5 space-y-3">
-      <div data-spec="SPC-MID-010" className="rounded-lg bg-brand-50 border border-brand-100 px-3 py-2">
-        <p className="text-xs2 text-brand-400 font-medium">AI가 중간명세서를 초안 작성했습니다.</p>
-        <p className="text-xs2 text-neutral-500 mt-0.5">각 항목을 직접 편집하거나 단락을 추가·삭제할 수 있습니다.</p>
-      </div>
 
       {/* 생성 지시·선호 사항 + 다시 생성 — 데모 정합 */}
       {!done && (

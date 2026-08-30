@@ -68,6 +68,21 @@ export function NewTaskView() {
           <Button variant="filled" color="primary" size="sm" data-spec="SPC-WIZ-011" onClick={submit}>명세서 작성 시작</Button>
         </div>
       </Card>
+
+      {/* 진행 방식 안내 — 폼 아래 빈 공간을 콘텐츠로 (L9) */}
+      <div className="max-w-xl w-full mt-8 grid grid-cols-3 gap-3 animate-fade-up">
+        {[
+          { n: '1', t: '직무발명서 업로드', d: 'PDF에서 설명·이미지·명칭 후보를 AI가 추출합니다' },
+          { n: '2', t: '8단계 확인·확정', d: '구성요소·도면·청구항을 단계별로 검토해 확정합니다' },
+          { n: '3', t: '에디터에서 완성', d: '실시예를 포함한 초안을 다듬고 DOCX·PDF로 내보냅니다' },
+        ].map(it => (
+          <div key={it.n} className="rounded-xl border border-zinc-200 bg-white px-4 py-3.5">
+            <div className="w-5 h-5 rounded-full bg-brand-50 text-brand-600 text-xs2 font-bold flex items-center justify-center mb-2 tabular-nums">{it.n}</div>
+            <p className="text-sm2 font-semibold text-zinc-700 mb-0.5">{it.t}</p>
+            <p className="text-xs2 text-zinc-400 leading-relaxed">{it.d}</p>
+          </div>
+        ))}
+      </div>
       {/* 서비스 푸터 — 하단 고정(빈 공간 채움), px-8 상쇄해 풀블리드 */}
       <div className="mt-auto -mx-8 self-stretch">
         <SiteFooter />

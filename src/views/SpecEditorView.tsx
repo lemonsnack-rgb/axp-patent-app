@@ -528,6 +528,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
 
   // 모바일 AI 패널 오픈 상태
   const [mobileAiOpen, setMobileAiOpen] = useState(false);
+  const [aiPanelOpen, setAiPanelOpen] = useState(true);   // 데스크탑 패널 접기 (L3)
 
   // 채팅 UI — API SpecificationEditorChatMessage 정합(intent / edit_proposals / expression_replacements / plan)
   type ChatMsg = {
@@ -1347,7 +1348,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             <div className="px-3 pt-2 pb-1.5">
                               <div className="flex items-center gap-1.5 mb-0.5">
                                 <span className="text-xs2 font-bold text-neutral-700" title={`원본 기호: ${d.detail.symbol}`}>도 {idx + 1}</span>
-                                <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', DRAWING_LABEL_STYLES[labelKo] ?? 'bg-neutral-100 text-neutral-500')}>{labelKo}</span>
+                                <span className={clsx('text-xs2 px-1.5 py-px rounded-sm font-medium', DRAWING_LABEL_STYLES[labelKo] ?? 'bg-neutral-100 text-neutral-500')}>{labelKo}</span>
                               </div>
                               <p className="text-xs2 text-neutral-600 leading-snug">{d.detail.name}</p>
                             </div>
@@ -1530,16 +1531,28 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             onClick={() => setMobileAiOpen(false)}
           />
         )}
+        {/* 접힌 상태 레일 (데스크탑) — 클릭하면 패널 복원 (L3) */}
+        {!aiPanelOpen && (
+          <button
+            type="button"
+            onClick={() => setAiPanelOpen(true)}
+            title="AI 어시스턴트 열기"
+            className="hidden md:flex w-9 shrink-0 border-l border-neutral-200 bg-neutral-50 hover:bg-brand-50 flex-col items-center gap-1.5 pt-3 text-neutral-400 hover:text-brand-500 transition-colors"
+          >
+            <span className="w-5 h-5 rounded-md bg-brand-400 text-white flex items-center justify-center"><svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9" aria-hidden="true"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg></span>
+            <span className="text-xs2 font-semibold [writing-mode:vertical-rl]">AI 어시스턴트</span>
+          </button>
+        )}
         <aside data-spec="SPC-EDT-010" className={clsx(
           'bg-white flex-col overflow-hidden',
-          'md:flex md:relative md:shrink-0 md:border-l md:border-neutral-200',
+          aiPanelOpen ? 'md:flex' : 'md:hidden',
+          'md:relative md:shrink-0 md:border-l md:border-neutral-200',
           'md:w-[clamp(280px,28vw,360px)] md:min-w-[280px]',
           'max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-50',
           'max-md:h-[72vh] max-md:rounded-t-2xl max-md:shadow-2xl',
           'max-md:border-t max-md:border-neutral-200',
           'max-md:transition-transform max-md:duration-300 max-md:ease-out',
           mobileAiOpen ? 'max-md:flex max-md:translate-y-0' : 'max-md:hidden',
-          'md:flex',
         )}>
           {/* 모바일 핸들 */}
           <div className="md:hidden shrink-0 pt-2 pb-1 px-4 flex items-center justify-between relative">
@@ -1556,6 +1569,10 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             <div className="w-5 h-5 rounded-md flex items-center justify-center text-white text-xs font-bold shrink-0 bg-brand-400"><svg viewBox="0 0 16 16" fill="currentColor" width="10" height="10" aria-hidden="true"><path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z"/></svg></div>
             <span className="text-base2 font-bold text-neutral-800">AI 어시스턴트</span>
             <span className="text-xs2 text-neutral-400 font-medium">본문 수정</span>
+            <button type="button" onClick={() => setAiPanelOpen(false)} title="패널 접기"
+              className="ml-auto w-6 h-6 rounded-md flex items-center justify-center text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors">
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="11" height="11"><path d="M4 2l4 4-4 4"/></svg>
+            </button>
           </div>
 
           {/* ── 상단: 정보 영역(선택 단락) — 하단 대화 영역과 영역 제목 바로 구분 ── */}
@@ -1814,9 +1831,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
               <button
                 onClick={() => sendChat()}
                 disabled={!chatInput.trim() || planRunning || aiThinking}
-                className="shrink-0 w-8 h-8 rounded-xl bg-brand-400 hover:bg-brand-500 disabled:opacity-40 flex items-center justify-center transition-colors">
+                className="shrink-0 w-8 h-8 rounded-xl bg-brand-400 hover:bg-brand-500 text-white disabled:bg-transparent disabled:text-neutral-300 flex items-center justify-center transition-colors">
                 <svg viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" width="13" height="13">
-                  <path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z" fill="white" stroke="none"/>
+                  <path d="M2 14L14 8L2 2v4.5l7 1.5-7 1.5V14z" fill="currentColor" stroke="none"/>
                 </svg>
               </button>
             </div>
