@@ -9,19 +9,20 @@ import { EmptyState } from './EmptyState';
 import type { Task } from '../types';
 import { loadSpecState } from '../features/spec/specStore';
 
-// 명세서 작업의 진행 단계 표시 (U11) — 위저드 8단계 + 에디터/완료
+// 명세서 작업의 진행 상태 배지 — 2단계로 단순화(사용자 결정 2026-08-31)
+// '명세서 생성완료' 기준 = 명세서 생성을 거쳐 에디터에 진입한 시점(명시적 이벤트). 그 전은 전부 '분석 중'.
+// 세부 단계(N/8 단계명)는 배지 툴팁으로만 제공한다.
 const SPEC_STAGE: Record<string, [number, string]> = {
-  upload: [1, '업로드'], description: [2, '발명 설명'], images: [3, '이미지 선별'], title: [4, '제목·요약'],
+  upload: [1, '업로드'], description: [2, '발명 설명'], images: [3, '이미지 선별'], title: [4, '명칭·요약'],
   components: [5, '구성요소'], drawings: [6, '명세서 도면'], claims: [7, '청구항'], midspec: [8, '중간명세서'],
 };
-function specStageOf(t: Task): { text: string; tone: 'progress' | 'done' } | null {
+function specStageOf(t: Task): { text: string; tone: 'progress' | 'done'; title: string } | null {
   if (t.type !== 'spec') return null;
   try {
     const st = loadSpecState(t.id);
     if (!st) return null;
-    if (st.mainView === 'editor') return { text: '에디터 편집 중', tone: 'done' };
-    if (st.phase === 'done') return { text: '분석 완료', tone: 'done' };
-    if (st.phase === 'flow') { const [n, label] = SPEC_STAGE[st.curStep] ?? [0, st.curStep]; return { text: `${n}/8 ${label}`, tone: 'progress' }; }
+    if (st.mainView === 'editor' || st.phase === 'done') return { text: '명세서 생성완료', tone: 'done', title: '명세서가 생성되어 에디터에서 편집할 수 있습니다' };
+    if (st.phase === 'flow') { const [n, label] = SPEC_STAGE[st.curStep] ?? [0, st.curStep]; return { text: '분석 중', tone: 'progress', title: `진행 단계: ${n}/8 ${label}` }; }
     return null;
   } catch { return null; }
 }
@@ -248,7 +249,7 @@ function TaskRow({ t, active, onSelect, onToggleFav, menuOpen, onMenuToggle, onR
           </span>
           {stage && (
             <span className={clsx('ml-auto shrink-0 px-1.5 py-px rounded font-medium',
-              stage.tone === 'done' ? 'bg-green-50 text-green-700' : 'bg-brand-50 text-brand-600')} data-spec="SPC-WIZ-120" title="진행 단계">{stage.text}</span>
+              stage.tone === 'done' ? 'bg-green-50 text-green-700' : 'bg-brand-50 text-brand-600')} data-spec="SPC-WIZ-120" title={stage.title}>{stage.text}</span>
           )}
         </div>
       </span>
