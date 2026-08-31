@@ -85,6 +85,21 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
     return m;
   });
   const cropBox = cropBoxMap[activeId] ?? { x1: 15, y1: 15, x2: 85, y2: 85 };
+  // 이미지 실제 크기 — 로드 시 naturalSize 저장 (좌표 변환·BBox 초기값용, API BBox는 원본 px 절대좌표)
+  const [imgSizeMap, setImgSizeMap] = useState<Record<string, { w: number; h: number }>>({});
+  const bboxInitRef = React.useRef<Set<string>>(new Set());
+  const initCropFromBbox = (id: string, natW: number, natH: number) => {
+    if (bboxInitRef.current.has(id)) return;
+    bboxInitRef.current.add(id);
+    const d = drawings.find(x => x.id === id);
+    const bb = d?.adjustedBbox ?? d?.bbox;
+    if (!d || !bb || bb.w <= 0 || bb.h <= 0 || natW <= 0 || natH <= 0) return;
+    const pct = (v: number) => Math.max(0, Math.min(100, v * 100));
+    setCropBoxMap(m => ({ ...m, [id]: {
+      x1: pct(bb.x / natW), y1: pct(bb.y / natH),
+      x2: pct((bb.x + bb.w) / natW), y2: pct((bb.y + bb.h) / natH),
+    } }));
+  };
   const cropContainerRef = React.useRef<HTMLDivElement>(null);
   type CropHandle = 'move'|'nw'|'n'|'ne'|'e'|'se'|'s'|'sw'|'w';
   const cropDragRef = React.useRef<{ type: CropHandle; startX: number; startY: number; startBox: { x1:number; y1:number; x2:number; y2:number }; } | null>(null);
@@ -173,8 +188,9 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
   const startConvert = () => {
     // ① adjustedBbox 저장 (퍼센트 → 픽셀 변환)
     const activeDraw = drawings.find(d => d.id === activeId);
-    const imgW = activeDraw?.imageSize?.w ?? 800;
-    const imgH = activeDraw?.imageSize?.h ?? 600;
+    // 좌표 변환은 실제 이미지 크기(naturalSize) 우선 — 미로드 시 세션 imageSize, 마지막 폴백 800×600
+    const imgW = imgSizeMap[activeId]?.w ?? activeDraw?.imageSize?.w ?? 800;
+    const imgH = imgSizeMap[activeId]?.h ?? activeDraw?.imageSize?.h ?? 600;
     const adjustedBbox = {
       x: Math.round(cropBox.x1 / 100 * imgW),
       y: Math.round(cropBox.y1 / 100 * imgH),
@@ -451,7 +467,12 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                     >
                       {/* 배경 이미지 또는 플레이스홀더 */}
                       {(activeDraw.originalImageUrl || activeDraw.exportedImageUrl)
-                        ? <img src={activeDraw.originalImageUrl || activeDraw.exportedImageUrl} className="w-full h-full object-contain" alt="" />
+                        ? <img src={activeDraw.originalImageUrl || activeDraw.exportedImageUrl} className="w-full h-full object-contain" alt=""
+                            onLoad={e => {
+                              const im = e.currentTarget;
+                              setImgSizeMap(m => m[activeId] ? m : ({ ...m, [activeId]: { w: im.naturalWidth, h: im.naturalHeight } }));
+                              initCropFromBbox(activeId, im.naturalWidth, im.naturalHeight);   // 추출/조정 BBox를 크롭 초기값으로
+                            }} />
                         : (
                           <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-300 gap-2">
                             <Icon name="image" size={48} className="text-gray-200" />

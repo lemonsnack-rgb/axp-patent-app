@@ -333,17 +333,8 @@ export function SpecView() {
       import('../features/spec/mockAiService').then(({ MOCK_MIDSPEC }) => {
         const specDrawings = context.drawings.filter(d => d.included !== false && d.useForSpec);
         const fallback = MOCK_MIDSPEC.find(s => s.key === 'drawing_descriptions')?.blocks ?? [];
-        // 도 번호는 명세서 도면 채택 순서(1부터), 조사는 받침에 따라 자동 선택 (U9)
-        const drawingBlocks = specDrawings.length
-          ? specDrawings.map((d, i) => {
-              const fig = `도 ${i + 1}`;
-              const name = d.detail.name || '발명의 구성';
-              return {
-                id: uid(), type: 'text' as const,
-                content: `${fig}${particle(fig, '은', '는')} ${name}${particle(name, '을', '를')} 나타낸 도면이다.${d.isRepresentative ? ' (대표도면)' : ''}`,
-              };
-            })
-          : fallback;
+        // 도 번호는 명세서 도면 채택 순서(1부터) · 같은 분류 연속은 묶음 설명 (API idxs 대응)
+        const drawingBlocks = specDrawings.length ? buildDrawingDescBlocks(specDrawings) : fallback;
         const next = MOCK_MIDSPEC.map(s => s.key === 'drawing_descriptions' ? { ...s, blocks: drawingBlocks } : s);
         setMidspec(next);
       });
@@ -896,6 +887,14 @@ export function SpecView() {
                               <MidspecPanel
                                 done={isDone}
                                 elements={context.elements}
+                                onRegenDrawingDesc={(instruction) => {
+                                  const specDrawings = context.drawings.filter(d => d.included !== false && d.useForSpec);
+                                  const blocks = buildDrawingDescBlocks(specDrawings, instruction);
+                                  const next = (midspec ?? []).map(sec => sec.key === 'drawing_descriptions' ? { ...sec, blocks } : sec);
+                                  setMidspec(next);
+                                  setGSel(p => ({ ...p, midspec: next.map(sec => `【${sec.label}】\n${sec.blocks.map(b => b.content).join('\n')}`).join('\n\n') }));
+                                  toast('도면 설명을 다시 생성했습니다');
+                                }}
                                 onActionChange={setStepAction}
                                 sections={midspec ?? []}
                                 onUpdate={(next) => {
@@ -1140,6 +1139,32 @@ type GuideChatMsg = {
   intentOptions?: string[];             // clarify 선택지
   sourceMsg?: string;
 };
+
+// ── 도면의 간단한 설명 생성 — API /v2/generate/specification/drawing-description 정합 목업 ──
+// 묶음 설명(GeneratedDrawingDescription.idxs 복수) 대응: 같은 분류(label)가 연속되면 한 문장으로 묶는다.
+// instruction은 API 요청 파라미터(추가 지시) — 목업에서는 생성 문장에 미반영(⚠).
+function buildDrawingDescBlocks(specDrawings: Drawing[], instruction?: string): { id: string; type: 'text'; content: string }[] {
+  void instruction;   // API 요청 파라미터 — 목업 생성 문장에는 미반영
+  const groups: number[][] = [];
+  specDrawings.forEach((d, i) => {
+    const last = groups[groups.length - 1];
+    if (last && specDrawings[last[last.length - 1]].detail.label === d.detail.label) last.push(i);
+    else groups.push([i]);
+  });
+  return groups.map(idxs => {
+    if (idxs.length === 1) {
+      const i = idxs[0]; const d = specDrawings[i];
+      const fig = `도 ${i + 1}`;
+      const name = d.detail.name || '발명의 구성';
+      return { id: uid(), type: 'text' as const, content: `${fig}${particle(fig, '은', '는')} ${name}${particle(name, '을', '를')} 나타낸 도면이다.${d.isRepresentative ? ' (대표도면)' : ''}` };
+    }
+    const figs = idxs.map(i => `도 ${i + 1}`).join(' 및 ');
+    const names = idxs.map(i => specDrawings[i].detail.name || '발명의 구성');
+    const nameList = names.slice(0, -1).join(', ') + `${particle(names[names.length - 2] ?? names[0], '과', '와')} ` + names[names.length - 1];
+    const rep = idxs.find(i => specDrawings[i].isRepresentative);
+    return { id: uid(), type: 'text' as const, content: `${figs}${particle(`도 ${idxs[idxs.length - 1] + 1}`, '은', '는')} 각각 ${nameList}${particle(nameList, '을', '를')} 나타낸 도면이다.${rep !== undefined ? ` (도 ${rep + 1}: 대표도면)` : ''}` };
+  });
+}
 
 // ── 덮어쓰기 확인 — 재생성·재분석처럼 편집 내용을 대체하는 동작 (중간명세서 '다시 생성'과 같은 규칙) ──
 function confirmOverwrite(title: string, description: string, confirmLabel: string, onConfirm: () => void) {
@@ -3730,14 +3755,16 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
 }
 
 // ── 중간명세서 패널 (#22) ─────────────────────────────────────────────────────
-function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange, elements = [] }: {
+function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange, elements = [], onRegenDrawingDesc }: {
   done: boolean;
   elements?: ElementLike[];
   sections: MidspecSection[];
   onUpdate: (next: MidspecSection[]) => void;
   onGoToEditor?: () => void;
   onActionChange?: (a: StepAction | null) => void;   // 하단 바 주 동작 등록 (D3)
+  onRegenDrawingDesc?: (instruction: string) => void; // 도면 설명 다시 생성 — API drawing-description(instruction)
 }) {
+  const [drawDescInstr, setDrawDescInstr] = useState('');
   // 하단 바 주 동작: '명세서 생성 →' (패널 내부 풀폭 CTA 대신) — D3
   const goRef = useRef(onGoToEditor);
   useEffect(() => { goRef.current = onGoToEditor; });
@@ -3836,6 +3863,22 @@ function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange, 
           <div className="flex items-center px-3 py-2 bg-neutral-50 border-b border-neutral-100">
             <span className="text-xs2 font-bold text-neutral-700">{section.label}</span>
             <span className="text-xs2 text-neutral-400 ml-2">({section.blocks.length}개 단락)</span>
+            {section.key === 'drawing_descriptions' && !done && onRegenDrawingDesc && (
+              <span className="ml-auto flex items-center gap-1.5 min-w-0" data-spec="SPC-MID-015">
+                <input
+                  value={drawDescInstr}
+                  onChange={e => setDrawDescInstr(e.target.value)}
+                  placeholder="생성 지시 (선택) — 예: 도면 시점(사시도/단면도)을 명시해줘"
+                  title="도면 설명 생성에 전달되는 추가 지시 (API drawing-description instruction)"
+                  className="w-64 max-w-full text-xs2 bg-white border border-neutral-200 rounded-md px-2 py-1 outline-none focus:border-brand-300 transition-colors"
+                />
+                <button
+                  onClick={() => confirmOverwrite('도면 설명 다시 생성', '이 섹션의 단락이 채택 도면 기준 새 설명으로 대체됩니다. 계속할까요?', '다시 생성', () => onRegenDrawingDesc(drawDescInstr))}
+                  className="shrink-0 inline-flex items-center gap-1 h-6 px-2 rounded-lg text-xs2 font-medium text-brand-500 border border-brand-200 bg-white hover:bg-brand-50 transition-colors"
+                  title="채택 도면 기준으로 도면의 간단한 설명을 다시 생성"
+                >↻ 다시 생성</button>
+              </span>
+            )}
           </div>
 
           <div className="p-2.5 space-y-2">
