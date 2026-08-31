@@ -79,7 +79,7 @@ const FORMULA_TEMPLATES = [
 
 // ── 섹션 정의 ──────────────────────────────────────────────────────────────
 // 이번 버전 범위: 표 삽입은 제외(사용자 결정 2026-08-28). API SpecificationBlock은 table 타입을 지원하므로 후속 버전에서 플래그만 켜면 된다.
-const ENABLE_TABLE_INSERT = false;
+const ENABLE_TABLE_INSERT = true;   // 2026-08-31 사용자 결정: 재포함 (API SpecificationBlock.type=table 지원)
 // 도면 참조 '(도 N 참조)' 삽입도 이번 버전 제외(사용자 결정 2026-08-28) — API 없음, 실시예 생성이 표기를 포함하므로 보조 도구로만 유효
 const ENABLE_DRAWING_REF = false;
 
@@ -1182,7 +1182,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           </button>
           <div className="w-px h-5 bg-neutral-200 mx-1" />
           {ENABLE_TABLE_INSERT && (
-            <button onClick={() => setTableModal(true)} disabled={!sel} title="표 삽입"
+            <button onClick={() => setTableModal(true)} disabled={!sel} data-spec="SPC-EDT-066" title="표 삽입"
               className="flex items-center gap-1 px-2 h-7 whitespace-nowrap shrink-0 rounded-md hover:bg-neutral-100 disabled:opacity-30 transition-colors text-neutral-500 text-xs2">
               <TableIcon /><span>표</span>
             </button>

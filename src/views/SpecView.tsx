@@ -799,6 +799,14 @@ export function SpecView() {
                           <DescriptionItemCards
                             previous={context.previous}
                             proposed={context.proposed}
+                            onRegenerate={() => {
+                              // API /v2/generate/context/description/refined — 현재 목업(getMockExtractResult)
+                              import('../features/spec/mockAiService').then(({ getMockExtractResult }) => {
+                                const r = getMockExtractResult();
+                                setContext(p => ({ ...p, previous: r.previous, proposed: r.proposed }));
+                                toast('발명 설명을 다시 정제했습니다');
+                              });
+                            }}
                             onToggle={(type, idx) => setContext(p => ({
                               ...p,
                               [type]: p[type].map((item, i) => i === idx ? { ...item, adopted: !item.adopted } : item),
@@ -1580,7 +1588,7 @@ const DESC_LABEL_MAP: Record<string, string> = {
 };
 
 function DescriptionItemCards({
-  previous, proposed, onToggle, onChange, onAdd, onRemove, onReorder, onMoveAcross,
+  previous, proposed, onToggle, onChange, onAdd, onRemove, onReorder, onMoveAcross, onRegenerate,
 }: {
   previous: InventionDescriptionItem[];
   proposed: InventionDescriptionItem[];
@@ -1590,6 +1598,7 @@ function DescriptionItemCards({
   onRemove: (type: 'previous' | 'proposed', idx: number) => void;
   onReorder: (type: 'previous' | 'proposed', from: number, to: number) => void;
   onMoveAcross: (fromType: 'previous' | 'proposed', fromIdx: number, toIdx?: number) => void;
+  onRegenerate?: () => void;   // 다시 정제 — API /v2/generate/context/description/refined
 }) {
   const [tab, setTab] = useState<'previous' | 'proposed'>('proposed');
   // 인라인 AI 수정 — 열린 카드 키 (`${type}-${idx}`)
@@ -1825,6 +1834,15 @@ function DescriptionItemCards({
         propose={proposeGlobal}
         doneMsg="발명 설명에 적용했습니다"
       />
+      {onRegenerate && (
+        <div className="flex justify-end">
+          <button data-spec="SPC-DSC-030"
+            onClick={() => confirmOverwrite('발명 설명 다시 정제', '채택·편집한 항목이 정제된 새 항목으로 대체됩니다. 계속할까요?', '다시 정제', onRegenerate)}
+            className="inline-flex items-center gap-1 h-6 px-2 rounded-lg text-xs2 font-medium text-brand-500 border border-brand-200 bg-white hover:bg-brand-50 transition-colors"
+            title="추출 원천 정보를 AI가 다시 정제합니다 (API description/refined)"
+          >↻ 다시 정제</button>
+        </div>
+      )}
       {/* lg+: 2컬럼 */}
       <div className="max-lg:hidden lg:grid lg:grid-cols-2 lg:gap-4">
         {renderColumn('proposed', proposed)}
@@ -3021,6 +3039,7 @@ const CATEGORY_LABEL: Record<string, string> = {
 interface DepItemState {
   id: number; text: string; sel: boolean;
   editing: boolean; editVal: string;
+  element_idxs?: number[];   // 연관 구성요소 인덱스 — API GeneratedDependentClaimItem.element_idxs
 }
 interface DepGroupState { generated: boolean; items: DepItemState[]; newText: string }
 
@@ -3035,6 +3054,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
   elements?: ElementLike[];                          // 구성요소 하이라이트용 원천
 }) {
   const [claimsPhase, setClaimsPhase] = useState<'indep' | 'dep'>('indep');
+  const [depInstr, setDepInstr] = useState('');   // 종속항 생성 지시사항 — API dependent-claim instruction (목업 미반영)
   const [claimSets] = useState(MOCK_INDEPENDENT_CLAIM_SETS);
   // 생성 전에는 세트를 미리 선택하지 않는다 (C1: preference 설정 → 생성 순서 강제)
   const [selectedSetIndex, setSelectedSetIndex] = useState<number | null>(done ? 2 : null);
@@ -3118,6 +3138,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
     const ref = `제${ci + 1}`;
     return depTemplates(ref, suffix).slice(0, LEVEL_DEP_COUNT[level]).map((text, i) => ({
       id: i + 1, sel: true, text, editing: false, editVal: '',
+      element_idxs: [i % 3],   // 목업: API element_idxs 대응 (구성요소 인덱스)
     }));
   };
   // 개수 레벨 변경 → 선택 세트 종속항 재생성
@@ -3501,6 +3522,13 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
             ))}
           </div>
           <span className="text-xs2 text-neutral-400 ml-auto">분량을 바꾸면 종속항이 다시 생성됩니다</span>
+          <input
+            value={depInstr}
+            onChange={e => setDepInstr(e.target.value)}
+            placeholder="생성 지시사항 (선택) — 예: 센서 구성 위주로 한정해줘"
+            title="종속항 생성·다시 생성에 전달되는 추가 지시 (API dependent-claim instruction)"
+            className="flex-1 min-w-0 text-xs2 bg-white border border-neutral-200 rounded-md px-2 py-1 outline-none focus:border-brand-300 transition-colors"
+          />
         </div>
       )}
 
@@ -3550,10 +3578,10 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                       const suffix = isDevice ? '데이터 처리 시스템.' : '데이터 처리 방법.';
                       const ref = `제${indepNum}`;
                       const newItems: DepItemState[] = [
-                        { id: 1, sel: true,  text: `${ref}항에 있어서, 상기 처리부는 딥러닝 알고리즘을 포함하는, ${suffix}`, editing: false, editVal: '' },
-                        { id: 2, sel: true,  text: `${ref}항에 있어서, 상기 입력부는 복수의 센서를 포함하는, ${suffix}`, editing: false, editVal: '' },
-                        { id: 3, sel: true,  text: `${ref}항에 있어서, 상기 출력부는 처리 결과를 시각화하여 표시하는, ${suffix}`, editing: false, editVal: '' },
-                        { id: 4, sel: false, text: `${ref}항에 있어서, 상기 구성은 클라우드 환경에서 동작하는, ${suffix}`, editing: false, editVal: '' },
+                        { id: 1, sel: true,  text: `${ref}항에 있어서, 상기 처리부는 딥러닝 알고리즘을 포함하는, ${suffix}`, editing: false, editVal: '', element_idxs: [0] },
+                        { id: 2, sel: true,  text: `${ref}항에 있어서, 상기 입력부는 복수의 센서를 포함하는, ${suffix}`, editing: false, editVal: '', element_idxs: [1] },
+                        { id: 3, sel: true,  text: `${ref}항에 있어서, 상기 출력부는 처리 결과를 시각화하여 표시하는, ${suffix}`, editing: false, editVal: '', element_idxs: [2] },
+                        { id: 4, sel: false, text: `${ref}항에 있어서, 상기 구성은 클라우드 환경에서 동작하는, ${suffix}`, editing: false, editVal: '', element_idxs: [0, 1] },
                       ];
                       const next = { ...setGroups, [ci]: { ...grp, items: newItems } };
                       const nextMap = { ...depGroupsMap, [selectedSetIndex]: next };
@@ -3617,6 +3645,17 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                         />
                       ) : (
                         <p className="text-base2 text-neutral-700 leading-relaxed"><ElementText text={displayText} elements={elements} /></p>
+                      )}
+                      {/* 연관 구성요소 칩 — API GeneratedDependentClaimItem.element_idxs (생성 단계 표시용) */}
+                      {!!dep.element_idxs?.length && elements.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1 mt-1.5" title="이 종속항과 연관된 구성요소 (API element_idxs)">
+                          <span className="text-xs2 text-neutral-400">연관 구성요소</span>
+                          {dep.element_idxs.filter(ei => elements[ei]).map(ei => (
+                            <span key={ei} className="text-xs2 px-1.5 py-px rounded-full bg-neutral-100 text-neutral-600">
+                              {elements[ei].symbol ? `${elements[ei].symbol} ` : ''}{elements[ei].value_ko}
+                            </span>
+                          ))}
+                        </div>
                       )}
                       {/* 선행 근거 경고 — "상기 X"가 인용 독립항에 없으면 표시 (A2) */}
                       {ENABLE_ANTECEDENT_CHECK && dep.sel && (() => {
