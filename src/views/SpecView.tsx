@@ -62,18 +62,6 @@ const STEP_LABEL: Partial<Record<StepId, string>> = {
 // 명세서 생성(중간명세서 → 에디터) mock 소요 시간. 실 API에서는 응답 도착 시 onDone 호출로 대체.
 const SPEC_GEN_MOCK_MS = 6600;
 
-// AI 어시스턴트 빈 대화 영역의 예시 질문 (심미성 A1) — 클릭하면 그대로 전송
-const GUIDE_EXAMPLES: Record<string, string[]> = {
-  description: ['제안기술과 종래기술은 어떻게 나누나요?', '채택하지 않은 항목은 어디에 영향이 있나요?', '표 항목은 왜 수정할 수 없나요?'],
-  images:      ['대표 이미지는 무엇에 쓰이나요?', '선택하지 않은 이미지는 어떻게 되나요?', '이미지를 나중에 추가할 수 있나요?'],
-  title:       ['발명의 명칭은 어떻게 정하나요?', '요약은 어디에 반영되나요?', '후보를 다시 생성하면 무엇이 바뀌나요?'],
-  components:  ['부호 100, 200은 어떤 규칙인가요?', '구성요소 명칭을 바꾸면 어디까지 바뀌나요?', '하위 구성요소는 어떻게 만들나요?'],
-  drawings:    ['참고만과 채택의 차이는?', '대표도면은 어디에 표시되나요?', 'CAD 변환은 무엇을 하나요?'],
-  claims:      ['추상화 수준은 어떻게 고르나요?', '장치항과 방법항의 차이는?', '종속항 분량은 어떻게 정하나요?'],
-  midspec:     ['중간명세서와 명세서의 차이는?', '명세서 생성은 얼마나 걸리나요?', '에디터에서 다시 돌아올 수 있나요?'],
-  default:     ['이 단계에서 무엇을 확인해야 하나요?', '확정 후 되돌릴 수 있나요?', '청구항은 어떻게 구성되나요?'],
-};
-
 // 단계별 실질 안내 — 8단계 동일 템플릿 대신 이 단계에서 실제로 할 일 1~2문장 (D7)
 const STEP_HINT: Partial<Record<StepId, string>> = {
   description: '채택할 항목만 체크해 두세요. 카드를 끌어 순서를 바꾸거나 제안/종래 기술 사이로 보낼 수 있고, 표 항목은 원문 그대로 반영됩니다.',
@@ -2128,19 +2116,7 @@ function GuidePanel({ step, confirmed, summary, mobileOpen, onMobileClose, chatI
             <div ref={guideChatEndRef} />
           </div>
         )}
-        {guideChatMsgs.length === 0 && (
-          <div className="flex-1 px-3 py-3">
-            <p className="text-xs2 text-neutral-400 mb-2">이런 것을 물어볼 수 있습니다</p>
-            <div className="flex flex-col gap-1.5">
-              {(GUIDE_EXAMPLES[step] ?? GUIDE_EXAMPLES.default).map(q => (
-                <button key={q} type="button" onClick={() => sendGuideChat(q)}
-                  className="text-left text-sm2 text-neutral-600 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white hover:bg-brand-50 hover:border-brand-200 hover:text-brand-700 transition-colors">
-                  {q}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {guideChatMsgs.length === 0 && <div className="flex-1" />}
         {/* 입력창 — 항상 표시 */}
         <div className="shrink-0 flex gap-2 items-end px-3 py-2">
           <Textarea
