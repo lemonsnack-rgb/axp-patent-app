@@ -23,24 +23,29 @@ interface Props {
   standalone?: boolean;
 }
 
-// 내부 작업 단계 (converting은 스타일 변환 단계 내 로딩 상태)
-type WorkStage = 'crop' | 'reselect' | 'converting' | 'decide' | 'editing';
+// 이번 버전 범위(사용자 결정 2026-08-31): 도면 선택 → 영역 확인(크롭) → CAD 변환·완료까지.
+// 도면 편집(부호 배치, PatentEditor)은 API(M2)에 대응 기능이 없어 제외 — 코드는 플래그 뒤에 유지.
+const ENABLE_DRAWING_EDIT = false;
 
-// 사용자에게 보이는 3단계
-const STEP_LABELS = ['영역 확인', '스타일 변환', '도면 편집'];
+// 내부 작업 단계 (converting은 CAD 변환 단계 내 로딩 상태, completed=변환 완료)
+type WorkStage = 'crop' | 'reselect' | 'converting' | 'decide' | 'completed' | 'editing';
+
+// 사용자에게 보이는 단계 (편집 단계는 플래그 뒤)
+const STEP_LABELS = ENABLE_DRAWING_EDIT ? ['영역 확인', 'CAD 변환', '도면 편집'] : ['영역 확인', 'CAD 변환'];
 
 const LABEL_COLORS: Record<string, string> = {
-  '제안기술': 'bg-blue-100 text-blue-700',
-  '종래기술': 'bg-gray-100 text-gray-600',
-  'AI생성':   'bg-violet-100 text-violet-700',
+  '제안기술': 'bg-brand-100 text-brand-700',
+  '종래기술': 'bg-neutral-100 text-neutral-600',
+  'AI생성':   'bg-neutral-100 text-neutral-600',
 };
 
 const WORK_STAGE_BADGE: Record<string, { text: string; cls: string }> = {
-  'crop':       { text: '영역 확인',  cls: 'bg-amber-100 text-amber-700' },
-  'reselect':   { text: '영역 확인',  cls: 'bg-amber-100 text-amber-700' },
-  'converting': { text: '변환 중',    cls: 'bg-violet-100 text-violet-700' },
-  'decide':     { text: '후보 선택',  cls: 'bg-orange-100 text-orange-700' },
-  'editing':    { text: '편집 중',    cls: 'bg-sky-100 text-sky-700' },
+  'crop':       { text: '영역 확인',  cls: 'bg-neutral-100 text-neutral-600' },
+  'reselect':   { text: '영역 확인',  cls: 'bg-neutral-100 text-neutral-600' },
+  'converting': { text: '변환 중',    cls: 'bg-brand-50 text-brand-600' },
+  'decide':     { text: '후보 선택',  cls: 'bg-brand-50 text-brand-600' },
+  'completed':  { text: '변환 완료',  cls: 'bg-green-100 text-green-700' },
+  'editing':    { text: '편집 중',    cls: 'bg-brand-50 text-brand-600' },
 };
 
 const MOCK_SVGS = [
@@ -55,7 +60,8 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
   const [workStageMap, setWorkStageMap] = useState<Record<string, WorkStage>>(() => {
     const m: Record<string, WorkStage> = {};
     drawings.forEach(d => {
-      if (d.stage === 'done' || d.stage === 'editing') m[d.id] = 'editing';
+      if (d.stage === 'done') m[d.id] = ENABLE_DRAWING_EDIT ? 'editing' : 'completed';
+      else if (d.stage === 'editing') m[d.id] = ENABLE_DRAWING_EDIT ? 'editing' : 'crop';
       else if (d.stage === 'candidate-select') m[d.id] = 'decide';
       else m[d.id] = 'crop';
     });
@@ -67,6 +73,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
   const [localRefs, setLocalRefs] = useState<EditorReference[]>(() => availableReferences ?? []);
   const [zoomedCandId, setZoomedCandId] = useState<string | null>(null);
   const [regenPrompt, setRegenPrompt] = useState('');
+  const [convInstrMap, setConvInstrMap] = useState<Record<string, string>>({});   // 변환 지시문 — API user_instruction
   const [showRegen, setShowRegen] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
@@ -141,7 +148,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
         exportedImageUrl: result.exportedImageUrl,
       });
       if (result.stage === 'done') {
-        setSyncNotice('도면 편집 완료 — 결과가 반영되었습니다.');
+        setSyncNotice('CAD 변환 완료 — 결과가 반영되었습니다.');
         setTimeout(() => setSyncNotice(null), 4000);
       }
     });
@@ -181,7 +188,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
     setTimeout(() => {
       const cands = MOCK_SVGS.map((svg, i) => ({
         id: `c-${activeId}-${i}`,
-        svgDataUrl: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg),
+        svgDataUrl: 'data:image/svg+xml;base64,' + btoa(svg),   // 메인 탭 썸네일 반영 규격(base64 data URL)
       }));
       setCandidatesMap(m => ({ ...m, [activeId]: cands }));
       setSelectedMap(m => ({ ...m, [activeId]: cands[0].id }));
@@ -196,7 +203,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
     setTimeout(() => {
       const cands = MOCK_SVGS.map((svg, i) => ({
         id: `r-${activeId}-${i}`,
-        svgDataUrl: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg),
+        svgDataUrl: 'data:image/svg+xml;base64,' + btoa(svg),   // 메인 탭 썸네일 반영 규격(base64 data URL)
       }));
       setCandidatesMap(m => ({ ...m, [activeId]: cands }));
       setSelectedMap(m => ({ ...m, [activeId]: cands[0].id }));
@@ -204,12 +211,27 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
     }, 1500);
   };
 
-  // 버전 확정 → 도면 편집 단계로 직접 이동
+  // 버전 확정 — 이번 범위: CAD 변환 완료(명시적 완료 상태). 편집 단계는 플래그 뒤.
   const confirmVersion = () => {
     const selId = selectedMap[activeId];
     if (!selId) return;
-    handleSave(activeId, { stage: 'editing', selectedCandidateId: selId });
-    goStage('editing');
+    if (ENABLE_DRAWING_EDIT) {
+      handleSave(activeId, { stage: 'editing', selectedCandidateId: selId });
+      goStage('editing');
+      return;
+    }
+    const cands = candidatesMap[activeId] ?? [];
+    const sel = cands.find(c => c.id === selId);
+    // 완료 = stage 'done' + 선택본을 결과 이미지로 확정 → 메인 탭(위저드/에디터)에서 'CAD 변환 완료' 배지·썸네일 반영
+    handleSave(activeId, {
+      stage: 'done',
+      selectedCandidateId: selId,
+      cadCandidates: cands,
+      exportedImageUrl: sel?.svgDataUrl,
+    });
+    goStage('completed');
+    setSyncNotice('CAD 변환 완료 — 결과가 명세서 도면에 반영되었습니다.');
+    setTimeout(() => setSyncNotice(null), 4000);
   };
 
   // PatentEditor용 데이터
@@ -232,10 +254,11 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
   const candidates = candidatesMap[activeId] || [];
   const selCandId = selectedMap[activeId] ?? candidates[0]?.id;
 
-  // 3단계 인덱스 매핑 (converting은 스타일 변환=1의 로딩 상태)
+  // 단계 인덱스 매핑 (converting/decide는 CAD 변환=1, completed는 전체 완료)
   const stepIdx =
     workStage === 'crop' || workStage === 'reselect' ? 0 :
-    workStage === 'converting' || workStage === 'decide' ? 1 : 2;
+    workStage === 'converting' || workStage === 'decide' ? 1 :
+    workStage === 'completed' ? STEP_LABELS.length : 2;
 
   // Wrapper: standalone=풀스크린 / 모달=backdrop
   const Wrapper = standalone
@@ -305,8 +328,8 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
               <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium shrink-0', LABEL_COLORS[activeDraw.label] || 'bg-gray-100 text-gray-600')}>
                 {activeDraw.label}
               </span>
-              {/* 대표도면 지정 (편집 단계에서만 표시) */}
-              {workStage === 'editing' && (
+              {/* 대표도면 지정 — 편집 단계 전용(이번 범위 제외). 대표도는 위저드에서 지정 */}
+              {ENABLE_DRAWING_EDIT && workStage === 'editing' && (
                 <button
                   onClick={() => {
                     const next = !isRepresentative;
@@ -377,8 +400,8 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                   const isActive = d.id === activeId;
                   const ws = workStageMap[d.id] || 'crop';
                   const statusBadge = d.stage === 'done'
-                    ? { text: '편집 완료', cls: 'bg-green-100 text-green-700' }
-                    : WORK_STAGE_BADGE[ws] ?? { text: '대기', cls: 'bg-gray-100 text-gray-500' };
+                    ? { text: '변환 완료', cls: 'bg-green-100 text-green-700' }
+                    : WORK_STAGE_BADGE[ws] ?? { text: '대기', cls: 'bg-neutral-100 text-neutral-500' };
                   return (
                     <div
                       key={d.id}
@@ -394,8 +417,8 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                       </div>
                       <p className="text-xs2 font-semibold text-gray-700 truncate">{d.name || '(명칭 없음)'}</p>
                       <div className="mt-1">
-                        {isActive
-                          ? <span className="text-[9px] px-1.5 py-px rounded-full bg-blue-600 text-white font-semibold">▶ 진행 중</span>
+                        {isActive && ws !== 'completed' && d.stage !== 'done'
+                          ? <span className="text-[9px] px-1.5 py-px rounded-full bg-brand-500 text-white font-semibold">▶ 진행 중</span>
                           : <span className={clsx('text-[9px] px-1.5 py-px rounded-full font-semibold', statusBadge.cls)}>{statusBadge.text}</span>
                         }
                       </div>
@@ -490,6 +513,16 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                       </div>
                     </div>
                     <div>
+                      <p className="text-xs2 font-semibold text-gray-400 uppercase tracking-wide mb-1.5">변환 지시문 (선택)</p>
+                      <textarea
+                        value={convInstrMap[activeId] ?? ''}
+                        onChange={e => setConvInstrMap(m => ({ ...m, [activeId]: e.target.value }))}
+                        placeholder="예: 외곽선은 선명하게, 배경은 완전 흰색으로"
+                        rows={2}
+                        className="w-full text-xs2 text-gray-600 leading-relaxed bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-brand-400 resize-none transition-colors"
+                      />
+                    </div>
+                    <div>
                       <p className="text-xs2 font-semibold text-gray-400 uppercase tracking-wide mb-1.5">캡션</p>
                       <textarea
                         value={activeDraw.description}
@@ -514,7 +547,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                     </Button>
                   </div>
                   <Button variant="filled" color="primary" size="sm" className="flex items-center gap-1.5" onClick={startConvert}>
-                    <Icon name="check" size={13} /> 영역 확인 완료 — 변환 시작
+                    <Icon name="check" size={13} /> 영역 확인 완료 — CAD 변환 시작
                   </Button>
                 </div>
               </div>
@@ -550,7 +583,7 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                         ))}
                       </div>
                     </div>
-                    <p className="text-sm2 text-gray-500">특허 도면 스타일로 변환 중입니다…</p>
+                    <p className="text-sm2 text-neutral-500">특허 도면 스타일(CAD)로 변환 중입니다…</p>
                   </div>
                 ) : (
                   /* 후보 선택 */
@@ -639,11 +672,11 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                         <input className="input py-1 text-xs2 w-32" placeholder="예: 더 단순하게"
                           value={regenPrompt} onChange={e => setRegenPrompt(e.target.value)}
                           onKeyDown={e => e.key === 'Enter' && doRegen()} autoFocus />
-                        <Button variant="filled" color="primary" size="xs" className="bg-violet-600 border-violet-600" onClick={doRegen}>재변환</Button>
+                        <Button variant="filled" color="primary" size="xs" onClick={doRegen}>재변환</Button>
                         <Button variant="outlined" color="primary" size="xs" onClick={() => setShowRegen(false)}>취소</Button>
                       </div>
                     ) : (
-                      <button className="text-xs2 text-gray-400 hover:text-violet-600 flex items-center gap-1" onClick={() => setShowRegen(true)}>
+                      <button className="text-xs2 text-gray-400 hover:text-brand-600 flex items-center gap-1" onClick={() => setShowRegen(true)}>
                         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="10" height="10">
                           <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 2.5v3.5H10"/>
                           <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 13.5V10H6"/>
@@ -654,15 +687,35 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                   </div>
                   {workStage === 'decide' && (
                     <Button variant="filled" color="primary" size="sm" onClick={confirmVersion} disabled={!selCandId}>
-                      이 버전으로 편집 시작 →
+                      {ENABLE_DRAWING_EDIT ? '이 버전으로 편집 시작 →' : '✓ 이 버전으로 CAD 변환 완료'}
                     </Button>
                   )}
                 </div>
               </div>
             )}
 
-            {/* ── 단계 3: 도면 편집 (PatentEditor 인라인) ── */}
-            {workStage === 'editing' && (
+            {/* ── 변환 완료 화면 — 명시적 완료 표시 (이번 범위의 종착점) ── */}
+            {workStage === 'completed' && activeDraw && (
+              <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 overflow-y-auto scroll-thin">
+                  <span className="w-12 h-12 rounded-full bg-green-500 text-white flex items-center justify-center"><Icon name="check" size={22} /></span>
+                  <p className="text-lg2 font-bold text-gray-800">CAD 변환 완료</p>
+                  <p className="text-sm2 text-neutral-500 text-center">선택한 변환본이 명세서 도면에 반영되었습니다.<br/>위저드·에디터의 도면 카드에 <b className="text-green-700">CAD 변환 완료</b> 배지와 변환본 썸네일이 표시됩니다.</p>
+                  <div className="w-64 aspect-[4/3] bg-white rounded-lg border border-neutral-200 flex items-center justify-center overflow-hidden">
+                    {activeDraw.exportedImageUrl
+                      ? <img src={activeDraw.exportedImageUrl} className="max-w-full max-h-full object-contain p-2" alt="CAD 변환 결과" />
+                      : <Icon name="image" size={32} className="text-neutral-300" />}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-t border-ck-border bg-white shrink-0">
+                  <Button variant="outlined" color="primary" size="sm" onClick={() => goStage('crop')}>↻ 다시 변환 (영역부터)</Button>
+                  <Button variant="filled" color="primary" size="sm" onClick={onClose}>완료 — 닫기</Button>
+                </div>
+              </div>
+            )}
+
+            {/* ── 단계 3: 도면 편집 (PatentEditor 인라인) — ENABLE_DRAWING_EDIT=false: API(M2)에 없는 기능이라 이번 범위 제외 ── */}
+            {ENABLE_DRAWING_EDIT && workStage === 'editing' && (
               <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                 {patentDrawings.length > 0 ? (
                   <PatentEditor

@@ -1351,11 +1351,16 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                                 <span className={clsx('text-xs2 px-1.5 py-px rounded-sm font-medium', DRAWING_LABEL_STYLES[labelKo] ?? 'bg-neutral-100 text-neutral-500')}>{labelKo}</span>
                               </div>
                               <p className="text-xs2 text-neutral-600 leading-snug">{d.detail.name}</p>
+                              {d.cadConverted && (
+                                <span className="mt-1 inline-flex items-center gap-1 text-xs2 px-1.5 py-px rounded-full bg-green-50 text-green-700 font-medium" title="도면 편집기에서 CAD 변환 결과를 반영했습니다">
+                                  <Icon name="check" size={9} /> CAD 변환 완료
+                                </span>
+                              )}
                             </div>
                             {/* 도면 수정모드(새 탭) — 참조 삽입은 본문 툴바의 '도면 참조'로 이동 */}
                             <div className="border-t border-neutral-100 px-3 py-1.5 flex items-center justify-end">
                               <button
-                                onClick={() => openEditorTab({ drawingId: String(idx), drawings: drawings.map(toWorkflowDrawingItem), components: [], references: [], drawingName: d.detail.name, timestamp: Date.now() })}
+                                onClick={() => openEditorTab({ taskId: task?.id, drawingId: String(idx), drawings: drawings.map(toWorkflowDrawingItem), components: [], references: [], drawingName: d.detail.name, timestamp: Date.now() })}
                                 data-spec="SPC-EDT-100" title="도면 편집기를 새 탭에서 엽니다 (범위 조정·CAD 변환)"
                                 className="inline-flex items-center gap-0.5 h-7 px-2 rounded-md text-xs2 font-semibold text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 transition-colors shrink-0"
                               >도면 편집기 <span className="text-xs2">↗</span></button>

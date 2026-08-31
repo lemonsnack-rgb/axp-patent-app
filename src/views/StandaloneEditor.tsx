@@ -35,7 +35,7 @@ export function StandaloneEditor() {
   }
 
   const syncResult = (drawingId: string, stage: 'editing' | 'done', extra?: { editorJson?: string; exportedImageUrl?: string; adjustedBbox?: { x: number; y: number; w: number; h: number }; detail?: { name?: string; label?: string; description?: string } }) => {
-    writeEditorResult({ drawingId, stage, references: refs, ...extra, timestamp: Date.now() });
+    writeEditorResult({ taskId: session?.taskId, drawingId, stage, references: refs, ...extra, timestamp: Date.now() });
   };
 
   return (

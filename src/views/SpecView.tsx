@@ -1,5 +1,5 @@
 // SpecView
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { SpecEditorView } from './SpecEditorView';
 import { useStore } from '../store';
 import { Icon } from '../components/Icon';
@@ -25,7 +25,8 @@ import { replaceElementName, countElementMentions } from '../features/spec/eleme
 import { ElementText, type ElementLike } from '../components/ElementText';
 import { DiffText } from '../components/DiffText';
 import type { DrawingItem as WorkflowDrawingItem } from '../features/drawing-workflow/types';
-import { openEditorTab, onEditorResult } from '../features/drawing-workflow/editorChannel';
+import { openEditorTab, onEditorResult, readEditorResult } from '../features/drawing-workflow/editorChannel';
+import type { EditorResult } from '../features/drawing-workflow/editorChannel';
 import type {
   SpecAnalysisState, SpecStepId, StepConfig,
   TitleCandidate, SpecComponentItem,
@@ -114,7 +115,6 @@ export function SpecView() {
 
   const [mainView, setMainView] = useState<'analysis' | 'editor'>(savedSpec?.mainView ?? 'analysis');
   const handleSetMainView = (v: 'analysis' | 'editor') => setMainView(v);
-
   // ── 구성요소 명칭 전역 치환 (원천 = context.elements) ─────────────────────
   // 정의 지점(구성요소 단계)·인용 지점(에디터 하이라이트 클릭)이 같은 엔진을 쓴다. 텍스트 치환은 elementRename.ts.
   const elementNames = () => context.elements.map(e => e.value_ko).filter(Boolean);
@@ -188,6 +188,50 @@ export function SpecView() {
   const [confirmed, setConfirmed] = useState<Partial<Record<StepId, string>>>((savedSpec?.confirmed as Partial<Record<StepId, string>>) ?? {});
   const [guideStep, setGuideStep] = useState<StepId>((savedSpec?.curStep as StepId) ?? 'title');
   const [gSel, setGSel] = useState<Partial<Record<StepId, string>>>((savedSpec?.gSel as Partial<Record<StepId, string>>) ?? {});
+
+  // ── 도면 편집기(새 탭) 결과 수신 — 톱레벨: 위저드/에디터 어느 화면이든 반영, 재진입 시 잔류 결과도 적용 ──
+  const applyEditorResult = useCallback((result: EditorResult | null) => {
+    if (!result) return;
+    if (result.taskId && result.taskId !== task?.id) return;   // 다른 작업의 결과는 무시
+    const idx = parseInt(result.drawingId, 10);
+    if (isNaN(idx)) return;
+    const LABEL_TO_API: Record<string, Drawing['detail']['label']> = {
+      '제안기술': 'proposed_implementation', '종래기술': 'previous_implementation', 'AI생성': 'proposed_implementation',
+    };
+    setContext(p => {
+      const ds = [...(p.drawings ?? [])];
+      const d = ds[idx];
+      if (!d) return p;
+      let next = d;
+      if (result.adjustedBbox) {
+        const ab = result.adjustedBbox;
+        next = { ...next, image: { ...next.image, bbox: { x1: ab.x, y1: ab.y, x2: ab.x + ab.w, y2: ab.y + ab.h } } };
+      }
+      if (result.detail) {
+        const dt = result.detail;
+        next = { ...next, detail: {
+          ...next.detail,
+          ...(dt.name !== undefined ? { name: dt.name } : {}),
+          ...(dt.description !== undefined ? { description: dt.description } : {}),
+          ...(dt.label !== undefined ? { label: LABEL_TO_API[dt.label] ?? next.detail.label } : {}),
+        } };
+      }
+      // CAD 변환 완료: 썸네일을 변환본으로 교체 + 완료 배지 (B13)
+      if (result.stage === 'done' && result.exportedImageUrl?.startsWith('data:')) {
+        const mm = result.exportedImageUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (mm) next = { ...next, cadConverted: true, image: { ...next.image, file: { ...next.image.file, media_type: mm[1] as Drawing['image']['file']['media_type'], data: mm[2] } } };
+      }
+      ds[idx] = next;
+      return { ...p, drawings: ds };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.id]);
+  useEffect(() => {
+    // 리스너 미등록 상태에서 도착해 잔류한 결과를 재진입 시 적용 (taskId가 일치할 때만)
+    const pending = readEditorResult();
+    if (pending && pending.taskId && pending.taskId === task?.id) applyEditorResult(pending);
+    return onEditorResult(applyEditorResult);
+  }, [applyEditorResult]);
 
   const [diTitle, setDiTitle] = useState(savedSpec?.diTitle ?? '');
   const [diField, setDiField] = useState(savedSpec?.diField ?? '');
@@ -792,7 +836,7 @@ export function SpecView() {
                         {(s.id === 'images' || s.id === 'components' || s.id === 'drawings' || s.id === 'claims' || s.id === 'midspec') && (
                           <div className="mt-3">
                             {s.id === 'images' && (
-                              <DrawingsPanel
+                              <DrawingsPanel taskId={task?.id}
                                 mode="select"
                                 done={isDone}
                                 onConfirm={() => confirm('images')}
@@ -822,7 +866,7 @@ export function SpecView() {
                               />
                             )}
                             {s.id === 'drawings' && (
-                              <DrawingsPanel
+                              <DrawingsPanel taskId={task?.id}
                                 mode="spec"
                                 done={isDone}
                                 onConfirm={() => confirm('drawings')}
@@ -2621,13 +2665,14 @@ function CroppedCanvas({ data, mediaType, bbox }: { data: string; mediaType: str
   return <canvas ref={canvasRef} className="w-full h-full object-contain" />;
 }
 
-function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateDrawings }: {
+function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateDrawings, taskId }: {
   mode: 'select' | 'spec';
   done: boolean;
   onConfirm: () => void;
   onUpdate: (v: string) => void;
   drawings?: Drawing[];
   onUpdateDrawings?: (next: Drawing[]) => void;
+  taskId?: string;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const drawings = propDrawings ?? MOCK_DRAWINGS;
@@ -2637,44 +2682,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
     onUpdate(next.filter(d => d.useForSpec).map(d => `${d.detail.symbol} ${d.detail.name}: ${d.detail.description}`).join('\n\n'));
   };
 
-  useEffect(() => {
-    // 편집기 라벨(제안기술/종래기술/AI생성) → API 라벨 역매핑
-    const LABEL_TO_API: Record<string, Drawing['detail']['label']> = {
-      '제안기술': 'proposed_implementation',
-      '종래기술': 'previous_implementation',
-      'AI생성': 'proposed_implementation',
-    };
-    return onEditorResult((result) => {
-      const idx = parseInt(result.drawingId, 10);
-      if (isNaN(idx)) return;
-      updateDrawings(drawings.map((d, i) => {
-        if (i !== idx) return d;
-        let next = d;
-        if (result.adjustedBbox) {
-          const ab = result.adjustedBbox;
-          next = { ...next, image: { ...next.image, bbox: { x1: ab.x, y1: ab.y, x2: ab.x + ab.w, y2: ab.y + ab.h } } };
-        }
-        if (result.detail) {
-          const dt = result.detail;
-          next = { ...next, detail: {
-            ...next.detail,
-            ...(dt.name !== undefined ? { name: dt.name } : {}),
-            ...(dt.description !== undefined ? { description: dt.description } : {}),
-            ...(dt.label !== undefined ? { label: LABEL_TO_API[dt.label] ?? next.detail.label } : {}),
-          } };
-        }
-        // 편집기에서 CAD 변환(내보내기) 결과가 오면 썸네일을 변환본으로 교체하고 상태 배지를 표시 (B13)
-        if (result.stage === 'done' && result.exportedImageUrl?.startsWith('data:')) {
-          const mm = result.exportedImageUrl.match(/^data:([^;]+);base64,(.+)$/);
-          if (mm) {
-            next = { ...next, cadConverted: true, image: { file: { ...next.image.file, media_type: mm[1], data: mm[2] } } };
-          }
-        }
-        return next;
-      }));
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawings]);
+  // (도면 편집기 결과 수신은 SpecView 톱레벨로 이관 — 위저드/에디터 어느 화면에서도 유실 없이 반영)
 
   const handleFileAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2959,7 +2967,7 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                   {!done && isForSpec && (
                     <div className="flex border-t border-neutral-100">
                       <button data-spec="SPC-DRW-014"
-                        onClick={() => openEditorTab({ drawingId: String(idx), drawings: drawings.map(toWorkflowDrawingItem), components: [], references: [], drawingName: d.detail.name, timestamp: Date.now() })}
+                        onClick={() => openEditorTab({ taskId, drawingId: String(idx), drawings: drawings.map(toWorkflowDrawingItem), components: [], references: [], drawingName: d.detail.name, timestamp: Date.now() })}
                         className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs2 font-semibold text-brand-500 hover:bg-brand-50 transition-colors"
                         title="범위 조정·CAD 변환"
                       >도면 편집기에서 조정·변환 ↗</button>

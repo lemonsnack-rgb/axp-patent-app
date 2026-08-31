@@ -7,6 +7,7 @@ const RESULT_KEY  = 'axp_drawing_editor_result';
 
 /** 메인 탭이 새 탭에 전달하는 세션 데이터 (Stage 1부터 전체 워크플로) */
 export interface EditorSession {
+  taskId?: string;                 // 결과를 적용할 작업 스코프 — 다른 작업에 잘못 반영되는 것 방지
   drawingId: string;
   drawings: DrawingItem[];         // Stage 1~3용 전체 도면 데이터
   components: InventionComponent[];
@@ -17,6 +18,7 @@ export interface EditorSession {
 
 /** 편집기 탭이 메인 탭에 전달하는 결과 */
 export interface EditorResult {
+  taskId?: string;                 // 세션의 taskId를 그대로 되돌려줌
   drawingId: string;
   editorJson?: string;
   exportedImageUrl?: string;
@@ -58,6 +60,16 @@ export function readEditorSession(): EditorSession | null {
 /** 편집기 탭에서 결과를 저장 (메인 탭이 storage 이벤트로 수신) */
 export function writeEditorResult(result: EditorResult): void {
   localStorage.setItem(RESULT_KEY, JSON.stringify(result));
+}
+
+/** 잔류 결과 읽기 — 메인 탭이 리스너 미등록 상태(다른 화면·새로고침)일 때 유실된 결과를 재진입 시 적용 */
+export function readEditorResult(): EditorResult | null {
+  try {
+    const raw = localStorage.getItem(RESULT_KEY);
+    return raw ? (JSON.parse(raw) as EditorResult) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** 메인 탭에서 편집기 결과를 수신하는 리스너 등록, 해제 함수 반환 */
