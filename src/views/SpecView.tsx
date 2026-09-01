@@ -778,14 +778,6 @@ export function SpecView() {
                           <DescriptionItemCards
                             previous={context.previous}
                             proposed={context.proposed}
-                            onRegenerate={() => {
-                              // API /v2/generate/context/description/refined — 현재 목업(getMockExtractResult)
-                              import('../features/spec/mockAiService').then(({ getMockExtractResult }) => {
-                                const r = getMockExtractResult();
-                                setContext(p => ({ ...p, previous: r.previous, proposed: r.proposed }));
-                                toast('발명 설명을 다시 정제했습니다');
-                              });
-                            }}
                             onToggle={(type, idx) => setContext(p => ({
                               ...p,
                               [type]: p[type].map((item, i) => i === idx ? { ...item, adopted: !item.adopted } : item),
@@ -1221,15 +1213,15 @@ export type PendingChange = {
 
 // mock 제안 생성 — 단일 텍스트 항목
 function proposeMock(original: string, instruction: string, label?: string, apply?: (next: string) => void): PendingChange {
+  // instruction은 수정문 생성(API 요청)에만 쓰고 카드에는 노출하지 않는다 (2026-08-31 사용자 지시)
   const after = generateMockModification(original, instruction);
   return {
     tag: '수정', label, before: original, after,
-    explanation: `"${instruction.slice(0, 30)}${instruction.length > 30 ? '…' : ''}" 지시를 반영해 표현을 보완했습니다.`,
     apply: apply ? () => apply(after) : undefined,
   };
 }
 
-function AiPendingCard({ title, instruction, changes, onApply, onCancel, className }: {
+function AiPendingCard({ title, changes, onApply, onCancel, className }: {   // instruction은 표시하지 않음(프롬프트 미노출)
   title: string;
   instruction: string;
   changes: PendingChange[];
@@ -1242,7 +1234,7 @@ function AiPendingCard({ title, instruction, changes, onApply, onCancel, classNa
       <div className="flex items-center gap-2 px-3 py-1.5 bg-brand-50/60 border-b border-brand-100">
         <AiIcon />
         <span className="text-xs2 font-semibold text-brand-600 shrink-0 whitespace-nowrap">{title}</span>
-        <span className="text-xs2 text-neutral-500 truncate">{changes.length}건 · 지시사항: {instruction}</span>
+        <span className="text-xs2 text-neutral-500 truncate">{changes.length}건</span>
       </div>
       <div className="divide-y divide-neutral-100 max-h-[320px] overflow-y-auto scroll-thin">
         {changes.map((c, i) => (
@@ -1601,7 +1593,7 @@ const DESC_LABEL_MAP: Record<string, string> = {
 };
 
 function DescriptionItemCards({
-  previous, proposed, onToggle, onChange, onAdd, onRemove, onReorder, onMoveAcross, onRegenerate,
+  previous, proposed, onToggle, onChange, onAdd, onRemove, onReorder, onMoveAcross,
 }: {
   previous: InventionDescriptionItem[];
   proposed: InventionDescriptionItem[];
@@ -1611,23 +1603,46 @@ function DescriptionItemCards({
   onRemove: (type: 'previous' | 'proposed', idx: number) => void;
   onReorder: (type: 'previous' | 'proposed', from: number, to: number) => void;
   onMoveAcross: (fromType: 'previous' | 'proposed', fromIdx: number, toIdx?: number) => void;
-  onRegenerate?: () => void;   // 다시 정제 — API /v2/generate/context/description/refined
 }) {
   const [tab, setTab] = useState<'previous' | 'proposed'>('proposed');
   // 인라인 AI 수정 — 열린 카드 키 (`${type}-${idx}`)
   const [aiKey, setAiKey] = useState<string | null>(null);
   // 전체 AI 수정 바 (데모: "발명 설명 전반에 대한 AI 지시사항" + 전체 AI 수정)
   const [globalInstr, setGlobalInstr] = useState('');
-  // 전체 AI 수정 제안 — 채택된 텍스트 항목 전부에 지시 반영 (표 항목 제외). 확인 후 적용은 AiGlobalBar가 담당.
-  const proposeGlobal = (instr: string): PendingChange[] =>
-    (['proposed', 'previous'] as const).flatMap(type => {
+  // 전체 AI 수정 제안 — API /v2/generate/context/description/modification 정합:
+  // 응답은 영역(제안/종래)별 deleted(item id 목록)·added(새 항목 목록)뿐이다(전체 재작성 아님 — 일부만 삭제/추가될 수 있음).
+  // 삭제는 id로 명확히 지우고, 추가는 그룹 내 위치를 알 수 없으므로 해당 영역의 가장 뒤에 순서대로 붙인다.
+  const proposeGlobal = (instr: string): PendingChange[] => {
+    void instr;   // API 요청에는 전달되지만 제안 카드·수정문에 프롬프트 문구를 노출하지 않는다
+    const delta: PendingChange[] = [];
+    (['proposed', 'previous'] as const).forEach(type => {
       const items = type === 'proposed' ? proposed : previous;
-      return items.flatMap((item, idx) => {
-        if (item.adopted === false || item.type === 'table') return [];
-        const secKo = type === 'proposed' ? '제안기술' : '종래기술';
-        return [proposeMock(item.content, instr, `${secKo} · ${DESC_LABEL_MAP[item.label] ?? item.label}`, next => onChange(type, idx, next))];
-      });
+      const secKo = type === 'proposed' ? '제안기술' : '종래기술';
+      const cand = items.filter(it => it.adopted !== false && it.type !== 'table');
+      // mock deleted[]: 영역별 마지막 채택 항목 1건 (2건 이상일 때만)
+      if (cand.length >= 2) {
+        const del = cand[cand.length - 1];
+        delta.push({
+          tag: '삭제', label: `${secKo} · ${DESC_LABEL_MAP[del.label] ?? del.label}`, before: del.content,
+          apply: () => {
+            const cur = type === 'proposed' ? proposed : previous;
+            const i = cur.findIndex(x => x.id === del.id);
+            if (i >= 0) onRemove(type, i);
+          },
+        });
+      }
     });
+    // mock added[]: 영역별 1건 — 적용 시 해당 영역 맨 뒤에 추가
+    const adds: { type: 'proposed' | 'previous'; secKo: string; label: InventionDescriptionItem['label']; content: string }[] = [
+      { type: 'proposed', secKo: '제안기술', label: 'effect', content: '제안 구조는 처리 단계 간 대기 시간을 제거하여 전체 지연을 낮춘다.' },
+      { type: 'previous', secKo: '종래기술', label: 'background', content: '종래 방식은 단일 처리 경로에 의존하여 부하 증가 시 지연이 누적되는 한계가 있었다.' },
+    ];
+    adds.forEach(a => delta.push({
+      tag: '추가', label: `${a.secKo} · ${DESC_LABEL_MAP[a.label] ?? a.label} (영역 맨 뒤에 추가)`, after: a.content,
+      apply: () => onAdd(a.type, a.content, a.label),
+    }));
+    return delta;
+  };
   const [dragSrc, setDragSrc] = useState<{ type: 'previous' | 'proposed'; idx: number } | null>(null);
   const [dropHint, setDropHint] = useState<string | null>(null);
   const handleDrop = (toType: 'previous' | 'proposed', toIdx: number) => {
@@ -1847,15 +1862,6 @@ function DescriptionItemCards({
         propose={proposeGlobal}
         doneMsg="발명 설명에 적용했습니다"
       />
-      {onRegenerate && (
-        <div className="flex justify-end">
-          <button data-spec="SPC-DSC-030"
-            onClick={() => confirmOverwrite('발명 설명 다시 정제', '채택·편집한 항목이 정제된 새 항목으로 대체됩니다. 계속할까요?', '다시 정제', onRegenerate)}
-            className="inline-flex items-center gap-1 h-6 px-2 rounded-lg text-xs2 font-medium text-brand-500 border border-brand-200 bg-white hover:bg-brand-50 transition-colors"
-            title="추출 원천 정보를 AI가 다시 정제합니다 (API description/refined)"
-          >↻ 다시 정제</button>
-        </div>
-      )}
       {/* lg+: 2컬럼 */}
       <div className="max-lg:hidden lg:grid lg:grid-cols-2 lg:gap-4">
         {renderColumn('proposed', proposed)}

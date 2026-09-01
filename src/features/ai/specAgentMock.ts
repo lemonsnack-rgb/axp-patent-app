@@ -127,9 +127,9 @@ export function buildProposal(
 ): EditProposal {
   const action = inferAction(instruction);
   const targetDesc = `'${sectionLabel}' ${idx + 1}번째 블록`;
-  const summary = `${instruction.slice(0, 30).trim() || '요청'} 반영`;
+  const summary = '지시를 반영한 수정안입니다.';   // 프롬프트(지시) 문구 미노출
   let source = original, target = '';
-  if (action === 'DELETE') { target = ''; }
+  if (action === 'DELETE') { /* 삭제 제안 — target 없음 */ }
   else if (action === 'INSERT') { source = ''; target = generateMockModification('', instruction); }
   else { target = generateMockModification(original, instruction); }
   return { sid, idx, action, targetDesc, summary, source, target, status: 'pending' };

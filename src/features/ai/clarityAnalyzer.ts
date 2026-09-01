@@ -34,12 +34,13 @@ export function generateIntentOptions(prompt: string): string[] {
 // ── 수정안 생성 (mock) ────────────────────────────────────────────────────────
 // 실제 구현 시 LLM API 호출로 교체
 export function generateMockModification(originalText: string, instruction: string): string {
-  const trimmed = (instruction.slice(0, 20).trim()) || '요청';
-  // 이전 mock 보완 주석을 제거한 뒤 최신 지시를 반영 — 반복 수정 시에도 매번 변경이 보이도록
-  // (원문이 '이다.'로 끝나지 않아도 항상 수정된 결과를 반환)
+  void instruction;   // 수정문에 프롬프트(지시) 문구를 노출하지 않는다 (2026-08-31 사용자 지시)
+  const NOTE = ' 이 구성은 요구 사항을 충족하도록 표현을 보완한 것이다.';
+  // 이전 mock 보완 문장·구 형식 주석을 제거한 뒤 다시 붙인다 — 반복 수정 시에도 매번 변경이 보이도록
   const base = originalText
-    .replace(/\s*—\s*\([^()]*관점 보완\)\s*$/u, '')       // 새 형식 주석 제거
-    .replace(/\s*[^.]*관점에서 보완했습니다\.\s*$/u, '')   // 구 형식 주석 제거
+    .replace(/\s*—\s*\([^()]*관점 보완\)\s*$/u, '')
+    .replace(/\s*[^.]*관점에서 보완했습니다\.\s*$/u, '')
+    .replace(/\s*이 구성은 요구 사항을 충족하도록 표현을 보완한 것이다\.\s*$/u, '')
     .trimEnd();
-  return `${base} — (${trimmed} 관점 보완)`;
+  return `${base}${NOTE}`;
 }
