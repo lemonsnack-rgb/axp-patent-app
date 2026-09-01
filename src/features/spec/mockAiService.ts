@@ -99,7 +99,7 @@ export const MOCK_DRAWINGS: Drawing[] = [
       bbox: { x1: 0, y1: 0, x2: 640, y2: 400 },
     },
     detail: { symbol: '도면1', name: '시스템 전체 구성도', description: '발명의 전체 구성을 나타내는 블록도', label: 'proposed_implementation' },
-    included: true, useForSpec: false, isRepresentative: false,
+    included: true, useForSpec: false, isRepresentative: false, page: 1,
   },
   {
     image: {
@@ -107,7 +107,7 @@ export const MOCK_DRAWINGS: Drawing[] = [
       bbox: { x1: 0, y1: 0, x2: 640, y2: 400 },
     },
     detail: { symbol: '도면2', name: '종래 기술 구성도', description: '기존 기술 구조를 나타낸 도면', label: 'previous_implementation' },
-    included: true, useForSpec: false, isRepresentative: false,
+    included: true, useForSpec: false, isRepresentative: false, page: 2,
   },
 ]
 

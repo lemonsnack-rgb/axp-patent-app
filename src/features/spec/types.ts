@@ -111,6 +111,7 @@ export interface Drawing {
   useForSpec?: boolean
   isRepresentative?: boolean
   cadConverted?: boolean   // 도면 편집기(새 탭)에서 CAD 변환 결과를 받아 반영했는지 (B13)
+  page?: number            // 직무발명서 원본 페이지 번호 — extract 응답 List[List[...]]의 페이지 인덱스(1부터)
 }
 
 // ── 명세서 타입 ──────────────────────────────────────────────────────────────

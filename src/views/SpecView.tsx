@@ -2633,7 +2633,7 @@ function toWorkflowDrawingItem(drawing: Drawing, idx: number): WorkflowDrawingIt
     name: drawing.detail.name,
     description: drawing.detail.description,
     applied: drawing.useForSpec ?? false,
-    pageNumber: 1,
+    pageNumber: drawing.page ?? 1,
     stage: 'bbox-adjusted',
     originalImageUrl: drawing.image.file.data ? `data:${drawing.image.file.media_type};base64,${drawing.image.file.data}` : '',
     bbox,
@@ -2699,6 +2699,67 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
   const updateDrawings = (next: Drawing[]) => {
     onUpdateDrawings?.(next);
     onUpdate(next.filter(d => d.useForSpec).map(d => `${d.detail.symbol} ${d.detail.name}: ${d.detail.description}`).join('\n\n'));
+  };
+
+  // ── 이미지 선별: 복제 — 같은 원본(파일)에서 다른 영역을 잘라내도록 사본 생성 (한 원본 → 여러 도면)
+  const duplicateDrawing = (idx: number) => {
+    if (done) return;
+    const src = drawings[idx];
+    if (!src) return;
+    const copy: Drawing = {
+      ...src,
+      image: { file: src.image.file, bbox: src.image.bbox ? { ...src.image.bbox } : undefined },
+      detail: { ...src.detail, name: `${src.detail.name} (복제)` },
+      isRepresentative: false, useForSpec: false, cadConverted: false,
+    };
+    const next = [...drawings];
+    next.splice(idx + 1, 0, copy);
+    updateDrawings(next);
+  };
+
+  // ── 이미지 선별: 영역 조정 — 원본 페이지 위에서 BBox(extract 응답 좌표)를 드래그로 보정 ──
+  const [bboxEdit, setBboxEdit] = useState<{ idx: number; box: { x1: number; y1: number; x2: number; y2: number }; nat: { w: number; h: number } | null } | null>(null);
+  const bboxContainerRef = useRef<HTMLDivElement>(null);
+  const bboxDragRef = useRef<{ type: string; startX: number; startY: number; startBox: { x1: number; y1: number; x2: number; y2: number } } | null>(null);
+  const openBboxEdit = (idx: number) => {
+    if (done) return;
+    setBboxEdit({ idx, box: { x1: 10, y1: 10, x2: 90, y2: 90 }, nat: null });
+  };
+  const startBboxDrag = (type: string, e: React.MouseEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    if (!bboxEdit) return;
+    bboxDragRef.current = { type, startX: e.clientX, startY: e.clientY, startBox: { ...bboxEdit.box } };
+    const onMove = (ev: MouseEvent) => {
+      const dctx = bboxDragRef.current; const c = bboxContainerRef.current;
+      if (!dctx || !c) return;
+      const r = c.getBoundingClientRect();
+      const dx = ((ev.clientX - dctx.startX) / r.width) * 100;
+      const dy = ((ev.clientY - dctx.startY) / r.height) * 100;
+      const b = dctx.startBox; const M = 5;
+      let { x1, y1, x2, y2 } = b;
+      if (dctx.type === 'move') { x1 = b.x1 + dx; y1 = b.y1 + dy; x2 = b.x2 + dx; y2 = b.y2 + dy; }
+      else {
+        if (dctx.type.includes('w')) x1 = Math.min(b.x1 + dx, b.x2 - M);
+        if (dctx.type.includes('e')) x2 = Math.max(b.x2 + dx, b.x1 + M);
+        if (dctx.type.includes('n')) y1 = Math.min(b.y1 + dy, b.y2 - M);
+        if (dctx.type.includes('s')) y2 = Math.max(b.y2 + dy, b.y1 + M);
+      }
+      const cl = (v: number) => Math.max(0, Math.min(v, 100));
+      setBboxEdit(prev => prev ? { ...prev, box: { x1: cl(x1), y1: cl(y1), x2: cl(x2), y2: cl(y2) } } : prev);
+    };
+    const onUp = () => { bboxDragRef.current = null; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+  const saveBboxEdit = () => {
+    if (!bboxEdit?.nat) { setBboxEdit(null); return; }
+    const { idx, box, nat } = bboxEdit;
+    const px = (v: number, base: number) => Math.round((v / 100) * base);
+    updateDrawings(drawings.map((d, i) => i === idx
+      ? { ...d, image: { ...d.image, bbox: { x1: px(box.x1, nat.w), y1: px(box.y1, nat.h), x2: px(box.x2, nat.w), y2: px(box.y2, nat.h) } } }
+      : d));
+    setBboxEdit(null);
+    toast('도면 영역을 조정했습니다');
   };
 
   // (도면 편집기 결과 수신은 SpecView 톱레벨로 이관 — 위저드/에디터 어느 화면에서도 유실 없이 반영)
@@ -2846,6 +2907,9 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                   <div className="px-2.5 pt-1.5 pb-1">
                     <div className="flex items-center gap-1 flex-wrap mb-0.5">
                       <span className="text-xs2 font-bold text-neutral-700" title={`원본 기호: ${d.detail.symbol}`}>이미지 {idx + 1}</span>
+                      {typeof d.page === 'number' && (
+                        <span className="text-xs2 px-1.5 py-px rounded-md bg-neutral-100 text-neutral-500 font-medium" title={`직무발명서 ${d.page}페이지에서 추출`}>p.{d.page}</span>
+                      )}
                       {done ? (
                         <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium', labelInfo.cls)}>{labelInfo.text}</span>
                       ) : (
@@ -2867,6 +2931,17 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                   </div>
                   {!done && (
                     <div className="flex border-t border-neutral-100">
+                      <button
+                        onClick={() => openBboxEdit(idx)}
+                        disabled={!d.image.file.data}
+                        className="inline-flex items-center h-7 px-2 ml-1 my-0.5 rounded-md text-xs2 font-medium text-neutral-500 hover:text-brand-600 hover:bg-brand-50 transition-colors disabled:opacity-40"
+                        data-spec="SPC-IMG-016" title="원본 페이지에서 도면 영역(BBox)을 드래그로 조정합니다"
+                      >영역 조정</button>
+                      <button
+                        onClick={() => duplicateDrawing(idx)}
+                        className="inline-flex items-center h-7 px-2 my-0.5 rounded-md text-xs2 font-medium text-neutral-500 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                        data-spec="SPC-IMG-017" title="같은 원본에서 다른 영역을 잘라내도록 이미지를 복제합니다"
+                      >복제</button>
                       <button
                         onClick={() => removeDrawing(idx)}
                         className="ml-auto inline-flex items-center justify-center w-7 h-7 mr-1 my-0.5 rounded-md text-neutral-300 hover:bg-red-50 hover:text-red-500 transition-colors"
@@ -2891,6 +2966,65 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileAdd} />
             </div>
           )}
+
+          {/* 영역 조정 모달 — 원본 페이지 이미지 위 드래그 박스 (도면 편집기 '영역 확인'과 동일 조작) */}
+          {bboxEdit && (() => {
+            const d = drawings[bboxEdit.idx];
+            if (!d) return null;
+            const b = bboxEdit.box;
+            return (
+              <div className="fixed inset-0 z-[70] bg-black/50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+                <div className="bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden w-full max-w-2xl" style={{ height: 'min(600px, calc(100vh - 48px))' }}>
+                  <div className="flex items-center gap-2 px-4 py-2.5 border-b border-ck-border shrink-0">
+                    <span className="text-base2 font-bold text-neutral-800">영역 조정</span>
+                    <span className="text-sm2 text-neutral-500 truncate">{d.detail.name}</span>
+                    {typeof d.page === 'number' && <span className="text-xs2 px-1.5 py-px rounded-md bg-neutral-100 text-neutral-500 font-medium">p.{d.page}</span>}
+                  </div>
+                  <p className="px-4 pt-2 text-xs2 text-neutral-400 shrink-0">파란 박스를 드래그해 이 이미지로 쓸 도면 영역을 지정하세요. 썸네일과 이후 생성·변환에 이 영역이 사용됩니다.</p>
+                  <div ref={bboxContainerRef} className="flex-1 m-4 bg-neutral-100 rounded-lg border border-neutral-200 relative overflow-hidden select-none min-h-0">
+                    {d.image.file.data && (
+                      <img
+                        src={`data:${d.image.file.media_type};base64,${d.image.file.data}`}
+                        className="w-full h-full object-contain" alt=""
+                        onLoad={e => {
+                          const im = e.currentTarget;
+                          setBboxEdit(prev => {
+                            if (!prev || prev.nat) return prev;
+                            const nat = { w: im.naturalWidth || 1, h: im.naturalHeight || 1 };
+                            const bb = d.image.bbox;
+                            const pct = (v: number, base: number) => Math.max(0, Math.min((v / base) * 100, 100));
+                            const box = bb && bb.x2 > bb.x1 && bb.y2 > bb.y1
+                              ? { x1: pct(bb.x1, nat.w), y1: pct(bb.y1, nat.h), x2: pct(bb.x2, nat.w), y2: pct(bb.y2, nat.h) }
+                              : prev.box;
+                            return { ...prev, nat, box };
+                          });
+                        }}
+                      />
+                    )}
+                    <div className="absolute inset-0 bg-black/25 pointer-events-none" />
+                    <div
+                      className="absolute border-2 border-brand-500 shadow-[0_0_0_9999px_rgba(0,0,0,0.3)]"
+                      style={{ left: `${b.x1}%`, top: `${b.y1}%`, width: `${b.x2 - b.x1}%`, height: `${b.y2 - b.y1}%`, cursor: 'move' }}
+                      // eslint-disable-next-line react-hooks/refs -- 이벤트 핸들러에서만 ref를 사용(렌더 중 접근 아님)
+                      onMouseDown={e => startBboxDrag('move', e)}
+                    >
+                      {(['nw','n','ne','e','se','s','sw','w'] as const).map(h => {
+                        const pos: React.CSSProperties = {};
+                        if (h.includes('n')) pos.top = '-5px'; if (h.includes('s')) pos.bottom = '-5px'; if (!h.includes('n') && !h.includes('s')) pos.top = 'calc(50% - 5px)';
+                        if (h.includes('w')) pos.left = '-5px'; if (h.includes('e')) pos.right = '-5px'; if (!h.includes('w') && !h.includes('e')) pos.left = 'calc(50% - 5px)';
+                        const cursors: Record<string, string> = { nw: 'nw-resize', n: 'n-resize', ne: 'ne-resize', e: 'e-resize', se: 'se-resize', s: 's-resize', sw: 'sw-resize', w: 'w-resize' };
+                        return <div key={h} className="absolute w-2.5 h-2.5 bg-white border-2 border-brand-500 rounded-sm z-10 shadow-sm" style={{ ...pos, cursor: cursors[h] }} onMouseDown={e => { e.stopPropagation(); startBboxDrag(h, e); }} />;
+                      })}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 px-4 py-2.5 border-t border-ck-border shrink-0">
+                    <Button variant="outlined" color="primary" size="sm" onClick={() => setBboxEdit(null)}>취소</Button>
+                    <Button variant="filled" color="primary" size="sm" onClick={saveBboxEdit} disabled={!bboxEdit.nat}>영역 저장</Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </>
       )}
 

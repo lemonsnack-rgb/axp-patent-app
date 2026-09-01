@@ -159,7 +159,7 @@ function toWorkflowDrawingItem(drawing: Drawing, idx: number): WorkflowDrawingIt
     name: drawing.detail.name,
     description: drawing.detail.description,
     applied: drawing.useForSpec ?? false,
-    pageNumber: 1,
+    pageNumber: drawing.page ?? 1,
     stage: 'bbox-adjusted',
     originalImageUrl: drawing.image.file.data ? `data:${drawing.image.file.media_type};base64,${drawing.image.file.data}` : '',
     bbox,
