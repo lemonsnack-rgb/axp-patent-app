@@ -191,11 +191,13 @@ function serializeClaimItems(items: { value: string }[]): string[] {
 }
 const isClaimBlock = (b: string) => /^청구항\s*\d+\./.test(b.trim());
 
-function ClaimsEditor({ blocks, onChange, elements = [], onClickElement }: {
+function ClaimsEditor({ blocks, onChange, elements = [], onClickElement, selSet, onToggleSel }: {
   blocks: string[];
   onChange: (next: string[]) => void;
   elements?: ElementLike[];
   onClickElement?: (name: string) => void;   // 하이라이트 클릭 → 구성요소 이름 전체 변경 (본문과 동일)
+  selSet?: Set<string>;                                      // AI 수정 대상 선택 — 단락과 동일 규칙 (키: claims-{idx})
+  onToggleSel?: (idx: number, e: React.MouseEvent) => void;
 }) {
   const items = parseClaimItems(blocks);
   const commit = (next: { value: string }[]) => onChange(serializeClaimItems(next));
@@ -267,8 +269,18 @@ function ClaimsEditor({ blocks, onChange, elements = [], onClickElement }: {
         const isIndep = dep === null;
         const mismatch = dep !== null && (dep < 1 || dep >= no);
         return (
-          <div key={idx} className={clsx('rounded-lg border border-neutral-200 bg-white p-2 border-l-[3px]', isIndep ? 'border-l-brand-400' : 'border-l-neutral-300 ml-4')}>
+          <div key={idx} className={clsx('rounded-lg border bg-white p-2 border-l-[3px]',
+            selSet?.has(`claims-${idx}`) ? 'border-brand-300 bg-brand-50/30' : 'border-neutral-200',
+            isIndep ? 'border-l-brand-400' : 'border-l-neutral-300 ml-4')}>
             <div className="flex items-center gap-1.5 mb-1">
+              {onToggleSel && (() => { const checked = selSet?.has(`claims-${idx}`); return (
+                <button type="button" data-spec="SPC-EDT-081" onClick={e => onToggleSel(idx, e)}
+                  title="체크하면 이 항이 AI 수정 명령의 대상이 됩니다"
+                  className={clsx('w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0',
+                    checked ? 'bg-brand-400 border-brand-400 text-white' : 'border-neutral-300 bg-white hover:border-brand-400')}>
+                  {checked && <Icon name="check" size={10} />}
+                </button>
+              ); })()}
               <span className="text-xs2 font-bold text-neutral-700">청구항 {no}</span>
               {isIndep ? (
                 <span className="text-xs2 px-1.5 py-px rounded-full bg-brand-50 text-brand-600 font-medium">독립항</span>
@@ -724,7 +736,14 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       const arr = [...(prev[sid] || [])];
       if (p.action === 'DELETE') arr.splice(p.idx, 1);
       else if (p.action === 'INSERT') arr.splice(p.idx + 1, 0, p.target);
-      else arr[p.idx] = p.target;   // REPLACE / REWRITE
+      else {   // REPLACE / REWRITE — 청구범위는 '청구항 N.' 헤더 유지(항 목록 파싱 규격)
+        let t = p.target;
+        if (sid === 'claims' && !isClaimBlock(t)) {
+          const head = (arr[p.idx] ?? p.source ?? '').split('\n')[0];
+          if (/^청구항\s*\d+\./.test(head)) t = `${head}\n${t.replace(/^청구항\s*\d+\.\s*/, '')}`;
+        }
+        arr[p.idx] = t;
+      }
       const next = { ...prev, [sid]: arr } as Record<SectionId, string[]>;
       if (task?.id) {
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -935,8 +954,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
         } else {
           pushAi({ text: '문서에서 교체가 필요한 용어를 찾지 못했습니다. "A를 B로 바꿔줘"처럼 구체적으로 지시하면 해당 표현을 일괄 교체합니다.', intent: 'answer' });
         }
-      } else if (mentionsClaims) {
-        // 청구항 수정 — 개발노트: 독립항 → 종속항 순으로 고정 파이프라인 (전체 세트 단위)
+      } else if (mentionsClaims && !refs.some(r => r.sid === 'claims')) {
+        // 청구항 수정(항 미선택) — 개발노트: 독립항 → 종속항 순 고정 파이프라인 (전체 세트 단위)
+        // 항을 체크한 경우는 아래 pushEditProposals로 떨어져 선택한 항에 직접 제안한다
         const claimRefs = (blocks['claims'] && blocks['claims'].length) ? [{ sid: 'claims' as SectionId, idx: 0 }] : [];
         pushAi({
           text: '청구항 수정은 독립항 → 종속항 순으로 검토합니다.', intent: 'plan',
@@ -1377,6 +1397,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                   <ClaimsEditor
                     blocks={blocks['claims']}
                     elements={context?.elements ?? []}
+                    selSet={selSet}
+                    onToggleSel={(idx, e) => toggleSelSet('claims', idx, e)}
                     onClickElement={(name) => setRenamingComp({ name, draft: name })}
                     onChange={(next) => {
                       setUndoStack(p => [...p.slice(-20), blocks]);
