@@ -28,3 +28,12 @@ dist-ssr
 
 # 대용량 수집 데이터 원본 (127MB) — 커밋 금지
 docs/데이터/patent.json
+
+# 참고자료(커밋 제외 — 2026-09-01 사용자 방침)
+docs/API 매뉴얼 최신본/
+docs/매뉴얼/
+docs/데이터/
+docs/테스트 시나리오/
+docs/*.pdf
+docs/image (31).png
+docs/qc-서지-수정검증.csv
