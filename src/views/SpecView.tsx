@@ -786,9 +786,9 @@ export function SpecView() {
                               ...p,
                               [type]: p[type].map((item, i) => i === idx ? { ...item, content: text } : item),
                             }))}
-                            onAdd={(type, text, label) => setContext(p => ({
+                            onAdd={(type, text, label, extra) => setContext(p => ({
                               ...p,
-                              [type]: [...p[type], { id: uid(), type: 'text' as const, label, content: text }],
+                              [type]: [...p[type], { id: uid(), type: extra?.itemType ?? 'text' as const, label, content: text, ...(extra?.caption ? { caption: extra.caption } : {}) }],
                             }))}
                             onRemove={(type, idx) => setContext(p => ({
                               ...p,
@@ -1207,6 +1207,8 @@ export type PendingChange = {
   label?: string;
   before?: string;
   after?: string;
+  tableHtml?: string;     // 표 항목(InventionDescriptionItem.type=table) — 카드에서 표로 렌더
+  tableCaption?: string;  // 표 캡션
   explanation?: string;
   apply?: () => void;   // 적용 시 실행 (호출부 내부용, 렌더되지 않음)
 };
@@ -1246,7 +1248,15 @@ function AiPendingCard({ title, changes, onApply, onCancel, className }: {   // 
               )}>{c.tag}</span>
               {c.label && <span className="text-xs2 font-semibold text-neutral-700">{c.label}</span>}
             </div>
-            {c.before && c.after ? (
+            {c.tableHtml ? (
+              <div className={clsx('rounded-md px-2 py-1.5 overflow-x-auto', c.tag === '삭제' ? 'bg-red-50/60 opacity-70' : 'bg-green-50/60')}>
+                {c.tableCaption && (
+                  <p className="text-xs2 mb-1"><span className="px-1 py-px rounded bg-neutral-100 text-neutral-500 font-medium mr-1">표 캡션</span><span className={clsx(c.tag === '삭제' && 'line-through text-neutral-400')}>{c.tableCaption}</span></p>
+                )}
+                <div className={clsx('text-sm2 [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_td]:border [&_th]:border-neutral-200 [&_td]:border-neutral-200 [&_th]:px-2 [&_th]:py-1 [&_td]:px-2 [&_td]:py-1 [&_th]:bg-neutral-50 [&_th]:text-left', c.tag === '삭제' && 'line-through decoration-neutral-300 text-neutral-400')}
+                  dangerouslySetInnerHTML={{ __html: c.tableHtml }} />
+              </div>
+            ) : c.before && c.after ? (
               /* 한 문장 안에서 변경부만 강조 — 삭제(취소선)·추가(강조) (U16) */
               <p className="text-sm2 leading-relaxed text-neutral-800 whitespace-pre-wrap"><DiffText segs={diffWords(c.before, c.after).merged} mode="merged" /></p>
             ) : (<>
@@ -1599,7 +1609,7 @@ function DescriptionItemCards({
   proposed: InventionDescriptionItem[];
   onToggle: (type: 'previous' | 'proposed', idx: number) => void;
   onChange: (type: 'previous' | 'proposed', idx: number, text: string) => void;
-  onAdd: (type: 'previous' | 'proposed', text: string, label: InventionDescriptionItem['label']) => void;
+  onAdd: (type: 'previous' | 'proposed', text: string, label: InventionDescriptionItem['label'], extra?: { itemType?: 'table'; caption?: string }) => void;
   onRemove: (type: 'previous' | 'proposed', idx: number) => void;
   onReorder: (type: 'previous' | 'proposed', from: number, to: number) => void;
   onMoveAcross: (fromType: 'previous' | 'proposed', fromIdx: number, toIdx?: number) => void;
@@ -1618,12 +1628,13 @@ function DescriptionItemCards({
     (['proposed', 'previous'] as const).forEach(type => {
       const items = type === 'proposed' ? proposed : previous;
       const secKo = type === 'proposed' ? '제안기술' : '종래기술';
-      const cand = items.filter(it => it.adopted !== false && it.type !== 'table');
-      // mock deleted[]: 영역별 마지막 채택 항목 1건 (2건 이상일 때만)
+      const cand = items.filter(it => it.adopted !== false);
+      // mock deleted[]: 영역별 1건 — 표 항목이 있으면 표를 우선 예시로(삭제는 표도 대상), 없으면 마지막 텍스트 항목
       if (cand.length >= 2) {
-        const del = cand[cand.length - 1];
+        const del = cand.find(it => it.type === 'table') ?? cand[cand.length - 1];
         delta.push({
-          tag: '삭제', label: `${secKo} · ${DESC_LABEL_MAP[del.label] ?? del.label}`, before: del.content,
+          tag: '삭제', label: `${secKo} · ${DESC_LABEL_MAP[del.label] ?? del.label}`,
+          ...(del.type === 'table' ? { tableHtml: del.content, tableCaption: del.caption ?? undefined } : { before: del.content }),
           apply: () => {
             const cur = type === 'proposed' ? proposed : previous;
             const i = cur.findIndex(x => x.id === del.id);
@@ -1641,6 +1652,13 @@ function DescriptionItemCards({
       tag: '추가', label: `${a.secKo} · ${DESC_LABEL_MAP[a.label] ?? a.label} (영역 맨 뒤에 추가)`, after: a.content,
       apply: () => onAdd(a.type, a.content, a.label),
     }));
+    // mock added[] 표 예시 — API InventionDescriptionItem.type=table (content는 HTML 표, caption 별도)
+    const tableHtml = '<table><thead><tr><th>구분</th><th>종래</th><th>제안</th></tr></thead><tbody><tr><td>처리 지연</td><td>120ms</td><td>45ms</td></tr><tr><td>오류율</td><td>2.1%</td><td>0.4%</td></tr></tbody></table>';
+    delta.push({
+      tag: '추가', label: `제안기술 · ${DESC_LABEL_MAP['effect']} (영역 맨 뒤에 추가)`,
+      tableHtml, tableCaption: '종래·제안 성능 비교',
+      apply: () => onAdd('proposed', tableHtml, 'effect', { itemType: 'table', caption: '종래·제안 성능 비교' }),
+    });
     return delta;
   };
   const [dragSrc, setDragSrc] = useState<{ type: 'previous' | 'proposed'; idx: number } | null>(null);
