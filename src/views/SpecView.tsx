@@ -1007,18 +1007,6 @@ export function SpecView() {
                       >{specCount === 0 ? '도면 없이 다음 →' : '다음 →'}</button>
                     );
                   }
-                  if (curStep === 'components') {
-                    // 채택 구성요소에 빈 필드(영문명·상위어·정의)가 있으면 확인 후 진행 (A4)
-                    const incomplete = aiComponents.filter(c => c.sel && (!c.value_en.trim() || !c.hypernym_ko.trim() || !c.description.trim()));
-                    return (
-                      <button
-                        onClick={() => incomplete.length
-                          ? showConfirm(`보완이 필요한 구성요소 ${incomplete.length}개(${incomplete.map(c => c.value_ko || '(이름 없음)').slice(0, 3).join(', ')}${incomplete.length > 3 ? ' 외' : ''})가 있습니다. 영문명·상위어·정의가 비어 있으면 청구항·명세서에 그대로 반영됩니다. 그대로 진행할까요?`, () => confirm('components'))
-                          : confirm('components')}
-                        className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl hover:bg-brand-500 transition-colors"
-                      >다음 →</button>
-                    );
-                  }
                   if (curStep === 'images') {
                     // 선택 이미지 0개면 확인 후 진행 — 이후 도면·도면 설명이 비게 됨을 알린다 (A5)
                     const inc = context.drawings.filter(d => d.included !== false).length;
@@ -2283,30 +2271,44 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
     upd([...items, { id, ...EMPTY_COMP }]);
     setFocusId(id);
   };
-  // AI 추가 — 자연어 지시로 새 구성요소를 추가 (mock). 기존 항목은 절대 건드리지 않아 손실 없음.
-  const [aiOpen, setAiOpen] = useState(false);
-  const [aiInput, setAiInput] = useState('');
-  const submitAiComponent = () => {
-    const instr = aiInput.trim();
-    if (!instr || done) return;
-    const id = uid();
-    upd([...items, {
-      id, ...EMPTY_COMP,
-      value_ko: instr.length > 24 ? instr.slice(0, 24) : instr,
-      // 안내문을 값으로 넣지 않는다 — 빈 필드는 '보완 필요' 배지 + 진행 시 확인으로 안내 (A4)
-      description: '',
-    }]);
-    setAiInput('');
-    setAiOpen(false);
-    setFocusId(id);
-  };
 
-  // 전체 AI 수정 제안 — 선택된 구성요소 정의에 지시 반영 (mock). 확인 후 적용은 AiGlobalBar가 담당.
-  const proposeGlobal = (instr: string): PendingChange[] =>
-    items.filter(it => it.sel).map(it => proposeMock(it.description, instr, `${it.num ? it.num + ' ' : ''}${it.value_ko}`));
+  // 전체 AI 수정 제안 — API /v2/generate/context/invention-element/modification 정합:
+  // 응답 = deleted(인덱스) + modified(수정) + added(신규). 수정 지시 하나로 삭제·수정·추가가 함께 제안된다
+  // (별도 'AI 추가' 기능은 이 델타의 added로 흡수 — 2026-09-02 사용자 결정).
+  const proposeGlobal = (instr: string): PendingChange[] => {
+    const sel = items.filter(it => it.sel);
+    const delta: PendingChange[] = [];
+    // modified — 채택 항목 정의 수정 (마지막 1건은 삭제 예시로 사용)
+    sel.slice(0, Math.max(1, sel.length - 1)).forEach(it =>
+      delta.push(proposeMock(it.description, instr, `${it.num ? it.num + ' ' : ''}${it.value_ko}`)));
+    // deleted — 마지막 채택 항목 1건 (2건 이상일 때만)
+    if (sel.length >= 2) {
+      const del = sel[sel.length - 1];
+      delta.push({ tag: '삭제', label: `${del.num ? del.num + ' ' : ''}${del.value_ko}`, before: del.description || del.value_ko });
+    }
+    // added — 신규 구성요소 1건 (부호는 미부여 — 부호 자동 부여는 이용자 도구)
+    delta.push({
+      tag: '추가', label: '보조 저장부 (목록 맨 뒤에 추가)',
+      after: '명칭: 보조 저장부 (Auxiliary Storage) · 상위어: 저장 장치 (Storage Device)\n정의: 처리 결과와 중간 데이터를 보관하여 재처리 시 재사용할 수 있게 하는 저장 요소',
+    });
+    return delta;
+  };
   const applyGlobal = (changes: PendingChange[]) => {
-    const byBefore = new Map(changes.map(c => [c.before, c.after ?? c.before]));
-    upd(items.map(it => it.sel && byBefore.has(it.description) ? { ...it, description: byBefore.get(it.description)! } : it));
+    const byBefore = new Map(changes.filter(c => c.tag === '수정').map(c => [c.before, c.after ?? c.before]));
+    let next = items.map(it => it.sel && byBefore.has(it.description) ? { ...it, description: byBefore.get(it.description)! } : it);
+    // deleted 적용
+    const delLabels = new Set(changes.filter(c => c.tag === '삭제').map(c => c.label));
+    next = next.filter(it => !delLabels.has(`${it.num ? it.num + ' ' : ''}${it.value_ko}`));
+    // added 적용 — 목록 맨 뒤, 부호 미부여
+    if (changes.some(c => c.tag === '추가')) {
+      next = [...next, {
+        id: uid(), num: '', depth: 0, sel: true,
+        value_ko: '보조 저장부', value_en: 'Auxiliary Storage',
+        hypernym_ko: '저장 장치', hypernym_en: 'Storage Device',
+        description: '처리 결과와 중간 데이터를 보관하여 재처리 시 재사용할 수 있게 하는 저장 요소',
+      }];
+    }
+    upd(next);
   };
   // 다시 분석 — AI 추출 결과로 재생성 (mock)
   const reanalyze = () => {
@@ -2372,15 +2374,6 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
                 data-spec="SPC-CMP-021" title="AI 추출을 다시 실행">
                 ↻ 다시 분석
               </button>
-              <button onClick={() => setAiOpen(o => !o)}
-                className={clsx(
-                  'inline-flex items-center gap-1 h-6 px-2 rounded-lg text-xs2 font-medium border transition-colors',
-                  aiOpen ? 'bg-brand-400 border-brand-400 text-white' : 'text-brand-500 border-brand-200 bg-white hover:bg-brand-50 hover:border-brand-300',
-                )}
-                data-spec="SPC-CMP-022" title="자연어 지시로 AI가 구성요소를 추가">
-                <AiIcon />
-                AI 추가
-              </button>
               <button data-spec="SPC-CMP-023" onClick={autoAssign}
                 className="inline-flex items-center gap-1 h-6 px-2 rounded-lg text-xs2 font-semibold bg-brand-400 border border-brand-400 text-white hover:bg-brand-500 transition-colors">
                 <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="10" height="10">
@@ -2391,27 +2384,6 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
             </div>
           )}
         </div>
-        {/* AI 추가 입력 바 */}
-        {!done && aiOpen && (
-          <div className="mb-2 rounded-lg border-2 border-brand-200 bg-brand-50/40 p-2">
-            <div className="flex gap-1.5 items-end">
-              <textarea
-                autoFocus
-                className="flex-1 text-xs2 bg-white border border-brand-200 rounded-md px-2 py-1 outline-none focus:border-brand-400 resize-none min-h-[36px]"
-                placeholder="추가할 구성요소를 설명하세요. 예: 사용자 인증을 처리하는 보안 모듈 (Enter로 추가)"
-                rows={2}
-                value={aiInput}
-                onChange={e => setAiInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitAiComponent(); } }}
-              />
-              <button
-                onClick={submitAiComponent}
-                disabled={!aiInput.trim()}
-                className="shrink-0 text-xs2 font-semibold px-2.5 py-1 rounded-lg bg-brand-400 text-white hover:bg-brand-500 disabled:opacity-40 transition-colors"
-              >추가</button>
-            </div>
-          </div>
-        )}
         {!done && (
           <p className="text-xs2 text-neutral-400 mb-2">
             순서 조정 후 <strong className="text-brand-600">부호 자동 부여</strong>를 클릭하면 100, 200... 번호가 할당됩니다.
@@ -2463,9 +2435,6 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
                   )}>
                     {item.num || '—'}
                   </span>
-                  {item.sel && (!item.value_en.trim() || !item.hypernym_ko.trim() || !item.description.trim()) && (
-                    <span className="text-xs2 px-1.5 py-px rounded-md bg-amber-50 text-amber-700 font-medium shrink-0" data-spec="SPC-CMP-015" title="영문명·상위어·정의 중 빈 항목이 있습니다. 채워 넣거나 채택을 해제하세요.">보완 필요</span>
-                  )}
                   {!done && (
                     <div className="flex items-center gap-px shrink-0 ml-auto">
                       {item.sel && (
