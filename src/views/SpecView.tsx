@@ -2804,6 +2804,11 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
     updateDrawings(next);
   };
 
+  // 카드에서 도면 설명(detail.description)을 직접 수정 (2026-09-02 사용자 지시 — 제목(캡션)은 표시하지 않음)
+  const setDrawingDescription = (idx: number, text: string) => {
+    if (done) return;
+    updateDrawings(drawings.map((d, i) => i === idx ? { ...d, detail: { ...d.detail, description: text } } : d));
+  };
   const setDrawingLabel = (idx: number, label: Drawing['detail']['label']) => {
     if (done) return;
     const next = drawings.map((d, i) => i === idx ? { ...d, detail: { ...d.detail, label } } : d);
@@ -2813,9 +2818,8 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
 
   const removeDrawing = (idx: number) => {
     if (done) return;
-    const name = drawings[idx]?.detail.name || drawings[idx]?.detail.symbol || '이 이미지';
     openAlertDialog(
-      { title: '이미지 삭제', description: `"${name}"${particle(name, '을', '를')} 목록에서 삭제하시겠습니까?`, confirm: '삭제', cancel: '취소' },
+      { title: '이미지 삭제', description: `이미지 ${idx + 1}${particle(`이미지 ${idx + 1}`, '을', '를')} 목록에서 삭제하시겠습니까?`, confirm: '삭제', cancel: '취소' },
       { theme: 'danger', onConfirm: (ctrl) => { updateDrawings(drawings.filter((_, i) => i !== idx)); ctrl.close(); } }
     );
   };
@@ -2920,7 +2924,18 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                         </select>
                       )}
                     </div>
-                    <p className="text-xs2 text-neutral-700 font-semibold leading-snug line-clamp-1">{d.detail.name}</p>
+                    {done ? (
+                      <p className="text-xs2 text-neutral-600 leading-snug line-clamp-2">{d.detail.description || '—'}</p>
+                    ) : (
+                      <textarea
+                        value={d.detail.description}
+                        onChange={e => setDrawingDescription(idx, e.target.value)}
+                        placeholder="도면 설명을 입력하세요"
+                        rows={2}
+                        className="w-full text-xs2 text-neutral-600 leading-snug bg-transparent outline-none resize-none border border-transparent hover:border-neutral-200 focus:border-brand-300 rounded-md px-1 py-0.5 transition-colors"
+                        ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                      />
+                    )}
                   </div>
                   {!done && (
                     <div className="flex border-t border-neutral-100">
@@ -2970,7 +2985,6 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                 <div className="bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden w-full max-w-2xl" style={{ height: 'min(600px, calc(100vh - 48px))' }}>
                   <div className="flex items-center gap-2 px-4 py-2.5 border-b border-ck-border shrink-0">
                     <span className="text-base2 font-bold text-neutral-800">영역 조정</span>
-                    <span className="text-sm2 text-neutral-500 truncate">{d.detail.name}</span>
                     {typeof d.page === 'number' && <span className="text-xs2 px-1.5 py-px rounded-md bg-neutral-100 text-neutral-500 font-medium">p.{d.page}</span>}
                   </div>
                   <p className="px-4 pt-2 text-xs2 text-neutral-400 shrink-0">파란 박스를 드래그해 이 이미지로 쓸 도면 영역을 지정하세요. 썸네일과 이후 생성·변환에 이 영역이 사용됩니다.</p>
@@ -3108,7 +3122,18 @@ function DrawingsPanel({ mode, done, onUpdate, drawings: propDrawings, onUpdateD
                         </select>
                       )}
                     </div>
-                    <p className="text-xs2 text-neutral-700 font-semibold leading-snug line-clamp-1">{d.detail.name}</p>
+                    {done ? (
+                      <p className="text-xs2 text-neutral-600 leading-snug line-clamp-2">{d.detail.description || '—'}</p>
+                    ) : (
+                      <textarea
+                        value={d.detail.description}
+                        onChange={e => setDrawingDescription(idx, e.target.value)}
+                        placeholder="도면 설명을 입력하세요"
+                        rows={2}
+                        className="w-full text-xs2 text-neutral-600 leading-snug bg-transparent outline-none resize-none border border-transparent hover:border-neutral-200 focus:border-brand-300 rounded-md px-1 py-0.5 transition-colors"
+                        ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                      />
+                    )}
                   </div>
                   {!done && isForSpec && (
                     <div className="flex border-t border-neutral-100">
