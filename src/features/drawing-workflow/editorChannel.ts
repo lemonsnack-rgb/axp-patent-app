@@ -23,7 +23,7 @@ export interface EditorResult {
   editorJson?: string;
   exportedImageUrl?: string;
   adjustedBbox?: { x: number; y: number; w: number; h: number };
-  detail?: { name?: string; label?: string; description?: string }; // 명칭·분류·캡션 편집 전파
+  // 명칭·분류·캡션은 편집기에서 수정하지 않는다(이전 화면에서 수정) — 결과는 영역(BBox)·변환본만 전달
   stage: 'editing' | 'done';
   references: EditorReference[];
   timestamp: number;

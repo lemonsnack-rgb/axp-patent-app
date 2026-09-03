@@ -76,8 +76,6 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
   const [convInstrMap, setConvInstrMap] = useState<Record<string, string>>({});   // 변환 지시문 — API user_instruction
   const [showRegen, setShowRegen] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState(false);
-  const [nameDraft, setNameDraft] = useState('');
   // B-box 상태 — 도면별 독립 관리 (퍼센트, 0~100)
   const [cropBoxMap, setCropBoxMap] = useState<Record<string, {x1:number; y1:number; x2:number; y2:number}>>(() => {
     const m: Record<string, {x1:number; y1:number; x2:number; y2:number}> = {};
@@ -145,8 +143,6 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
 
   // 도면 전환 시 UI 상태 초기화
   useEffect(() => {
-    setEditingName(false);
-    setNameDraft('');
     setZoomedCandId(null);
     setShowRegen(false);
     setRegenPrompt('');
@@ -199,7 +195,9 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
     };
     handleSave(activeId, { adjustedBbox, stage: 'bbox-adjusted' });
 
-    // ② 변환 시작
+    // ② 변환 시작 — 연동 시 style-transfer 요청에 bbox + user_instruction(변환 지시문)을 함께 전달
+    const userInstruction = (convInstrMap[activeId] ?? '').trim();
+    void userInstruction;   // mock은 결과가 고정 (실 API: data.user_instruction)
     goStage('converting');
     setTimeout(() => {
       const cands = MOCK_SVGS.map((svg, i) => ({
@@ -213,6 +211,9 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
   };
 
   const doRegen = () => {
+    // 재변환 지시문 — 후보 화면 입력이 있으면 그것을, 없으면 크롭 단계에서 넣은 변환 지시문을 사용
+    const userInstruction = (regenPrompt.trim() || (convInstrMap[activeId] ?? '').trim());
+    void userInstruction;   // mock은 결과가 고정 (실 API: data.user_instruction)
     setShowRegen(false);
     setRegenPrompt('');
     goStage('converting');
@@ -313,35 +314,10 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
           {activeDraw && (
             <>
               <span className="text-gray-300 mx-0.5">·</span>
-              {editingName ? (
-                <input
-                  autoFocus
-                  value={nameDraft}
-                  onChange={e => setNameDraft(e.target.value)}
-                  onBlur={() => {
-                    const v = nameDraft.trim();
-                    if (v && v !== activeDraw.name) handleSave(activeId, { name: v });
-                    setEditingName(false);
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                    if (e.key === 'Escape') setEditingName(false);
-                  }}
-                  className="text-sm2 text-gray-700 font-semibold bg-white border border-blue-400 rounded px-1.5 py-0.5 outline-none max-w-[200px]"
-                />
-              ) : (
-                <button
-                  onClick={() => { setNameDraft(activeDraw.name); setEditingName(true); }}
-                  className="flex items-center gap-1 text-sm2 text-gray-700 hover:text-blue-700 truncate max-w-[140px] group"
-                  title="클릭하여 도면 명칭 편집"
-                >
-                  {activeDraw.name}
-                  <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="9" height="9" className="opacity-0 group-hover:opacity-60 shrink-0">
-                    <path d="M6.5 1.5l2 2L3 9H1V7z"/>
-                  </svg>
-                </button>
-              )}
-              <span className={clsx('text-xs2 px-1.5 py-px rounded-full font-medium shrink-0', LABEL_COLORS[activeDraw.label] || 'bg-gray-100 text-gray-600')}>
+              {/* 식별 표시(읽기 전용) — 명칭·분류·설명 편집은 「명세서 도면」 화면에서 (2026-09-02 사용자 지시) */}
+              <span className="text-sm2 font-semibold text-gray-700 shrink-0 tabular-nums">도 {activeDraw.symbol}</span>
+              <span className="text-sm2 text-gray-500 truncate max-w-[160px]">{activeDraw.name}</span>
+              <span className={clsx('text-xs2 px-1.5 py-px rounded-sm font-medium shrink-0', LABEL_COLORS[activeDraw.label] || 'bg-gray-100 text-gray-600')}>
                 {activeDraw.label}
               </span>
               {/* 대표도면 지정 — 편집 단계 전용(이번 범위 제외). 대표도는 위저드에서 지정 */}
@@ -506,52 +482,33 @@ export function DrawingEditorModal({ drawings, initialDrawingId, availableRefere
                       </div>
                     </div>
                   </div>
-                  {/* 우측: 캡션 */}
+                  {/* 우측: 변환 지시문 — 편집기 안에서는 '도면 생성'에 필요한 입력만 받는다.
+                      분류·설명(캡션) 수정은 이전 화면(「명세서 도면」)에서 (2026-09-02 사용자 지시) */}
                   <div className="w-48 shrink-0 border-l border-ck-border bg-ck-bg flex flex-col overflow-y-auto scroll-thin p-3 gap-3">
-                    <div>
-                      <p className="text-xs2 font-semibold text-gray-400 uppercase tracking-wide mb-1.5">도면 정보</p>
-                      <div className="space-y-2">
-                        <div>
-                          <span className="text-xs2 text-gray-400 block mb-0.5">명칭</span>
-                          <input
-                            value={activeDraw.name}
-                            onChange={e => handleSave(activeId, { name: e.target.value })}
-                            placeholder="도면 명칭"
-                            className="w-full text-xs2 font-semibold text-gray-700 bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-400 transition-colors"
-                          />
-                        </div>
-                        <div>
-                          <span className="text-xs2 text-gray-400 block mb-0.5">분류</span>
-                          <select
-                            value={activeDraw.label}
-                            onChange={e => handleSave(activeId, { label: e.target.value as DrawingItem['label'] })}
-                            className={clsx('w-full text-xs2 font-medium rounded px-2 py-1 border-0 outline-none cursor-pointer', LABEL_COLORS[activeDraw.label] || 'bg-gray-100 text-gray-600')}
-                          >
-                            <option value="제안기술">제안기술</option>
-                            <option value="종래기술">종래기술</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
                     <div>
                       <p className="text-xs2 font-semibold text-gray-400 uppercase tracking-wide mb-1.5">변환 지시문 (선택)</p>
                       <textarea
                         value={convInstrMap[activeId] ?? ''}
                         onChange={e => setConvInstrMap(m => ({ ...m, [activeId]: e.target.value }))}
                         placeholder="예: 외곽선은 선명하게, 배경은 완전 흰색으로"
-                        rows={2}
+                        rows={3}
                         className="w-full text-xs2 text-gray-600 leading-relaxed bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-brand-400 resize-none transition-colors"
                       />
+                      <p className="text-xs2 text-gray-400 leading-relaxed mt-1">지정한 영역을 특허 도면 스타일로 변환할 때 함께 전달됩니다.</p>
                     </div>
-                    <div>
-                      <p className="text-xs2 font-semibold text-gray-400 uppercase tracking-wide mb-1.5">캡션</p>
-                      <textarea
-                        value={activeDraw.description}
-                        onChange={e => handleSave(activeId, { description: e.target.value })}
-                        placeholder="도면 캡션·설명"
-                        rows={4}
-                        className="w-full text-xs2 text-gray-600 leading-relaxed bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-400 resize-none transition-colors"
-                      />
+                    <div className="border-t border-ck-border pt-3">
+                      <p className="text-xs2 font-semibold text-gray-400 uppercase tracking-wide mb-1.5">도면 정보 (읽기 전용)</p>
+                      <dl className="space-y-1.5">
+                        <div>
+                          <dt className="text-xs2 text-gray-400">분류</dt>
+                          <dd className="text-xs2 text-gray-600 m-0">{activeDraw.label}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs2 text-gray-400">설명</dt>
+                          <dd className="text-xs2 text-gray-600 m-0 leading-relaxed whitespace-pre-wrap">{activeDraw.description || '—'}</dd>
+                        </div>
+                      </dl>
+                      <p className="text-xs2 text-gray-400 leading-relaxed mt-2">분류·설명은 <b className="text-gray-500">명세서 도면</b> 화면에서 수정하세요.</p>
                     </div>
                   </div>
                 </div>

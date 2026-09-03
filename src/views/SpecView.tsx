@@ -183,9 +183,6 @@ export function SpecView() {
     if (result.taskId && result.taskId !== task?.id) return;   // 다른 작업의 결과는 무시
     const idx = parseInt(result.drawingId, 10);
     if (isNaN(idx)) return;
-    const LABEL_TO_API: Record<string, Drawing['detail']['label']> = {
-      '제안기술': 'proposed_implementation', '종래기술': 'previous_implementation', 'AI생성': 'proposed_implementation',
-    };
     setContext(p => {
       const ds = [...(p.drawings ?? [])];
       const d = ds[idx];
@@ -194,15 +191,6 @@ export function SpecView() {
       if (result.adjustedBbox) {
         const ab = result.adjustedBbox;
         next = { ...next, image: { ...next.image, bbox: { x1: ab.x, y1: ab.y, x2: ab.x + ab.w, y2: ab.y + ab.h } } };
-      }
-      if (result.detail) {
-        const dt = result.detail;
-        next = { ...next, detail: {
-          ...next.detail,
-          ...(dt.name !== undefined ? { name: dt.name } : {}),
-          ...(dt.description !== undefined ? { description: dt.description } : {}),
-          ...(dt.label !== undefined ? { label: LABEL_TO_API[dt.label] ?? next.detail.label } : {}),
-        } };
       }
       // CAD 변환 완료: 썸네일을 변환본으로 교체 + 완료 배지 (B13)
       if (result.stage === 'done' && result.exportedImageUrl?.startsWith('data:')) {
