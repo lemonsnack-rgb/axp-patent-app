@@ -3200,7 +3200,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
   // 생성 전에는 세트를 미리 선택하지 않는다 (C1: preference 설정 → 생성 순서 강제)
   const [selectedSetIndex, setSelectedSetIndex] = useState<number | null>(done ? 2 : null);
   const [generated, setGenerated] = useState(done); // 독립항 세트 생성 여부 — 생성 후에만 후보 표시
-  // 인라인 AI 수정 — 열린 항 키 (`indep-${setIdx}-${ci}` | `dep-${ci}-${depId}`)
+  // 인라인 AI 수정 — 열린 항 키 (`dep-${ci}-${depId}` — 종속항만; 독립항은 세트 단위 바)
   const [aiKey, setAiKey] = useState<string | null>(null);
   // 독립항 세트 생성 추가 지시사항 (데모: preference와 함께 전달)
   const [genInstruction, setGenInstruction] = useState('');
@@ -3220,6 +3220,9 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
   const updateSlotDescription = (i: number, description: string) => { if (done) return; setPreference(p => ({ ...p, slots: p.slots.map((s, idx) => idx === i ? { ...s, description } : s) })); };
   const [depGroupsMap, setDepGroupsMap] = useState<Record<number, DepGroupsForSet>>({});
   const [claimTexts, setClaimTexts] = useState<Record<number, Record<number, string>>>({}); // setIdx → claimIdx → text
+  // 독립항 세트 단위 AI 수정 — API /v2/generate/specification/independent-claim/modification 정합:
+  // 입력 = 선택 세트의 독립항 전체(independent_claims) + 지시 → 세트 수정. 항별 수정 API는 없으므로 항별 버튼을 두지 않는다 (2026-09-02 사용자 결정)
+  const [indepGlobalInstr, setIndepGlobalInstr] = useState('');
   const [depLevel, setDepLevel] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('MEDIUM'); // 종속항 개수 레벨 (API claim_count_level)
 
   const getClaimText = (setIdx: number, claimIdx: number): string => {
@@ -3227,6 +3230,23 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
   };
   const setClaimText = (setIdx: number, claimIdx: number, text: string) => {
     setClaimTexts(p => ({ ...p, [setIdx]: { ...(p[setIdx] ?? {}), [claimIdx]: text } }));
+  };
+  const proposeIndepGlobal = (instr: string): PendingChange[] => {
+    if (selectedSetIndex === null) return [];
+    const set = claimSets[selectedSetIndex];
+    return set.claims.map((claim, ci) =>
+      proposeMock(getClaimText(selectedSetIndex, ci), instr, `${CATEGORY_LABEL[claim.category] ?? claim.category} 독립항`));
+  };
+  const applyIndepGlobal = (changes: PendingChange[]) => {
+    if (selectedSetIndex === null) return;
+    const set = claimSets[selectedSetIndex];
+    const byBefore = new Map(changes.map(c => [c.before, c.after]));
+    set.claims.forEach((_, ci) => {
+      const cur = getClaimText(selectedSetIndex, ci);
+      const after = byBefore.get(cur);
+      if (after) setClaimText(selectedSetIndex, ci, after);
+    });
+    syncUpdate(selectedSetIndex, depGroupsMap);
   };
 
   const selectedSet = selectedSetIndex !== null ? claimSets[selectedSetIndex] ?? null : null;
@@ -3504,6 +3524,19 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
         )}
 
         <div data-claimsets data-spec="SPC-CLM-020" />
+        {/* 독립항 세트 단위 AI 수정 — independent-claim/modification (항별 수정 API 없음) */}
+        {generated && !done && selectedSetIndex !== null && (
+          <AiGlobalBar
+            className="mb-2.5"
+            title="독립항 세트 수정 제안"
+            placeholder="선택한 세트의 독립항 전반에 대한 AI 지시사항 (예: 권리범위를 조금 더 넓혀줘)"
+            value={indepGlobalInstr}
+            onChange={setIndepGlobalInstr}
+            propose={proposeIndepGlobal}
+            onApply={applyIndepGlobal}
+            doneMsg="독립항 세트에 적용했습니다"
+          />
+        )}
         {filteredSetIndices.map(setIdx => {
           const set = claimSets[setIdx];
           const isSelected = selectedSetIndex === setIdx;
@@ -3554,13 +3587,6 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                     )}>
                       <div className="flex items-center gap-1.5 mb-1">
                         <span className="text-xs2 px-1.5 py-0.5 rounded-md font-medium bg-neutral-100 text-neutral-700">{catLabel}</span>
-                        {!done && isSelected && (
-                          <AiEditButton
-                            className="ml-auto"
-                            active={aiKey === `indep-${setIdx}-${ci}`}
-                            onClick={e => { e.stopPropagation(); setAiKey(k => k === `indep-${setIdx}-${ci}` ? null : `indep-${setIdx}-${ci}`); }}
-                          />
-                        )}
                       </div>
                       {isSelected && !done ? (
                         <textarea
@@ -3573,16 +3599,6 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                         />
                       ) : (
                         <p className="text-sm2 text-neutral-600 leading-relaxed line-clamp-3"><ElementText text={text} elements={elements} /></p>
-                      )}
-                      {aiKey === `indep-${setIdx}-${ci}` && isSelected && !done && (
-                        <InlineAiEdit
-                          placeholder="이 독립항을 어떻게 수정할지 지시해주세요 (예: 권리범위를 조금 더 넓혀줘)"
-                          onClose={() => setAiKey(null)}
-                          original={text}
-                          label="독립항"
-                          onApply={newText => { setClaimText(setIdx, ci, newText); syncUpdate(setIdx, depGroupsMap); }}
-                          doneMsg="독립항을 수정했습니다"
-                        />
                       )}
                     </div>
                   );
@@ -3673,6 +3689,18 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
         </div>
       )}
 
+      {/* 독립항 세트 단위 AI 수정 — independent-claim/modification */}
+      {!done && (
+        <AiGlobalBar
+          title="독립항 세트 수정 제안"
+          placeholder="선택한 세트의 독립항 전반에 대한 AI 지시사항 (예: 권리범위를 조금 더 넓혀줘)"
+          value={indepGlobalInstr}
+          onChange={setIndepGlobalInstr}
+          propose={proposeIndepGlobal}
+          onApply={applyIndepGlobal}
+          doneMsg="독립항 세트에 적용했습니다"
+        />
+      )}
       {selectedSet.claims.map((claim, ci) => {
         const indepNum = ++globalClaimNum;
         const grp = setGroups[ci] ?? { generated: false, items: [], newText: '' };
@@ -3686,25 +3714,8 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                 <Icon name="check" size={11} className="text-brand-600" />
                 <span className="text-xs2 font-bold text-brand-400">청구항 {indepNum}</span>
                 <span className="text-xs2 px-1.5 py-0.5 rounded-md bg-neutral-100 text-neutral-700 font-medium">{catLabel}</span>
-                {!done && (
-                  <AiEditButton
-                    className="ml-auto"
-                    active={aiKey === `indepB-${ci}`}
-                    onClick={e => { e.stopPropagation(); setAiKey(k => k === `indepB-${ci}` ? null : `indepB-${ci}`); }}
-                  />
-                )}
               </div>
               <p className="text-base2 text-neutral-700 leading-relaxed whitespace-pre-wrap px-1"><ElementText text={claimText} elements={elements} /></p>
-              {aiKey === `indepB-${ci}` && !done && (
-                <InlineAiEdit
-                  placeholder="이 독립항을 어떻게 수정할지 지시해주세요"
-                  onClose={() => setAiKey(null)}
-                  original={claimText}
-                  label="독립항"
-                  onApply={newText => setClaimText(selectedSetIndex, ci, newText)}
-                  doneMsg="독립항을 수정했습니다"
-                />
-              )}
             </div>
 
             <div className="p-2.5 space-y-1.5">
