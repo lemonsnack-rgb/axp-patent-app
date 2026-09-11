@@ -1,7 +1,8 @@
 // src/features/spec/types.ts
 
+// 위저드는 청구항에서 끝난다 — 중간명세서(초안)는 에디터의 「초안 생성」으로 넘어갔다 (2026-09-10 회의 결정)
 export type SpecStepId =
-  'upload' | 'description' | 'images' | 'title' | 'components' | 'claims' | 'drawings' | 'midspec';
+  'upload' | 'description' | 'images' | 'title' | 'components' | 'claims' | 'drawings';
 export type SpecPhase = 'upload' | 'direct' | 'flow' | 'done';
 
 // ── 핵심 데이터 구조 (API InventionContext V2) ────────────────────────────────
@@ -187,6 +188,8 @@ export interface SpecAnalysisState {
   titleCandidates: TitleCandidate[]
   claimsState?: SpecClaimsState
   midspec?: MidspecSection[]
+  /** 에디터의 「초안 생성」을 이미 실행했는지 — 초안 생성은 1회만 허용한다 (토큰 비용) */
+  draftGenerated?: boolean
   mainView: 'analysis' | 'editor'
   editorBlocks?: Record<string, string[]>
 }

@@ -26,8 +26,37 @@ function normalizeBlock(raw: unknown): SpecificationBlock {
     content: (b.content as string) ?? (b.text as string) ?? '',
   };
 }
+// 위저드에서 '중간명세서'(midspec) 단계를 없애기 전에 저장된 상태를 옮긴다 (2026-09-10 회의 결정).
+//
+// 구 흐름은 ⑦ 청구항을 확정하는 순간 중간명세서를 미리 만들어 ⑧ 단계에 띄웠고, 거기서 「명세서 생성」을
+// 눌러야 실시예가 붙어 에디터로 넘어갔다. 새 흐름에서는 그 두 가지가 에디터의 「초안 생성」 하나로 합쳐졌고,
+// **에디터 본문은 오직 초안 생성으로만 채워진다.** 따라서 초안 생성을 끝내지 않은 상태로 남아 있는
+// 중간명세서는 "미리 만들어져 있던 것"일 뿐이므로 버린다 — 그대로 두면 초안 생성 버튼과 이미 채워진 본문이
+// 동시에 보여 앞뒤가 맞지 않는다.
+function migrateMidspecStep(s: SpecAnalysisState): SpecAnalysisState {
+  const confirmed = (s.confirmed ?? {}) as Record<string, string>;
+  const gSel = (s.gSel ?? {}) as Record<string, string>;
+  const onMidspecStep = (s.curStep as string) === 'midspec';
+  const midspecConfirmed = 'midspec' in confirmed;      // 구 「명세서 생성」까지 마침 = 초안 완성
+  const staleMidspec = !midspecConfirmed && !s.draftGenerated && !!s.midspec?.length;
+  if (!midspecConfirmed && !onMidspecStep && !('midspec' in gSel) && !staleMidspec) return s;
+
+  delete confirmed.midspec;
+  delete gSel.midspec;
+  const wizardDone = midspecConfirmed || !!confirmed.claims;   // ⑦ 청구항까지 확정 = 위저드 종료
+  return {
+    ...s,
+    confirmed, gSel,
+    curStep: onMidspecStep ? 'claims' : s.curStep,
+    // 초안 미완성 상태로 남은 중간명세서는 버린다 — 에디터에서 「초안 생성」으로 다시 만든다
+    ...(staleMidspec ? { midspec: undefined } : {}),
+    ...(midspecConfirmed ? { draftGenerated: true } : {}),
+    ...(wizardDone ? { mainView: 'editor' as const, phase: 'done' as const } : {}),
+  };
+}
+
 function normalizeState(raw: unknown): SpecAnalysisState {
-  const s = raw as SpecAnalysisState & { context?: LegacyRecord; midspec?: unknown[] };
+  const s = migrateMidspecStep(raw as SpecAnalysisState) as SpecAnalysisState & { context?: LegacyRecord; midspec?: unknown[] };
   if (s?.context) {
     const ctx = s.context as LegacyRecord;
     ctx.previous = ((ctx.previous as unknown[]) ?? []).map(normalizeDescItem);

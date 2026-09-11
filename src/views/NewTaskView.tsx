@@ -73,7 +73,7 @@ export function NewTaskView() {
       <div className="max-w-xl w-full mt-8 grid grid-cols-3 gap-3 animate-fade-up">
         {[
           { n: '1', t: '직무발명서 업로드', d: 'PDF에서 설명·이미지·명칭 후보를 AI가 추출합니다' },
-          { n: '2', t: '8단계 확인·확정', d: '구성요소·도면·청구항을 단계별로 검토해 확정합니다' },
+          { n: '2', t: '발명 정보 7단계 확정', d: '구성요소·도면·청구항을 단계별로 검토해 확정합니다' },
           { n: '3', t: '에디터에서 완성', d: '실시예를 포함한 초안을 다듬고 DOCX·PDF로 내보냅니다' },
         ].map(it => (
           <div key={it.n} className="rounded-xl border border-zinc-200 bg-white px-4 py-3.5">

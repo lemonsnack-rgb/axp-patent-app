@@ -13,6 +13,7 @@ import type { InventionContext, MidspecSection, InventionSpecification, Drawing 
 import type { DrawingItem as WorkflowDrawingItem } from '../features/drawing-workflow/types';
 import { openEditorTab } from '../features/drawing-workflow/editorChannel';
 import { loadSpecState, saveSpecState } from '../features/spec/specStore';
+import { MOCK_MIDSPEC, MOCK_EMBODIMENT, buildDrawingDescBlocks } from '../features/spec/mockAiService';
 import { PreviewModal } from '../components/PreviewModal';
 import type { PreviewSection } from '../components/PreviewModal';
 import {
@@ -97,6 +98,19 @@ const EDITOR_SECTIONS = [
   { id: 'abstract',               label: '요약',                              short: '요약' },       // A7: 요약서 (확정 개요 + 대표도)
 ] as const;
 type SectionId = typeof EDITOR_SECTIONS[number]['id'];
+
+// ── 초안 생성 그룹 ──────────────────────────────────────────────────────────
+// API의 단계별 결과 조회 4종에 대응한다. 뒤 단계 호출에 앞 단계 결과를 함께 넘기는 구조라
+// 실제로도 이 순서대로 완료되므로, 완료되는 그룹부터 위에서 아래로 채워 넣는다.
+// 명칭·부호의 설명·청구범위·요약은 위저드에서 확정된 값이라 생성 대상이 아니다.
+const DRAFT_GROUPS: { label: string; sections: SectionId[] }[] = [
+  { label: '도면의 간단한 설명', sections: ['drawing_descriptions'] },
+  { label: '기술분야 · 배경기술', sections: ['technical_field', 'background_art'] },
+  { label: '발명의 내용', sections: ['technical_problem', 'technical_solution', 'advantageous_effects'] },
+  { label: '실시예', sections: ['embodiment_description'] },
+];
+// 그룹당 mock 소요 시간. 실 API에서는 상태 조회가 완료를 알릴 때마다 해당 결과를 채운다.
+const DRAFT_GROUP_MOCK_MS = 1800;
 
 // ── 초기 텍스트 ────────────────────────────────────────────────────────────
 
@@ -457,7 +471,7 @@ function ThinkingProgress({ steps, done }: { steps: ProgressStep[]; done: number
 }
 
 // ── 메인 컴포넌트 ──────────────────────────────────────────────────────────
-export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context, confirmedClaimsText, onRenameElement }: {
+export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context, confirmedClaimsText, onRenameElement, draftGenerated, onDraftGenerated }: {
   task: any
   onBack: () => void
   confirmedTitle?: string
@@ -465,12 +479,17 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
   context?: InventionContext
   confirmedClaimsText?: string
   onRenameElement?: (oldName: string, newName: string) => void   // 원천(context.elements)·위저드 텍스트 동기화
+  draftGenerated?: boolean                                        // 초안 생성을 이미 실행했는지 (1회 제한)
+  onDraftGenerated?: (sections: MidspecSection[]) => void         // 생성 완료 결과를 원천에 반영
 }) {
   const taskName: string = task?.name || '새 명세서';
   const effectiveTitle = confirmedTitle || taskName;
 
   // ── 초기 콘텐츠 헬퍼 (MidspecSection 기반) ──
+  // 본문은 「초안 생성」으로만 채워진다 — 초안을 만들기 전에는 중간명세서가 남아 있어도 쓰지 않고
+  // 안내 문구를 보여 준다. 그래야 "초안 생성 버튼 + 이미 채워진 본문"이 동시에 뜨지 않는다.
   function getMidspecText(key: string): string {
+    if (!draftGenerated) return ''
     const section = midspec?.find(s => s.key === key)
     return section?.blocks.map(b => b.content).join('\n\n') ?? ''
   }
@@ -511,8 +530,10 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
   }
 
   // 섹션별 블록 배열 (localStorage 복원 우선)
+  // 단, 초안 생성 전에는 저장된 편집본도 쓰지 않는다 — 본문은 「초안 생성」으로만 채워진다.
+  // (초안 생성 전에는 편집 자체가 불가능하므로, 이 상태의 저장본은 구 흐름이 남긴 잔여물이다.)
   const [blocks, setBlocks] = useState<Record<SectionId, string[]>>(() => {
-    if (task?.id) {
+    if (task?.id && draftGenerated) {
       const saved = loadSpecState(task.id);
       if (saved?.editorBlocks && Object.keys(saved.editorBlocks).length > 0) {
         // 저장본에 없는 섹션(요약·부호의 설명 등 신규)은 초기 콘텐츠로 채운다 (A7 마이그레이션)
@@ -526,6 +547,67 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       EDITOR_SECTIONS.map(s => [s.id, toBlocks(getInitialContent(s.id, effectiveTitle))])
     ) as Record<SectionId, string[]>;
   });
+
+  // ── 초안 생성 (2026-09-10 회의 결정) ──────────────────────────────────────
+  // 위저드의 '중간명세서' 단계를 대신한다. 실행 중에는 본문 편집을 막고 진행 상태를 보여주며,
+  // 완료되는 그룹부터 위에서 아래로 채운다. 토큰 비용 때문에 재생성은 없다 — 1회만 실행 가능.
+  const [draftStage, setDraftStage] = useState<number | null>(null);   // null = 대기, n = DRAFT_GROUPS[n] 생성 중
+  const draftTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const draftJustDone = useRef(false);
+  useEffect(() => () => { draftTimers.current.forEach(clearTimeout); draftTimers.current = []; }, []);
+
+  /** 초안 전체(MidspecSection[])를 미리 만들어 두고 그룹 순서대로 반영한다 (실 API: 단계별 결과 조회 4종) */
+  const buildDraftSections = (): MidspecSection[] => {
+    const specDrawings = (context?.drawings ?? []).filter(d => d.included !== false && d.useForSpec);
+    const fallback = MOCK_MIDSPEC.find(s => s.key === 'drawing_descriptions')?.blocks ?? [];
+    // 도 번호는 명세서 도면 채택 순서(1부터) · 같은 분류 연속은 묶음 설명 (API idxs 대응)
+    const drawingBlocks = specDrawings.length ? buildDrawingDescBlocks(specDrawings) : fallback;
+    return [
+      ...MOCK_MIDSPEC
+        .filter(s => s.key !== 'embodiment_description')
+        .map(s => s.key === 'drawing_descriptions' ? { ...s, blocks: drawingBlocks } : s),
+      { key: 'embodiment_description', label: '실시예 (구체적 내용)', blocks: MOCK_EMBODIMENT },
+    ];
+  };
+
+  const startDraftGeneration = () => {
+    if (draftGenerated || draftStage !== null) return;
+    const sections = buildDraftSections();
+    const textOf = (sid: SectionId) =>
+      sections.find(s => s.key === sid)?.blocks.map(b => b.content).join('\n\n') ?? '';
+    setDraftStage(0);
+    DRAFT_GROUPS.forEach((group, i) => {
+      draftTimers.current.push(setTimeout(() => {
+        // 이 그룹의 섹션을 채우고, 다음 그룹으로 넘어간다
+        setBlocks(prev => {
+          const next = { ...prev };
+          group.sections.forEach(sid => { const t = textOf(sid); if (t) next[sid] = toBlocks(t); });
+          return next;
+        });
+        // 방금 채운 자리로 스크롤 — 순차로 작성되는 결과가 화면에 보이게 한다
+        setTimeout(() => {
+          centerRef.current
+            ?.querySelector<HTMLElement>(`[data-section="${group.sections[0]}"]`)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 60);
+        const isLast = i === DRAFT_GROUPS.length - 1;
+        setDraftStage(isLast ? null : i + 1);
+        if (isLast) {
+          draftTimers.current = [];
+          draftJustDone.current = true;   // 다음 렌더에서 생성 결과를 저장한다
+          onDraftGenerated?.(sections);
+          toast('명세서 초안을 작성했습니다');
+        }
+      }, DRAFT_GROUP_MOCK_MS * (i + 1)));
+    });
+  };
+
+  // 초안 생성으로 채운 본문 저장 — 편집 경로(updateBlock 등)를 거치지 않으므로 여기서 한 번 저장한다
+  useEffect(() => {
+    if (!draftJustDone.current || !task?.id) return;
+    draftJustDone.current = false;
+    saveSpecState(task.id, { editorBlocks: blocks as Record<string, string[]> });
+  }, [blocks, task?.id]);
 
   // 편집 중인 블록 (textarea 활성화, 단일) — 진입 시에는 아무 단락도 편집 모드로 두지 않는다 (A1: 의도치 않은 덮어쓰기 방지)
   const [sel, setSel] = useState<{ sid: SectionId; idx: number } | null>(null);
@@ -1155,7 +1237,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
           <p className="text-base2 font-bold text-neutral-800 mb-1">구성요소 이름 전체 변경</p>
           <p className="text-xs2 text-neutral-500 mb-3 leading-relaxed">
             <span className="font-semibold text-neutral-700">"{renamingComp.name}"</span>{' '}
-            → 본문·청구범위·부호의 설명과 작성 단계(구성요소·청구항·중간명세서)의 모든 언급이 한 번에 바뀝니다. 부호는 유지됩니다.
+            → 본문·청구범위·부호의 설명과 발명 정보(구성요소·청구항)의 모든 언급이 한 번에 바뀝니다. 부호는 유지됩니다.
           </p>
           <Input
             autoFocus
@@ -1292,12 +1374,12 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
         </div>
       )}
 
-      {/* 서브헤더 Row 2: 내비게이션 — [← 작성 단계로] + 섹션 탭 (툴바는 편집 도구만, 이동은 이 줄에) */}
+      {/* 서브헤더 Row 2: 내비게이션 — [← 발명 정보] + 섹션 탭 (툴바는 편집 도구만, 이동은 이 줄에) */}
       <div data-spec="SPC-EDT-070" className="flex items-stretch border-b border-neutral-200 bg-white shrink-0">
         <div className="flex items-center pl-3 pr-2 shrink-0 border-r border-neutral-200 my-1.5">
-          <button onClick={onBack} data-spec="SPC-EDT-071" title="위저드(작성 단계)로 돌아갑니다 — 편집 내용은 저장됩니다"
+          <button onClick={onBack} data-spec="SPC-EDT-071" title="발명 정보 단계로 돌아갑니다 — 편집 내용은 저장됩니다"
             className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border border-brand-300 text-brand-600 text-xs2 font-semibold whitespace-nowrap hover:bg-brand-50 transition-colors">
-            ← 작성 단계로
+            ← 발명 정보
           </button>
         </div>
       <div className="flex flex-1 min-w-0 overflow-x-auto scroll-thin [mask-image:linear-gradient(to_right,transparent_0,black_8px,black_calc(100%-32px),transparent_100%)]">
@@ -1315,10 +1397,74 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       </div>
       </div>
 
-      {/* 본문 — 전체 명세서 스크롤 */}
+      {/* 서브헤더 Row 3: 초안 생성 — 위저드의 중간명세서 단계를 대신한다. 1회만 실행 가능 */}
+      {!draftGenerated && (
+        <div data-spec="SPC-EDT-075" className="flex items-center gap-3 px-4 py-2.5 border-b border-brand-200 bg-brand-50 shrink-0">
+          {draftStage === null ? (
+            <>
+              <div className="min-w-0">
+                <p className="text-sm2 font-semibold text-neutral-800">명세서 초안이 아직 작성되지 않았습니다</p>
+                <p className="text-xs2 text-neutral-500 mt-0.5">
+                  확정한 구성요소·도면·청구항을 바탕으로 도면의 간단한 설명부터 실시예까지 작성합니다. <b className="text-neutral-700">작성은 한 번만 가능</b>하며, 이후 수정은 에디터에서 진행합니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={startDraftGeneration}
+                className="ml-auto shrink-0 inline-flex items-center gap-1.5 h-9 px-4 rounded-xl text-sm font-semibold text-white bg-brand-400 hover:bg-brand-500 transition-colors"
+              >초안 생성</button>
+            </>
+          ) : (
+            /* 작성 순서대로 항목을 늘어놓고 완료 / 작성 중 / 대기를 함께 보여 준다 */
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="shrink-0 w-4 h-4 border-2 border-brand-300 border-t-brand-500 rounded-full animate-spin" aria-hidden="true" />
+                <p className="text-sm2 font-semibold text-neutral-800" role="status" aria-live="polite">
+                  명세서 초안을 작성하고 있습니다 — {DRAFT_GROUPS[draftStage].label}
+                </p>
+                <span className="ml-auto shrink-0 text-xs2 text-neutral-500 tabular-nums">{draftStage + 1} / {DRAFT_GROUPS.length}</span>
+              </div>
+              <ol className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                {DRAFT_GROUPS.map((g, i) => {
+                  const doneG = i < draftStage;
+                  const active = i === draftStage;
+                  return (
+                    <li key={g.label} className="flex items-center gap-1.5">
+                      {i > 0 && <span className="text-neutral-300" aria-hidden="true">›</span>}
+                      <span className={clsx(
+                        'inline-flex items-center gap-1 h-6 px-2 rounded-lg text-xs2 border transition-colors',
+                        doneG && 'border-green-200 bg-green-50 text-green-700',
+                        active && 'border-brand-300 bg-white text-brand-600 font-semibold',
+                        !doneG && !active && 'border-neutral-200 bg-white/60 text-neutral-400',
+                      )}>
+                        {doneG && <Icon name="check" size={9} />}
+                        {g.label}
+                        {active && <span className="text-neutral-400 font-normal">작성 중…</span>}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+              {/* 진행 바 — 완료된 그룹까지 채운다 */}
+              <div className="mt-1.5 h-1.5 rounded-full bg-white overflow-hidden border border-brand-200">
+                <div
+                  className="h-full bg-brand-400 transition-[width] duration-500"
+                  style={{ width: `${(draftStage / DRAFT_GROUPS.length) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 본문 — 전체 명세서 스크롤. 초안 생성 중에는 편집을 막는다 */}
       <div
           ref={centerRef}
-          className="flex-1 overflow-y-auto scroll-thin bg-neutral-50"
+          aria-busy={draftStage !== null}
+          className={clsx(
+            'flex-1 overflow-y-auto scroll-thin bg-neutral-50',
+            draftStage !== null && 'opacity-50 pointer-events-none select-none',
+          )}
           onClick={e => { if (e.target === e.currentTarget) setSel(null); }}
           onScroll={() => {
             if (!centerRef.current) return;
@@ -1546,6 +1692,21 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                 )}
               </div>
             ))}
+
+            {/* 본문 마지막의 초안 생성 — 상단 띠와 같은 동작. 안내 문구를 다 읽고 내려온 자리에서도 바로 누를 수 있게 한다 (2026-09-11 사용자 결정) */}
+            {!draftGenerated && draftStage === null && (
+              <div data-spec="SPC-EDT-076" className="mt-2 mb-6 rounded-xl border border-brand-200 bg-brand-50 px-5 py-5 text-center">
+                <p className="text-sm2 font-semibold text-neutral-800">명세서 초안이 아직 작성되지 않았습니다</p>
+                <p className="text-xs2 text-neutral-500 mt-1">
+                  확정한 구성요소·도면·청구항을 바탕으로 도면의 간단한 설명부터 실시예까지 작성합니다. <b className="text-neutral-700">작성은 한 번만 가능</b>합니다.
+                </p>
+                <button
+                  type="button"
+                  onClick={startDraftGeneration}
+                  className="mt-3 inline-flex items-center gap-1.5 h-9 px-4 rounded-xl text-sm font-semibold text-white bg-brand-400 hover:bg-brand-500 transition-colors"
+                >초안 생성</button>
+              </div>
+            )}
           </div>
         </div>
 

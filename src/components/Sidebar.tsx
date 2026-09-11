@@ -14,7 +14,7 @@ import { loadSpecState } from '../features/spec/specStore';
 // 세부 단계(N/8 단계명)는 배지 툴팁으로만 제공한다.
 const SPEC_STAGE: Record<string, [number, string]> = {
   upload: [1, '업로드'], description: [2, '발명 설명'], images: [3, '이미지 선별'], title: [4, '명칭·요약'],
-  components: [5, '구성요소'], drawings: [6, '명세서 도면'], claims: [7, '청구항'], midspec: [8, '중간명세서'],
+  components: [5, '구성요소'], drawings: [6, '명세서 도면'], claims: [7, '청구항'],
 };
 function specStageOf(t: Task): { text: string; tone: 'progress' | 'done'; title: string } | null {
   if (t.type !== 'spec') return null;
@@ -22,7 +22,7 @@ function specStageOf(t: Task): { text: string; tone: 'progress' | 'done'; title:
     const st = loadSpecState(t.id);
     if (!st) return null;
     if (st.mainView === 'editor' || st.phase === 'done') return { text: '명세서 생성완료', tone: 'done', title: '명세서가 생성되어 에디터에서 편집할 수 있습니다' };
-    if (st.phase === 'flow') { const [n, label] = SPEC_STAGE[st.curStep] ?? [0, st.curStep]; return { text: '분석 중', tone: 'progress', title: `진행 단계: ${n}/8 ${label}` }; }
+    if (st.phase === 'flow') { const [n, label] = SPEC_STAGE[st.curStep] ?? [0, st.curStep]; return { text: '발명 정보', tone: 'progress', title: `발명 정보 ${n}/7 ${label}` }; }
     return null;
   } catch { return null; }
 }

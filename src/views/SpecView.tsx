@@ -13,7 +13,6 @@ import {
   generateComponentCandidates,
   MOCK_INDEPENDENT_CLAIM_SETS,
   MOCK_DRAWINGS,
-  MOCK_EMBODIMENT,
   getMockExtractResult,
 } from '../features/spec/mockAiService';
 import { generateMockModification } from '../features/ai/clarityAnalyzer';
@@ -51,18 +50,14 @@ const STEPS: StepConfig[] = [
   { id: 'components',  label: '구성요소',    step: 5 },
   { id: 'drawings',    label: '명세서 도면', step: 6 },
   { id: 'claims',      label: '청구항',      step: 7 },
-  { id: 'midspec',     label: '중간명세서',  step: 8 },
 ];
 
 const STEP_LABEL: Partial<Record<StepId, string>> = {
   title: '발명의 명칭', description: '발명의 설명', images: '이미지 선별', components: '구성요소',
-  drawings: '명세서 도면', claims: '청구항', midspec: '중간명세서',
+  drawings: '명세서 도면', claims: '청구항',
 };
 
-// 명세서 생성(중간명세서 → 에디터) mock 소요 시간. 실 API에서는 응답 도착 시 onDone 호출로 대체.
-const SPEC_GEN_MOCK_MS = 6600;
-
-// 단계별 실질 안내 — 8단계 동일 템플릿 대신 이 단계에서 실제로 할 일 1~2문장 (D7)
+// 단계별 실질 안내 — 단계마다 동일한 템플릿 대신 이 단계에서 실제로 할 일 1~2문장 (D7)
 const STEP_HINT: Partial<Record<StepId, string>> = {
   description: '채택할 항목만 체크해 두세요. 카드를 끌어 순서를 바꾸거나 제안/종래 기술 사이로 보낼 수 있고, 표 항목은 원문 그대로 반영됩니다.',
   images:      '명세서 맥락에 쓸 이미지를 고르고 대표 이미지 1개를 지정하세요. 선택하지 않은 이미지는 이후 단계에서 제외됩니다.',
@@ -70,7 +65,6 @@ const STEP_HINT: Partial<Record<StepId, string>> = {
   components:  '구성요소의 명칭·정의를 확인하고 순서를 정한 뒤 부호(100, 200…)를 부여하세요. 채택한 구성요소가 청구항의 기준이 됩니다.',
   drawings:    '이미지 선별에서 고른 이미지가 도면으로 기본 채택되어 있습니다. 명세서에 넣지 않을 이미지는 참고만으로 바꾸세요.',
   claims:      '권리범위와 청구항 구성을 정해 독립항 세트를 생성하고, 하나를 선택해 종속항을 구성하세요.',
-  midspec:     '섹션별 단락을 확인·편집하세요. 마치면 하단 명세서 생성으로 실시예를 포함한 초안을 만들고 에디터로 이동합니다.',
 };
 const AI_NEXT: Record<StepId, string> = {
   upload:      '업로드하신 문서를 분석했습니다. 발명의 설명 항목을 분석합니다.',
@@ -79,8 +73,7 @@ const AI_NEXT: Record<StepId, string> = {
   title:       '발명 명칭을 확정했습니다. 발명의 구성요소를 추출합니다.',
   components:  '구성요소를 확정했습니다. 명세서에 넣을 도면을 처리합니다.',
   drawings:    '명세서 도면을 확정했습니다. 청구항을 생성합니다.',
-  claims:      '청구항을 확정했습니다. 중간명세서를 확인하고 편집하세요.',
-  midspec:     '중간명세서를 확정했습니다. 에디터로 이동합니다.',
+  claims:      '청구항을 확정했습니다. 에디터에서 명세서 초안을 생성하세요.',
 };
 const GUIDE_CANDS: Record<string, string[]> = {
   title: [
@@ -147,20 +140,7 @@ export function SpecView() {
     toast(c.total ? `'${oldName}' → '${newName}' — 본문 ${c.total}곳도 함께 바꿨습니다` : `'${oldName}' → '${newName}'로 바꿨습니다`);
   };
 
-  // ── 명세서 생성 진행 (중간명세서 → 에디터) ─────────────────────────────
-  // 실시예를 포함한 명세서 생성은 실제 API에서 1분 이상 걸린다. 단계 체크리스트 + 진행 바 + 경과 시간을 보여주고
-  // 완료 시 에디터로 전환한다. mock은 SPEC_GEN_MOCK_MS 후 완료 처리. (실 API: 응답 도착 시 onDone)
-  // 경과 시간은 표시하지 않는다(사용자 결정: 오래 걸림을 강조할 필요 없음) — 진행 중 표시와 단계만.
-  const [specGen, setSpecGen] = useState<{ stage: number } | null>(null);
-  const specGenTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const clearSpecGenTimers = () => { specGenTimers.current.forEach(clearTimeout); specGenTimers.current = []; };
-  const startSpecGeneration = (onDone: () => void) => {
-    clearSpecGenTimers();
-    setSpecGen({ stage: 0 });
-    specGenTimers.current.push(setTimeout(() => { clearSpecGenTimers(); setSpecGen(null); onDone(); }, SPEC_GEN_MOCK_MS));
-  };
-  const cancelSpecGeneration = () => { clearSpecGenTimers(); setSpecGen(null); toast('명세서 생성을 취소했습니다'); };
-  useEffect(() => () => clearSpecGenTimers(), []);
+  // 명세서 초안 생성은 위저드가 아니라 에디터의 「초안 생성」에서 실행한다 (2026-09-10 회의 결정).
   const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
   // AI 수정은 본문 내 삽입형(인라인)으로 통일 — 사이드패널로 포커스를 넘기지 않는다 (데모 정합)
   const guidePanelInputRef = useRef<HTMLTextAreaElement>(null);
@@ -170,11 +150,16 @@ export function SpecView() {
     }
   );
   const [midspec, setMidspec] = useState<MidspecSection[] | undefined>(savedSpec?.midspec);
+  // 초안 생성은 에디터에서 1회만 — 실행 여부를 저장해 재진입 후에도 버튼이 돌아오지 않게 한다
+  const [draftGenerated, setDraftGenerated] = useState<boolean>(savedSpec?.draftGenerated ?? false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [phase, setPhase] = useState<'upload' | 'direct' | 'flow' | 'done'>(savedSpec?.phase ?? 'upload');
   const [curStep, setCurStep] = useState<StepId>((savedSpec?.curStep as StepId) ?? 'upload');
   const [confirmed, setConfirmed] = useState<Partial<Record<StepId, string>>>((savedSpec?.confirmed as Partial<Record<StepId, string>>) ?? {});
   const [guideStep, setGuideStep] = useState<StepId>((savedSpec?.curStep as StepId) ?? 'title');
+  // 보고 있는 단계 — 한 화면에 한 단계만 띄우고 이전/다음으로 오간다 (2026-09-10 회의 결정).
+  // 진행 상태(curStep)와 분리해 두어, 지나온 단계를 다시 봐도 진행이 되돌아가지 않는다(조회 전용).
+  const [viewStep, setViewStep] = useState<StepId>((savedSpec?.curStep as StepId) ?? 'upload');
   const [gSel, setGSel] = useState<Partial<Record<StepId, string>>>((savedSpec?.gSel as Partial<Record<StepId, string>>) ?? {});
 
   // ── 도면 편집기(새 탭) 결과 수신 — 톱레벨: 위저드/에디터 어느 화면이든 반영, 재진입 시 잔류 결과도 적용 ──
@@ -232,8 +217,6 @@ export function SpecView() {
   const [stepLoading, setStepLoading] = useState<StepId | null>(null);
   // 하단 바 주 동작 — 현재 단계 패널(청구항·중간명세서)이 등록 (U1/D3)
   const [stepAction, setStepAction] = useState<StepAction | null>(null);
-  // 완료 단계 접기/펼치기 — 기본 접힘(1줄 요약) (U3)
-  const [expandedDone, setExpandedDone] = useState<Partial<Record<StepId, boolean>>>({});
 
   const flowRef = useRef<HTMLDivElement>(null);
   const flowSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -257,35 +240,43 @@ export function SpecView() {
         titleCandidates,
         context,
         midspec,
+        draftGenerated,
         mainView,
       });
     }, 400);
     return () => { if (flowSaveTimerRef.current) clearTimeout(flowSaveTimerRef.current); };
   }, [phase, curStep, confirmed, gSel, diTitle, diField, diContent,
-      diProblem, diKeywords, titleCandidates, context, midspec, mainView, task?.id]);
+      diProblem, diKeywords, titleCandidates, context, midspec, draftGenerated, mainView, task?.id]);
+
+  // 확정 뒤에도 명칭은 직접 고칠 수 있다(2026-09-11) — 고친 값이 확정값·InventionContext.title까지 따라가야
+  // 우측 확정 요약·에디터 제목·요약서가 한 값을 가리킨다.
+  useEffect(() => {
+    const t = gSel['title'];
+    if (!t || !confirmed['title'] || confirmed['title'] === t) return;
+    setConfirmed(p => ({ ...p, title: t }));
+    setContext(p => (p.title === t ? p : { ...p, title: t }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gSel['title']]);
 
   // (제거) 분석 중 beforeunload 이탈 확인 — 진행 상태가 자동저장(400ms 디바운스)으로 보존되므로
   // 경고 대화상자가 오히려 페이지 이동/자동화(CDP)를 블로킹시켜 제거함.
 
   const si = (id: StepId) => STEPS.findIndex(s => s.id === id);
   const isSpecialStep = (id: StepId) =>
-    id === 'description' || id === 'images' || id === 'components' || id === 'drawings' || id === 'claims' || id === 'midspec';
-  const isVisible = (id: StepId) => {
-    if (id === 'upload') return true;
-    if (phase === 'upload' || phase === 'direct') return false;
-    return si(id) <= si(curStep);
-  };
-
+    id === 'description' || id === 'images' || id === 'components' || id === 'drawings' || id === 'claims';
   const resetAnalysis = () => {
-    showConfirm('처음부터 다시 시작하면 모든 분석 내용이 삭제됩니다.\n계속하시겠습니까?', () => {
+    showConfirm('처음부터 다시 시작하면 입력한 발명 정보가 모두 삭제됩니다.\n계속하시겠습니까?', () => {
       setPhase('upload');
       setCurStep('upload');
+      setViewStep('upload');
       setConfirmed({});
       setGSel({});
       setTitleCandidates([]);
       setAiComponents([]);
       setContext({ title: '', summary: '', elements: [], previous: [], proposed: [], drawings: [] });
       setMidspec(undefined);
+      setDraftGenerated(false);
+      setMainView('analysis');
       if (task?.id) {
         saveSpecState(task.id, {
           phase: 'upload', curStep: 'upload',
@@ -293,6 +284,8 @@ export function SpecView() {
           titleCandidates: [],
           context: { title: '', summary: '', elements: [], previous: [], proposed: [], drawings: [] },
           midspec: undefined,
+          draftGenerated: false,
+          editorBlocks: undefined,   // 초안 생성부터 다시 — 에디터 본문도 비운다
           mainView: 'analysis',
         });
       }
@@ -304,17 +297,6 @@ export function SpecView() {
     setConfirmed(p => ({ ...p, [id]: val }));
     // 확정 제목을 InventionContext 단일 원천에 역기록
     if (id === 'title') setContext(p => ({ ...p, title: val }));
-    // 청구항 확정 시 중간명세서 자동 로드 — 도면설명은 명세서 도면에서 생성 (도면은 직전 단계에서 확정됨)
-    if (id === 'claims' && !midspec) {
-      import('../features/spec/mockAiService').then(({ MOCK_MIDSPEC }) => {
-        const specDrawings = context.drawings.filter(d => d.included !== false && d.useForSpec);
-        const fallback = MOCK_MIDSPEC.find(s => s.key === 'drawing_descriptions')?.blocks ?? [];
-        // 도 번호는 명세서 도면 채택 순서(1부터) · 같은 분류 연속은 묶음 설명 (API idxs 대응)
-        const drawingBlocks = specDrawings.length ? buildDrawingDescBlocks(specDrawings) : fallback;
-        const next = MOCK_MIDSPEC.map(s => s.key === 'drawing_descriptions' ? { ...s, blocks: drawingBlocks } : s);
-        setMidspec(next);
-      });
-    }
     // 이미지 선별 확정 시 대표 이미지가 없으면 첫 선택 이미지를 대표로 (A5)
     if (id === 'images') {
       setContext(p => {
@@ -344,35 +326,27 @@ export function SpecView() {
     if (next) {
       // 다음 단계 분석 로딩 표시 후 전환 (실제 AI 분석 지연 대응)
       setStepLoading(next.id);
-      setTimeout(() => flowRef.current?.scrollTo({ top: 99999, behavior: 'smooth' }), 50);
       setTimeout(() => {
         setCurStep(next.id);
         setGuideStep(next.id);
+        setViewStep(next.id);
         setStepLoading(null);
-        // 새 단계의 헤더로 스크롤 — 하단이 아니라 상단 도구부터 보이게 (U3)
-        setTimeout(() => scrollToStep(next.id), 60);
+        // 새 단계 화면은 위에서부터 보이게 한다
+        setTimeout(scrollFlowTop, 60);
       }, 900);
     } else {
+      // 마지막 단계(청구항) 확정 — 위저드는 여기서 끝나고 에디터로 넘어간다.
+      // 명세서 초안은 에디터의 「초안 생성」에서 만든다 (2026-09-10 회의 결정).
       setPhase('done');
-      setTimeout(() => flowRef.current?.scrollTo({ top: 99999, behavior: 'smooth' }), 50);
+      setStepLoading(null);
+      handleSetMainView('editor');
     }
   };
-  const reselect = (id: StepId) => {
-    const doIt = () => {
-      const p = { ...confirmed }; delete p[id];
-      setConfirmed(p); setCurStep(id); setGuideStep(id);
-      setStepAction(null);
-      setTimeout(() => scrollToStep(id), 60);
-    };
-    // 이후 단계가 이미 확정되어 있으면 재확정이 필요함을 먼저 알린다 (U4)
-    const later = STEPS.filter(st => si(st.id) > si(id) && confirmed[st.id] && STEP_LABEL[st.id]).map(st => STEP_LABEL[st.id]);
-    if (later.length) showConfirm(`${withParticle(`"${STEP_LABEL[id]}"`.replace(/"$/, ''), '을', '를').replace(/^"([^"]+)/, '"$1"')} 다시 선택하면 이후 단계(${later.join(' · ')})를 다시 확정해야 합니다. 계속할까요?`, doIt);
-    else doIt();
-  };
-  const scrollToStep = (id: StepId) => {
-    flowRef.current?.querySelector<HTMLElement>(`[data-flowstep="${id}"]`)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  // 이전 단계로 되돌아가는 상태 이동은 없다 — 확정한 단계는 조회 전용이다 (2026-09-10 회의 결정).
+  // 앞 단계 변경이 뒤 단계에 영향을 주는 경우는 제목 선택 변경·독립항 선택 변경 두 가지뿐이며,
+  // 그 두 지점에서만 리셋 확인을 띄운다. 상세 정의는 기획 확정 후 반영한다.
+  // 단계가 바뀌면 화면을 새로 그리므로 스크롤은 항상 맨 위로 돌린다
+  const scrollFlowTop = () => flowRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   // 완료 단계 1줄 요약 (U3)
   const doneSummary = (id: StepId): string => {
     switch (id) {
@@ -391,19 +365,15 @@ export function SpecView() {
         return n ? `명세서 도면 ${n}개 (${n === 1 ? '도 1' : `도 1~${n}`})` : '명세서 도면 없음 (참고 이미지만 사용)';
       }
       case 'claims': return '독립항 세트 · 종속항 확정';
-      case 'midspec': return `${(midspec ?? []).length}개 섹션`;
       default: return '확정';
     }
   };
-  // 진행표시(Stepper) 클릭 이동 — 방문한 단계로 스크롤(확정 내용은 보존)
+  // 단계 이동 — 화면만 바꾼다(진행 상태는 그대로). 아직 도달하지 않은 단계로는 갈 수 없다.
   const gotoFlowStep = (id: StepId) => {
     if (!(phase === 'flow' || phase === 'done') || si(id) > si(curStep)) return;
+    setViewStep(id);
     setGuideStep(id);
-    if (id === 'upload') { flowRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); return; }
-    requestAnimationFrame(() => {
-      flowRef.current?.querySelector<HTMLElement>(`[data-flowstep="${id}"]`)
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+    scrollFlowTop();
   };
   const startFlow = (override?: { title: string; field: string; content: string }) => {
     const title   = override?.title   ?? diTitle.trim();
@@ -426,13 +396,14 @@ export function SpecView() {
       setPhase('flow');
       setCurStep('description');
       setGuideStep('description');
+      setViewStep('description');
       setAnalyzing(false);
       setLoadingStage(0);
       if (task?.id && title && (!task.name || task.name === '새 명세서' || task.name === '새 작업')) {
         const taskName = title.length > 40 ? title.slice(0, 40) + '…' : title;
         taskUpdate(task.id, { name: taskName });
       }
-      setTimeout(() => scrollToStep('description'), 80);
+      setTimeout(scrollFlowTop, 80);
     }, 1500);
   };
 
@@ -466,6 +437,8 @@ export function SpecView() {
           context={context}
           confirmedClaimsText={gSel['claims'] || confirmed['claims'] || ''}
           onRenameElement={(o, n) => renameElementEverywhere(o, n, { skipEditorBlocks: true })}
+          draftGenerated={draftGenerated}
+          onDraftGenerated={sections => { setMidspec(sections); setDraftGenerated(true); }}
         />
         {previewOpen && <PreviewModal taskName={task?.name} sections={makePreviewSections()} onClose={() => setPreviewOpen(false)} />}
       </>
@@ -533,7 +506,8 @@ export function SpecView() {
             <div className="flex-1 min-w-0 flex items-center justify-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {STEPS.map((s, i) => {
                 const isDone = si(s.id) < si(curStep) && (phase === 'flow' || phase === 'done');
-                const active = s.id === curStep && (phase === 'flow' || phase === 'done');
+                // 강조는 '보고 있는 단계' 기준 — 지나온 단계를 조회 중이면 그 단계가 강조된다
+                const active = s.id === viewStep && (phase === 'flow' || phase === 'done');
                 const locked = phase !== 'flow' && phase !== 'done' && s.id !== 'upload';
                 const prevDone = i > 0 && si(STEPS[i - 1].id) < si(curStep) && (phase === 'flow' || phase === 'done');
                 const navigable = (phase === 'flow' || phase === 'done') && si(s.id) <= si(curStep);
@@ -721,38 +695,52 @@ export function SpecView() {
 
             {(phase === 'flow' || phase === 'done') && (
               <>
-                <AiMsg text={AI_NEXT.upload} />
-                {STEPS.slice(1).map(s => {
-                  if (!isVisible(s.id)) return null;
-                  const isDone = si(s.id) < si(curStep) && (phase === 'flow' || phase === 'done');
-                  const collapsed = isDone && !expandedDone[s.id];
-                  return (
-                    <div key={s.id} data-flowstep={s.id} className="space-y-3 scroll-mt-3">
-                      {collapsed ? (
-                        /* 완료 단계 — 1줄 요약 (펼치기 / 다시 선택) */
-                        <div data-spec="SPC-WIZ-040" className="flex items-center gap-2.5 rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5">
+                {/* 단계별 화면 — 한 번에 한 단계만 보인다. 도달한 단계는 모두 마운트해 두고 보는 단계만 표시한다:
+                    언마운트하면 청구항 패널처럼 로컬 상태를 가진 단계가 이전/다음 이동만으로 초기화되기 때문.
+                    확정한 단계도 직접 수정(텍스트·채택·순서·AI 수정)은 열어 둔다 — 잠그는 것은 후보/세트 '선택 변경'과
+                    '다시 생성'뿐이며, 이 둘은 뒤 단계 리셋 팝업 대상(2026-09-10 회의)으로 기획 확정 대기. */}
+                {STEPS.filter(st => si(st.id) <= si(curStep)).map(s => {
+                  const isDone = si(s.id) < si(curStep) || phase === 'done';
+                  const isView = s.id === viewStep;
+
+                  // ① 업로드 — 분석을 시작한 기초 자료를 조회만 한다
+                  if (s.id === 'upload') {
+                    return (
+                      <div key="upload" data-flowstep="upload" className="space-y-3" style={isView ? undefined : { display: 'none' }}>
+                        <AiMsg text={AI_NEXT.upload} />
+                        <div data-spec="SPC-WIZ-040" className="flex items-center gap-2.5 rounded-xl border border-green-200 bg-green-50/60 px-3.5 py-2.5">
                           <span className="w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center shrink-0"><Icon name="check" size={10} /></span>
-                          <span className="text-sm2 font-semibold text-neutral-800 shrink-0">{STEP_LABEL[s.id]}</span>
-                          <span className="text-xs2 text-neutral-500 truncate flex-1 min-w-0">{doneSummary(s.id)}</span>
-                          <button data-spec="SPC-WIZ-041"
-                            onClick={() => setExpandedDone(p => ({ ...p, [s.id]: true }))}
-                            className="shrink-0 inline-flex items-center h-7 px-2.5 rounded-lg text-xs2 font-medium text-neutral-500 border border-neutral-200 bg-white hover:bg-neutral-50 transition-colors"
-                          >펼치기</button>
-                          <button data-spec="SPC-WIZ-042"
-                            onClick={() => reselect(s.id)}
-                            className="shrink-0 inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-xs2 font-medium text-brand-500 border border-brand-200 bg-white hover:bg-brand-50 transition-colors"
-                          ><Icon name="edit" size={10} /> 다시 선택</button>
+                          <span className="text-sm2 font-semibold text-neutral-800 shrink-0">{STEPS[0].label}</span>
+                          <span className="text-xs2 text-neutral-500 truncate flex-1 min-w-0">
+                            {diTitle ? `${diTitle} — 기초 자료 분석 완료` : '기초 자료 분석 완료'}
+                          </span>
                         </div>
-                      ) : (<>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={s.id} data-flowstep={s.id} className="space-y-3" style={isView ? undefined : { display: 'none' }}>
+                      {/* 확정 단계 — 1줄 요약. 직접 수정은 그대로 가능하고, 선택 변경·다시 생성만 잠겨 있음을 알린다 */}
+                      {isDone && (
+                        <div data-spec="SPC-WIZ-040" className="flex items-center gap-2.5 rounded-xl border border-green-200 bg-green-50/60 px-3.5 py-2.5">
+                          <span className="w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center shrink-0"><Icon name="check" size={10} /></span>
+                          <span className="text-sm2 font-semibold text-neutral-800 shrink-0">확정됨</span>
+                          <span className="text-xs2 text-neutral-500 truncate flex-1 min-w-0">{doneSummary(s.id)}</span>
+                          <span className="shrink-0 text-xs2 text-neutral-400" title="확정한 뒤에도 내용은 바로 고칠 수 있습니다. 후보·세트를 바꾸거나 다시 생성하는 것만 잠겨 있습니다">직접 수정 가능 · 선택 변경·다시 생성 잠김</span>
+                        </div>
+                      )}
                       <AiMsg text={
                         <><strong className="text-lg2 font-bold text-neutral-800">{STEP_LABEL[s.id]}</strong><br />
                         {STEP_HINT[s.id] ?? `${STEP_LABEL[s.id]} 항목을 확인하고 채우세요.`}</>
                       } />
-                      {/* 단계 콘텐츠 — isDone 시 전체 딤 처리 */}
-                      <div className={isDone ? 'opacity-60 pointer-events-none select-none' : ''}>
+                      {/* 단계 콘텐츠 — 확정 후에도 직접 수정 가능(딤·잠금 없음). 재생성·선택 변경 잠금은 각 패널이 done으로 처리 */}
+                      <div>
                         {s.id === 'title' && (
                           <TitleCandidateCards
+                            lockSelection={isDone}
                             candidates={titleCandidates}
+                            onEditCandidate={(id, patch) => setTitleCandidates(cs => cs.map(c => c.id === id ? { ...c, ...patch } : c))}
                             gSel={gSel}
                             setGSel={setGSel}
                             onSummaryChange={summary => setContext(p => p.summary === summary ? p : { ...p, summary })}
@@ -800,12 +788,12 @@ export function SpecView() {
                             })}
                           />
                         )}
-                        {(s.id === 'images' || s.id === 'components' || s.id === 'drawings' || s.id === 'claims' || s.id === 'midspec') && (
+                        {(s.id === 'images' || s.id === 'components' || s.id === 'drawings' || s.id === 'claims') && (
                           <div className="mt-3">
                             {s.id === 'images' && (
                               <DrawingsPanel taskId={task?.id}
                                 mode="select"
-                                done={isDone}
+                                done={false}   // 이미지 선택·대표 지정은 직접 수정 — 확정 후에도 열어 둔다
                                 onConfirm={() => confirm('images')}
                                 onUpdate={v => setGSel(p => ({ ...p, images: v }))}
                                 drawings={context.drawings}
@@ -835,7 +823,7 @@ export function SpecView() {
                             {s.id === 'drawings' && (
                               <DrawingsPanel taskId={task?.id}
                                 mode="spec"
-                                done={isDone}
+                                done={false}   // 도면 채택·설명 편집은 직접 수정 — 확정 후에도 열어 둔다
                                 onConfirm={() => confirm('drawings')}
                                 onUpdate={v => setGSel(p => ({ ...p, drawings: v }))}
                                 drawings={context.drawings}
@@ -851,60 +839,9 @@ export function SpecView() {
                                 onActionChange={setStepAction}
                               />
                             )}
-                            {s.id === 'midspec' && (
-                              <MidspecPanel
-                                done={isDone}
-                                elements={context.elements}
-                                onRegenDrawingDesc={(instruction) => {
-                                  const specDrawings = context.drawings.filter(d => d.included !== false && d.useForSpec);
-                                  const blocks = buildDrawingDescBlocks(specDrawings, instruction);
-                                  const next = (midspec ?? []).map(sec => sec.key === 'drawing_descriptions' ? { ...sec, blocks } : sec);
-                                  setMidspec(next);
-                                  setGSel(p => ({ ...p, midspec: next.map(sec => `【${sec.label}】\n${sec.blocks.map(b => b.content).join('\n')}`).join('\n\n') }));
-                                  toast('도면 설명을 다시 생성했습니다');
-                                }}
-                                onActionChange={setStepAction}
-                                sections={midspec ?? []}
-                                onUpdate={(next) => {
-                                  setMidspec(next);
-                                  setGSel(p => ({ ...p, midspec: next.map(s => `【${s.label}】\n${s.blocks.map(b => b.content).join('\n')}`).join('\n\n') }));
-                                }}
-                                onGoToEditor={() => {
-                                  const embodimentSection: MidspecSection = {
-                                    key: 'embodiment_description',
-                                    label: '실시예 (구체적 내용)',
-                                    blocks: MOCK_EMBODIMENT,
-                                  };
-                                  const nextMidspec = [
-                                    ...(midspec ?? []).filter(s => s.key !== 'embodiment_description'),
-                                    embodimentSection,
-                                  ];
-                                  // 생성 진행 화면을 띄우고 완료 시 에디터로 전환 (실 API: 1분 이상)
-                                  startSpecGeneration(() => {
-                                    setMidspec(nextMidspec);
-                                    confirm('midspec');
-                                    handleSetMainView('editor');
-                                  });
-                                }}
-                              />
-                            )}
                           </div>
                         )}
                       </div>
-                      {/* 완료 단계(펼침) — 접기 / 다시 선택 */}
-                      {isDone && (
-                        <div className="flex justify-end gap-1.5 mt-1">
-                          <button
-                            onClick={() => setExpandedDone(p => ({ ...p, [s.id]: false }))}
-                            className="inline-flex items-center h-7 px-2.5 rounded-lg text-xs2 text-neutral-500 hover:bg-neutral-100 transition-colors"
-                          >접기</button>
-                          <button data-spec="SPC-WIZ-042"
-                            onClick={() => reselect(s.id)}
-                            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-xs2 font-medium text-brand-500 border border-brand-200 bg-white hover:bg-brand-50 transition-colors"
-                          ><Icon name="edit" size={10} /> 다시 선택</button>
-                        </div>
-                      )}
-                      </>)}
                     </div>
                   );
                 })}
@@ -931,7 +868,7 @@ export function SpecView() {
                 {phase === 'done' && (
                   <div data-spec="SPC-WIZ-070" className="text-center py-8">
                     <Icon name="logo" size={40} className="text-brand-400 mx-auto mb-3" />
-                    <h3 className="text-lg2 font-bold text-neutral-800 mb-2">모든 분석 항목이 확정되었습니다</h3>
+                    <h3 className="text-lg2 font-bold text-neutral-800 mb-2">발명 정보를 모두 확정했습니다</h3>
                     <p className="text-md2 text-neutral-500 mb-5">확정된 내용을 바탕으로 명세서 초안을 편집하세요.</p>
                     <Button
                       variant="filled" color="primary" size="sm"
@@ -951,24 +888,31 @@ export function SpecView() {
         {/* 네비게이션 바 — 본문 하단 */}
         {(phase === 'flow' || phase === 'done') && (
           <div data-spec="SPC-WIZ-050" className="shrink-0 border-t border-ck-border bg-neutral-50/90 backdrop-blur w-full shadow-[0_-4px_12px_rgba(0,0,0,0.03)]">
-            <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-end gap-2">
-              <div>
-                {si(curStep) > 1 && (
+            <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-2">
+              <div className="flex-1 flex justify-start">
+                {si(viewStep) > 0 && (
                   <button data-spec="SPC-WIZ-051"
-                    onClick={() => {
-                      // 보기 이동만 — 확정 상태는 바꾸지 않는다 (재확정은 '다시 선택'으로) (U4)
-                      const prev = STEPS[si(curStep) - 1].id;
-                      setExpandedDone(p => ({ ...p, [prev]: true }));
-                      gotoFlowStep(prev);
-                    }}
+                    onClick={() => gotoFlowStep(STEPS[si(viewStep) - 1].id)}
                     className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-neutral-600 bg-white border border-neutral-300 rounded-xl hover:bg-neutral-50 transition-colors"
-                    title="이전 단계 내용 보기"
+                    title="이전 단계 내용 보기 (진행 상태는 그대로)"
                   >← 이전</button>
                 )}
               </div>
-              <div className="flex items-center gap-3">
+              {/* 현재 보고 있는 단계 위치 */}
+              <span className="shrink-0 text-xs2 text-neutral-400 tabular-nums max-md:hidden">
+                {si(viewStep) + 1} / {STEPS.length} · {STEPS[si(viewStep)]?.label}
+              </span>
+              <div className="flex-1 flex items-center justify-end gap-3">
+                {/* 지나온 단계를 보는 중이면 진행 상태를 건드리지 않고 화면만 앞으로 넘긴다 */}
+                {viewStep !== curStep && (
+                  <button data-spec="SPC-WIZ-053"
+                    onClick={() => gotoFlowStep(STEPS[si(viewStep) + 1].id)}
+                    className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-neutral-600 bg-white border border-neutral-300 rounded-xl hover:bg-neutral-50 transition-colors"
+                    title="다음 단계 내용 보기"
+                  >다음 →</button>
+                )}
                 {/* 하단 바의 Primary는 화면당 1개 — 단계 패널이 등록한 주 동작(stepAction)이 있으면 그것을, 없으면 단계 확정(다음)을 표시 (U1/D3) */}
-                {phase === 'flow' && (() => {
+                {viewStep === curStep && phase === 'flow' && (() => {
                   if (stepLoading) {
                     return <button disabled className="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-white bg-brand-400 rounded-xl opacity-40">분석 중…</button>;
                   }
@@ -982,7 +926,6 @@ export function SpecView() {
                       >{stepAction.label}</button>
                     </>);
                   }
-                  if (curStep === 'midspec') return null; // 중간명세서는 패널이 '명세서 생성' 동작을 등록
                   if (curStep === 'drawings') {
                     // 도면 0개면 확인 후 진행 — 별도 '건너뛰기' 버튼 없이 한 경로로 (U2)
                     const specCount = context.drawings.filter(d => d.included !== false && d.useForSpec).length;
@@ -1021,22 +964,6 @@ export function SpecView() {
           </div>
         )}
         </div>
-
-        {/* 명세서 생성 진행 오버레이 — 중간명세서 → 에디터 (세부 단계·진행 바 없이 '작성 중' 표시만) */}
-        {specGen && (
-          <div className="fixed inset-0 z-[60] bg-white/92 backdrop-blur-sm flex items-center justify-center px-4" data-spec="SPC-WIZ-080" role="dialog" aria-modal="true" aria-labelledby="specgen-title">
-            <div className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white shadow-xl px-6 py-7 text-center">
-              <span className="mx-auto mb-4 block w-10 h-10 border-[3px] border-brand-200 border-t-brand-400 rounded-full animate-spin" aria-hidden="true" />
-              <h3 id="specgen-title" className="text-base2 font-bold text-neutral-800">명세서를 작성하고 있습니다</h3>
-              <p className="mt-1.5 text-xs2 text-neutral-500">완료되면 에디터로 자동 이동합니다.</p>
-              <button
-                type="button"
-                data-spec="SPC-WIZ-080" onClick={cancelSpecGeneration}
-                className="mt-5 inline-flex items-center h-8 px-3 rounded-lg text-xs2 text-neutral-500 border border-neutral-200 bg-white hover:bg-neutral-50 transition-colors"
-              >취소</button>
-            </div>
-          </div>
-        )}
 
         {/* 모바일 배경 오버레이 */}
         {mobileGuideOpen && (
@@ -1095,32 +1022,6 @@ type GuideChatMsg = {
   intentOptions?: string[];             // clarify 선택지
   sourceMsg?: string;
 };
-
-// ── 도면의 간단한 설명 생성 — API /v2/generate/specification/drawing-description 정합 목업 ──
-// 묶음 설명(GeneratedDrawingDescription.idxs 복수) 대응: 같은 분류(label)가 연속되면 한 문장으로 묶는다.
-// instruction은 API 요청 파라미터(추가 지시) — 목업에서는 생성 문장에 미반영(⚠).
-function buildDrawingDescBlocks(specDrawings: Drawing[], instruction?: string): { id: string; type: 'text'; content: string }[] {
-  void instruction;   // API 요청 파라미터 — 목업 생성 문장에는 미반영
-  const groups: number[][] = [];
-  specDrawings.forEach((d, i) => {
-    const last = groups[groups.length - 1];
-    if (last && specDrawings[last[last.length - 1]].detail.label === d.detail.label) last.push(i);
-    else groups.push([i]);
-  });
-  return groups.map(idxs => {
-    if (idxs.length === 1) {
-      const i = idxs[0]; const d = specDrawings[i];
-      const fig = `도 ${i + 1}`;
-      const name = d.detail.name || '발명의 구성';
-      return { id: uid(), type: 'text' as const, content: `${fig}${particle(fig, '은', '는')} ${name}${particle(name, '을', '를')} 나타낸 도면이다.${d.isRepresentative ? ' (대표도면)' : ''}` };
-    }
-    const figs = idxs.map(i => `도 ${i + 1}`).join(' 및 ');
-    const names = idxs.map(i => specDrawings[i].detail.name || '발명의 구성');
-    const nameList = names.slice(0, -1).join(', ') + `${particle(names[names.length - 2] ?? names[0], '과', '와')} ` + names[names.length - 1];
-    const rep = idxs.find(i => specDrawings[i].isRepresentative);
-    return { id: uid(), type: 'text' as const, content: `${figs}${particle(`도 ${idxs[idxs.length - 1] + 1}`, '은', '는')} 각각 ${nameList}${particle(nameList, '을', '를')} 나타낸 도면이다.${rep !== undefined ? ` (도 ${rep + 1}: 대표도면)` : ''}` };
-  });
-}
 
 // ── 덮어쓰기 확인 — 재생성·재분석처럼 편집 내용을 대체하는 동작 (중간명세서 '다시 생성'과 같은 규칙) ──
 function confirmOverwrite(title: string, description: string, confirmLabel: string, onConfirm: () => void) {
@@ -1428,17 +1329,21 @@ function InlineAiEdit({ placeholder, original, label, onApply, targets, onClose,
 
 // ── 발명의 명칭 후보 카드 (title + abstract) ──────────────────────
 function TitleCandidateCards({
-  candidates, gSel, setGSel, onRegenerate, onSummaryChange,
+  candidates, gSel, setGSel, onRegenerate, onSummaryChange, onEditCandidate, lockSelection = false,
 }: {
   candidates: TitleCandidate[];
   gSel: Partial<Record<StepId, string>>;
   setGSel: React.Dispatch<React.SetStateAction<Partial<Record<StepId, string>>>>;
   onRegenerate?: () => void;
   onSummaryChange?: (summary: string) => void;   // 선택된 후보/직접 입력의 개요를 InventionContext.summary로 전파 (A9)
+  // 후보 명칭·요약의 편집(직접 수정·AI 수정)은 후보 원본(titleCandidates)에 바로 반영한다 — 저장·복원 시에도
+  // 후보와 선택값이 어긋나지 않게 하기 위함(컴포넌트 로컬 편집 상태를 두지 않는다).
+  onEditCandidate: (id: string, patch: Partial<Pick<TitleCandidate, 'title' | 'summary'>>) => void;
+  // 확정 후: 명칭·요약 텍스트의 직접 수정은 그대로 두고, 후보 '선택 변경'과 '다시 생성'만 잠근다.
+  // 선택 변경은 뒤 단계 리셋 팝업 대상(2026-09-10 회의) — 팝업 상세는 기획 확정 후 붙인다.
+  lockSelection?: boolean;
 }) {
   const curSel = gSel['title'] || '';
-  const [titleEdits, setTitleEdits] = useState<Record<string, string>>({});
-  const [abstractEdits, setAbstractEdits] = useState<Record<string, string>>({});
   const [directAbstract, setDirectAbstract] = useState('');
   // 인라인 AI 수정 — 열린 카드 키 (`${후보id}`; 명칭+개요를 한 번에 수정) (B1)
   const [aiKey, setAiKey] = useState<string | null>(null);
@@ -1449,32 +1354,34 @@ function TitleCandidateCards({
     }
   }, [candidates.length]);
 
-  const isFromCandidates = (val: string) =>
-    candidates.some(c => (titleEdits[c.id] ?? c.title) === val || c.title === val);
+  const isFromCandidates = (val: string) => candidates.some(c => c.title === val);
 
   // 선택 변화·개요 편집 시 요약(개요) 전파 — 직접 입력이면 직접 입력 개요, 후보면 그 후보의 개요
   const summaryRef = useRef(onSummaryChange);
   useEffect(() => { summaryRef.current = onSummaryChange; });
   useEffect(() => {
-    const sel = candidates.find(c => (titleEdits[c.id] ?? c.title) === curSel || c.title === curSel);
-    summaryRef.current?.(sel ? (abstractEdits[sel.id] ?? sel.summary) : directAbstract);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [curSel, abstractEdits, titleEdits, directAbstract, candidates]);
+    const sel = candidates.find(c => c.title === curSel);
+    summaryRef.current?.(sel ? sel.summary : directAbstract);
+  }, [curSel, directAbstract, candidates]);
 
   return (
     <div className="space-y-2 mt-3">
       {candidates.map(c => {
-        const titleVal = titleEdits[c.id] ?? c.title;
-        const abstractVal = abstractEdits[c.id] ?? c.summary;
-        const isSelected = curSel === titleVal || curSel === c.title;
+        const titleVal = c.title;
+        const abstractVal = c.summary;
+        const isSelected = curSel === titleVal;
         return (
           <div
             key={c.id}
-            onClick={() => setGSel(p => ({ ...p, title: titleVal }))}
+            onClick={() => { if (!lockSelection) setGSel(p => ({ ...p, title: titleVal })); }}
+            title={lockSelection && !isSelected ? '확정 후에는 후보 선택을 바꿀 수 없습니다 (명칭 텍스트는 수정 가능)' : undefined}
             className={clsx(
-              'rounded-xl border-2 p-3 cursor-pointer transition-all bg-white',
+              'rounded-xl border-2 p-3 transition-all bg-white',
+              lockSelection ? 'cursor-default' : 'cursor-pointer',
               isSelected && 'border-brand-400 bg-brand-50/60 shadow-sm',
-              !isSelected && 'border-neutral-200 hover:border-brand-300 hover:bg-brand-50/30',
+              !isSelected && 'border-neutral-200',
+              !isSelected && !lockSelection && 'hover:border-brand-300 hover:bg-brand-50/30',
+              !isSelected && lockSelection && 'opacity-60',
             )}
           >
             {/* 카드 헤더 — 라디오 + 명칭(선택 라벨) + AI 수정 (기호 라벨 없음: 명칭 자체가 선택 항목) */}
@@ -1485,30 +1392,66 @@ function TitleCandidateCards({
               )}>
                 {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
               </span>
-              <p className="flex-1 min-w-0 text-sm2 font-semibold text-neutral-800 leading-snug">{titleVal}</p>
+              {/* 선택된 후보는 명칭을 그 자리에서 직접 고칠 수 있다 — 고친 텍스트가 곧 선택값(gSel.title)이 된다 */}
+              {isSelected ? (
+                <textarea
+                  data-spec="SPC-TTL-014"
+                  className="flex-1 min-w-0 text-sm2 font-semibold text-neutral-800 leading-snug bg-transparent outline-none resize-none overflow-hidden border-b border-dashed border-brand-200 focus:border-brand-400 transition-colors"
+                  value={titleVal}
+                  rows={1}
+                  aria-label="발명의 명칭 (직접 수정)"
+                  title="명칭을 직접 수정할 수 있습니다"
+                  onClick={e => e.stopPropagation()}
+                  onChange={e => {
+                    const v = e.target.value;
+                    onEditCandidate(c.id, { title: v });
+                    setGSel(p => ({ ...p, title: v }));
+                  }}
+                  ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                />
+              ) : (
+                <p className="flex-1 min-w-0 text-sm2 font-semibold text-neutral-800 leading-snug">{titleVal}</p>
+              )}
               {/* 카드당 AI 수정 1개 — 명칭·개요를 한 번에 지시 (데모 "명칭·개요를 어떻게 수정할지" 정합) (B1) */}
-              <AiEditButton
-                active={aiKey === c.id}
-                title="명칭과 요약을 AI로 수정"
-                onClick={e => {
-                  e.stopPropagation();
-                  setGSel(p => ({ ...p, title: titleVal }));
-                  setAiKey(k => k === c.id ? null : c.id);
-                }}
-              />
+              {/* 확정 후에는 선택된 후보만 AI 수정 — 다른 후보를 고치면 선택이 바뀌어 버리기 때문 */}
+              {(!lockSelection || isSelected) && (
+                <AiEditButton
+                  active={aiKey === c.id}
+                  title="명칭과 요약을 AI로 수정"
+                  onClick={e => {
+                    e.stopPropagation();
+                    if (!lockSelection) setGSel(p => ({ ...p, title: titleVal }));
+                    setAiKey(k => k === c.id ? null : c.id);
+                  }}
+                />
+              )}
             </div>
             {/* 개요 행 */}
             <div className="pt-1.5 mt-1.5 border-t border-neutral-100">
               <span className="text-xs2 text-neutral-400 font-medium block mb-0.5">요약</span>
-              <p className="text-sm2 text-neutral-600 leading-relaxed">{abstractVal}</p>
+              {isSelected ? (
+                <textarea
+                  data-spec="SPC-TTL-015"
+                  className="w-full text-sm2 text-neutral-700 leading-relaxed bg-transparent outline-none resize-none overflow-hidden"
+                  value={abstractVal}
+                  rows={2}
+                  aria-label="요약 (직접 수정)"
+                  title="요약을 직접 수정할 수 있습니다"
+                  onClick={e => e.stopPropagation()}
+                  onChange={e => onEditCandidate(c.id, { summary: e.target.value })}
+                  ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                />
+              ) : (
+                <p className="text-sm2 text-neutral-600 leading-relaxed">{abstractVal}</p>
+              )}
             </div>
             {aiKey === c.id && (
               <InlineAiEdit
                 placeholder="명칭·요약을 어떻게 수정할지 지시해주세요 (예: 방법(method) 청구 관점으로 바꿔줘)"
                 onClose={() => setAiKey(null)}
                 targets={[
-                  { original: titleVal, label: '발명의 명칭', onApply: newText => { setTitleEdits(prev => ({ ...prev, [c.id]: newText })); setGSel(p => ({ ...p, title: newText })); } },
-                  { original: abstractVal, label: '요약', onApply: newText => setAbstractEdits(prev => ({ ...prev, [c.id]: newText })) },
+                  { original: titleVal, label: '발명의 명칭', onApply: newText => { onEditCandidate(c.id, { title: newText }); setGSel(p => ({ ...p, title: newText })); } },
+                  { original: abstractVal, label: '요약', onApply: newText => onEditCandidate(c.id, { summary: newText }) },
                 ]}
                 doneMsg="명칭·요약을 수정했습니다"
               />
@@ -1561,7 +1504,7 @@ function TitleCandidateCards({
           />
         </div>
       </div>
-      {onRegenerate && (
+      {onRegenerate && !lockSelection && (
         <div className="flex justify-end">
           <button data-spec="SPC-TTL-030"
             onClick={onRegenerate}
@@ -2247,14 +2190,13 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
 
   const applyUpd = (next: CompItem[]) => upd(hasNums(next) ? calcAutoNums(next) : next);
 
-  const moveUp   = (idx: number) => { if (idx===0||done) return; const a=[...items]; [a[idx-1],a[idx]]=[a[idx],a[idx-1]]; applyUpd(a); };
-  const moveDown = (idx: number) => { if (idx===items.length-1||done) return; const a=[...items]; [a[idx],a[idx+1]]=[a[idx+1],a[idx]]; applyUpd(a); };
-  const indent   = (id: string)  => { if (!done) applyUpd(items.map(it => it.id===id ? {...it, depth: Math.min(it.depth+1,2)} : it)); };
-  const outdent  = (id: string)  => { if (!done) applyUpd(items.map(it => it.id===id ? {...it, depth: Math.max(it.depth-1,0)} : it)); };
-  const autoAssign = () => { if (!done) upd(calcAutoNums(items)); };
+  const moveUp   = (idx: number) => { if (idx===0) return; const a=[...items]; [a[idx-1],a[idx]]=[a[idx],a[idx-1]]; applyUpd(a); };
+  const moveDown = (idx: number) => { if (idx===items.length-1) return; const a=[...items]; [a[idx],a[idx+1]]=[a[idx+1],a[idx]]; applyUpd(a); };
+  const indent   = (id: string)  => { applyUpd(items.map(it => it.id===id ? {...it, depth: Math.min(it.depth+1,2)} : it)); };
+  const outdent  = (id: string)  => { applyUpd(items.map(it => it.id===id ? {...it, depth: Math.max(it.depth-1,0)} : it)); };
+  const autoAssign = () => { upd(calcAutoNums(items)); };
   const EMPTY_COMP = { num: '', depth: 0, sel: true, value_ko: '', value_en: '', hypernym_ko: '', hypernym_en: '', description: '' };
   const add = () => {
-    if (done) return;
     const id = uid();
     upd([...items, { id, ...EMPTY_COMP }]);
     setFocusId(id);
@@ -2338,30 +2280,29 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
     <>
       <div className="flex-1 overflow-y-auto scroll-thin p-3 ml-1.5">
         {/* 전체 AI 지시 바 — 데모 정합: 구성요소 전반에 대한 AI 지시사항 */}
-        {!done && (
-          <AiGlobalBar
-            className="mb-2.5"
-            title="구성요소 수정 제안"
-            placeholder="구성요소 전반에 대한 AI 지시사항 (예: 가이드 레일 설명에 설치 간격 내용을 보강해줘)"
-            value={globalInstr}
-            onChange={setGlobalInstr}
-            propose={proposeGlobal}
-            onApply={applyGlobal}
-            doneMsg="구성요소에 적용했습니다"
-            disabled={done}
-          />
-        )}
+        <AiGlobalBar
+          className="mb-2.5"
+          title="구성요소 수정 제안"
+          placeholder="구성요소 전반에 대한 AI 지시사항 (예: 가이드 레일 설명에 설치 간격 내용을 보강해줘)"
+          value={globalInstr}
+          onChange={setGlobalInstr}
+          propose={proposeGlobal}
+          onApply={applyGlobal}
+          doneMsg="구성요소에 적용했습니다"
+        />
         {/* 헤더 + 부호 자동 부여 */}
         <div data-spec="SPC-CMP-020" className="flex items-center justify-between mb-1">
           <span className="text-xs2 font-semibold text-neutral-600">구성요소 목록</span>
-          {!done && (
-            <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1">
+            {/* 다시 분석은 재생성 — 확정 후에는 잠근다(뒤 단계 리셋 팝업 대상, 기획 확정 대기). 부호 자동 부여는 직접 수정이라 유지 */}
+            {!done && (
               <button onClick={reanalyze}
                 disabled={globalBusy}
                 className="inline-flex items-center gap-1 h-6 px-2 rounded-lg text-xs2 font-medium text-brand-500 border border-brand-200 bg-white hover:bg-brand-50 hover:border-brand-300 disabled:opacity-40 transition-colors"
                 data-spec="SPC-CMP-021" title="AI 추출을 다시 실행">
                 ↻ 다시 분석
               </button>
+            )}
               <button data-spec="SPC-CMP-023" onClick={autoAssign}
                 className="inline-flex items-center gap-1 h-6 px-2 rounded-lg text-xs2 font-semibold bg-brand-400 border border-brand-400 text-white hover:bg-brand-500 transition-colors">
                 <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="10" height="10">
@@ -2369,20 +2310,17 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
                 </svg>
                 부호 자동 부여
               </button>
-            </div>
-          )}
+          </div>
         </div>
-        {!done && (
-          <p className="text-xs2 text-neutral-400 mb-2">
-            순서 조정 후 <strong className="text-brand-600">부호 자동 부여</strong>를 클릭하면 100, 200... 번호가 할당됩니다.
-          </p>
-        )}
+        <p className="text-xs2 text-neutral-400 mb-2">
+          순서 조정 후 <strong className="text-brand-600">부호 자동 부여</strong>를 클릭하면 100, 200... 번호가 할당됩니다.
+        </p>
 
         <div className="space-y-2">
           {items.map((item, idx) => (
             <div key={item.id}
               style={{ paddingLeft: item.depth * DEPTH_INDENT }}
-              draggable={!done}
+              draggable
               onDragStart={() => onDragStart(idx)}
               onDragOver={e => onDragOver(e, idx)}
               onDragEnd={onDragEnd}
@@ -2393,13 +2331,12 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
               )}>
               <div className={clsx(
                 'rounded-lg border p-2 space-y-1.5 transition-all group',
-                item.sel && !done ? 'bg-white border-neutral-200 hover:border-brand-300' : '',
-                !item.sel ? 'bg-neutral-50 border-dashed border-neutral-200' : '',
-                done && item.sel ? 'bg-green-50 border-green-200' : ''
+                item.sel ? 'bg-white border-neutral-200 hover:border-brand-300' : '',
+                !item.sel ? 'bg-neutral-50 border-dashed border-neutral-200' : ''
               )}>
                 {/* 컨트롤 행: 채택 + 드래그 + 부호 + 순서 조정 */}
                 <div className="flex items-center gap-1">
-                  {!done && (
+                  {(
                     <button
                       onClick={() => upd(items.map(it => it.id===item.id ? {...it, sel: !it.sel} : it).filter(it => it.sel || it.value_ko.trim()))}
                       className={clsx(
@@ -2423,7 +2360,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
                   )}>
                     {item.num || '—'}
                   </span>
-                  {!done && (
+                  {(
                     <div className="flex items-center gap-px shrink-0 ml-auto">
                       {item.sel && (
                         <AiEditButton
@@ -2460,8 +2397,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <span className="text-xs2 text-neutral-400 block mb-0.5">명칭</span>
-                      {!done ? (
-                        <input
+                      <input
                           ref={el => { if (el && item.id === focusId) { el.focus(); setFocusId(null); } }}
                           className="w-full text-xs2 text-neutral-800 font-medium bg-neutral-50 border border-neutral-200 rounded-md px-2 py-0.5 outline-none focus:border-brand-300 focus:bg-white transition-colors min-w-0"
                           value={item.value_ko}
@@ -2477,69 +2413,50 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
                             onRenameEverywhere(old, nw);
                           }}
                         />
-                      ) : (
-                        <span className="text-xs2 text-neutral-800 font-medium truncate block">{item.value_ko || <span className="text-neutral-300">—</span>}</span>
-                      )}
                     </div>
                     <div>
                       <span className="text-xs2 text-neutral-400 block mb-0.5">명칭 영문명</span>
-                      {!done ? (
-                        <input
+                      <input
                           className="w-full text-xs2 text-neutral-600 bg-neutral-50 border border-neutral-200 rounded-md px-2 py-0.5 outline-none focus:border-brand-300 focus:bg-white transition-colors min-w-0"
                           value={item.value_en}
                           placeholder="English name"
                           onChange={e => upd(items.map(it => it.id===item.id ? {...it, value_en: e.target.value} : it))}
                         />
-                      ) : (
-                        <span className="text-xs2 text-neutral-500 truncate block">{item.value_en || <span className="text-neutral-300">—</span>}</span>
-                      )}
                     </div>
                   </div>
                   {/* 상위어 / 상위어 영문명 */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <span className="text-xs2 text-neutral-400 block mb-0.5">상위어</span>
-                      {!done ? (
-                        <input
+                      <input
                           className="w-full text-xs2 text-neutral-600 bg-neutral-50 border border-neutral-200 rounded-md px-2 py-0.5 outline-none focus:border-brand-300 focus:bg-white transition-colors min-w-0"
                           value={item.hypernym_ko}
                           placeholder="상위 개념"
                           onChange={e => upd(items.map(it => it.id===item.id ? {...it, hypernym_ko: e.target.value} : it))}
                         />
-                      ) : (
-                        <span className="text-xs2 text-neutral-500 truncate block">{item.hypernym_ko || <span className="text-neutral-300">—</span>}</span>
-                      )}
                     </div>
                     <div>
                       <span className="text-xs2 text-neutral-400 block mb-0.5">상위어 영문명</span>
-                      {!done ? (
-                        <input
+                      <input
                           className="w-full text-xs2 text-neutral-600 bg-neutral-50 border border-neutral-200 rounded-md px-2 py-0.5 outline-none focus:border-brand-300 focus:bg-white transition-colors min-w-0"
                           value={item.hypernym_en}
                           placeholder="hypernym (English)"
                           onChange={e => upd(items.map(it => it.id===item.id ? {...it, hypernym_en: e.target.value} : it))}
                         />
-                      ) : (
-                        <span className="text-xs2 text-neutral-500 truncate block">{item.hypernym_en || <span className="text-neutral-300">—</span>}</span>
-                      )}
                     </div>
                   </div>
                   {/* 정의 (전체폭) */}
                   <div>
                     <span className="text-xs2 text-neutral-400 block mb-0.5">정의</span>
-                    {!done ? (
-                      <Textarea
+                    <Textarea
                         className="w-full text-xs2 text-neutral-600 bg-neutral-50 px-2 py-0.5"
                         value={item.description}
                         placeholder="구성요소의 기능·역할 설명"
                         rows={2}
                         onChange={e => upd(items.map(it => it.id===item.id ? {...it, description: e.target.value} : it))}
                       />
-                    ) : (
-                      <span className="text-xs2 text-neutral-500 leading-relaxed block">{item.description || <span className="text-neutral-300">—</span>}</span>
-                    )}
                   </div>
-                  {aiEditId === item.id && !done && (
+                  {aiEditId === item.id && (
                     <InlineAiEdit
                       placeholder="이 구성요소를 어떻게 수정할지 지시해주세요 (예: 정의에 센서 융합 기능을 보강해줘)"
                       onClose={() => setAiEditId(null)}
@@ -2557,7 +2474,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
           ))}
 
           {/* 하단 드롭 존 — 마지막 위치로 드래그 허용 */}
-          {!done && (
+          {(
             <div
               onDragOver={e => { e.preventDefault(); setDropIdx(items.length); }}
               className={clsx(
@@ -2569,7 +2486,7 @@ function ComponentsPanel({ done, onUpdate, onComponentsChange, initialItems, onR
         </div>
 
         {/* 새 구성요소 추가 — 빈 카드 생성 후 인라인 편집 */}
-        {!done && (
+        {(
           <button data-spec="SPC-CMP-024"
             onClick={add}
             className="w-full mt-3 flex items-center justify-center gap-1 px-3 py-2 rounded-lg border-2 border-dashed border-neutral-200 text-xs2 font-semibold text-neutral-500 hover:border-brand-300 hover:text-brand-600 hover:bg-brand-50/30 transition-colors"
@@ -3177,12 +3094,57 @@ const CATEGORY_LABEL: Record<string, string> = {
   COMPOSITION:   '조성물항',
 };
 
-interface DepItemState {
-  id: number; text: string; sel: boolean;
-  editing: boolean; editVal: string;
-  element_idxs?: number[];   // 연관 구성요소 인덱스 — API GeneratedDependentClaimItem.element_idxs
+// ── 종속항 인용부 ────────────────────────────────────────────────────────────
+// 인용부("제N항에 있어서,")와 본문을 나눠 보관한다. 인용 항 번호는 API DepClaimItem.depends_on에
+// 대응하는 필수 숫자값이라 자유 텍스트에 섞지 않고 별도 입력·검증한다. 접두·접미 텍스트는
+// 영문 작성("In claim 1, ...")을 위해 수정 가능하게 둔다.
+const DEP_REF_PREFIX = '제';
+const DEP_REF_SUFFIX = '항에 있어서,';
+
+/** 접두가 영문으로 끝나거나 접미가 영문으로 시작하면 숫자 앞뒤에 공백을 넣는다 ("In claim 1,") */
+function joinDepRef(prefix: string, no: string, suffix: string): string {
+  const gapBefore = /[A-Za-z]$/.test(prefix) ? ' ' : '';
+  const gapAfter = /^[A-Za-z]/.test(suffix) ? ' ' : '';
+  return `${prefix}${gapBefore}${no}${gapAfter}${suffix}`;
 }
-interface DepGroupState { generated: boolean; items: DepItemState[]; newText: string }
+
+interface DepItemState {
+  id: number; sel: boolean;
+  refPrefix: string;          // 인용 접두 — 기본 '제' (영문 작성 시 'In claim' 등으로 수정)
+  refNo: string | null;       // 인용 항 번호 — null이면 자기 독립항의 통산 번호를 따라간다
+  refSuffix: string;          // 인용 접미 — 기본 '항에 있어서,'
+  body: string;               // 인용부 이후 자유 텍스트
+  element_idxs?: number[];    // 연관 구성요소 인덱스 — API GeneratedDependentClaimItem.element_idxs
+}
+interface DepGroupState { generated: boolean; items: DepItemState[]; newText: string; newRefNo: string }
+
+/** 표시·출력용 인용 항 번호 — 미입력(null)이면 자기 독립항의 통산 번호 */
+const resolveDepRefNo = (d: DepItemState, indepNum: number): string => d.refNo ?? String(indepNum);
+/** 인용부 + 본문을 이어 붙인 전체 문장 */
+const depFullText = (d: DepItemState, indepNum: number): string => {
+  const ref = joinDepRef(d.refPrefix, resolveDepRefNo(d, indepNum), d.refSuffix);
+  return d.body ? `${ref} ${d.body}` : ref;
+};
+/** 인용 항 번호 검증 — 필수 + 선행 항만 인용 가능(자기 번호 이상은 존재하지 않거나 순환) */
+function depRefError(refNo: string, selfNum: number): string | null {
+  const t = refNo.trim();
+  if (!t) return '인용 항 번호를 입력하세요';
+  if (!/^\d+$/.test(t)) return '인용 항 번호는 숫자만 입력하세요';
+  const n = Number(t);
+  if (n < 1) return '인용 항 번호는 1 이상이어야 합니다';
+  if (n >= selfNum) return `제${n}항은 인용할 수 없습니다 (선행 항만 인용 가능)`;
+  return null;
+}
+/** AI 수정 결과처럼 통짜 문장으로 돌아온 종속항을 인용부/본문으로 다시 나눈다 */
+function splitDepText(text: string, base: DepItemState, indepNum: number): Partial<DepItemState> {
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const keepAuto = (no: string) => (base.refNo === null && no === String(indepNum) ? null : no);
+  const withAffix = text.match(new RegExp(`^\\s*${esc(base.refPrefix)}\\s*(\\d+)\\s*${esc(base.refSuffix)}\\s*`));
+  if (withAffix) return { refNo: keepAuto(withAffix[1]), body: text.slice(withAffix[0].length) };
+  const ko = text.match(/^\s*제\s*(\d+)\s*항에\s*있어서,?\s*/);
+  if (ko) return { refPrefix: DEP_REF_PREFIX, refNo: keepAuto(ko[1]), refSuffix: DEP_REF_SUFFIX, body: text.slice(ko[0].length) };
+  return { body: text };   // 인용부를 찾지 못하면 본문만 교체하고 인용부는 유지
+}
 
 // 선택된 세트의 각 claim별 종속항 그룹 (key: claimIndex 숫자)
 type DepGroupsForSet = Record<number, DepGroupState>;
@@ -3265,8 +3227,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
       const grp = setGroups[ci];
       if (grp?.generated) {
         grp.items.filter(d => d.sel).forEach(d => {
-          const correctedText = d.text.replace(new RegExp(`제${ci + 1}항에 있어서`, 'g'), `제${indepNum}항에 있어서`);
-          lines.push(`청구항 ${++num}.\n${correctedText}`);
+          lines.push(`청구항 ${++num}.\n${depFullText(d, indepNum)}`);
         });
       }
     });
@@ -3284,23 +3245,23 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 종속항 템플릿 풀 (개수 레벨에 따라 slice)
-  const depTemplates = (ref: string, suffix: string): string[] => [
-    `${ref}항에 있어서, 상기 처리부는 딥러닝 알고리즘을 포함하는, ${suffix}`,
-    `${ref}항에 있어서, 상기 입력부는 복수의 센서를 포함하는, ${suffix}`,
-    `${ref}항에 있어서, 상기 출력부는 처리 결과를 시각화하여 표시하는, ${suffix}`,
-    `${ref}항에 있어서, 상기 구성은 클라우드 환경에서 동작하는, ${suffix}`,
-    `${ref}항에 있어서, 상기 처리부는 결과를 저장하는 저장 모듈을 더 포함하는, ${suffix}`,
-    `${ref}항에 있어서, 상기 입력부는 사용자 인증 수단을 더 포함하는, ${suffix}`,
+  // 종속항 본문 템플릿 풀 (개수 레벨에 따라 slice) — 인용부는 별도 필드라 본문만 담는다
+  const depBodyTemplates = (suffix: string): string[] => [
+    `상기 처리부는 딥러닝 알고리즘을 포함하는, ${suffix}`,
+    `상기 입력부는 복수의 센서를 포함하는, ${suffix}`,
+    `상기 출력부는 처리 결과를 시각화하여 표시하는, ${suffix}`,
+    `상기 구성은 클라우드 환경에서 동작하는, ${suffix}`,
+    `상기 처리부는 결과를 저장하는 저장 모듈을 더 포함하는, ${suffix}`,
+    `상기 입력부는 사용자 인증 수단을 더 포함하는, ${suffix}`,
   ];
   const LEVEL_DEP_COUNT: Record<'LOW' | 'MEDIUM' | 'HIGH', number> = { LOW: 2, MEDIUM: 4, HIGH: 6 };
-  const genDepItems = (ci: number, claim: { category: string }, level: 'LOW' | 'MEDIUM' | 'HIGH'): DepItemState[] => {
+  const newDepItem = (id: number, body: string, extra?: Partial<DepItemState>): DepItemState => ({
+    id, sel: true, refPrefix: DEP_REF_PREFIX, refNo: null, refSuffix: DEP_REF_SUFFIX, body, ...extra,
+  });
+  const genDepItems = (claim: { category: string }, level: 'LOW' | 'MEDIUM' | 'HIGH'): DepItemState[] => {
     const suffix = claim.category === 'MACHINE' ? '데이터 처리 시스템.' : '데이터 처리 방법.';
-    const ref = `제${ci + 1}`;
-    return depTemplates(ref, suffix).slice(0, LEVEL_DEP_COUNT[level]).map((text, i) => ({
-      id: i + 1, sel: true, text, editing: false, editVal: '',
-      element_idxs: [i % 3],   // 목업: API element_idxs 대응 (구성요소 인덱스)
-    }));
+    return depBodyTemplates(suffix).slice(0, LEVEL_DEP_COUNT[level]).map((body, i) =>
+      newDepItem(i + 1, body, { element_idxs: [i % 3] }));   // 목업: API element_idxs 대응
   };
   // 개수 레벨 변경 → 선택 세트 종속항 재생성
   const applyDepLevel = (level: 'LOW' | 'MEDIUM' | 'HIGH') => {
@@ -3308,7 +3269,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
     if (selectedSetIndex === null || !selectedSet) return;
     const groups: DepGroupsForSet = {};
     selectedSet.claims.forEach((claim, ci) => {
-      groups[ci] = { generated: true, newText: '', items: genDepItems(ci, claim, level) };
+      groups[ci] = { generated: true, newText: '', newRefNo: '', items: genDepItems(claim, level) };
     });
     const nextMap = { ...depGroupsMap, [selectedSetIndex]: groups };
     setDepGroupsMap(nextMap);
@@ -3320,7 +3281,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
     const autoGroups: DepGroupsForSet = {};
     selectedSet.claims.forEach((claim, ci) => {
       if (!(depGroupsMap[selectedSetIndex]?.[ci]?.generated)) {
-        autoGroups[ci] = { generated: true, newText: '', items: genDepItems(ci, claim, depLevel) };
+        autoGroups[ci] = { generated: true, newText: '', newRefNo: '', items: genDepItems(claim, depLevel) };
       } else {
         autoGroups[ci] = depGroupsMap[selectedSetIndex]![ci];
       }
@@ -3338,6 +3299,23 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
     setTimeout(() => document.querySelector<HTMLElement>('[data-claimsets]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
   };
 
+  // 채택된 종속항의 인용 항 번호 오류 건수 — 하나라도 있으면 청구항 확정을 막는다
+  const depRefErrorCount = (() => {
+    if (selectedSetIndex === null) return 0;
+    const set = claimSets[selectedSetIndex];
+    if (!set) return 0;
+    const groups = depGroupsMap[selectedSetIndex] ?? {};
+    let num = 0, bad = 0;
+    set.claims.forEach((_claim, ci) => {
+      const indepNum = ++num;
+      (groups[ci]?.items ?? []).forEach(d => {
+        const selfNum = ++num;
+        if (d.sel && depRefError(resolveDepRefNo(d, indepNum), selfNum)) bad++;
+      });
+    });
+    return bad;
+  })();
+
   // 하단 바 주 동작 등록 — 단계 내부 상태에 따라 라벨·동작이 바뀐다 (U1: 종속항 건너뜀 방지, D3: Primary 1개)
   const latest = useRef({ generateSets, confirmIndep, onConfirm });
   useEffect(() => { latest.current = { generateSets, confirmIndep, onConfirm }; });
@@ -3354,14 +3332,19 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
         hint: '독립항 세트를 하나 선택하세요',
       });
     } else {
-      onActionChange({ label: '청구항 확정 →', onClick: () => latest.current.onConfirm() });
+      onActionChange({
+        label: '청구항 확정 →',
+        onClick: () => latest.current.onConfirm(),
+        disabled: depRefErrorCount > 0,
+        hint: `인용 항 번호를 확인하세요 (${depRefErrorCount}건)`,
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [done, generated, claimsPhase, selectedSetIndex]);
+  }, [done, generated, claimsPhase, selectedSetIndex, depRefErrorCount]);
   useEffect(() => () => onActionChange?.(null), [onActionChange]);
 
   const toggleDep = (claimIdx: number, depId: number) => {
-    if (done || selectedSetIndex === null) return;
+    if (selectedSetIndex === null) return;
     const setGroups = depGroupsMap[selectedSetIndex] ?? {};
     const grp = setGroups[claimIdx];
     if (!grp) return;
@@ -3382,24 +3365,38 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
     syncUpdate(selectedSetIndex, nextMap);
   };
 
+  /** 종속항 한 건의 필드 갱신 — 인용부(접두·번호·접미)와 본문 모두 이 경로로 반영한다 */
+  const patchDep = (claimIdx: number, depId: number, patch: Partial<DepItemState>) => {
+    if (selectedSetIndex === null) return;
+    const setGroups = depGroupsMap[selectedSetIndex] ?? {};
+    const grp = setGroups[claimIdx];
+    if (!grp) return;
+    const next = { ...setGroups, [claimIdx]: { ...grp, items: grp.items.map(d => d.id === depId ? { ...d, ...patch } : d) } };
+    const nextMap = { ...depGroupsMap, [selectedSetIndex]: next };
+    setDepGroupsMap(nextMap);
+    syncUpdate(selectedSetIndex, nextMap);
+  };
+
   const addDep = (claimIdx: number) => {
     if (selectedSetIndex === null) return;
     const setGroups = depGroupsMap[selectedSetIndex] ?? {};
     const grp = setGroups[claimIdx];
     if (!grp || !grp.newText.trim()) return;
     const maxId = grp.items.reduce((m, d) => Math.max(m, d.id), 0);
-    const newItem: DepItemState = { id: maxId + 1, text: grp.newText.trim(), sel: true, editing: false, editVal: grp.newText.trim() };
-    const next = { ...setGroups, [claimIdx]: { ...grp, items: [...grp.items, newItem], newText: '' } };
+    // 번호를 비워 두면 자기 독립항을 인용한다 (refNo = null)
+    const refNo = grp.newRefNo.trim() ? grp.newRefNo.trim() : null;
+    const newItem = newDepItem(maxId + 1, grp.newText.trim(), { refNo });
+    const next = { ...setGroups, [claimIdx]: { ...grp, items: [...grp.items, newItem], newText: '', newRefNo: '' } };
     const nextMap = { ...depGroupsMap, [selectedSetIndex]: next };
     setDepGroupsMap(nextMap);
     syncUpdate(selectedSetIndex, nextMap);
   };
 
-  const updateDepNewText = (claimIdx: number, text: string) => {
+  const updateDepNew = (claimIdx: number, patch: { newText?: string; newRefNo?: string }) => {
     if (selectedSetIndex === null) return;
     const setGroups = depGroupsMap[selectedSetIndex] ?? {};
-    const grp = setGroups[claimIdx] ?? { generated: true, newText: '', items: [] };
-    const nextMap = { ...depGroupsMap, [selectedSetIndex]: { ...setGroups, [claimIdx]: { ...grp, newText: text } } };
+    const grp = setGroups[claimIdx] ?? { generated: true, newText: '', newRefNo: '', items: [] };
+    const nextMap = { ...depGroupsMap, [selectedSetIndex]: { ...setGroups, [claimIdx]: { ...grp, ...patch } } };
     setDepGroupsMap(nextMap);
   };
 
@@ -3525,7 +3522,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
 
         <div data-claimsets data-spec="SPC-CLM-020" />
         {/* 독립항 세트 단위 AI 수정 — independent-claim/modification (항별 수정 API 없음) */}
-        {generated && !done && selectedSetIndex !== null && (
+        {generated && selectedSetIndex !== null && (
           <AiGlobalBar
             className="mb-2.5"
             title="독립항 세트 수정 제안"
@@ -3571,7 +3568,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                     {set.claims.map(c => CATEGORY_LABEL[c.category] ?? c.category).join(' + ')} · 구성요소 {new Set(set.claims.flatMap(c => c.element_ids ?? [])).size}개 · {scopeInfo.sub}
                   </span>
                 </div>
-                {isSelected && !done && (
+                {isSelected && (
                   <span className="text-xs2 text-brand-600 font-semibold shrink-0">선택됨</span>
                 )}
               </div>
@@ -3588,7 +3585,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                       <div className="flex items-center gap-1.5 mb-1">
                         <span className="text-xs2 px-1.5 py-0.5 rounded-md font-medium bg-neutral-100 text-neutral-700">{catLabel}</span>
                       </div>
-                      {isSelected && !done ? (
+                      {isSelected ? (
                         <textarea
                           className="w-full text-sm2 text-neutral-800 bg-transparent outline-none resize-none leading-relaxed overflow-hidden"
                           value={text}
@@ -3622,22 +3619,40 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
 
   let globalClaimNum = 0;
 
+  // 그룹별 독립항 통산 번호 — 화면 표시 번호와 같은 규칙(모든 종속항이 번호를 차지한다)
+  const indepNums = (groups: DepGroupsForSet): number[] => {
+    let num = 0;
+    return selectedSet.claims.map((_claim, ci) => {
+      const n = ++num;
+      num += groups[ci]?.items.length ?? 0;
+      return n;
+    });
+  };
+
   // 종속항 전체 수정 제안 — 선택된 종속항 전체에 지시 반영 (mock, API dependent-claim/modification). 확인 후 적용은 AiGlobalBar가 담당.
   const proposeDepGlobal = (instr: string): PendingChange[] => {
     if (selectedSetIndex === null) return [];
     const groups = depGroupsMap[selectedSetIndex] ?? {};
-    return Object.values(groups).flatMap(grp =>
-      (grp as DepGroupState).items.filter(d => d.sel).map((d, i) => proposeMock(d.text, instr, `종속항 ${i + 1}`)));
+    const nums = indepNums(groups);
+    return Object.entries(groups).flatMap(([k, grp]) =>
+      grp.items.filter(d => d.sel).map((d, i) => proposeMock(depFullText(d, nums[Number(k)] ?? 1), instr, `종속항 ${i + 1}`)));
   };
   const applyDepGlobal = (changes: PendingChange[]) => {
     if (selectedSetIndex === null) return;
     const byBefore = new Map(changes.map(c => [c.before, c.after ?? c.before]));
     const groups = depGroupsMap[selectedSetIndex] ?? {};
+    const nums = indepNums(groups);
     const nextGroups: DepGroupsForSet = {};
     Object.entries(groups).forEach(([k, grp]) => {
+      const indepNum = nums[Number(k)] ?? 1;
       nextGroups[Number(k)] = {
-        ...(grp as DepGroupState),
-        items: (grp as DepGroupState).items.map(d => d.sel && byBefore.has(d.text) ? { ...d, text: byBefore.get(d.text)! } : d),
+        ...grp,
+        items: grp.items.map(d => {
+          if (!d.sel) return d;
+          const after = byBefore.get(depFullText(d, indepNum));
+          // AI가 돌려준 통짜 문장을 인용부/본문으로 다시 나눈다
+          return after ? { ...d, ...splitDepText(after, d, indepNum) } : d;
+        }),
       };
     });
     const nextMap = { ...depGroupsMap, [selectedSetIndex]: nextGroups };
@@ -3690,7 +3705,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
       )}
 
       {/* 독립항 세트 단위 AI 수정 — independent-claim/modification */}
-      {!done && (
+      {(
         <AiGlobalBar
           title="독립항 세트 수정 제안"
           placeholder="선택한 세트의 독립항 전반에 대한 AI 지시사항 (예: 권리범위를 조금 더 넓혀줘)"
@@ -3703,7 +3718,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
       )}
       {selectedSet.claims.map((claim, ci) => {
         const indepNum = ++globalClaimNum;
-        const grp = setGroups[ci] ?? { generated: false, items: [], newText: '' };
+        const grp = setGroups[ci] ?? { generated: false, items: [], newText: '', newRefNo: '' };
         const catLabel = CATEGORY_LABEL[claim.category] ?? claim.category;
         const claimText = getClaimText(selectedSetIndex, ci);
 
@@ -3726,14 +3741,12 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                 {!done && grp.generated && (
                   <button
                     onClick={() => confirmOverwrite('종속항 다시 생성', `청구항 ${indepNum}의 종속항이 새 초안으로 대체됩니다(편집·채택 내용 소실). 계속할까요?`, '다시 생성', () => {
-                      const isDevice = claim.category === 'MACHINE';
-                      const suffix = isDevice ? '데이터 처리 시스템.' : '데이터 처리 방법.';
-                      const ref = `제${indepNum}`;
+                      const suffix = claim.category === 'MACHINE' ? '데이터 처리 시스템.' : '데이터 처리 방법.';
                       const newItems: DepItemState[] = [
-                        { id: 1, sel: true,  text: `${ref}항에 있어서, 상기 처리부는 딥러닝 알고리즘을 포함하는, ${suffix}`, editing: false, editVal: '', element_idxs: [0] },
-                        { id: 2, sel: true,  text: `${ref}항에 있어서, 상기 입력부는 복수의 센서를 포함하는, ${suffix}`, editing: false, editVal: '', element_idxs: [1] },
-                        { id: 3, sel: true,  text: `${ref}항에 있어서, 상기 출력부는 처리 결과를 시각화하여 표시하는, ${suffix}`, editing: false, editVal: '', element_idxs: [2] },
-                        { id: 4, sel: false, text: `${ref}항에 있어서, 상기 구성은 클라우드 환경에서 동작하는, ${suffix}`, editing: false, editVal: '', element_idxs: [0, 1] },
+                        newDepItem(1, `상기 처리부는 딥러닝 알고리즘을 포함하는, ${suffix}`, { element_idxs: [0] }),
+                        newDepItem(2, `상기 입력부는 복수의 센서를 포함하는, ${suffix}`, { element_idxs: [1] }),
+                        newDepItem(3, `상기 출력부는 처리 결과를 시각화하여 표시하는, ${suffix}`, { element_idxs: [2] }),
+                        newDepItem(4, `상기 구성은 클라우드 환경에서 동작하는, ${suffix}`, { sel: false, element_idxs: [0, 1] }),
                       ];
                       const next = { ...setGroups, [ci]: { ...grp, items: newItems } };
                       const nextMap = { ...depGroupsMap, [selectedSetIndex]: next };
@@ -3748,7 +3761,9 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
 
               {grp.items.map(dep => {
                 const depNum = ++globalClaimNum;
-                const displayText = dep.text.replace(new RegExp(`제${ci + 1}항에 있어서`, 'g'), `제${indepNum}항에 있어서`);
+                const refNo = resolveDepRefNo(dep, indepNum);
+                const refErr = dep.sel ? depRefError(refNo, depNum) : null;
+                const displayText = depFullText(dep, indepNum);
                 return (
                   <div key={dep.id} className={clsx('group rounded-lg border overflow-hidden', dep.sel ? 'border-neutral-200 bg-white' : 'border-neutral-100 bg-neutral-50 opacity-60')}>
                     <div className="flex items-center gap-2 px-2.5 py-1.5">
@@ -3762,7 +3777,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                       </button>
                       <span className="text-xs2 text-neutral-500 font-medium shrink-0">종속항 {depNum}</span>
                       {/* 행 액션은 hover/포커스/열림 상태에서만 노출 — 8행 반복 버튼 기둥 제거 (B2) */}
-                      {!done && (
+                      {(
                         <div className={clsx(
                           'ml-auto flex items-center gap-1 transition-opacity',
                           aiKey === `dep-${ci}-${dep.id}` ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100',
@@ -3782,19 +3797,49 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                       )}
                     </div>
                     <div className="px-2.5 pb-2">
-                      {!done && dep.sel ? (
-                        <textarea
-                          className="w-full text-base2 text-neutral-700 leading-relaxed bg-transparent outline-none resize-none overflow-hidden"
-                          value={displayText}
-                          rows={1}
-                          onChange={e => {
-                            const next = { ...setGroups, [ci]: { ...grp, items: grp.items.map(d => d.id === dep.id ? { ...d, text: e.target.value } : d) } };
-                            const nextMap = { ...depGroupsMap, [selectedSetIndex]: next };
-                            setDepGroupsMap(nextMap);
-                            syncUpdate(selectedSetIndex, nextMap);
-                          }}
-                          ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
-                        />
+                      {dep.sel ? (
+                        <div className="space-y-1.5">
+                          {/* 인용부 — 접두·접미 텍스트는 영문 작성을 위해 수정 가능, 항 번호는 숫자 필수 (SPC-CLM-038) */}
+                          <div data-spec="SPC-CLM-039" className="flex items-stretch gap-1 rounded-lg border border-neutral-200 bg-neutral-50 p-1">
+                            <input
+                              value={dep.refPrefix}
+                              onChange={e => patchDep(ci, dep.id, { refPrefix: e.target.value })}
+                              title="인용 접두 텍스트 — 영문 작성 시 'In claim' 등으로 바꿀 수 있습니다"
+                              aria-label="인용 접두 텍스트"
+                              className="w-14 shrink-0 text-sm2 text-neutral-600 bg-white border border-neutral-200 rounded-md px-1.5 py-1 outline-none focus:border-brand-400 transition-colors"
+                            />
+                            <input
+                              value={refNo}
+                              inputMode="numeric"
+                              onChange={e => patchDep(ci, dep.id, { refNo: e.target.value })}
+                              title="인용 항 번호 (필수) — 앞선 청구항 번호만 인용할 수 있습니다"
+                              aria-label="인용 항 번호 (필수)"
+                              aria-invalid={!!refErr}
+                              className={clsx(
+                                'w-12 shrink-0 text-sm2 font-semibold text-center bg-white border rounded-md px-1 py-1 outline-none transition-colors',
+                                refErr ? 'border-red-400 text-red-600 focus:border-red-500' : 'border-neutral-200 text-neutral-800 focus:border-brand-400',
+                              )}
+                            />
+                            <input
+                              value={dep.refSuffix}
+                              onChange={e => patchDep(ci, dep.id, { refSuffix: e.target.value })}
+                              title="인용 접미 텍스트 — 영문 작성 시 ',' 등으로 바꿀 수 있습니다"
+                              aria-label="인용 접미 텍스트"
+                              className="flex-1 min-w-0 text-sm2 text-neutral-600 bg-white border border-neutral-200 rounded-md px-1.5 py-1 outline-none focus:border-brand-400 transition-colors"
+                            />
+                          </div>
+                          {refErr && <p className="text-xs2 text-red-600 px-0.5">{refErr}</p>}
+                          {/* 본문 — 인용부 이후 자유 텍스트 */}
+                          <textarea
+                            className="w-full text-base2 text-neutral-700 leading-relaxed bg-transparent outline-none resize-none overflow-hidden"
+                            value={dep.body}
+                            rows={1}
+                            placeholder="한정 사항을 입력하세요"
+                            aria-label="종속항 본문"
+                            onChange={e => patchDep(ci, dep.id, { body: e.target.value })}
+                            ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                          />
+                        </div>
                       ) : (
                         <p className="text-base2 text-neutral-700 leading-relaxed"><ElementText text={displayText} elements={elements} /></p>
                       )}
@@ -3821,18 +3866,14 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                           </p>
                         );
                       })()}
-                      {aiKey === `dep-${ci}-${dep.id}` && !done && dep.sel && (
+                      {aiKey === `dep-${ci}-${dep.id}` && dep.sel && (
                         <InlineAiEdit
                           placeholder="이 종속항을 어떻게 수정할지 지시해주세요 (예: 한정 요소를 더 구체화해줘)"
                           onClose={() => setAiKey(null)}
                           original={displayText}
                           label="종속항"
-                          onApply={newText => {
-                              const next = { ...setGroups, [ci]: { ...grp, items: grp.items.map(d => d.id === dep.id ? { ...d, text: newText } : d) } };
-                              const nextMap = { ...depGroupsMap, [selectedSetIndex]: next };
-                              setDepGroupsMap(nextMap);
-                              syncUpdate(selectedSetIndex, nextMap);
-                            }}
+                          // AI가 돌려준 통짜 문장을 인용부/본문으로 다시 나눠 반영한다
+                          onApply={newText => patchDep(ci, dep.id, splitDepText(newText, dep, indepNum))}
                           doneMsg="종속항을 수정했습니다"
                         />
                       )}
@@ -3841,14 +3882,29 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
                 );
               })}
 
-              {!done && (
+              {(
                 <div className="flex gap-1.5 pt-1">
+                  {/* 인용 항 번호 — 비워 두면 이 독립항(제{indepNum}항)을 인용한다. 접두·접미는 추가 후 행에서 수정 */}
+                  <span className="inline-flex items-center gap-1 shrink-0 text-xs2 text-neutral-500">
+                    {DEP_REF_PREFIX}
+                    <input
+                      value={grp.newRefNo}
+                      inputMode="numeric"
+                      onChange={e => updateDepNew(ci, { newRefNo: e.target.value })}
+                      onKeyDown={e => e.key === 'Enter' && addDep(ci)}
+                      placeholder={String(indepNum)}
+                      title="인용 항 번호 — 비워 두면 이 독립항을 인용합니다"
+                      aria-label="인용 항 번호"
+                      className="w-10 text-xs2 text-center font-semibold px-1 py-1.5 border border-neutral-200 rounded-lg bg-neutral-50 focus:outline-none focus:border-brand-400 focus:bg-white"
+                    />
+                    {DEP_REF_SUFFIX}
+                  </span>
                   <input
                     value={grp.newText}
-                    onChange={e => updateDepNewText(ci, e.target.value)}
+                    onChange={e => updateDepNew(ci, { newText: e.target.value })}
                     onKeyDown={e => e.key === 'Enter' && addDep(ci)}
-                    data-spec="SPC-CLM-037" placeholder={`제${indepNum}항에 있어서, ...`}
-                    className="flex-1 text-xs2 px-2.5 py-1.5 border border-neutral-200 rounded-lg bg-neutral-50 focus:outline-none focus:border-brand-400 focus:bg-white"
+                    data-spec="SPC-CLM-037" placeholder="한정 사항을 입력하세요"
+                    className="flex-1 min-w-0 text-xs2 px-2.5 py-1.5 border border-neutral-200 rounded-lg bg-neutral-50 focus:outline-none focus:border-brand-400 focus:bg-white"
                   />
                   <button
                     onClick={() => addDep(ci)}
@@ -3863,7 +3919,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
       })}
 
       {/* 종속항 전체 수정 지시 — 데모 정합: dependent-claim/modification */}
-      {!done && (
+      {(
         <AiGlobalBar
           className="pt-1"
           title="종속항 수정 제안"
@@ -3873,7 +3929,7 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
           propose={proposeDepGlobal}
           onApply={applyDepGlobal}
           doneMsg="종속항에 적용했습니다"
-          disabled={done || selectedSetIndex === null}
+          disabled={selectedSetIndex === null}
         />
       )}
     </div>
@@ -3881,229 +3937,3 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
   );
 }
 
-// ── 중간명세서 패널 (#22) ─────────────────────────────────────────────────────
-function MidspecPanel({ done, sections, onUpdate, onGoToEditor, onActionChange, elements = [], onRegenDrawingDesc }: {
-  done: boolean;
-  elements?: ElementLike[];
-  sections: MidspecSection[];
-  onUpdate: (next: MidspecSection[]) => void;
-  onGoToEditor?: () => void;
-  onActionChange?: (a: StepAction | null) => void;   // 하단 바 주 동작 등록 (D3)
-  onRegenDrawingDesc?: (instruction: string) => void; // 도면 설명 다시 생성 — API drawing-description(instruction)
-}) {
-  const [drawDescInstr, setDrawDescInstr] = useState('');
-  // 하단 바 주 동작: '명세서 생성 →' (패널 내부 풀폭 CTA 대신) — D3
-  const goRef = useRef(onGoToEditor);
-  useEffect(() => { goRef.current = onGoToEditor; });
-  useEffect(() => {
-    if (!onActionChange) return;
-    onActionChange(!done && onGoToEditor ? { label: '명세서 생성 →', onClick: () => goRef.current?.() } : null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [done, !!onGoToEditor]);
-  useEffect(() => () => onActionChange?.(null), [onActionChange]);
-  const [editing, setEditing] = useState<{ sectionKey: string; blockIdx: number } | null>(null);
-  const [editVal, setEditVal] = useState('');
-  const [newTexts, setNewTexts] = useState<Record<string, string>>({});
-  // 인라인 AI 수정 — 열린 블록 키 (`${sectionKey}-${blockIdx}`)
-  const [aiKey, setAiKey] = useState<string | null>(null);
-  // 생성 지시·선호 사항 + 다시 생성 (데모 정합)
-  const [genInstr, setGenInstr] = useState('');
-  const [genBusy, setGenBusy] = useState(false);
-
-  if (sections.length === 0) {
-    return (
-      <div className="flex-1 p-4 text-center text-neutral-400">
-        <p className="text-sm2">중간명세서를 생성 중입니다...</p>
-      </div>
-    );
-  }
-
-  const updateBlock = (sKey: string, bIdx: number, text: string) => {
-    const next = sections.map(s => s.key !== sKey ? s : {
-      ...s,
-      blocks: s.blocks.map((b, i) => i === bIdx ? { ...b, content: text } : b),
-    });
-    onUpdate(next);
-  };
-
-  const addBlock = (sKey: string) => {
-    const text = (newTexts[sKey] ?? '').trim();
-    if (!text) return;
-    const next = sections.map(s => s.key !== sKey ? s : { ...s, blocks: [...s.blocks, { id: uid(), type: 'text' as const, content: text }] });
-    onUpdate(next);
-    setNewTexts(p => ({ ...p, [sKey]: '' }));
-  };
-
-  const removeBlock = (sKey: string, bIdx: number) => {
-    const next = sections.map(s => s.key !== sKey ? s : { ...s, blocks: s.blocks.filter((_, i) => i !== bIdx) });
-    onUpdate(next);
-  };
-
-  // 중간명세서 다시 생성 — 생성 지시·선호 사항 반영 (mock: 전체 블록에 지시 반영)
-  const regenerate = () => {
-    if (genBusy || done) return;
-    // 편집 내용이 대체되므로 확인 후 실행 (A3, 데모 confirm 정합)
-    openAlertDialog(
-      { title: '중간명세서 다시 생성', description: '현재 편집한 단락 내용이 새 초안으로 대체됩니다. 계속할까요?', confirm: '다시 생성', cancel: '취소' },
-      { theme: 'primary', onConfirm: (ctrl) => { ctrl.close(); runRegenerate(); } },
-    );
-  };
-  const runRegenerate = () => {
-    setGenBusy(true);
-    setTimeout(() => {
-      const instr = genInstr.trim() || '초안 재생성';
-      onUpdate(sections.map(s => ({
-        ...s,
-        blocks: s.blocks.map(b => ({ ...b, content: generateMockModification(b.content, instr) })),
-      })));
-      setGenBusy(false);
-      toast('중간명세서를 다시 생성했습니다');
-    }, 1100);
-  };
-
-  return (
-    <div className="flex-1 overflow-y-auto scroll-thin p-3 ml-1.5 space-y-3">
-
-      {/* 생성 지시·선호 사항 + 다시 생성 — 데모 정합 */}
-      {!done && (
-        <div className="space-y-1.5">
-          <textarea
-            className="w-full text-xs2 px-2.5 py-1.5 border border-neutral-200 rounded-lg bg-white outline-none focus:border-brand-400 resize-none transition-colors disabled:bg-neutral-50"
-            placeholder="생성 지시·선호 사항 (선택) — 예: 배경기술은 규제 동향부터 서술해줘 / 효과는 정량 수치를 강조해줘"
-            rows={2}
-            value={genInstr}
-            disabled={genBusy}
-            onChange={e => setGenInstr(e.target.value)}
-          />
-          <button data-spec="SPC-MID-020"
-            onClick={regenerate}
-            disabled={genBusy}
-            className="inline-flex items-center gap-1 h-8 px-3 rounded-lg text-xs2 font-medium text-brand-500 border border-brand-200 bg-white hover:bg-brand-50 disabled:opacity-50 transition-colors"
-          >
-            {genBusy ? <><span className="w-3 h-3 border-2 border-brand-400 border-t-transparent rounded-full animate-spin inline-block" /> 생성 중...</> : '↻ 중간명세서 다시 생성'}
-          </button>
-        </div>
-      )}
-
-      {sections.map(section => (
-        <div key={section.key} className="rounded-xl border border-neutral-200 overflow-hidden">
-          <div className="flex items-center px-3 py-2 bg-neutral-50 border-b border-neutral-100">
-            <span className="text-xs2 font-bold text-neutral-700">{section.label}</span>
-            <span className="text-xs2 text-neutral-400 ml-2">({section.blocks.length}개 단락)</span>
-            {section.key === 'drawing_descriptions' && !done && onRegenDrawingDesc && (
-              <span className="ml-auto flex items-center gap-1.5 min-w-0" data-spec="SPC-MID-015">
-                <input
-                  value={drawDescInstr}
-                  onChange={e => setDrawDescInstr(e.target.value)}
-                  placeholder="생성 지시 (선택) — 예: 도면 시점(사시도/단면도)을 명시해줘"
-                  title="도면 설명 생성에 전달되는 추가 지시 (API drawing-description instruction)"
-                  className="w-64 max-w-full text-xs2 bg-white border border-neutral-200 rounded-md px-2 py-1 outline-none focus:border-brand-300 transition-colors"
-                />
-                <button
-                  onClick={() => confirmOverwrite('도면 설명 다시 생성', '이 섹션의 단락이 채택 도면 기준 새 설명으로 대체됩니다. 계속할까요?', '다시 생성', () => onRegenDrawingDesc(drawDescInstr))}
-                  className="shrink-0 inline-flex items-center gap-1 h-6 px-2 rounded-lg text-xs2 font-medium text-brand-500 border border-brand-200 bg-white hover:bg-brand-50 transition-colors"
-                  title="채택 도면 기준으로 도면의 간단한 설명을 다시 생성"
-                >↻ 다시 생성</button>
-              </span>
-            )}
-          </div>
-
-          <div className="p-2.5 space-y-2">
-            {section.blocks.map((block, bIdx) => {
-              const isEdit = editing?.sectionKey === section.key && editing.blockIdx === bIdx;
-              return (
-                <div key={bIdx} className="rounded-lg border border-neutral-100 bg-white overflow-hidden group">
-                  {isEdit ? (
-                    <div className="p-2">
-                      <textarea
-                        autoFocus
-                        className="w-full text-sm2 text-neutral-800 leading-relaxed bg-transparent outline-none resize-none"
-                        value={editVal}
-                        rows={Math.max(3, Math.ceil(editVal.length / 46))}
-                        onChange={e => setEditVal(e.target.value)}
-                        ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
-                      />
-                      <div className="flex gap-1.5 mt-1.5 justify-end">
-                        <button
-                          onClick={() => setEditing(null)}
-                          className="text-xs2 px-2 py-1 rounded-md text-neutral-500 hover:bg-neutral-100"
-                        >취소</button>
-                        <button
-                          onClick={() => { updateBlock(section.key, bIdx, editVal); setEditing(null); }}
-                          className="text-xs2 px-2 py-1 rounded-lg bg-brand-400 text-white hover:bg-brand-500"
-                        >저장</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                    <div className="flex gap-2 px-3 py-2">
-                      <p className="flex-1 text-base2 text-neutral-700 leading-relaxed whitespace-pre-wrap"><ElementText text={block.content} elements={elements} /></p>
-                      {!done && (
-                        <div className={clsx(
-                          'flex items-center gap-1 shrink-0 self-start transition-opacity',
-                          aiKey === `${section.key}-${bIdx}` ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100',
-                        )}>
-                          <AiEditButton
-                            active={aiKey === `${section.key}-${bIdx}`}
-                            onClick={() => setAiKey(k => k === `${section.key}-${bIdx}` ? null : `${section.key}-${bIdx}`)}
-                          />
-                          <button
-                            onClick={() => { setEditing({ sectionKey: section.key, blockIdx: bIdx }); setEditVal(block.content); }}
-                            data-spec="SPC-MID-011" title="직접 편집"
-                            className="h-6 w-6 inline-flex items-center justify-center rounded-lg text-neutral-400 hover:text-brand-500 hover:bg-brand-50 transition-colors"
-                          ><Icon name="edit" size={11} /></button>
-                          <button
-                            data-spec="SPC-MID-013" onClick={() => confirmDelete(`'${section.label}' 단락`, () => removeBlock(section.key, bIdx))}
-                            title="삭제"
-                            className="h-6 w-6 inline-flex items-center justify-center rounded-lg text-neutral-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                          >✕</button>
-                        </div>
-                      )}
-                    </div>
-                    {aiKey === `${section.key}-${bIdx}` && !done && (
-                      <div className="px-3 pb-2">
-                        <InlineAiEdit
-                          placeholder={`'${section.label}' 단락을 어떻게 수정할지 지시해주세요`}
-                          onClose={() => setAiKey(null)}
-                          original={block.content}
-                          label="중간명세서 단락"
-                          onApply={newText => updateBlock(section.key, bIdx, newText)}
-                          doneMsg="단락을 수정했습니다"
-                        />
-                      </div>
-                    )}
-                    </>
-                  )}
-                </div>
-              );
-            })}
-
-            {!done && (
-              <div className="flex gap-1.5">
-                <input
-                  value={newTexts[section.key] ?? ''}
-                  onChange={e => setNewTexts(p => ({ ...p, [section.key]: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && addBlock(section.key)}
-                  data-spec="SPC-MID-014" placeholder="단락 추가..."
-                  className="flex-1 text-xs2 px-2.5 py-1.5 border border-neutral-200 rounded-lg bg-neutral-50 focus:outline-none focus:border-brand-400 focus:bg-white"
-                />
-                <button
-                  onClick={() => addBlock(section.key)}
-                  disabled={!(newTexts[section.key] ?? '').trim()}
-                  className="px-2.5 py-1.5 text-xs2 text-brand-600 border border-brand-200 rounded-lg hover:bg-brand-50 disabled:opacity-40"
-                >추가</button>
-              </div>
-            )}
-          </div>
-        </div>
-      ))}
-
-      {/* 다음 동작 안내 — 실행 버튼은 하단 바 '명세서 생성 →' 하나로 (D3) */}
-      {!done && onGoToEditor && (
-        <p data-spec="SPC-MID-030" className="text-xs2 text-neutral-500 px-1">
-          편집을 마쳤으면 하단의 <b className="text-neutral-700">명세서 생성 →</b>을 누르세요. AI가 구성요소·도면·청구항을 기반으로 실시예를 포함한 명세서 초안을 만들고 에디터로 이동합니다.
-        </p>
-      )}
-    </div>
-  );
-}

@@ -1,5 +1,6 @@
 // src/features/spec/mockAiService.ts
 import { uid } from '../../utils/uid';
+import { particle } from '../../utils/korean';
 import type {
   InventionInput,
   InventionContext,
@@ -225,4 +226,30 @@ export const MOCK_EMBODIMENT: import('./types').SpecificationBlock[] = [
 
 export function mockPartialModify(selectedText: string, _instruction: string): string {
   return `[AI 수정] ${selectedText.slice(0, 30)}... → 수정된 내용이 여기에 표시됩니다.`
+}
+
+// ── 도면의 간단한 설명 생성 — API /v2/generate/specification/drawing-description 정합 목업 ──
+// 묶음 설명(GeneratedDrawingDescription.idxs 복수) 대응: 같은 분류(label)가 연속되면 한 문장으로 묶는다.
+// instruction은 API 요청 파라미터(추가 지시) — 목업에서는 생성 문장에 미반영(⚠).
+export function buildDrawingDescBlocks(specDrawings: Drawing[], instruction?: string): SpecificationBlock[] {
+  void instruction;   // API 요청 파라미터 — 목업 생성 문장에는 미반영
+  const groups: number[][] = [];
+  specDrawings.forEach((d, i) => {
+    const last = groups[groups.length - 1];
+    if (last && specDrawings[last[last.length - 1]].detail.label === d.detail.label) last.push(i);
+    else groups.push([i]);
+  });
+  return groups.map(idxs => {
+    if (idxs.length === 1) {
+      const i = idxs[0]; const d = specDrawings[i];
+      const fig = `도 ${i + 1}`;
+      const name = d.detail.name || '발명의 구성';
+      return tb(`${fig}${particle(fig, '은', '는')} ${name}${particle(name, '을', '를')} 나타낸 도면이다.${d.isRepresentative ? ' (대표도면)' : ''}`);
+    }
+    const figs = idxs.map(i => `도 ${i + 1}`).join(' 및 ');
+    const names = idxs.map(i => specDrawings[i].detail.name || '발명의 구성');
+    const nameList = names.slice(0, -1).join(', ') + `${particle(names[names.length - 2] ?? names[0], '과', '와')} ` + names[names.length - 1];
+    const rep = idxs.find(i => specDrawings[i].isRepresentative);
+    return tb(`${figs}${particle(`도 ${idxs[idxs.length - 1] + 1}`, '은', '는')} 각각 ${nameList}${particle(nameList, '을', '를')} 나타낸 도면이다.${rep !== undefined ? ` (도 ${rep + 1}: 대표도면)` : ''}`);
+  });
 }
