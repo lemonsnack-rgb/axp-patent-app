@@ -98,46 +98,42 @@ export function SpecView() {
   const handleSetMainView = (v: 'analysis' | 'editor') => setMainView(v);
   // ── 구성요소 명칭 전역 치환 (원천 = context.elements) ─────────────────────
   // 정의 지점(구성요소 단계)·인용 지점(에디터 하이라이트 클릭)이 같은 엔진을 쓴다. 텍스트 치환은 elementRename.ts.
+  // 치환 범위는 **청구항만** (2026-09-10 회의 결정). 발명 설명·중간명세서·에디터 본문은 건드리지 않는다 —
+  // 일반적인 단어일 때 다른 의미로 쓰인 곳까지 바뀔 위험이 있고, 청구항은 용어 선택이 고정적이라 오치환 위험이 낮다는 판단.
   const elementNames = () => context.elements.map(e => e.value_ko).filter(Boolean);
-  const collectRenameTargets = () => ({
-    desc: [...context.proposed, ...context.previous].map(i => i.content),
-    claims: [gSel['claims'] ?? '', confirmed['claims'] ?? ''],
-    midspec: (midspec ?? []).flatMap(sec => sec.blocks.map(b => b.content)),
-    editor: (Object.values((task?.id && loadSpecState(task.id)?.editorBlocks) ?? {}) as string[][]).flat(),
-  });
-  const countElementMentionsAll = (oldName: string) => {
-    const t = collectRenameTargets(); const names = elementNames();
-    const c = {
-      desc: countElementMentions(t.desc, oldName, names),
-      claims: countElementMentions(t.claims, oldName, names),
-      midspec: countElementMentions(t.midspec, oldName, names),
-      editor: countElementMentions(t.editor, oldName, names),
-    };
-    return { ...c, total: c.desc + c.claims + c.midspec + c.editor };
-  };
+  const claimRenameTargets = () => [
+    gSel['claims'] ?? '',
+    confirmed['claims'] ?? '',
+    ...(((task?.id && loadSpecState(task.id)?.editorBlocks?.claims) ?? []) as string[]),
+  ];
+  const countClaimMentions = (oldName: string) =>
+    countElementMentions(claimRenameTargets(), oldName, elementNames());
+
+  // 청구항 패널의 내부 상태(독립항 본문·종속항)는 로컬이라 부모에서 직접 못 고친다 — 치환 신호를 내려보내 반영시킨다
+  const [claimRenameSignal, setClaimRenameSignal] = useState<{ oldName: string; newName: string; names: string[]; seq: number } | null>(null);
+  const renameSeq = useRef(0);
+
   const renameElementEverywhere = (oldName: string, newName: string, opts?: { skipEditorBlocks?: boolean }) => {
     const names = elementNames();
     const R = (v: string) => replaceElementName(v, oldName, newName, names).text;
+    const mentions = countClaimMentions(oldName);
+    // 원천(구성요소 명칭)은 항상 갱신
     setContext(p => ({
       ...p,
-      title: R(p.title), summary: R(p.summary),
       elements: p.elements.map(e => e.value_ko === oldName ? { ...e, value_ko: newName } : e),
-      proposed: p.proposed.map(i => ({ ...i, content: R(i.content) })),
-      previous: p.previous.map(i => ({ ...i, content: R(i.content) })),
     }));
-    setMidspec(m => m ? m.map(sec => ({ ...sec, blocks: sec.blocks.map(b => ({ ...b, content: R(b.content) })) })) : m);
-    setGSel(g => Object.fromEntries(Object.entries(g).map(([k, v]) => [k, typeof v === 'string' ? R(v) : v])) as typeof g);
-    setConfirmed(c => Object.fromEntries(Object.entries(c).map(([k, v]) => [k, typeof v === 'string' ? R(v) : v])) as typeof c);
     setAiComponents(list => list.map(c => c.value_ko === oldName ? { ...c, value_ko: newName } : c));
+    // 인용 갱신은 청구항에 한정
+    setGSel(g => (typeof g.claims === 'string' ? { ...g, claims: R(g.claims) } : g));
+    setConfirmed(c => (typeof c.claims === 'string' ? { ...c, claims: R(c.claims) } : c));
+    setClaimRenameSignal({ oldName, newName, names, seq: ++renameSeq.current });
     if (!opts?.skipEditorBlocks && task?.id) {
       const saved = loadSpecState(task.id);
-      if (saved?.editorBlocks) {
-        const eb = Object.fromEntries(Object.entries(saved.editorBlocks).map(([k, arr]) => [k, (arr as string[]).map(R)]));
-        saveSpecState(task.id, { editorBlocks: eb });
+      if (saved?.editorBlocks?.claims) {
+        saveSpecState(task.id, { editorBlocks: { ...saved.editorBlocks, claims: (saved.editorBlocks.claims as string[]).map(R) } });
       }
     }
-    const c = countElementMentionsAll(oldName);
-    toast(c.total ? `'${oldName}' → '${newName}' — 본문 ${c.total}곳도 함께 바꿨습니다` : `'${oldName}' → '${newName}'로 바꿨습니다`);
+    toast(mentions ? `'${oldName}' → '${newName}' — 청구항 ${mentions}곳도 함께 바꿨습니다` : `'${oldName}' → '${newName}'로 바꿨습니다`);
   };
 
   // 명세서 초안 생성은 위저드가 아니라 에디터의 「초안 생성」에서 실행한다 (2026-09-10 회의 결정).
@@ -834,6 +830,7 @@ export function SpecView() {
                               <ClaimsPanel
                                 done={isDone}
                                 elements={context.elements}
+                                renameSignal={claimRenameSignal}
                                 onConfirm={() => confirm('claims')}
                                 onUpdate={v => setGSel(p => ({ ...p, claims: v }))}
                                 onActionChange={setStepAction}
@@ -3149,12 +3146,14 @@ function splitDepText(text: string, base: DepItemState, indepNum: number): Parti
 // 선택된 세트의 각 claim별 종속항 그룹 (key: claimIndex 숫자)
 type DepGroupsForSet = Record<number, DepGroupState>;
 
-function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] }: {
+function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [], renameSignal }: {
   done: boolean;
   onConfirm: () => void;
   onUpdate: (v: string) => void;
   onActionChange?: (a: StepAction | null) => void;   // 하단 바 주 동작 등록 (U1/D3)
   elements?: ElementLike[];                          // 구성요소 하이라이트용 원천
+  // 구성요소 명칭 치환 신호 — 회의 결정상 치환 대상이 청구항뿐이라, 이 패널의 로컬 상태를 여기서 갱신한다
+  renameSignal?: { oldName: string; newName: string; names: string[]; seq: number } | null;
 }) {
   const [claimsPhase, setClaimsPhase] = useState<'indep' | 'dep'>('indep');
   const [depInstr, setDepInstr] = useState('');   // 종속항 생성 지시사항 — API dependent-claim instruction (목업 미반영)
@@ -3291,6 +3290,34 @@ function ClaimsPanel({ done, onConfirm, onUpdate, onActionChange, elements = [] 
     setClaimsPhase('dep');
     syncUpdate(selectedSetIndex, nextMap);
   };
+
+  // 구성요소 명칭 치환 반영 — 독립항 본문·종속항 인용부/본문 모두 같은 엔진으로 바꾼다
+  const lastRenameSeq = useRef(0);
+  useEffect(() => {
+    if (!renameSignal || renameSignal.seq === lastRenameSeq.current) return;
+    lastRenameSeq.current = renameSignal.seq;
+    const { oldName, newName, names } = renameSignal;
+    const R = (v: string) => replaceElementName(v, oldName, newName, names).text;
+    // 편집 이력이 없는 항은 목업 원본을 읽어 쓰므로, 치환이 남으려면 모든 항을 확정 텍스트로 만들어 둔다
+    setClaimTexts(prev => {
+      const next: typeof prev = {};
+      claimSets.forEach((set, si2) => {
+        next[si2] = Object.fromEntries(set.claims.map((c, ci) => [ci, R(prev[si2]?.[ci] ?? c.value)]));
+      });
+      return next;
+    });
+    setDepGroupsMap(prev => {
+      const next: typeof prev = {};
+      Object.entries(prev).forEach(([si2, groups]) => {
+        next[Number(si2)] = Object.fromEntries(Object.entries(groups).map(([ci, grp]) => [
+          Number(ci),
+          { ...grp, items: grp.items.map(d => ({ ...d, body: R(d.body) })), newText: R(grp.newText) },
+        ]));
+      });
+      return next;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [renameSignal?.seq]);
 
   // 독립항 세트 생성 (mock) — 생성 후 세트 목록 첫 항목으로 스크롤
   const generateSets = () => {

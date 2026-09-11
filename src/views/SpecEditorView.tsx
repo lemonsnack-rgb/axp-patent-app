@@ -3,7 +3,7 @@
  * 블록 단위 편집 + 섹션 탭(앵커) + 우측 AI/도면/참고문헌 패널
  * absolute 없음 — 기존 사이드바/레이아웃 유지
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import katex from 'katex';
 import { Icon } from '../components/Icon';
@@ -98,6 +98,15 @@ const EDITOR_SECTIONS = [
   { id: 'abstract',               label: '요약',                              short: '요약' },       // A7: 요약서 (확정 개요 + 대표도)
 ] as const;
 type SectionId = typeof EDITOR_SECTIONS[number]['id'];
+
+// 앞 단계 확정값에서 파생되는 섹션 — 직접 편집도, AI 어시스턴트 수정 대상 지정도 막는다 (2026-09-10 회의 결정).
+// 뒤에서 정보가 들어가는 구조라 여기서 고치면 원천과 어긋난다.
+const DERIVED_SECTIONS: SectionId[] = ['title', 'reference_signs', 'abstract'];
+const DERIVED_SECTION_SOURCE: Partial<Record<SectionId, string>> = {
+  title:           '④ 명칭·요약에서 확정한 발명의 명칭입니다. 고치려면 발명 정보 단계에서 수정하세요.',
+  reference_signs: '⑤ 구성요소의 부호·명칭에서 자동으로 만들어집니다. 고치려면 발명 정보 단계에서 수정하세요.',
+  abstract:        '④ 명칭·요약의 개요와 대표도에서 자동으로 만들어집니다. 고치려면 발명 정보 단계에서 수정하세요.',
+};
 
 // ── 초안 생성 그룹 ──────────────────────────────────────────────────────────
 // API의 단계별 결과 조회 4종에 대응한다. 뒤 단계 호출에 앞 단계 결과를 함께 넘기는 구조라
@@ -619,6 +628,54 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
 
   // 활성 섹션 탭
   const [activeSec, setActiveSec] = useState<SectionId>('technical_field');
+  // 발명 정보 조회 패널 — 초안 생성 후에는 발명 정보 단계로 돌아갈 수 없으므로(2026-09-10 회의 1-5),
+  // 화면 이동 없이 본문 왼쪽을 밀어내며 여는 조회 전용 패널로 확정 내용을 보여 준다.
+  const [infoPanelOpen, setInfoPanelOpen] = useState(false);
+  // 패널 폭 — 기본은 에디터 영역의 1/3, 드래그로 조정하고 작업별로 기억한다
+  const INFO_MIN_W = 240, INFO_MAX_W = 720;
+  const infoRowRef = useRef<HTMLDivElement>(null);
+  const [infoPanelW, setInfoPanelW] = useState<number | null>(() => {
+    try { const v = localStorage.getItem('axp_infopanel_w'); return v ? Number(v) : null; } catch { return null }
+  });
+  const [infoResizing, setInfoResizing] = useState(false);
+  const startInfoResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setInfoResizing(true);
+    const left = infoRowRef.current?.getBoundingClientRect().left ?? 0;
+    const onMove = (ev: MouseEvent) => {
+      const w = Math.min(INFO_MAX_W, Math.max(INFO_MIN_W, ev.clientX - left));
+      setInfoPanelW(w);
+    };
+    const onUp = () => {
+      setInfoResizing(false);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      setInfoPanelW(w => { try { if (w != null) localStorage.setItem('axp_infopanel_w', String(w)); } catch { /* 저장 실패는 무시 */ } return w; });
+    };
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+  // 패널에 띄우는 확정 내용 — 발명 정보 단계에서 확정한 값(InventionContext)을 그대로 읽는다
+  const inventionInfoSections = useMemo(() => {
+    const els = context?.elements ?? [];
+    const specDrawings = (context?.drawings ?? []).filter(d => d.included !== false && d.useForSpec);
+    const repIdx = specDrawings.findIndex(d => d.isRepresentative);
+    const adopted = (arr?: { content: string; adopted?: boolean }[]) =>
+      (arr ?? []).filter(i => i.adopted !== false).map(i => i.content);
+    return [
+      { label: '발명의 명칭', items: [confirmedTitle || ''].filter(Boolean) },
+      { label: '요약', items: [(context?.summary ?? '').trim()].filter(Boolean) },
+      { label: '구성요소', items: els.map(e => `${e.symbol ? `${e.symbol} · ` : ''}${e.value_ko}${e.description ? ` — ${e.description}` : ''}`) },
+      { label: '명세서 도면', items: specDrawings.map((d, i) => `도 ${i + 1}${i === repIdx ? ' (대표도)' : ''}${d.detail.description ? ` — ${d.detail.description}` : ''}`) },
+      { label: '청구범위', items: (confirmedClaimsText ?? '').split(/\n{2,}/).map(s => s.trim()).filter(Boolean) },
+      { label: '제안기술', items: adopted(context?.proposed) },
+      { label: '종래기술', items: adopted(context?.previous) },
+    ];
+  }, [context, confirmedTitle, confirmedClaimsText]);
 
   // 모바일 AI 패널 오픈 상태
   const [mobileAiOpen, setMobileAiOpen] = useState(false);
@@ -739,6 +796,27 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
 
   const centerRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 파생 섹션(명칭·부호의 설명·요약)은 원천이 바뀌면 따라 갱신한다.
+  // 구성요소 부호를 고쳐도 「부호의 설명」이 진입 시점 값에 머물러 있던 문제 (2026-09-10 회의 액션 7).
+  // 편집이 막힌 섹션이라 사용자 입력을 덮어쓸 여지가 없다.
+  useEffect(() => {
+    setBlocks(prev => {
+      let changed = false;
+      const next = { ...prev };
+      for (const id of DERIVED_SECTIONS) {
+        const want = toBlocks(getInitialContent(id, effectiveTitle));
+        if ((prev[id] ?? []).join(' ') !== want.join(' ')) { next[id] = want; changed = true; }
+      }
+      if (!changed) return prev;
+      if (task?.id) {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() => saveSpecState(task.id, { editorBlocks: next as any }), 500);
+      }
+      return next;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveTitle, context]);
 
   // ── 블록 업데이트 (500ms debounce 자동저장) ──────────────────────────
   const updateBlock = (sid: SectionId, idx: number, text: string) => {
@@ -1010,6 +1088,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       const dashIdx = key.indexOf('-');
       const sid = key.slice(0, dashIdx) as SectionId;
       const idx = parseInt(key.slice(dashIdx + 1));
+      // 파생 섹션(명칭·부호의 설명·요약)은 어시스턴트 수정 대상에서 제외 (2026-09-10 회의 결정)
+      if (DERIVED_SECTIONS.includes(sid)) return;
       if (blocks[sid]?.[idx] !== undefined) refs.push({ sid, idx });
     });
 
@@ -1377,10 +1457,25 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       {/* 서브헤더 Row 2: 내비게이션 — [← 발명 정보] + 섹션 탭 (툴바는 편집 도구만, 이동은 이 줄에) */}
       <div data-spec="SPC-EDT-070" className="flex items-stretch border-b border-neutral-200 bg-white shrink-0">
         <div className="flex items-center pl-3 pr-2 shrink-0 border-r border-neutral-200 my-1.5">
-          <button onClick={onBack} data-spec="SPC-EDT-071" title="발명 정보 단계로 돌아갑니다 — 편집 내용은 저장됩니다"
-            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border border-brand-300 text-brand-600 text-xs2 font-semibold whitespace-nowrap hover:bg-brand-50 transition-colors">
-            ← 발명 정보
-          </button>
+          {/* 초안 생성 전에는 단계로 돌아가 고칠 수 있고, 생성 후에는 조회 패널만 연다 (회의 1-5) */}
+          {draftGenerated ? (
+            <button
+              onClick={() => setInfoPanelOpen(o => !o)}
+              data-spec="SPC-EDT-077"
+              aria-pressed={infoPanelOpen}
+              title="확정한 발명 정보를 옆에 펼쳐 봅니다 (조회 전용) — 초안을 만든 뒤에는 단계로 돌아갈 수 없습니다"
+              className={clsx(
+                'inline-flex items-center gap-1 h-7 px-2.5 rounded-md border text-xs2 font-semibold whitespace-nowrap transition-colors',
+                infoPanelOpen ? 'border-brand-400 bg-brand-50 text-brand-600' : 'border-brand-300 text-brand-600 hover:bg-brand-50',
+              )}>
+              {infoPanelOpen ? '◧ 발명 정보 닫기' : '◧ 발명 정보'}
+            </button>
+          ) : (
+            <button onClick={onBack} data-spec="SPC-EDT-071" title="발명 정보 단계로 돌아갑니다 — 편집 내용은 저장됩니다"
+              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border border-brand-300 text-brand-600 text-xs2 font-semibold whitespace-nowrap hover:bg-brand-50 transition-colors">
+              ← 발명 정보
+            </button>
+          )}
         </div>
       <div className="flex flex-1 min-w-0 overflow-x-auto scroll-thin [mask-image:linear-gradient(to_right,transparent_0,black_8px,black_calc(100%-32px),transparent_100%)]">
         {EDITOR_SECTIONS.map(s => (
@@ -1457,6 +1552,59 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
         </div>
       )}
 
+      {/* 본문 행 — 발명 정보 패널이 열리면 본문을 오른쪽으로 밀어낸다. 기본 1/3, 경계 드래그로 조정 */}
+      <div ref={infoRowRef} className="flex-1 flex overflow-hidden min-h-0">
+      {infoPanelOpen && (
+        <aside data-spec="SPC-EDT-078"
+          style={infoPanelW != null ? { width: infoPanelW } : undefined}
+          className={clsx(
+            'shrink-0 border-r border-neutral-200 bg-white flex flex-col overflow-hidden',
+            infoPanelW == null && 'w-1/3 min-w-[260px]',
+          )}>
+          <div className="flex items-center gap-2 px-3.5 py-2.5 border-b border-neutral-200 bg-neutral-50 shrink-0">
+            <span className="text-sm2 font-semibold text-neutral-800">발명 정보</span>
+            <span className="text-xs2 text-neutral-400">조회 전용</span>
+            <button onClick={() => setInfoPanelOpen(false)} title="닫기"
+              className="ml-auto w-6 h-6 inline-flex items-center justify-center rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors">✕</button>
+          </div>
+          <div className="flex-1 overflow-y-auto scroll-thin p-3.5 space-y-3.5">
+            {inventionInfoSections.map(sec => (
+              <div key={sec.label}>
+                <p className="text-xs2 font-semibold text-neutral-400 mb-1">{sec.label}</p>
+                {sec.items.length ? (
+                  <ul className="space-y-1">
+                    {sec.items.map((it, i) => (
+                      <li key={i} className="text-sm2 text-neutral-700 leading-relaxed rounded-md border border-neutral-200 bg-neutral-50/60 px-2.5 py-1.5 whitespace-pre-wrap">{it}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs2 text-neutral-300 px-2.5 py-1.5">—</p>
+                )}
+              </div>
+            ))}
+            <p className="text-xs2 text-neutral-400 pt-1 border-t border-neutral-100">
+              초안을 만든 뒤에는 발명 정보를 고칠 수 없습니다. 본문 수정은 에디터에서 진행하세요.
+            </p>
+          </div>
+        </aside>
+      )}
+      {/* 폭 조절 손잡이 — 드래그로 패널과 본문의 경계를 옮긴다 (더블클릭하면 기본 1/3로) */}
+      {infoPanelOpen && (
+        <div
+          data-spec="SPC-EDT-0781"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="발명 정보 패널 폭 조절"
+          title="드래그해 폭을 조절합니다 (더블클릭: 기본 폭)"
+          onMouseDown={startInfoResize}
+          onDoubleClick={() => { setInfoPanelW(null); try { localStorage.removeItem('axp_infopanel_w'); } catch { /* 무시 */ } }}
+          className={clsx(
+            'w-1.5 shrink-0 cursor-col-resize border-r border-neutral-200 transition-colors',
+            infoResizing ? 'bg-brand-400' : 'bg-neutral-100 hover:bg-brand-300',
+          )}
+        />
+      )}
+
       {/* 본문 — 전체 명세서 스크롤. 초안 생성 중에는 편집을 막는다 */}
       <div
           ref={centerRef}
@@ -1479,8 +1627,14 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             {/* 섹션별 단락 */}
             {EDITOR_SECTIONS.map(sec => (
               <div key={sec.id} data-section={sec.id} data-spec="SPC-EDT-080" className="mb-10">
-                <h2 className="text-lg2 font-semibold text-neutral-800 mb-3 mt-1">
+                <h2 className="text-lg2 font-semibold text-neutral-800 mb-3 mt-1 flex items-center gap-2">
                   {sec.label}
+                  {DERIVED_SECTIONS.includes(sec.id) && (
+                    <span data-spec="SPC-EDT-079" className="text-xs2 font-medium text-neutral-400 border border-neutral-200 rounded-md px-1.5 py-0.5"
+                      title={DERIVED_SECTION_SOURCE[sec.id]}>
+                      앞 단계 확정값 · 편집 불가
+                    </span>
+                  )}
                 </h2>
 
                 {/* 도면의 간단한 설명 섹션 — 도면 인라인 카드 */}
@@ -1564,24 +1718,28 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                 {sec.id !== 'claims' && (
                 <div className="space-y-2">
                   {blocks[sec.id].map((blockText, blockIdx) => {
-                    const isEditing = sel?.sid === sec.id && sel?.idx === blockIdx;
+                    const locked = DERIVED_SECTIONS.includes(sec.id);
+                    const isEditing = !locked && sel?.sid === sec.id && sel?.idx === blockIdx;
                     const isChecked = selSet.has(`${sec.id}-${blockIdx}`);
                     return (
                       <div
                         key={blockIdx}
-                        data-spec="SPC-EDT-082" onClick={() => { if (!isEditing) selectBlock(sec.id, blockIdx); }}
+                        data-spec="SPC-EDT-082" onClick={() => { if (!locked && !isEditing) selectBlock(sec.id, blockIdx); }}
+                        title={locked ? DERIVED_SECTION_SOURCE[sec.id] : undefined}
                         className={clsx(
-                          'group relative pl-8 pr-4 py-2.5 transition-all rounded-lg border',
-                          isEditing
+                          'group relative pr-4 py-2.5 transition-all rounded-lg border',
+                          locked ? 'pl-4 border-neutral-200 bg-neutral-50 cursor-default' : 'pl-8',
+                          !locked && (isEditing
                             ? 'border-brand-400 bg-white shadow-sm cursor-text'
                             : isChecked
                               ? 'border-brand-500 bg-brand-50 shadow-sm cursor-pointer'
                               : blockText.trim()
                                 ? 'border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-sm cursor-pointer'
-                                : 'border-dashed border-neutral-200 bg-white hover:border-neutral-300 cursor-pointer'
+                                : 'border-dashed border-neutral-200 bg-white hover:border-neutral-300 cursor-pointer'),
                         )}
                       >
-                        {/* 체크박스 — 상시 표시 (다중 선택용), 선택 시 강조 */}
+                        {/* 체크박스 — 상시 표시 (다중 선택용), 선택 시 강조. 파생 섹션은 AI 수정 대상에서 제외 */}
+                        {!locked && (
                         <div
                           onClick={e => toggleSelSet(sec.id, blockIdx, e)}
                           data-spec="SPC-EDT-081" title="여러 단락을 한번에 AI 수정하려면 체크하세요"
@@ -1594,8 +1752,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                         >
                           {isChecked && <Icon name="check" size={10} />}
                         </div>
+                        )}
                         {/* 단락 이동 (위/아래) */}
-                        {blocks[sec.id].length > 1 && (
+                        {!locked && blocks[sec.id].length > 1 && (
                           <div className="absolute top-1.5 right-7 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
                             <button
                               onClick={e => { e.stopPropagation(); moveBlock(sec.id, blockIdx, -1); }}
@@ -1612,7 +1771,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                           </div>
                         )}
                         {/* 단락 삭제 버튼 */}
-                        {blocks[sec.id].length > 1 && (
+                        {!locked && blocks[sec.id].length > 1 && (
                           <button
                             onClick={e => {
                               e.stopPropagation();
@@ -1675,7 +1834,8 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                     );
                   })}
 
-                  {/* 단락 추가 */}
+                  {/* 단락 추가 — 파생 섹션은 구성이 원천에서 정해지므로 제외 */}
+                  {!DERIVED_SECTIONS.includes(sec.id) && (
                   <button data-spec="SPC-EDT-085"
                     onClick={() => {
                       setUndoStack(p => [...p.slice(-20), blocks]);
@@ -1688,6 +1848,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                   >
                     + 단락 추가
                   </button>
+                  )}
                 </div>
                 )}
               </div>
@@ -1709,6 +1870,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             )}
           </div>
         </div>
+      </div>{/* 본문 행 끝 (발명 정보 패널 + 본문) */}
 
       </div>{/* 좌측 에디터 컬럼 끝 */}
 
