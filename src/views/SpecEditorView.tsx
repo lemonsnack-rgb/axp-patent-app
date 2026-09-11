@@ -456,24 +456,25 @@ function ProposalCard({ p, onAccept, onDecline, onRefine, onZoom }: {
 }
 
 // ── 요청 분석 진행 트리 (데모 SSE 진행 이벤트 정합) ─────────────────────────
+// 뎁스(작업 계층)는 표시하지 않는다 — 들여쓰기로 계층을 드러내고 완료 단계를 쌓아 보이면 AI 내부 구조가
+// 그대로 노출되는 느낌이라, **한 줄에 현재 라벨만 바뀌며 프로그레스처럼** 보이게 한다 (2026-09-10 회의 4절).
+// ProgressStep.depth는 SSE가 계속 내려주므로 타입·데이터는 그대로 두고 렌더에서만 쓰지 않는다.
 function ThinkingProgress({ steps, done }: { steps: ProgressStep[]; done: number }) {
+  const current = steps[Math.min(done, steps.length - 1)];
   return (
-    <div className="rounded-xl px-3 py-2 bg-neutral-100 border border-neutral-200">
-      <p className="text-xs2 font-semibold text-neutral-500 mb-1">요청 분석 중...</p>
-      <div className="space-y-0.5">
-        {steps.slice(0, done + 1).map((s, i) => {
-          const finished = i < done;
-          return (
-            <div key={i} className="flex items-center gap-1.5" style={{ paddingLeft: s.depth * 14 }}>
-              {finished ? (
-                <span className="text-emerald-600 text-xs2 shrink-0">✓</span>
-              ) : (
-                <span className="w-2.5 h-2.5 border-2 border-brand-400 border-t-transparent rounded-full animate-spin shrink-0 inline-block" />
-              )}
-              <span className={clsx('text-xs2', finished ? 'text-neutral-400' : 'text-brand-700 font-semibold')}>{s.label}</span>
-            </div>
-          );
-        })}
+    <div data-spec="SPC-AST-034" className="rounded-xl px-3 py-2 bg-neutral-100 border border-neutral-200">
+      <div className="flex items-center gap-1.5">
+        <span className="w-2.5 h-2.5 border-2 border-brand-400 border-t-transparent rounded-full animate-spin shrink-0 inline-block" />
+        <span className="text-xs2 text-brand-700 font-semibold" role="status" aria-live="polite">
+          {current?.label ?? '요청 분석 중'}
+        </span>
+      </div>
+      {/* 진행 바 — 단계 목록을 펼치지 않고 진척만 보여 준다 */}
+      <div className="mt-1.5 h-1 rounded-full bg-white border border-neutral-200 overflow-hidden">
+        <div
+          className="h-full bg-brand-400 transition-[width] duration-300"
+          style={{ width: `${steps.length ? (done / steps.length) * 100 : 0}%` }}
+        />
       </div>
     </div>
   );

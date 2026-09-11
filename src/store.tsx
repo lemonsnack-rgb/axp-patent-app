@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { Task, Project, Client, Contact, LibraryItem, LibraryCollection, AppMode, TaskType } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
+import { isRetentionExpired } from './utils/retention';
 
 // Storage 키 (기존 mockup과 호환)
 const K_TASKS    = 'axp_tasks_v1';
@@ -137,6 +138,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // 진입 시 디폴트 = 새 작업 (사용자 결정)
   // activeTaskId는 사이드바에서 task 클릭 시 설정됨
 
+  // 보관 기간(1년)이 지난 작업은 어떤 경로로도 열리지 않게 한다 — 사이드바 클릭 외에
+  // 프로그램 이동·재진입까지 한 곳에서 막기 위해 setter를 감싼다 (2026-09-11 사용자 확정)
+  const tasksRef = useRef<Task[]>(tasks);
+  useEffect(() => { tasksRef.current = tasks; }, [tasks]);
+  const openTask = useCallback((id: string | null) => {
+    if (id) {
+      const t = tasksRef.current.find(x => x.id === id);
+      if (t && isRetentionExpired(t)) return;   // 열지 않고 무시 — 안내는 호출부(사이드바 토스트)가 한다
+    }
+    setActiveTaskId(id);
+  }, []);
+
   // === search history ops ===
   const searchHistoryAdd = useCallback((kind: 'patent' | 'paper', query: string) => {
     const q = query.trim();
@@ -270,7 +283,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     mode, setMode,
     searchKind, setSearchKind,
     searchHistory, searchHistoryAdd, searchHistoryRemove, searchHistoryClear, searchHistoryTogglePin,
-    activeTaskId, setActiveTaskId,
+    activeTaskId, setActiveTaskId: openTask,
     activeProjectId, setActiveProjectId,
     bgPatentRef, setBgPatentRef,
     sidebarCollapsed, setSidebarCollapsed,
@@ -282,7 +295,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     library, libraryAdd, libraryRemove, libraryToggleFavorite, libraryUpdate,
     collections, collectionAdd, collectionUpdate, collectionRemove, collectionToggleFavorite, ensureUncategorized,
   }), [
-    mode, searchKind, searchHistory, activeTaskId, activeProjectId, bgPatentRef, sidebarCollapsed,
+    mode, searchKind, searchHistory, activeTaskId, openTask, activeProjectId, bgPatentRef, sidebarCollapsed,
     searchHistoryAdd, searchHistoryRemove, searchHistoryClear, searchHistoryTogglePin,
     tasks, projects, clients, contacts, library, collections,
     taskAdd, taskUpdate, taskRemove, taskToggleFavorite,

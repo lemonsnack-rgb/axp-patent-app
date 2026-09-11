@@ -8,6 +8,7 @@ import { QuickNameModal } from './QuickNameModal';
 import { EmptyState } from './EmptyState';
 import type { Task } from '../types';
 import { loadSpecState } from '../features/spec/specStore';
+import { isRetentionExpired, retentionLockReason } from '../utils/retention';
 
 // 명세서 작업의 진행 상태 배지 — 2단계로 단순화(사용자 결정 2026-08-31)
 // '명세서 생성완료' 기준 = 명세서 생성을 거쳐 에디터에 진입한 시점(명시적 이벤트). 그 전은 전부 '분석 중'.
@@ -123,6 +124,8 @@ export function Sidebar() {
                 t={t}
                 active={t.id === activeTaskId}
                 onSelect={() => {
+                  // 보관 기간이 지난 작업은 목록에 보이기만 하고 열지 않는다 (2026-09-11 사용자 확정)
+                  if (isRetentionExpired(t)) { toast(retentionLockReason(t)); return; }
                   if (t.type === 'patent_search' || t.type === 'paper_search') {
                     toast('준비 중입니다. 추후 오픈될 예정입니다.');
                     return;
@@ -130,7 +133,7 @@ export function Sidebar() {
                   setActiveTaskId(t.id);
                   setMode(t.type === 'spec' ? 'spec' : 'search');
                 }}
-                onToggleFav={() => taskToggleFavorite(t.id)}
+                onToggleFav={() => { if (isRetentionExpired(t)) { toast(retentionLockReason(t)); return; } taskToggleFavorite(t.id); }}
                 menuOpen={menuFor === t.id}
                 onMenuToggle={() => setMenuFor(menuFor === t.id ? null : t.id)}
                 onRename={() => { setRenameState({ open: true, taskId: t.id, current: t.name }); setMenuFor(null); }}
@@ -214,18 +217,27 @@ function TaskRow({ t, active, onSelect, onToggleFav, menuOpen, onMenuToggle, onR
     return () => document.removeEventListener('click', onClickOutside);
   }, [menuOpen, onMenuToggle]);
 
+  // 보관 기간(1년)이 지난 작업 — 목록에 남기되 열기·즐겨찾기·이름 변경·복제를 잠근다. 삭제만 허용
+  const expired = isRetentionExpired(t);
+  const lockReason = expired ? retentionLockReason(t) : undefined;
+
   return (
     <div
+      data-spec={expired ? 'SPC-NAV-031' : undefined}
+      aria-disabled={expired || undefined}
+      title={lockReason}
       className={clsx(
-        'group relative w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-left transition-all cursor-pointer',
-        active ? 'bg-blue-50' : 'hover:bg-zinc-50',
+        'group relative w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-left transition-all',
+        expired ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+        active ? 'bg-blue-50' : !expired && 'hover:bg-zinc-50',
       )}
       onClick={onSelect}
     >
       <span
         onClick={(e) => { e.stopPropagation(); onToggleFav(); }}
-        className={clsx('mt-0.5', t.favorite ? 'text-amber-500' : 'text-gray-300 hover:text-gray-500')}
-        title="즐겨찾기"
+        className={clsx('mt-0.5',
+          expired ? 'text-gray-300 cursor-not-allowed' : t.favorite ? 'text-amber-500' : 'text-gray-300 hover:text-gray-500')}
+        title={expired ? lockReason : '즐겨찾기'}
       >
         <Icon name={t.favorite ? 'star-filled' : 'star'} size={13} />
       </span>
@@ -247,7 +259,10 @@ function TaskRow({ t, active, onSelect, onToggleFav, menuOpen, onMenuToggle, onR
               ? <><span className="text-zinc-500 font-medium">{t.techField}</span> · {ago}</>
               : ago}
           </span>
-          {stage && (
+          {expired ? (
+            <span className="ml-auto shrink-0 px-1.5 py-px rounded font-medium bg-zinc-100 text-zinc-500"
+              data-spec="SPC-NAV-032" title={lockReason}>보관 종료</span>
+          ) : stage && (
             <span className={clsx('ml-auto shrink-0 px-1.5 py-px rounded font-medium',
               stage.tone === 'done' ? 'bg-green-50 text-green-700' : 'bg-brand-50 text-brand-600')} data-spec="SPC-WIZ-120" title={stage.title}>{stage.text}</span>
           )}
@@ -266,8 +281,10 @@ function TaskRow({ t, active, onSelect, onToggleFav, menuOpen, onMenuToggle, onR
           className="absolute right-2 top-9 z-20 bg-white border border-zinc-200 rounded-xl shadow-card-deep py-1 min-w-[140px]"
           onClick={e => e.stopPropagation()}
         >
-          <button onClick={onRename} className="w-full text-left px-3 py-1.5 text-md2 hover:bg-zinc-50 transition-colors">이름 변경</button>
-          <button onClick={onDuplicate} className="w-full text-left px-3 py-1.5 text-md2 hover:bg-zinc-50 transition-colors">복제</button>
+          <button onClick={onRename} disabled={expired} title={lockReason}
+            className="w-full text-left px-3 py-1.5 text-md2 hover:bg-zinc-50 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors">이름 변경</button>
+          <button onClick={onDuplicate} disabled={expired} title={lockReason}
+            className="w-full text-left px-3 py-1.5 text-md2 hover:bg-zinc-50 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors">복제</button>
           <div className="h-px bg-zinc-100 my-1" />
           <button onClick={onDelete} className="w-full text-left px-3 py-1.5 text-md2 hover:bg-red-50 text-red-600 transition-colors">삭제</button>
         </div>
