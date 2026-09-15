@@ -629,6 +629,12 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
 
   // 활성 섹션 탭
   const [activeSec, setActiveSec] = useState<SectionId>('technical_field');
+
+  // ── 도면 선택 (어시스턴트 대상) ─────────────────────────────────────────
+  // 도면을 골라 「도면의 간단한 설명」을 AI에 맡긴다. 바뀌는 건 설명 문장뿐이고 도면 이미지는 건드리지 않는다.
+  // 한 번에 최대 20개 (2026-09-15 사용자 확정) — 초과하면 확인 모달로 알린다.
+  const MAX_DRAWING_SEL = 20;
+  const [selDrawings, setSelDrawings] = useState<Set<number>>(new Set());
   // 발명 정보 조회 패널 — 초안 생성 후에는 발명 정보 단계로 돌아갈 수 없으므로(2026-09-10 회의 1-5),
   // 화면 이동 없이 본문 왼쪽을 밀어내며 여는 조회 전용 패널로 확정 내용을 보여 준다.
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
@@ -734,7 +740,9 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
   }, [chatInput]);
 
   // 도면 데이터 (drawing_descriptions 인라인 카드용)
-  const drawings = context?.drawings ?? [];
+  // 에디터가 다루는 도면 = **명세서 도면**(⑥에서 채택한 것)만. 설명 문장·도 번호·내보내기가 모두 이 기준이라
+  // 카드 그리드·도면 참조 메뉴도 같은 목록을 써야 도 번호가 어긋나지 않는다. 참고용 이미지는 발명 정보 패널에서 본다.
+  const drawings = (context?.drawings ?? []).filter(d => d.included !== false && d.useForSpec);
   // SpecView의 DRAWING_LABEL_MAP과 동일하게 유지 (같은 도면이 화면 이동 시 배지가 바뀌지 않도록)
   const DRAWING_LABEL_MAP: Record<string, string> = {
     proposed_implementation: '제안기술',
@@ -818,6 +826,48 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveTitle, context]);
+
+  // 도 N을 언급하는 설명 단락을 찾는다. 같은 분류가 연속된 도면은 한 단락으로 묶이므로
+  // (buildDrawingDescBlocks) 도면 하나를 골라도 대상은 그 도면이 들어 있는 **단락 통째로**가 된다.
+  // 블록 인덱스가 아니라 문장을 보고 찾기 때문에 사용자가 단락을 고치거나 추가해도 따라간다.
+  const descBlockIdxsForFigure = (figNo: number): number[] => {
+    const re = new RegExp(`도\\s*${figNo}(?!\\d)`);
+    return (blocks['drawing_descriptions'] ?? [])
+      .map((t, i) => (re.test(t) ? i : -1))
+      .filter(i => i >= 0);
+  };
+
+  /** 도면 선택을 AI 대상(selSet)에 반영 — 선택된 도면들이 덮는 설명 단락으로 다시 계산한다 */
+  const syncDrawingSelection = (nextDrawings: Set<number>) => {
+    const covered = new Set<number>();
+    nextDrawings.forEach(i => descBlockIdxsForFigure(i + 1).forEach(b => covered.add(b)));
+    setSelSet(prev => new Set([
+      ...[...prev].filter(k => !k.startsWith('drawing_descriptions-')),
+      ...[...covered].map(b => `drawing_descriptions-${b}`),
+    ]));
+  };
+
+  const toggleDrawingSel = (idx: number) => {
+    const next = new Set(selDrawings);
+    if (next.has(idx)) {
+      next.delete(idx);
+    } else {
+      if (next.size >= MAX_DRAWING_SEL) {
+        openAlertDialog(
+          {
+            title: '도면 선택 개수 초과',
+            description: `도면은 한 번에 최대 ${MAX_DRAWING_SEL}개까지 선택할 수 있습니다.\n선택을 일부 해제한 뒤 다시 골라 주세요.`,
+            confirm: '확인',
+          },
+          { theme: 'primary', onConfirm: (ctrl) => ctrl.close() },
+        );
+        return;
+      }
+      next.add(idx);
+    }
+    setSelDrawings(next);
+    syncDrawingSelection(next);
+  };
 
   // ── 블록 업데이트 (500ms debounce 자동저장) ──────────────────────────
   const updateBlock = (sid: SectionId, idx: number, text: string) => {
@@ -1020,6 +1070,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     setActiveSec(sid);
     // 클릭한 단락을 AI 대상(selSet)으로도 단일 설정 → 직접 편집 + AI 요청이 같은 선택 공유
     setSelSet(new Set([`${sid}-${idx}`]));
+    setSelDrawings(new Set());   // 단락을 직접 고르면 도면 선택은 해제 — 대상이 두 갈래로 갈리지 않게
   };
 
   // ── 단락 삭제 (확인 후) — 실행 취소 스택에 저장 ─────────────────────────
@@ -1177,6 +1228,20 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
   // 플랜 진행 중이면 새 입력 차단 (개발노트: 진행 중 입력 막기)
   const planRunning = chatMessages.some(m => m.plan?.status === 'running');
 
+  // 단락 추가 행에서 부른 경우 — 그 섹션 맨 뒤에 넣는다 (툴바에서 부르면 선택 단락 뒤)
+  const [addTargetSec, setAddTargetSec] = useState<SectionId | null>(null);
+
+  /** 단락 추가 행의 3종 버튼 — 단락·표·수식을 그 섹션 맨 뒤에 추가한다 (데모 .para-add-row 정합) */
+  const addBlockOfType = (sid: SectionId, type: 'text' | 'table' | 'equation') => {
+    if (type === 'table') { setAddTargetSec(sid); setTableModal(true); return; }
+    setUndoStack(p => [...p.slice(-20), blocks]);
+    setRedoStack([]);
+    const newIdx = blocks[sid].length;
+    setBlocks(p => ({ ...p, [sid]: [...p[sid], ''] }));   // 빈 단락은 입력 시점에 저장
+    // 수식은 빈 단락을 만든 뒤 그 자리에 넣는다 (insertFormula가 선택 단락에 쓰므로)
+    setTimeout(() => { selectBlock(sid, newIdx); if (type === 'equation') setFormulaModal(true); }, 50);
+  };
+
   // ── 표 삽입 ─────────────────────────────────────────────────────────────
   const insertTable = () => {
     const cols = 3;
@@ -1184,12 +1249,12 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
     const sep = Array(cols).fill('---').join(' | ');
     const row = Array(cols).fill('내용').join(' | ');
     const tbl = `${header}\n${sep}\n${Array(tableRows).fill(row).join('\n')}`;
-    const sid = sel?.sid ?? activeSec;
+    const sid = addTargetSec ?? sel?.sid ?? activeSec;
     setUndoStack(p => [...p.slice(-20), blocks]);
     setRedoStack([]);
     setBlocks(p => {
       const arr = [...p[sid]];
-      const at = sel?.sid === sid ? sel.idx + 1 : arr.length;
+      const at = !addTargetSec && sel?.sid === sid ? sel.idx + 1 : arr.length;
       arr.splice(at, 0, tbl);
       const updated = { ...p, [sid]: arr };
       if (task?.id) {
@@ -1199,6 +1264,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
       return updated;
     });
     setTableModal(false);
+    setAddTargetSec(null);
   };
 
   // ── 수식 삽입 ($...$ 또는 $$...$$) ────────────────────────────────────
@@ -1624,16 +1690,38 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
             }
           }}
         >
-          <div className="max-w-3xl mx-auto py-6 px-8">
+          {/* 문서 틀 — 회색 배경 위에 종이 한 장(노션 스타일, 데모 #ed-doc 정합).
+              블록이 배경에 흩어져 보이지 않게 흰 카드 안쪽에 넣고 행간을 넓게 준다. */}
+          <div data-spec="SPC-EDT-105" className="max-w-[820px] mx-auto my-6 bg-white border border-neutral-200 rounded-xl px-11 py-9 leading-[1.8]">
+            {/* 문서 제목 — 확정한 발명의 명칭 */}
+            <div className="text-[17px] font-extrabold text-neutral-900 border-b-2 border-brand-400 pb-2.5 mb-4 leading-snug">
+              {effectiveTitle || '특허 명세서'}
+            </div>
             {/* 섹션별 단락 */}
             {EDITOR_SECTIONS.map(sec => (
-              <div key={sec.id} data-section={sec.id} data-spec="SPC-EDT-080" className="mb-10">
-                <h2 className="text-lg2 font-semibold text-neutral-800 mb-3 mt-1 flex items-center gap-2">
-                  {sec.label}
+              <div key={sec.id} data-section={sec.id} data-spec="SPC-EDT-080" className="mb-6">
+                {/* 섹션 제목 — 특허 명세서 표기대로 【 】로 감싼다 (데모·미리보기·DOCX 내보내기와 같은 형식) */}
+                <h2 className="text-sm2 font-bold text-neutral-800 mt-6 mb-2.5 flex items-center gap-2 leading-normal">
+                  【{sec.label}】
                   {DERIVED_SECTIONS.includes(sec.id) && (
                     <span data-spec="SPC-EDT-079" className="text-xs2 font-medium text-neutral-400 border border-neutral-200 rounded-md px-1.5 py-0.5"
                       title={DERIVED_SECTION_SOURCE[sec.id]}>
                       앞 단계 확정값 · 편집 불가
+                    </span>
+                  )}
+                  {/* 도면 선택 카운터 — 상한이 있다는 걸 미리 알 수 있게 항상 띄운다 */}
+                  {sec.id === 'drawing_descriptions' && drawings.length > 0 && (
+                    <span data-spec="SPC-EDT-104"
+                      title={`한 번에 최대 ${MAX_DRAWING_SEL}개까지 선택할 수 있습니다`}
+                      className={clsx(
+                        'ml-auto text-xs2 font-medium rounded-md px-1.5 py-0.5 border tabular-nums',
+                        selDrawings.size >= MAX_DRAWING_SEL
+                          ? 'border-amber-300 bg-amber-50 text-amber-700'
+                          : selDrawings.size > 0
+                            ? 'border-brand-200 bg-brand-50 text-brand-600'
+                            : 'border-neutral-200 text-neutral-400',
+                      )}>
+                      선택된 도면 {selDrawings.size}개 / {MAX_DRAWING_SEL}개
                     </span>
                   )}
                 </h2>
@@ -1641,11 +1729,42 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                 {/* 도면의 간단한 설명 섹션 — 도면 인라인 카드 */}
                 {sec.id === 'drawing_descriptions' && drawings.length > 0 && (
                   <div className="mb-6">
+                    {/* 선택 시 안내 — 바뀌는 건 설명 문장뿐이라는 것을 분명히 한다 */}
+                    {selDrawings.size > 0 && (
+                      <div data-spec="SPC-EDT-103" className="mb-3 flex items-start gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2">
+                        <span className="text-brand-500 shrink-0 mt-px" aria-hidden="true">ⓘ</span>
+                        <p className="text-xs2 text-neutral-700 leading-relaxed">
+                          선택한 도면의 <b className="text-neutral-900">간단한 설명(문장)만</b> 바뀝니다. <b className="text-neutral-900">도면 이미지는 수정되지 않습니다</b> —
+                          도면 자체를 고치려면 카드의 <b className="text-neutral-900">도면 편집기 ↗</b>를 여세요.
+                          <br />
+                          같은 분류가 연속된 도면은 설명이 한 문장으로 묶여 있어, 함께 묶인 도면의 설명도 같이 바뀔 수 있습니다.
+                        </p>
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 gap-4 mb-3">
                       {drawings.map((d, idx) => {
                         const labelKo = DRAWING_LABEL_MAP[d.detail.label] ?? 'AI생성';
+                        const picked = selDrawings.has(idx);
                         return (
-                          <div key={idx} className="rounded-xl border overflow-hidden bg-white shadow-sm border-neutral-200">
+                          <div key={idx}
+                            data-spec="SPC-EDT-102"
+                            onClick={() => toggleDrawingSel(idx)}
+                            title={picked ? '선택 해제' : '이 도면의 간단한 설명을 AI 수정 대상으로 선택'}
+                            className={clsx(
+                              'relative rounded-xl border overflow-hidden bg-white shadow-sm cursor-pointer transition-all',
+                              picked ? 'border-brand-500 ring-2 ring-brand-200' : 'border-neutral-200 hover:border-brand-300',
+                            )}>
+                            {/* 선택 체크박스 */}
+                            <div
+                              onClick={e => { e.stopPropagation(); toggleDrawingSel(idx); }}
+                              className={clsx(
+                                'absolute left-2 top-2 z-10 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all',
+                                picked ? 'bg-brand-400 border-brand-400 text-white' : 'border-neutral-400 bg-white/90 hover:border-brand-400',
+                              )}
+                              role="checkbox" aria-checked={picked} aria-label={`도 ${idx + 1} 선택`}
+                            >
+                              {picked && <Icon name="check" size={10} />}
+                            </div>
                             {/* 이미지 영역 */}
                             <div className="relative aspect-[4/3] bg-neutral-100 border-b border-neutral-200 flex flex-col items-center justify-center gap-1 overflow-hidden">
                               {d.image.file.data ? (
@@ -1681,7 +1800,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                             {/* 도면 수정모드(새 탭) — 참조 삽입은 본문 툴바의 '도면 참조'로 이동 */}
                             <div className="border-t border-neutral-100 px-3 py-1.5 flex items-center justify-end">
                               <button
-                                onClick={() => openEditorTab({ taskId: task?.id, drawingId: String(idx), drawings: drawings.map(toWorkflowDrawingItem), components: [], references: [], drawingName: d.detail.name, timestamp: Date.now() })}
+                                onClick={e => { e.stopPropagation(); openEditorTab({ taskId: task?.id, drawingId: String(idx), drawings: drawings.map(toWorkflowDrawingItem), components: [], references: [], drawingName: d.detail.name, timestamp: Date.now() }); }}
                                 data-spec="SPC-EDT-100" title="도면 편집기를 새 탭에서 엽니다 (범위 조정·CAD 변환)"
                                 className="inline-flex items-center gap-0.5 h-7 px-2 rounded-md text-xs2 font-semibold text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 transition-colors shrink-0"
                               >도면 편집기 <span className="text-xs2">↗</span></button>
@@ -1728,15 +1847,15 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                         data-spec="SPC-EDT-082" onClick={() => { if (!locked && !isEditing) selectBlock(sec.id, blockIdx); }}
                         title={locked ? DERIVED_SECTION_SOURCE[sec.id] : undefined}
                         className={clsx(
-                          'group relative pr-4 py-2.5 transition-all rounded-lg border',
-                          locked ? 'pl-4 border-neutral-200 bg-neutral-50 cursor-default' : 'pl-8',
+                          'group relative pr-9 py-2 my-1 transition-colors rounded-lg border text-[13.5px]',
+                          locked ? 'pl-3 border-neutral-200 bg-neutral-50 cursor-default' : 'pl-7',
                           !locked && (isEditing
-                            ? 'border-brand-400 bg-white shadow-sm cursor-text'
+                            ? 'border-brand-400 bg-brand-50/40 cursor-text'
                             : isChecked
-                              ? 'border-brand-500 bg-brand-50 shadow-sm cursor-pointer'
+                              ? 'border-brand-500 bg-brand-50 cursor-pointer'
                               : blockText.trim()
-                                ? 'border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-sm cursor-pointer'
-                                : 'border-dashed border-neutral-200 bg-white hover:border-neutral-300 cursor-pointer'),
+                                ? 'border-neutral-200 bg-white hover:bg-neutral-50 cursor-pointer'
+                                : 'border-dashed border-neutral-200 bg-white hover:bg-neutral-50 cursor-pointer'),
                         )}
                       >
                         {/* 체크박스 — 상시 표시 (다중 선택용), 선택 시 강조. 파생 섹션은 AI 수정 대상에서 제외 */}
@@ -1745,13 +1864,13 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                           onClick={e => toggleSelSet(sec.id, blockIdx, e)}
                           data-spec="SPC-EDT-081" title="여러 단락을 한번에 AI 수정하려면 체크하세요"
                           className={clsx(
-                            'absolute left-2 top-2.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer shrink-0',
+                            'absolute left-2 top-2.5 w-3.5 h-3.5 rounded border-[1.5px] flex items-center justify-center transition-all cursor-pointer shrink-0',
                             isChecked
                               ? 'bg-brand-400 border-brand-400 text-white'
-                              : 'border-neutral-400 bg-white opacity-90 group-hover:opacity-100 group-hover:border-brand-400'
+                              : 'border-neutral-300 bg-white group-hover:border-brand-400'
                           )}
                         >
-                          {isChecked && <Icon name="check" size={10} />}
+                          {isChecked && <Icon name="check" size={8} />}
                         </div>
                         )}
                         {/* 단락 이동 (위/아래) */}
@@ -1793,7 +1912,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                         {isEditing ? (
                           <>
                           <textarea
-                            className="w-full text-base2 text-neutral-800 bg-transparent outline-none border-0 resize-none leading-relaxed overflow-hidden py-1.5 px-3"
+                            className="w-full text-[13.5px] text-neutral-800 bg-transparent outline-none border-0 resize-none leading-[1.8] overflow-hidden py-0 px-0"
                             value={blockText}
                             autoFocus
                             rows={Math.max(2, Math.ceil(blockText.length / 55))}
@@ -1817,13 +1936,13 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                           )}
                           </>
                         ) : isMarkdownTable(blockText) ? (
-                          <div className="py-1.5 px-3 overflow-x-auto"><MarkdownTable text={blockText} /></div>
+                          <div className="overflow-x-auto"><MarkdownTable text={blockText} /></div>
                         ) : blockText.includes('$') ? (
-                          <p className="text-base2 leading-relaxed text-neutral-800 py-1.5 px-3"
+                          <p className="text-[13.5px] leading-[1.8] text-neutral-800"
                             dangerouslySetInnerHTML={{ __html: renderBlockWithTeX(blockText) }} />
                         ) : (
                           <p className={clsx(
-                            'text-base2 leading-relaxed whitespace-pre-wrap py-1.5 px-3',
+                            'text-[13.5px] leading-[1.8] whitespace-pre-wrap',
                             blockText.trim() ? 'text-neutral-800' : 'text-neutral-400 italic'
                           )}>
                             {blockText.trim()
@@ -1835,20 +1954,25 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                     );
                   })}
 
-                  {/* 단락 추가 — 파생 섹션은 구성이 원천에서 정해지므로 제외 */}
+                  {/* 단락 추가 행 — 가운데 정렬 점선 (데모 .para-add-row 정합).
+                      파생 섹션은 구성이 원천에서 정해지므로 제외. 표·수식은 본문 툴바에서 넣는다 */}
                   {!DERIVED_SECTIONS.includes(sec.id) && (
-                  <button data-spec="SPC-EDT-085"
-                    onClick={() => {
-                      setUndoStack(p => [...p.slice(-20), blocks]);
-                      setRedoStack([]);
-                      const newIdx = blocks[sec.id].length;
-                      setBlocks(p => ({ ...p, [sec.id]: [...p[sec.id], ''] }));  // 빈 단락은 입력 시점에 저장
-                      setTimeout(() => selectBlock(sec.id, newIdx), 50);
-                    }}
-                    className="w-full justify-center flex items-center h-8 px-2.5 text-xs2 text-neutral-400 hover:text-brand-500 border border-dashed border-neutral-200 rounded-lg hover:border-brand-300 hover:bg-brand-50/40 transition-colors"
-                  >
-                    + 단락 추가
-                  </button>
+                  <div data-spec="SPC-EDT-085" className="flex justify-center gap-6 border border-dashed border-neutral-200 rounded-lg py-1.5 mt-1.5 mb-0.5">
+                    <button onClick={() => addBlockOfType(sec.id, 'text')}
+                      className="text-xs2 text-neutral-400 hover:text-brand-500 px-1.5 py-0.5 transition-colors">
+                      T&nbsp; 단락 추가
+                    </button>
+                    {ENABLE_TABLE_INSERT && (
+                      <button onClick={() => addBlockOfType(sec.id, 'table')}
+                        className="text-xs2 text-neutral-400 hover:text-brand-500 px-1.5 py-0.5 transition-colors">
+                        ⊞&nbsp; 표 추가
+                      </button>
+                    )}
+                    <button onClick={() => addBlockOfType(sec.id, 'equation')}
+                      className="text-xs2 text-neutral-400 hover:text-brand-500 px-1.5 py-0.5 transition-colors">
+                      ∑&nbsp; 수식 추가
+                    </button>
+                  </div>
                   )}
                 </div>
                 )}
@@ -1946,7 +2070,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                     <span className="text-xs2 font-semibold text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded-md">
                       선택 중 · {secLabel} {idx + 1}
                     </span>
-                    <button onClick={() => setSelSet(new Set())} className="text-xs2 text-neutral-400 hover:text-neutral-600 transition-colors">
+                    <button onClick={() => { setSelSet(new Set()); setSelDrawings(new Set()); }} className="text-xs2 text-neutral-400 hover:text-neutral-600 transition-colors">
                       선택 해제
                     </button>
                   </div>
@@ -1965,7 +2089,7 @@ export function SpecEditorView({ task, onBack, confirmedTitle, midspec, context,
                   <span className="text-xs2 font-semibold text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded-md">
                     편집 명령 대상 · {selSet.size}개
                   </span>
-                  <button onClick={() => setSelSet(new Set())} className="text-xs2 text-neutral-400 hover:text-neutral-600 transition-colors">
+                  <button onClick={() => { setSelSet(new Set()); setSelDrawings(new Set()); }} className="text-xs2 text-neutral-400 hover:text-neutral-600 transition-colors">
                     선택 해제
                   </button>
                 </div>
